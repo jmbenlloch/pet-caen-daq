@@ -10,7 +10,7 @@ This roadmap orders discovery and risk reduction. It does not commit to dates.
 - Add the Buf module, lint, breaking-change, and generation configuration.
 - Decide monorepo build commands and generated-code policy.
 - Define the initial protobuf API and configuration units.
-- Record ADRs for native protocol ownership, storage format, and telemetry transport.
+- Record the remaining ADR for storage format; native protocol ownership and version-one telemetry transport are decided.
 
 Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 
@@ -32,6 +32,7 @@ Exit criterion: a Go test can perform a complete simulated test-pulse run and de
 
 - Implement the acquisition state machine and bounded event pipeline.
 - Define and generate ConnectRPC contracts.
+- Implement snapshot-based ConnectRPC telemetry streaming, sequence/staleness handling, and browser reconnection tests.
 - Implement configuration validation, run control, health, and telemetry services.
 - Persist run metadata and raw data with crash/incomplete-run handling.
 - Add integration, cancellation, disconnect, and recovery tests.
@@ -69,5 +70,6 @@ Exit criterion: acceptance criteria on the real system pass with retained eviden
 
 - Which processed storage format best fits downstream analysis?
 - What authentication boundary and deployment environment are required?
+- What measured scale or pub/sub requirement would justify introducing Centrifugo after version one?
 - After version one, is there sufficient need and a supported interface to automate DT5215 web provisioning?
 - What throughput, run duration, retention, and acceptable event-loss requirements apply?

@@ -10,6 +10,8 @@ CI must run `buf lint`, verify generated files are current, and run `buf breakin
 
 ConnectRPC unary methods suit commands and snapshots. Server streams suit state/telemetry updates where supported by the deployment path. Design reconnect semantics: a client that reconnects must obtain a complete snapshot before applying incremental updates.
 
+For version one, use the core Connect-Web streaming API for telemetry. Do not assume a unary query abstraction provides streaming support. Keep telemetry payload frequency and size bounded, and aggregate high-rate detector activity before it reaches the API.
+
 ## Configuration
 
 - Every physical value must include a documented unit.

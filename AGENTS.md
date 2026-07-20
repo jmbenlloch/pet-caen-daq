@@ -10,6 +10,7 @@ Build a reliable, observable, testable DAQ for four CAEN DT5202 boards behind a 
 
 - Backend: Go.
 - API: Protocol Buffers and ConnectRPC, managed with Buf. The `.proto` definitions are the contract and must not be duplicated manually in Go or TypeScript.
+- Version-one telemetry: ConnectRPC server streaming with snapshot-based reconnect behavior. Do not add Centrifugo unless a later ADR establishes a concrete scaling or pub/sub requirement.
 - Frontend: Vue.js with TypeScript and Tailwind CSS.
 - Frontend integration and browser end-to-end tests: Playwright.
 - Hardware development: a simulator must support development and CI without physical CAEN hardware.
@@ -89,6 +90,7 @@ Tests and documentation must not silently upgrade an inference to a verified fac
 - Use structured logging with run ID, device, chain, node, operation, and error fields where applicable.
 - Never log credentials or unrestricted event payloads by default.
 - Frontend code must be TypeScript, accessible, and resilient to reconnects and stale state.
+- Telemetry updates must be independently usable snapshots or explicitly versioned state. The frontend must replace state from the first snapshot after reconnect and detect stale streams.
 - Use Playwright for frontend integration tests that exercise browser behavior or cross the frontend/backend boundary. Keep lower-level component and composable tests in the frontend unit-test runner.
 - Generated protobuf/Connect files must be reproducible and must not be hand-edited.
 - Use Buf for protobuf linting, breaking-change detection, dependency management, and code generation. Do not invoke language-specific protobuf generators through parallel ad hoc scripts.

@@ -103,6 +103,14 @@ Exposes coarse operations rather than register-level UI coupling. Initial servic
 
 Raw register access should be a separately controlled diagnostic API, not part of the normal operator workflow.
 
+### Telemetry transport
+
+Version one uses a ConnectRPC server-streaming method for live telemetry. Run-control and configuration commands remain unary RPCs. The stream carries operationally bounded, aggregated snapshots rather than raw detector events.
+
+Each connection and reconnection begins with a complete system snapshot. Updates include an instance identity, run identity, monotonically increasing sequence, observation time, acquisition state, and board/system telemetry. The frontend treats the backend as authoritative, replaces its state from a new initial snapshot, and marks telemetry stale when the expected update interval is exceeded.
+
+The backend keeps telemetry production behind an internal publisher/subscriber boundary so transport concerns do not enter hardware or acquisition packages. Centrifugo is deferred. It may be introduced by a later ADR if the project develops requirements for substantial fan-out, multiple publishers/consumer applications, recoverable pub/sub history, presence, dynamic channels, or independent horizontal scaling.
+
 ## Frontend components
 
 The Vue application is a stateless client of the backend except for ephemeral presentation state. It should provide:
