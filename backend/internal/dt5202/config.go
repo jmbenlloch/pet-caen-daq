@@ -21,6 +21,7 @@ type RegisterWrite struct {
 type ConfigurationPlan struct {
 	Board    int
 	Writes   []RegisterWrite
+	Citiroc  [2]CitirocChip
 	Deferred []string
 }
 
@@ -266,6 +267,18 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if values["TestPulseSource"].Value == "OFF" {
 		tpAmp = 0
 	}
+	fastShaper, err := choice("FastShaperInput", map[string]uint32{"HG-PA": 0, "LG-PA": 1})
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	hvRange, err := choice("HV_Adjust_Range", map[string]uint32{"2.5": 0, "4.5": 1, "DISABLED": 2})
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	hvAdjustment, err := u32("HV_IndivAdj", 8)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
 
 	plan := ConfigurationPlan{Board: board, Writes: []RegisterWrite{
 		{ChannelMaskLow, mask0}, {ChannelMaskHigh, mask1}, {AcquisitionControl, acqControl},
@@ -295,11 +308,21 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	var citirocChannels [ChannelCount]CitirocChannel
 	for ch := uint8(0); ch < ChannelCount; ch++ {
+		hvValue := uint32(0x100 | hvAdjustment)
+		if hvRange == 2 {
+			hvValue = 0x1ff
+		}
 		plan.Writes = append(plan.Writes,
 			RegisterWrite{IndividualRegister(LowGain, ch), lg}, RegisterWrite{IndividualRegister(HighGain, ch), hg},
-			RegisterWrite{IndividualRegister(ChargeFineThreshold, ch), qfine}, RegisterWrite{IndividualRegister(TimeFineThreshold, ch), tfine})
+			RegisterWrite{IndividualRegister(ChargeFineThreshold, ch), qfine}, RegisterWrite{IndividualRegister(TimeFineThreshold, ch), tfine},
+			RegisterWrite{IndividualRegister(HVIndividualAdjustment, ch), hvValue})
+		citirocChannels[ch] = CitirocChannel{TimeFineThreshold: uint8(tfine), ChargeFineThreshold: uint8(qfine), HVAdjustment: uint16(hvValue), HighGain: uint8(hg), LowGain: uint8(lg)}
 	}
-	plan.Deferred = []string{"HV_Vbias", "HV_Imax", "HV_Adjust_Range", "HV_IndivAdj", "TempSensType", "TempFeedbackCoeff", "EnableTempFeedback", "FastShaperInput", "Pedestal", "ZS_Threshold_LG", "ZS_Threshold_HG", "AnalogProbe0", "DigitalProbe0", "ProbeChannel0", "AnalogProbe1", "DigitalProbe1", "ProbeChannel1", "TestPulseDestination", "TestPulsePreamp"}
+	common := CitirocCommon{DiscriminatorMask: qdMask0, LowShapingTime: uint8(lgShape), HighShapingTime: uint8(hgShape), ChargeCoarseThreshold: uint16(qd), TimeCoarseThreshold: uint16(td), FastShaperOnLowGain: fastShaper != 0, InputDACReference45V: hvRange != 0, PeakSensingExternalTrigger: true, OTAForceOn: true, NegativeTriggerPolarity: true}
+	plan.Citiroc = SplitCitirocChannels(citirocChannels, common)
+	plan.Citiroc[1].Common.DiscriminatorMask = qdMask1
+	plan.Deferred = []string{"HV_Vbias", "HV_Imax", "TempSensType", "TempFeedbackCoeff", "EnableTempFeedback", "Pedestal", "ZS_Threshold_LG", "ZS_Threshold_HG", "AnalogProbe0", "DigitalProbe0", "ProbeChannel0", "AnalogProbe1", "DigitalProbe1", "ProbeChannel1", "TestPulseDestination", "TestPulsePreamp"}
 	return plan, nil
 }

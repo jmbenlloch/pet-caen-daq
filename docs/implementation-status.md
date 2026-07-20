@@ -105,4 +105,15 @@ This map intentionally excludes registers belonging only to other FERS board fam
 
 The production configuration's complete 103-assignment document is also covered by an explicit semantic-owner catalog. Unknown or misspelled settings now fail classification with their source line instead of being silently ignored. Ownership does not yet imply implementation: hardware translation, run-control, storage, and analysis consumers must each prove requested-versus-effective behavior before configuration coverage is complete.
 
-The production DT5202 FPGA subset now has a pure configuration planner. It applies global values followed by per-board overrides, performs strict option/unit/range parsing, and emits ordered effective register writes using the 8 ns DT5202 clock. The production fixture yields 285 writes per board, including 64-channel gains and fine discriminator thresholds, with distinct effective timing thresholds of 181, 183, 179, and 178. Plans can compare their final requested values with a register readback snapshot and diagnose exact missing or mismatched addresses. Settings requiring Citiroc bitstreams, pedestal calibration reads, probe sequencing, or HV peripheral commands remain explicitly deferred in each plan.
+The production DT5202 FPGA subset now has a pure configuration planner. It applies global values followed by per-board overrides, performs strict option/unit/range parsing, and emits ordered effective register writes using the 8 ns DT5202 clock. The production fixture yields 349 writes per board, including 64-channel gains, fine discriminator thresholds, and HV adjustments, with distinct effective timing thresholds of 181, 183, 179, and 178. Plans can compare their final requested values with a register readback snapshot and diagnose exact missing or mismatched addresses. Settings requiring pedestal calibration reads, probe sequencing, or HV peripheral commands remain explicitly deferred in each plan.
+
+## Phase 1 Citiroc layout and automatic loading
+
+Implemented on 2026-07-20:
+
+- a bounded 1,144-bit/36-word Citiroc stream type with the bundled source's exact bit and word ordering;
+- placement for both chips' fine time/charge thresholds, nine-bit HV adjustment, six-bit HG/LG gains, calibration flags, preamplifier disable, discriminator mask, shaping, coarse thresholds, and every documented common control bit;
+- explicit mapping of board channels 0--31 to Citiroc 0 and 32--63 to Citiroc 1; and
+- the source-confirmed normal FPGA-assisted ASIC configuration sequence for both chips, including fail-fast error propagation.
+
+The production planner populates both chip representations with its effective 64-channel gains, fine thresholds, HV adjustments, shaping selections, discriminator thresholds/mask, fast-shaper source, and source-hardcoded common modes. The bundled host implementation delegates automatic stream synthesis to FPGA firmware, so it cannot provide a host-generated 36-word golden image. Layout comparisons use its `WriteCStoFileFormatted` field boundaries and the official Citiroc 1A slow-control table. Manual stream loading remains intentionally unavailable until all power-control values have explicit requested/default provenance; normal hardware configuration continues using FPGA-assisted loading.

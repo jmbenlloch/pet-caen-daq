@@ -148,6 +148,10 @@ These are accessed with `CWRG`/`CRRG`, not board `WREG`/`RREG`. Particularly rel
 
 This is important: setting gains is not just one register write. Values participate in construction of the Citiroc bitstream. A replacement that bypasses FERSlib must port the `SetCitiroc`/slow-control bit placement exactly.
 
+The project-owned Citiroc representation is now implemented in `backend/internal/dt5202/citiroc.go`. It uses the same least-significant-bit-first word convention as `ReadSCbsFromFile`, covers all 1,144 positions documented by the bundled `WriteCStoFileFormatted`, and maps board channels 0--31 to chip 0 and 32--63 to chip 1. The 15-bit channel preamplifier field is source-confirmed against the official Citiroc 1A datasheet: six HG-gain bits, six LG-gain bits, HG/LG calibration enables, and preamplifier disable.
+
+Normal JANUS configuration does not construct or upload these words on the host. FPGA firmware builds the stream from the DT5202 configuration registers. The source-confirmed production command sequence is therefore a write of `a_scbs_ctrl=0`, `CMD_CFG_ASIC`, a write of `a_scbs_ctrl=0x200`, and a second `CMD_CFG_ASIC`. The Go implementation follows that sequence. Explicit stream construction is retained for golden comparison and future manual loading, but must not be presented as a production manual-load image until every power-control value has been requested or deliberately defaulted.
+
 The user configuration vocabulary and units are completely represented by `Config_t` in `FERS_config.h`, parsing in `FERS_paramparser.c`, and the example/definition files under `bin/`. `FERS_LoadConfigFile`, `FERS_SetParam`, `FERS_GetParam`, and `FERS_configure` are suitable first-version APIs even if JANUS itself is not used.
 
 ## Run-control sequence for this topology

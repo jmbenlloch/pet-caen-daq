@@ -25,7 +25,7 @@ func TestPlanProductionConfiguration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("board %d: %v", board, err)
 		}
-		if got, want := len(plan.Writes), 29+4*ChannelCount; got != want {
+		if got, want := len(plan.Writes), 29+5*ChannelCount; got != want {
 			t.Fatalf("board %d writes = %d, want %d", board, got, want)
 		}
 		writes := make(map[Register]uint32)
@@ -38,6 +38,7 @@ func TestPlanProductionConfiguration(t *testing.T) {
 			DwellTime: 125000, TriggerLogicDefinition: 0x404, TimeCoarseThreshold: wantTD[board],
 			ChargeCoarseThreshold: 250, LowGainShapingTime: 0, HighGainShapingTime: 0,
 			IndividualRegister(LowGain, 63): 55, IndividualRegister(HighGain, 63): 55,
+			IndividualRegister(HVIndividualAdjustment, 63): 0x100,
 		}
 		for address, want := range checks {
 			if got := writes[address]; got != want {
@@ -46,6 +47,21 @@ func TestPlanProductionConfiguration(t *testing.T) {
 		}
 		if len(plan.Deferred) == 0 {
 			t.Fatalf("board %d has no explicit deferred settings", board)
+		}
+		for chip := range 2 {
+			stream, err := plan.Citiroc[chip].Stream()
+			if err != nil {
+				t.Fatalf("board %d chip %d: %v", board, chip, err)
+			}
+			for _, check := range []struct {
+				start, width int
+				want         uint32
+			}{{0, 4, 0}, {128, 4, 0}, {331, 9, 0x100}, {619, 6, 55}, {625, 6, 55}, {1107, 10, 250}, {1117, 10, wantTD[board]}} {
+				got, err := stream.Field(check.start, check.width)
+				if err != nil || got != check.want {
+					t.Errorf("board %d chip %d field %d = %d, %v; want %d", board, chip, check.start, got, err, check.want)
+				}
+			}
 		}
 	}
 }
