@@ -104,7 +104,7 @@ Important command values from `FERS_Registers_520X.h`:
 | `0x1e` / `0x1f` | select internal / external clock |
 | `0x20` | load/configure Citiroc ASIC |
 
-The complete register map is already machine-readable in `FERS_Registers_520X.h`. Key addresses include acquisition control `0x01000000`, run mask `0x01000004`, trigger mask `0x01000008`, time-reference mask `0x0100000c`, validation mask `0x01000010`, veto mask `0x0100001c`, dwell time `0x01000050`, channel masks `0x01000100/104`, Citiroc controls beginning at `0x01000108`, test pulse at `0x01000200/204`, status `0x01000304`, temperatures/monitoring in the `0x010003xx` region, PID `0x01000400`, and per-channel/broadcast spaces described below.
+The project-owned DT5202 register and command map is implemented in `backend/internal/dt5202/registers.go`, source-confirmed against `FERS_Registers_520X.h`. It includes all common and DT5202-specific FPGA addresses used by the bundled implementation, acquisition-status flags, command values, and the per-channel/broadcast address conversion. Firmware-family-specific DT5203, DT5204, picoTDC, flash-layout, and I2C peripheral sub-registers are deliberately outside the DT5202 map.
 
 Per-channel address conversion is:
 

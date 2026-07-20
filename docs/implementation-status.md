@@ -92,3 +92,13 @@ Implemented on 2026-07-20:
 - a complete simulator-backed persisted run integration test that produces four decoded events plus four raw batches, finalizes the manifest, removes the incomplete marker, and deterministically replays every raw event.
 
 This completes the initial Phase 1 test-pulse vertical slice for the currently implemented spectroscopy/timing path. It is intentionally a bounded one-pulse coordinator, not the Phase 2 long-running acquisition state machine. Remaining Phase 1 protocol breadth includes production configuration/Citiroc translation, other DT5202 event qualifiers, and simulator drain/fault modes.
+
+## Phase 1 DT5202 register vocabulary
+
+Implemented on 2026-07-20:
+
+- a project-owned typed map of every common and DT5202-specific FPGA register used by the bundled JANUS/FERSlib implementation;
+- typed definitions for all DT5202 commands and acquisition-status flags; and
+- source-confirmed individual-channel and broadcast-address conversion with byte-exact tests.
+
+This map intentionally excludes registers belonging only to other FERS board families and peripheral-internal sub-register spaces. Production configuration translation and Citiroc stream construction build on this vocabulary and remain incomplete.
