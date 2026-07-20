@@ -36,6 +36,8 @@ ConnectRPC unary methods suit commands and snapshots. Server streams suit state/
 - Build reusable accessible components; keyboard operation and readable error/status presentation are required.
 - Tailwind classes should express the design system consistently. Avoid arbitrary values when a shared token is appropriate.
 - Unit-test stores, composables, validation, and complex components; use browser tests for operator workflows.
+- Use Playwright for browser integration and end-to-end tests. Prefer user-visible roles, labels, and behavior over CSS selectors or implementation details.
+- Run Playwright against controlled backend/simulator states. Tests must not depend on arbitrary sleeps; wait for observable UI or API conditions.
 
 ## Data handling
 

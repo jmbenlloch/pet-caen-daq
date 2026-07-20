@@ -38,9 +38,12 @@ Test ConnectRPC handlers over an actual in-process or containerized HTTP server,
 ### Frontend tests
 
 - Component tests use generated/client abstractions with controlled responses.
-- End-to-end browser tests run the built frontend against the backend plus simulator.
+- Playwright is the required framework for frontend integration and browser end-to-end tests.
+- Playwright integration tests run the built frontend against controlled backend or simulator behavior; full end-to-end tests run against the backend plus hardware simulator.
 - Critical workflow: connect, inspect topology, validate/apply configuration, start a run, observe telemetry, stop, drain, and inspect the completed run.
 - Failure workflow: disconnect/stale telemetry, configuration rejection, hardware fault, stop timeout, and browser reconnect.
+- Browser tests use accessible locators and event/state-based waits rather than styling selectors or fixed delays.
+- CI retains Playwright traces, screenshots, and videos on failure according to the eventual retention policy.
 
 ### Storage/replay tests
 
@@ -70,7 +73,7 @@ The eventual CI pipeline should require:
 - unit and fuzz smoke tests;
 - backend/simulator integration tests;
 - frontend build and component tests;
-- selected browser end-to-end tests;
+- Playwright frontend integration and selected browser end-to-end tests;
 - race detection for relevant Go packages;
 - vulnerability and dependency checks;
 - reproducible container builds.

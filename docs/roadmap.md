@@ -5,7 +5,7 @@ This roadmap orders discovery and risk reduction. It does not commit to dates.
 ## Phase 0: repository and decisions
 
 - Establish project guidance and protocol evidence notes.
-- Select pinned Go, Node, Vue, Tailwind, ConnectRPC, Buf CLI/plugin, and test-tool versions.
+- Select pinned Go, Node, Vue, Tailwind, ConnectRPC, Buf CLI/plugin, Playwright, and unit-test tool versions.
 - Add the Buf module, lint, breaking-change, and generation configuration.
 - Decide monorepo build commands and generated-code policy.
 - Define the initial protobuf API and configuration units.
@@ -38,7 +38,7 @@ Exit criterion: generated clients can operate complete simulated runs and inspec
 
 - Build topology/status, configuration, run control, monitoring, fault, and run-history views.
 - Implement reconnect and stale-state behavior.
-- Add component and end-to-end tests against backend plus simulator.
+- Add unit/component tests and Playwright integration/end-to-end tests against the backend plus simulator.
 
 Exit criterion: an operator can safely complete and inspect simulated runs from a browser.
 
