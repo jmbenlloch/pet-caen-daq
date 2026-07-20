@@ -9,7 +9,7 @@ This roadmap orders discovery and risk reduction. It does not commit to dates.
 - Add the Buf module, lint, breaking-change, and generation configuration.
 - Decide monorepo build commands and generated-code policy.
 - Define the initial protobuf API and configuration units.
-- Record ADRs for FERSlib integration, storage format, and telemetry transport.
+- Record ADRs for native protocol ownership, storage format, and telemetry transport.
 
 Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 
@@ -17,6 +17,7 @@ Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 
 - Implement byte-level DT5215 slow-control types with golden tests.
 - Implement descriptor-table and DT5202 event decoders with unit/fuzz tests.
+- Port the complete DT5202 register/configuration and Citiroc bitstream behavior into project-owned Go code.
 - Implement a deterministic TCP simulator for one concentrator and four boards.
 - Implement discovery, enumeration, synchronization, and minimal register access against the simulator.
 - Add raw capture/replay fixtures.
@@ -62,7 +63,6 @@ Exit criterion: acceptance criteria on the real system pass with retained eviden
 
 ## Deferred questions
 
-- Use FERSlib through cgo initially, implement native Go immediately, or support both behind one interface?
 - Which processed storage format best fits downstream analysis?
 - What authentication boundary and deployment environment are required?
 - Is DT5215 web provisioning a documented manual prerequisite, or should its private HTTP behavior eventually be automated?

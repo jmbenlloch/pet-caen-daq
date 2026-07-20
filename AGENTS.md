@@ -13,6 +13,7 @@ Build a reliable, observable, testable DAQ for four CAEN DT5202 boards behind a 
 - Frontend: Vue.js with TypeScript and Tailwind CSS.
 - Hardware development: a simulator must support development and CI without physical CAEN hardware.
 - Deployment and reproducible tooling may use Docker and Docker Compose.
+- Hardware access: implement the DT5215/DT5202 binary protocol natively in Go. Production code must not link to or call FERSlib.
 
 Do not replace these technologies without an explicit architecture decision approved by the user.
 
@@ -47,6 +48,8 @@ Keep these responsibilities separate:
 
 The production backend and simulator must share protocol types or conformance fixtures, but the simulator must not be called from production hardware code.
 
+FERSlib and JANUS are reference implementations and comparison oracles only. Do not introduce cgo bindings, dynamic loading, subprocess wrappers, or runtime fallbacks that call FERSlib.
+
 ## Hardware safety
 
 - Default new tools to read-only behavior.
@@ -76,6 +79,7 @@ Tests and documentation must not silently upgrade an inference to a verified fac
 - Carry `context.Context` through blocking Go operations and define deadlines intentionally.
 - TCP is a byte stream: implement full-write and exact-read behavior; never assume one `Read` or `Write` maps to one protocol message.
 - Define byte order explicitly and test it with golden bytes.
+- Keep wire encoders/decoders independent of FERSlib data structures. Translate protocol bytes into project-owned immutable types.
 - Model acquisition as an explicit state machine. Reject invalid transitions.
 - Use bounded queues and state the backpressure/overflow policy.
 - Use structured logging with run ID, device, chain, node, operation, and error fields where applicable.

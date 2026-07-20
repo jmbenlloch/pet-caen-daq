@@ -9,7 +9,7 @@ Status: initial design constraints, not yet an implementation specification.
 - Support normal development and CI without hardware.
 - Preserve raw data for later replay and protocol verification.
 - Give operators clear state, diagnostics, and safe controls through a browser.
-- Permit later replacement of FERSlib or a native protocol implementation without rewriting acquisition policy or the UI API.
+- Keep native protocol details isolated so acquisition policy and the UI API do not depend on wire-format implementation details.
 
 ## Non-goals for the first milestone
 
@@ -52,7 +52,7 @@ Encodes slow-control requests and parses replies, chain information, descriptor 
 
 ### DT5202 device and decoder
 
-Owns register names/fields, command codes, configuration translation, Citiroc configuration, and typed event decoding. Initially this boundary may wrap FERSlib; a native implementation must satisfy the same behavioral tests.
+Owns project-maintained register names/fields, command codes, configuration translation, Citiroc configuration, and typed event decoding. It is implemented natively in Go and must be checked against source-derived vectors, simulator conformance tests, real packet captures, and hardware results.
 
 ### Acquisition coordinator
 
@@ -114,14 +114,19 @@ The simulator should listen on the same DT5215 TCP ports and reproduce observabl
 
 The simulator is a test double, not the protocol authority. Golden captures from real hardware supersede simulator assumptions.
 
-## FERSlib integration decision still open
+## Native hardware implementation
 
-Two backend implementations can share a higher-level hardware interface:
+The production backend implements the DT5215/DT5202 protocol directly in Go. It does not call or link FERSlib. This includes:
 
-- a FERSlib adapter, quickest for real-hardware parity;
-- a native Go DT5215/DT5202 implementation, easier to test and deploy once capture-validated.
+- DT5215 TCP control and streaming transports;
+- slow-control command/reply encoding;
+- chain discovery, enumeration, reset, and synchronization;
+- DT5202 register access and complete configuration translation;
+- Citiroc slow-control bitstream construction;
+- acquisition sequencing and stream framing;
+- all required DT5202 event decoders.
 
-The first implementation milestone should prove the interfaces and simulator before committing to complete native Citiroc/configuration parity. This decision must receive an ADR after a focused prototype.
+The bundled FERSlib/JANUS source remains valuable evidence and an offline comparison oracle. Tests may compare native results with recorded FERSlib/JANUS outputs, but builds, deployment images, and normal runtime behavior must not depend on the library.
 
 ## Cross-cutting requirements
 

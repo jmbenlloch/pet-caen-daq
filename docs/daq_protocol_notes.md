@@ -6,10 +6,7 @@ Status: repository study, 2026-07-20. This note records what is directly support
 
 The information missing from the public manuals is present in the source distribution bundled with JANUS 5.0.0. In particular, `janus/Janus_5202_5.0.0_20260713_linux/ferslib/src/FERS_LLtdl.c` constructs every DT5215 slow-control request byte by byte, `FERS_readout.c` parses the concentrator stream and DT5202 events, and `FERS_configure_5202.c` translates acquisition settings into register writes and the Citiroc configuration bitstream.
 
-There are two realistic implementation paths:
-
-1. Use the included FERSlib as the hardware-access layer and build a new DAQ above its C API. This is the fastest and least risky route for a first implementation.
-2. Reimplement the transport and decoding from the included source. This is feasible: the TCP commands, register map, start/stop sequence, concentrator framing, and event decoding are all visible. It carries more firmware-version compatibility risk.
+The project decision is to implement the transport, protocol, configuration, acquisition sequencing, and decoding natively in Go. FERSlib will not be a runtime dependency. Its included source is reference evidence and may be used as a comparison oracle while developing tests.
 
 The DT5215's USB-C connection is a USB Ethernet gadget, not the direct-DT5202 USB bulk protocol implemented in `FERS_LLusb.cpp`. On Linux the manual gives the concentrator gadget address as `172.16.1.11` (Windows: `172.16.0.11`). FERSlib opens ordinary TCP sockets to that address.
 
@@ -287,6 +284,6 @@ These are the next study steps, before architecture selection:
 
 ## Practical conclusion for later architecture work
 
-No binary reverse engineering is necessary to begin. The lowest-risk first milestone is a headless acquisition prototype linked to the included FERSlib, using its parameter/configuration and event APIs while independently owning run metadata, storage, monitoring, and operator control. In parallel, golden packet captures and raw fixtures can support a clean transport/parser implementation later if dependency removal is a product requirement.
+No disassembly-based binary reverse engineering is necessary to begin because the relevant FERSlib source is available. The first milestone will implement a native Go transport/parser against the deterministic simulator and source-derived golden vectors. Real packet captures and hardware tests will then validate and correct the implementation before production use.
 
 The included FERSlib carries LGPL notices while JANUS carries GPL/LGPL files; exact obligations depend on how the eventual product links, modifies, and distributes these components. Treat licensing as a design input and obtain appropriate legal review rather than assuming the source can simply be copied into a proprietary product.
