@@ -21,6 +21,22 @@ Status: initial design constraints, not yet an implementation specification.
 
 These may be added later without placing their assumptions into the initial core.
 
+## Version-one provisioning boundary
+
+Before the DAQ starts, an operator provisions persistent DT5215 link activation through the concentrator web interface. The expected production topology is:
+
+```text
+chain 0: enabled, one DT5202 at node 0
+chain 1: enabled, one DT5202 at node 0
+chain 2: enabled, one DT5202 at node 0
+chain 3: enabled, one DT5202 at node 0
+chains 4-7: disabled
+```
+
+The backend does not write `VR_ENABLED_LINKS` and does not call or reproduce the private web interface. At startup it queries chain status, enumerates enabled chains, and verifies the observed topology. A mismatch blocks configuration/acquisition and produces an actionable provisioning error.
+
+Runtime operations such as `CCNT`, `ENUM`, `RLNK`, and `SNT0` remain backend responsibilities. They control, enumerate, reset, and synchronize links that have already been enabled; they do not replace persistent web provisioning.
+
 ## Context
 
 ```text

@@ -15,6 +15,7 @@ Build a reliable, observable, testable DAQ for four CAEN DT5202 boards behind a 
 - Hardware development: a simulator must support development and CI without physical CAEN hardware.
 - Deployment and reproducible tooling may use Docker and Docker Compose.
 - Hardware access: implement the DT5215/DT5202 binary protocol natively in Go. Production code must not link to or call FERSlib.
+- Version-one provisioning: operators enable DT5215 TDlinks through its web interface before starting the DAQ. The DAQ validates that provisioning but does not change persistent link enablement.
 
 Do not replace these technologies without an explicit architecture decision approved by the user.
 
@@ -57,6 +58,7 @@ FERSlib and JANUS are reference implementations and comparison oracles only. Do 
 - Treat reset, firmware update, HV changes, acquisition start, and register writes as state-changing operations.
 - Require explicit configuration and clear logging for HV or firmware operations.
 - Do not experiment with undocumented writes on real hardware without user approval and a recovery plan.
+- Do not write `VR_ENABLED_LINKS` or automate the DT5215 private web interface in version one. Report provisioning mismatches with instructions to use the web interface.
 - On shutdown or error, attempt an orderly acquisition stop and drain while preserving the original error.
 - Never discard raw bytes solely because decoding failed. Record the failure and retain evidence when configured to capture raw data.
 

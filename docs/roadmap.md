@@ -21,6 +21,7 @@ Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 - Port the complete DT5202 register/configuration and Citiroc bitstream behavior into project-owned Go code.
 - Implement a deterministic TCP simulator for one concentrator and four boards.
 - Implement discovery, enumeration, synchronization, and minimal register access against the simulator.
+- Validate the provisioned four-link/one-node topology and return actionable errors without attempting persistent link activation.
 - Add raw capture/replay fixtures.
 
 Exit criterion: a Go test can perform a complete simulated test-pulse run and deterministically reproduce decoded events.
@@ -66,5 +67,5 @@ Exit criterion: acceptance criteria on the real system pass with retained eviden
 
 - Which processed storage format best fits downstream analysis?
 - What authentication boundary and deployment environment are required?
-- Is DT5215 web provisioning a documented manual prerequisite, or should its private HTTP behavior eventually be automated?
+- After version one, is there sufficient need and a supported interface to automate DT5215 web provisioning?
 - What throughput, run duration, retention, and acceptable event-loss requirements apply?

@@ -47,7 +47,7 @@ DT5215 concentrator
 
 JANUS connection paths described by the DT5215 manual are `usb:IP:tdl:x:y` or `eth:IP:tdl:x:y`, where `x` is chain and `y` is node. In FERSlib, both ultimately use the IP address with `LLtdl_OpenDevice`; the `usb`/`eth` prefix describes the host-to-concentrator physical interface. The production configuration establishes the intended topology as four separate links—chains 0, 1, 2, and 3—with one board at node 0 on each. Runtime enumeration must still verify that topology rather than assume it.
 
-DT5215 web configuration remains relevant before DAQ startup. The manual explicitly warns that an enabled but physically unconnected TDlink can hang the concentrator, that only connected links should be enabled, and that enabled links must be sequential starting at link 0.
+DT5215 web configuration remains relevant before DAQ startup. Version one explicitly requires operators to enable persistent TDlinks through that interface. The DAQ validates but does not modify link enablement and must not write `VR_ENABLED_LINKS`. The manual warns that an enabled but physically unconnected TDlink can hang the concentrator, that only connected links should be enabled, and that enabled links must be sequential starting at link 0.
 
 ## Byte order and transport assumptions
 
@@ -268,7 +268,7 @@ Still requiring validation or a vendor clarification:
 - precise unused/reserved descriptor bits and the packet-ID field not consumed by the current decoder;
 - exact `VERS`/`RBIC` response layout across concentrator firmware versions;
 - compatibility matrix for FERSlib 5.0.0, DT5215 firmware `2026.4.1.1`, DT5202 FPGA `8.0_A707`, and PIC firmware `2026.5.28.3`;
-- whether web-interface link enablement has an authenticated HTTP API worth automating, or should remain a provisioning step;
+- whether CAEN exposes a supported authenticated API for web-interface provisioning; this is explicitly outside version one;
 - behavior after cable loss, concentrator reboot, partial TCP writes/reads, CRC errors, and a board disappearing mid-run.
 
 ## Recommended evidence-gathering experiments
