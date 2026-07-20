@@ -12,6 +12,8 @@ The planned system has:
 
 This repository is currently in its documentation and architecture-definition phase. No production implementation has been selected or scaffolded yet.
 
+Project workflows will use [Task](https://taskfile.dev/docs/installation) through a root `Taskfile.yml`. Until implementation scaffolding begins, installation follows the official Task documentation; the project version will be pinned when the initial toolchain is selected.
+
 ## Start here
 
 - [Project instructions](AGENTS.md)

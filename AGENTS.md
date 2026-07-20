@@ -14,6 +14,7 @@ Build a reliable, observable, testable DAQ for four CAEN DT5202 boards behind a 
 - Frontend integration and browser end-to-end tests: Playwright.
 - Hardware development: a simulator must support development and CI without physical CAEN hardware.
 - Deployment and reproducible tooling may use Docker and Docker Compose.
+- Command runner: Task. Normal developer and CI workflows must be exposed through the root `Taskfile.yml`.
 - Hardware access: implement the DT5215/DT5202 binary protocol natively in Go. Production code must not link to or call FERSlib.
 - Version-one provisioning: operators enable DT5215 TDlinks through its web interface before starting the DAQ. The DAQ validates that provisioning but does not change persistent link enablement.
 
@@ -91,6 +92,8 @@ Tests and documentation must not silently upgrade an inference to a verified fac
 - Use Playwright for frontend integration tests that exercise browser behavior or cross the frontend/backend boundary. Keep lower-level component and composable tests in the frontend unit-test runner.
 - Generated protobuf/Connect files must be reproducible and must not be hand-edited.
 - Use Buf for protobuf linting, breaking-change detection, dependency management, and code generation. Do not invoke language-specific protobuf generators through parallel ad hoc scripts.
+- Use `task <name>` as the documented entry point for generation, formatting, linting, tests, builds, simulator workflows, and local development. Underlying native commands may remain directly usable for focused debugging, but CI and project documentation must call the Task targets.
+- Keep Task targets non-interactive by default, composable, and consistent between local development and CI. Destructive, hardware, or long-running targets must be explicit and clearly named.
 
 ## Test requirements
 

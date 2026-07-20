@@ -68,6 +68,24 @@ Logs complement metrics and must contain actionable context, not duplicate every
 - Commit generated API code only if the chosen build/consumer workflow requires it; whichever policy is selected must be consistent and checked in CI.
 - Docker images should be multi-stage, run as non-root, and contain only runtime requirements.
 
+## Command runner
+
+Task is the single project-level command runner. A root `Taskfile.yml` will provide stable commands for contributors and CI while delegating to Go, Buf, frontend package, Playwright, Docker, and other native tools.
+
+Target naming should be predictable. The initial public surface is expected to include:
+
+- `task setup` or `task tools` for pinned project tooling;
+- `task generate` for Buf and other generated artifacts;
+- `task format`, `task lint`, and `task test` for repository-wide checks;
+- `task test:unit`, `task test:integration`, `task test:e2e`, and `task test:hardware` for explicit layers;
+- `task build` for all deliverables;
+- `task dev` for the normal backend/frontend/simulator development environment;
+- `task ci` for the exact required local equivalent of CI.
+
+Leaf Taskfiles may be included from component directories as the repository grows, but the root targets remain the supported interface. Tasks must propagate failures, avoid hidden host mutations, and use dependency/status mechanisms only when their correctness is clear. Hardware-in-the-loop and destructive maintenance tasks must never be dependencies of ordinary `test` or `ci` targets.
+
+The Task CLI version and any CI installer/action reference must be pinned. Contributors may install Task using an official method described by the Task project; repository automation must not silently install an unpinned latest version.
+
 ## Change discipline
 
 Keep commits conceptually focused. Include tests and documentation with the behavior they describe. Do not mix bulk formatting or generated-code churn with unrelated logic changes.
