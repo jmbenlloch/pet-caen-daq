@@ -23,6 +23,7 @@ Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 - Implement discovery, enumeration, synchronization, and minimal register access against the simulator.
 - Validate the provisioned four-link/one-node topology and return actionable errors without attempting persistent link activation.
 - Add raw capture/replay fixtures.
+- Implement and test a JANUS processed-list format 3.4 reader against the production Run 54 prefix for compatibility and cross-checking.
 
 Exit criterion: a Go test can perform a complete simulated test-pulse run and deterministically reproduce decoded events.
 

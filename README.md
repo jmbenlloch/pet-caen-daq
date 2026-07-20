@@ -20,6 +20,7 @@ This repository is currently in its documentation and architecture-definition ph
 - [Testing strategy](docs/testing-strategy.md)
 - [Protocol evidence and hardware notes](docs/daq_protocol_notes.md)
 - [Production JANUS fixture provenance](test/fixtures/janus/README.md)
+- [Production Run 54 replay fixture](test/fixtures/runs/run54/README.md)
 - [Implementation roadmap](docs/roadmap.md)
 
 ## Current hardware boundary

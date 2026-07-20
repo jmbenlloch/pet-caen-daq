@@ -51,6 +51,8 @@ Test ConnectRPC handlers over an actual in-process or containerized HTTP server,
 
 Write raw data and metadata, simulate interruption, reopen, detect incomplete state, replay, and compare decoded events. Golden replay must be deterministic across supported platforms.
 
+Use the committed record-aligned Run 54 prefix to test JANUS processed-list format 3.4 parsing and offline compatibility. It contains 256 complete production events. Keep tests for this processed format separate from future DT5215 PCAP/raw-stream conformance tests.
+
 ### Hardware-in-the-loop tests
 
 Opt-in and never part of ordinary CI. Begin read-only, then controlled test-pulse acquisition. Record hardware and firmware identity in results. Destructive or HV tests require an explicit environment gate and operator procedure.

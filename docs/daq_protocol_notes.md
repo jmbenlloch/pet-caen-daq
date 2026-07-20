@@ -245,6 +245,8 @@ Do not confuse:
 
 FERSlib already supports opening raw output, splitting subruns, and replaying raw files offline. Retaining this facility in an early replacement DAQ would be valuable for regression tests.
 
+The production Run 54 artifacts add a concrete processed-list example: Windows JANUS 4.3.0, output format 3.4, A5202 spectroscopy plus timing, four boards, and a 0.5 ns ToA LSB. A 256-event record-aligned prefix and the complete run log are committed under `test/fixtures/runs/run54/`; the 129,926,126-byte full binary is identified by hash but kept outside normal Git. This fixture validates JANUS list compatibility, not DT5215 TCP framing.
+
 ## Direct DT5202 USB protocol (not DT5215 USB gadget)
 
 For completeness, `FERS_LLusb.cpp` exposes the direct front-end USB protocol (Microchip VID `0x04d8`, PID `0x0053`): bulk OUT endpoint `0x01`, command reply endpoint `0x81`, stream endpoint `0x82`; opcode `0x80` writes memory, `0x81` reads memory, `0x10` writes a service register, and `0xfa {0|1}` disables/enables streaming. Multi-byte fields are little-endian. This is not the host transport used by a DT5215 connected over its USB Ethernet gadget.
