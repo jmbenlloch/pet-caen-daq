@@ -16,6 +16,8 @@ Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 
 ## Phase 1: protocol core and simulator
 
+Progress as of 2026-07-20: read-only discovery/topology validation, core slow-control including register writes and synchronization/start/stop commands, the production configuration parser, incremental descriptor-table stream decoding, spectroscopy/timing event decoding, Run 54 format-3.4 compatibility decoding, simulator-backed synchronized control, and lightweight JSON/JSON Lines run storage are implemented. Complete configuration translation/Citiroc behavior, the remaining event qualifiers, command-triggered simulator generation and drain, raw capture/replay framing, and end-to-end persisted test-pulse replay remain.
+
 - Implement byte-level DT5215 slow-control types with golden tests.
 - Implement a JANUS-compatible configuration parser and parse the complete production fixture without ignored or silently defaulted fields.
 - Implement descriptor-table and DT5202 event decoders with unit/fuzz tests.

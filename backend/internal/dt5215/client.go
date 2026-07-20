@@ -16,9 +16,57 @@ const defaultOperationTimeout = 3 * time.Second
 
 // Client owns one DT5215 control connection and one stream connection.
 type Client struct {
-	control net.Conn
-	stream  net.Conn
-	mu      sync.Mutex
+	control  net.Conn
+	stream   net.Conn
+	mu       sync.Mutex
+	streamMu sync.Mutex
+}
+
+func (c *Client) WriteRegister(ctx context.Context, chain, node uint16, address, value uint32) error {
+	request, err := EncodeWriteRegisterRequest(chain, node, address, value)
+	if err != nil {
+		return err
+	}
+	response, err := c.exchange(ctx, request, 4)
+	if err != nil {
+		return fmt.Errorf("chain %d node %d WREG 0x%08x: %w", chain, node, address, err)
+	}
+	return DecodeStatusResponse("WREG", response)
+}
+func (c *Client) SendCommand(ctx context.Context, chain, node uint16, command, delay uint32) error {
+	return c.sendCommand(ctx, false, chain, node, command, delay)
+}
+func (c *Client) SetDelayedCommand(ctx context.Context, command, delay uint32) error {
+	return c.sendCommand(ctx, true, 0xff, 0xff, command, delay)
+}
+func (c *Client) sendCommand(ctx context.Context, delayed bool, chain, node uint16, command, delay uint32) error {
+	request, err := EncodeCommandRequest(delayed, chain, node, command, delay)
+	if err != nil {
+		return err
+	}
+	response, err := c.exchange(ctx, request, 4)
+	op := "FCMD"
+	if delayed {
+		op = "DCMD"
+	}
+	if err != nil {
+		return fmt.Errorf("%s command 0x%02x: %w", op, command, err)
+	}
+	return DecodeStatusResponse(op, response)
+}
+func (c *Client) Synchronize(ctx context.Context) error { return c.simple(ctx, "SNT0") }
+func (c *Client) ResetLinks(ctx context.Context) error  { return c.simple(ctx, "RLNK") }
+func (c *Client) ClearStream(ctx context.Context) error { return c.simple(ctx, "CLRS") }
+func (c *Client) simple(ctx context.Context, operation string) error {
+	request, err := EncodeSimpleRequest(operation)
+	if err != nil {
+		return err
+	}
+	response, err := c.exchange(ctx, request, 4)
+	if err != nil {
+		return fmt.Errorf("%s: %w", operation, err)
+	}
+	return DecodeStatusResponse(operation, response)
 }
 
 func Dial(ctx context.Context, controlAddress, streamAddress string) (*Client, error) {

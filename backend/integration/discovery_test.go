@@ -4,15 +4,89 @@ package integration
 
 import (
 	"context"
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/simulator"
 )
+
+func TestControlAndPartialStreamWorkflow(t *testing.T) {
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	const register = uint32(0x01000050)
+	if err = client.WriteRegister(ctx, 0, 0, register, 42); err != nil {
+		t.Fatal(err)
+	}
+	value, err := client.ReadRegister(ctx, 0, 0, register)
+	if err != nil || value != 42 {
+		t.Fatalf("read value %d: %v", value, err)
+	}
+	if err = client.SendCommand(ctx, 0, 0, dt5215.CommandAcquisitionStart, 0); err == nil {
+		t.Fatal("start succeeded before synchronization")
+	}
+	if err = client.Synchronize(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, 0); err != nil {
+		t.Fatal(err)
+	}
+	status, err := client.ReadRegister(ctx, 3, 0, dt5215.RegisterAcquisitionStatus)
+	if err != nil || status != 2 {
+		t.Fatalf("running status %d: %v", status, err)
+	}
+	batch := testBatch()
+	server.QueueStreamBatch(batch[:7])
+	server.QueueStreamBatch(batch[7:41])
+	server.QueueStreamBatch(batch[41:])
+	events, err := client.ReadStreamBatch(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0].Chain != 2 || events[0].Descriptor.TriggerID != 99 {
+		t.Fatalf("events = %#v", events)
+	}
+	decoded, err := dt5202.DecodeSpectroscopy(events[0].Descriptor.Qualifier, events[0].Descriptor.TriggerID, events[0].Descriptor.Timestamp, events[0].Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.Energies) != 1 || decoded.Energies[0].HighGain != 123 || decoded.Energies[0].LowGain != 456 || len(decoded.Timings) != 1 || decoded.Timings[0].ToA != 789 {
+		t.Fatalf("decoded event = %#v", decoded)
+	}
+	if err = client.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStop, 0); err != nil {
+		t.Fatal(err)
+	}
+}
+func testBatch() []byte {
+	payload := make([]byte, 16)
+	binary.LittleEndian.PutUint64(payload, 1)
+	binary.LittleEndian.PutUint32(payload[8:], 123|(456<<16))
+	binary.LittleEndian.PutUint32(payload[12:], 7<<16|789)
+	b := make([]byte, 12+32+len(payload))
+	binary.LittleEndian.PutUint32(b, 0xffffffff)
+	binary.LittleEndian.PutUint32(b[4:], 0xffffffff)
+	binary.LittleEndian.PutUint32(b[8:], 2|(1<<8))
+	binary.LittleEndian.PutUint32(b[12:], uint32(len(payload)/4))
+	binary.LittleEndian.PutUint32(b[24:], uint32(99<<16))
+	binary.LittleEndian.PutUint32(b[40:], uint32(dt5202.QualifierSpectroscopy|dt5202.QualifierTiming|dt5202.QualifierBothGains)<<8)
+	copy(b[44:], payload)
+	return b
+}
 
 func TestProductionConfigurationDiscoversSimulatedTopology(t *testing.T) {
 	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())

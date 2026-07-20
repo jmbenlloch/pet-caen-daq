@@ -17,6 +17,7 @@ type Board struct {
 	ProductID        uint32
 	FirmwareRevision uint32
 	Status           uint32
+	Registers        map[uint32]uint32
 }
 
 type Topology struct {
@@ -41,12 +42,15 @@ func ProductionTopology() Topology {
 }
 
 type Server struct {
-	control  net.Listener
-	stream   net.Listener
-	topology Topology
-	done     chan struct{}
-	wg       sync.WaitGroup
-	once     sync.Once
+	control      net.Listener
+	stream       net.Listener
+	topology     Topology
+	done         chan struct{}
+	wg           sync.WaitGroup
+	once         sync.Once
+	mu           sync.Mutex
+	synchronized bool
+	streamData   chan []byte
 }
 
 func Start(controlAddress, streamAddress string, topology Topology) (*Server, error) {
@@ -59,15 +63,16 @@ func Start(controlAddress, streamAddress string, topology Topology) (*Server, er
 		control.Close()
 		return nil, fmt.Errorf("listen stream: %w", err)
 	}
-	server := &Server{control: control, stream: stream, topology: topology, done: make(chan struct{})}
+	server := &Server{control: control, stream: stream, topology: topology, done: make(chan struct{}), streamData: make(chan []byte, 16)}
 	server.wg.Add(2)
 	go server.acceptControl()
 	go server.acceptStream()
 	return server, nil
 }
 
-func (s *Server) ControlAddress() string { return s.control.Addr().String() }
-func (s *Server) StreamAddress() string  { return s.stream.Addr().String() }
+func (s *Server) ControlAddress() string        { return s.control.Addr().String() }
+func (s *Server) StreamAddress() string         { return s.stream.Addr().String() }
+func (s *Server) QueueStreamBatch(batch []byte) { s.streamData <- append([]byte(nil), batch...) }
 
 func (s *Server) Close() error {
 	var closeErr error
@@ -112,7 +117,16 @@ func (s *Server) acceptStream() {
 		go func() {
 			defer s.wg.Done()
 			defer connection.Close()
-			<-s.done
+			for {
+				select {
+				case data := <-s.streamData:
+					if writeAll(connection, data) != nil {
+						return
+					}
+				case <-s.done:
+					return
+				}
+			}
 		}()
 	}
 }
@@ -131,6 +145,22 @@ func (s *Server) serveControl(connection net.Conn) {
 			err = s.handleEnumerate(connection)
 		case "RREG":
 			err = s.handleReadRegister(connection)
+		case "WREG":
+			err = s.handleWriteRegister(connection)
+		case "FCMD", "DCMD":
+			err = s.handleCommand(connection, string(opcode))
+		case "SNT0":
+			s.mu.Lock()
+			s.synchronized = true
+			s.mu.Unlock()
+			err = writeStatus(connection, 0)
+		case "RLNK":
+			s.mu.Lock()
+			s.synchronized = false
+			s.mu.Unlock()
+			err = writeStatus(connection, 0)
+		case "CLRS":
+			err = writeStatus(connection, 0)
 		default:
 			return
 		}
@@ -199,6 +229,8 @@ func (s *Server) handleReadRegister(connection net.Conn) error {
 		binary.LittleEndian.PutUint32(response[0:4], 2)
 		return writeAll(connection, response)
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	board := s.topology.Chains[chain][node]
 	var value uint32
 	switch address {
@@ -209,11 +241,84 @@ func (s *Server) handleReadRegister(connection net.Conn) error {
 	case dt5215.RegisterAcquisitionStatus:
 		value = board.Status
 	default:
-		binary.LittleEndian.PutUint32(response[0:4], 22)
-		return writeAll(connection, response)
+		value = board.Registers[address]
 	}
 	binary.LittleEndian.PutUint32(response[4:8], value)
 	return writeAll(connection, response)
+}
+
+func (s *Server) handleWriteRegister(connection net.Conn) error {
+	rest := make([]byte, 12)
+	if _, err := io.ReadFull(connection, rest); err != nil {
+		return err
+	}
+	chain := binary.LittleEndian.Uint16(rest)
+	node := binary.LittleEndian.Uint16(rest[2:])
+	address := binary.LittleEndian.Uint32(rest[4:])
+	value := binary.LittleEndian.Uint32(rest[8:])
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if chain >= dt5215.MaxChains || int(node) >= len(s.topology.Chains[chain]) {
+		return writeStatus(connection, 2)
+	}
+	if address == dt5215.RegisterProductID || address == dt5215.RegisterFirmwareRevision || address == dt5215.RegisterAcquisitionStatus {
+		return writeStatus(connection, 22)
+	}
+	board := &s.topology.Chains[chain][node]
+	if board.Registers == nil {
+		board.Registers = make(map[uint32]uint32)
+	}
+	board.Registers[address] = value
+	return writeStatus(connection, 0)
+}
+func (s *Server) handleCommand(connection net.Conn, operation string) error {
+	rest := make([]byte, 16)
+	if _, err := io.ReadFull(connection, rest); err != nil {
+		return err
+	}
+	chain := binary.LittleEndian.Uint16(rest)
+	node := binary.LittleEndian.Uint16(rest[2:])
+	command := binary.LittleEndian.Uint32(rest[4:])
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if operation == "DCMD" {
+		return writeStatus(connection, 0)
+	}
+	targets := []*Board{}
+	if chain == 0xff && node == 0xff {
+		for c := range s.topology.Chains {
+			for n := range s.topology.Chains[c] {
+				targets = append(targets, &s.topology.Chains[c][n])
+			}
+		}
+	} else if chain >= dt5215.MaxChains || int(node) >= len(s.topology.Chains[chain]) {
+		return writeStatus(connection, 2)
+	} else {
+		targets = append(targets, &s.topology.Chains[chain][node])
+	}
+	if command == dt5215.CommandAcquisitionStart && !s.synchronized {
+		return writeStatus(connection, 10)
+	}
+	for _, board := range targets {
+		switch command {
+		case dt5215.CommandAcquisitionStart:
+			board.Status = 2
+		case dt5215.CommandAcquisitionStop:
+			board.Status = 1
+		case dt5215.CommandGlobalReset:
+			board.Status = 1
+			board.Registers = make(map[uint32]uint32)
+		case dt5215.CommandResetTime, dt5215.CommandSoftwareTrigger, dt5215.CommandTestPulse, dt5215.CommandClearData, dt5215.CommandSync:
+		default:
+			return writeStatus(connection, 22)
+		}
+	}
+	return writeStatus(connection, 0)
+}
+func writeStatus(w io.Writer, status uint32) error {
+	response := make([]byte, 4)
+	binary.LittleEndian.PutUint32(response, status)
+	return writeAll(w, response)
 }
 
 func writeAll(writer io.Writer, data []byte) error {

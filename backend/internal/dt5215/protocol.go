@@ -21,6 +21,15 @@ const (
 	RegisterFirmwareRevision  uint32 = 0x01000300
 	RegisterAcquisitionStatus uint32 = 0x01000304
 	RegisterProductID         uint32 = 0x01000400
+
+	CommandResetTime        uint32 = 0x11
+	CommandAcquisitionStart uint32 = 0x12
+	CommandAcquisitionStop  uint32 = 0x13
+	CommandSoftwareTrigger  uint32 = 0x14
+	CommandGlobalReset      uint32 = 0x15
+	CommandTestPulse        uint32 = 0x16
+	CommandClearData        uint32 = 0x18
+	CommandSync             uint32 = 0x1c
 )
 
 var littleEndian = binary.LittleEndian
@@ -116,6 +125,65 @@ func DecodeReadRegisterResponse(response []byte) (uint32, error) {
 		return 0, &StatusError{Operation: "RREG", Status: status}
 	}
 	return littleEndian.Uint32(response[4:8]), nil
+}
+
+func EncodeWriteRegisterRequest(chain, node uint16, address, value uint32) ([]byte, error) {
+	if err := validateTarget(chain, node, false); err != nil {
+		return nil, err
+	}
+	request := make([]byte, 16)
+	copy(request, "WREG")
+	littleEndian.PutUint16(request[4:6], chain)
+	littleEndian.PutUint16(request[6:8], node)
+	littleEndian.PutUint32(request[8:12], address)
+	littleEndian.PutUint32(request[12:16], value)
+	return request, nil
+}
+
+func EncodeCommandRequest(delayed bool, chain, node uint16, command, delay uint32) ([]byte, error) {
+	if err := validateTarget(chain, node, true); err != nil {
+		return nil, err
+	}
+	request := make([]byte, 20)
+	if delayed {
+		copy(request, "DCMD")
+	} else {
+		copy(request, "FCMD")
+	}
+	littleEndian.PutUint16(request[4:6], chain)
+	littleEndian.PutUint16(request[6:8], node)
+	littleEndian.PutUint32(request[8:12], command)
+	littleEndian.PutUint32(request[16:20], delay)
+	return request, nil
+}
+func EncodeSimpleRequest(operation string) ([]byte, error) {
+	switch operation {
+	case "SNT0", "RLNK", "CLRS":
+		return []byte(operation), nil
+	default:
+		return nil, fmt.Errorf("unsupported simple operation %q", operation)
+	}
+}
+func DecodeStatusResponse(operation string, response []byte) error {
+	if len(response) != 4 {
+		return fmt.Errorf("%s response length = %d, want 4", operation, len(response))
+	}
+	if status := littleEndian.Uint32(response); status != StatusOK {
+		return &StatusError{Operation: operation, Status: status}
+	}
+	return nil
+}
+func validateTarget(chain, node uint16, allowBroadcast bool) error {
+	if allowBroadcast && chain == 0xff && node == 0xff {
+		return nil
+	}
+	if chain >= MaxChains {
+		return fmt.Errorf("chain %d out of range", chain)
+	}
+	if node >= MaxNodes {
+		return fmt.Errorf("node %d out of range", node)
+	}
+	return nil
 }
 
 // StatusError reports a non-zero status returned by the concentrator.

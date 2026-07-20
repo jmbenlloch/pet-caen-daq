@@ -17,6 +17,9 @@ func TestEncodeRequestsGolden(t *testing.T) {
 		{"read register", func() ([]byte, error) {
 			return EncodeReadRegisterRequest(1, 0, RegisterProductID)
 		}, "525245470100000000040001"},
+		{"write register", func() ([]byte, error) { return EncodeWriteRegisterRequest(2, 3, 0x01000050, 42) }, "5752454702000300500000012a000000"},
+		{"command", func() ([]byte, error) { return EncodeCommandRequest(false, 1, 0, CommandTestPulse, 1000000) }, "46434d4401000000160000000000000040420f00"},
+		{"delayed broadcast", func() ([]byte, error) { return EncodeCommandRequest(true, 0xff, 0xff, CommandAcquisitionStart, 0) }, "44434d44ff00ff00120000000000000000000000"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

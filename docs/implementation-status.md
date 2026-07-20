@@ -43,3 +43,27 @@ task build
 Start the simulator in one terminal and run the DAQ command in another. The simulator command defaults to loopback ports 9760 and 9000; integration tests request ephemeral ports so they can run concurrently.
 
 The next protocol work should add the complete configuration/register-write sequence, Citiroc configuration bitstream, acquisition state machine, data-stream framing, and Run 54 processed-event compatibility decoder. Each step should retain captured raw bytes so it can later be compared with the real PCAP.
+
+## Phase 1 offline decoding and development storage
+
+Implemented on 2026-07-20:
+
+- bounded decoding of complete DT5215 descriptor-table batches into immutable payload events, including sentinel, chain, row, node, payload range, size, qualifier, timestamp, trigger ID, and CRC-flag validation;
+- a streaming JANUS processed-list format 3.4 reader for DT5202 spectroscopy-plus-timing data;
+- a golden compatibility test over all 256 records and 12,988 channel hits in the committed production Run 54 prefix, including its complete 25-byte header and exact end-of-file boundary;
+- malformed-header, invalid-size, truncated-record, stream-framing, and fuzz coverage;
+- a lightweight development run repository with atomic JSON manifests, append-only JSON Lines event envelopes, string-encoded 64-bit counters, bounded replay, precise line/offset errors, and an incomplete-run marker that is removed only after successful synchronization and finalization.
+
+The JANUS list reader is an offline compatibility component: its fixture is processed output rather than raw TCP evidence. The development storage is not yet connected to acquisition orchestration.
+
+## Phase 1 synchronized control and stream slice
+
+Implemented on 2026-07-20:
+
+- byte-exact native codecs and client operations for board register writes, immediate and delayed board commands, chain synchronization/reset, and concentrator stream clearing;
+- an incremental descriptor-batch TCP reader that uses exact reads, validates allocation bounds before reading payloads, and handles arbitrary TCP fragmentation;
+- simulator-backed mutable registers, synchronization state, broadcast commands, acquisition start/stop status, global reset, and queued deterministic stream chunks;
+- native DT5202 spectroscopy and spectroscopy-plus-timing payload decoding for single- and both-gain layouts, time references, first-hit timing behavior, and malformed input, with fuzz coverage;
+- an integration workflow that round-trips a register, proves acquisition start is rejected before synchronization, synchronizes and starts four boards, receives a deliberately fragmented descriptor batch, decodes its synthetic test-pulse energy/timing event, and stops all boards.
+
+The simulator stream is currently explicitly queued by tests; command-triggered deterministic event generation and stop/drain behavior remain. Complete production configuration translation and the 1,144-bit Citiroc streams are also still outstanding.
