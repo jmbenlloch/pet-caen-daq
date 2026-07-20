@@ -19,6 +19,7 @@ This repository is currently in its documentation and architecture-definition ph
 - [Engineering guidelines](docs/engineering-guidelines.md)
 - [Testing strategy](docs/testing-strategy.md)
 - [Protocol evidence and hardware notes](docs/daq_protocol_notes.md)
+- [Production JANUS fixture provenance](test/fixtures/janus/README.md)
 - [Implementation roadmap](docs/roadmap.md)
 
 ## Current hardware boundary

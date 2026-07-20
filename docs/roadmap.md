@@ -16,6 +16,7 @@ Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 ## Phase 1: protocol core and simulator
 
 - Implement byte-level DT5215 slow-control types with golden tests.
+- Implement a JANUS-compatible configuration parser and parse the complete production fixture without ignored or silently defaulted fields.
 - Implement descriptor-table and DT5202 event decoders with unit/fuzz tests.
 - Port the complete DT5202 register/configuration and Citiroc bitstream behavior into project-owned Go code.
 - Implement a deterministic TCP simulator for one concentrator and four boards.

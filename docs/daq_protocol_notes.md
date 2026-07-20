@@ -10,6 +10,8 @@ The project decision is to implement the transport, protocol, configuration, acq
 
 The DT5215's USB-C connection is a USB Ethernet gadget, not the direct-DT5202 USB bulk protocol implemented in `FERS_LLusb.cpp`. On Linux the manual gives the concentrator gadget address as `172.16.1.11` (Windows: `172.16.0.11`). FERSlib opens ordinary TCP sockets to that address.
 
+The production Windows JANUS configuration `test/fixtures/janus/config_same4_v3_good.txt` uses `172.16.0.11`, consistent with the manual's Windows default. A native DAQ must make the concentrator address configurable rather than infer it solely from the host operating system.
+
 ## Repository sources and authority
 
 The most useful sources, in descending implementation relevance, are:
@@ -43,7 +45,7 @@ DT5215 concentrator
   `-- TDlink optical chain(s) --> four DT5202 boards
 ```
 
-JANUS connection paths described by the DT5215 manual are `usb:IP:tdl:x:y` or `eth:IP:tdl:x:y`, where `x` is chain and `y` is node. In FERSlib, both ultimately use the IP address with `LLtdl_OpenDevice`; the `usb`/`eth` prefix describes the host-to-concentrator physical interface. A typical four-board system on one optical chain would open nodes `0..3`, but the actual chain/node assignment must be obtained by enumeration, not assumed.
+JANUS connection paths described by the DT5215 manual are `usb:IP:tdl:x:y` or `eth:IP:tdl:x:y`, where `x` is chain and `y` is node. In FERSlib, both ultimately use the IP address with `LLtdl_OpenDevice`; the `usb`/`eth` prefix describes the host-to-concentrator physical interface. The production configuration establishes the intended topology as four separate links—chains 0, 1, 2, and 3—with one board at node 0 on each. Runtime enumeration must still verify that topology rather than assume it.
 
 DT5215 web configuration remains relevant before DAQ startup. The manual explicitly warns that an enabled but physically unconnected TDlink can hang the concentrator, that only connected links should be enabled, and that enabled links must be sequential starting at link 0.
 

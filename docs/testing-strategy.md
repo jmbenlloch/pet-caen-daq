@@ -29,6 +29,8 @@ Byte-exact tests using documented vectors and later real packet captures. Each f
 
 Test encoders in both directions when replies are simulated. Fuzz stream parsers and ensure malformed input cannot panic or allocate without bounds.
 
+The byte-preserved Windows JANUS 5.0.0 production configuration under `test/fixtures/janus/` is the initial golden configuration input. Parser tests must cover it in full, and configuration-translation tests should progressively add expected effective settings and register writes. Windows/Linux JANUS compatibility is expected because the packages share a version number, but expected register and wire behavior remains `source-confirmed` until matched to a PCAP or real-hardware register dump.
+
 ### Backend integration tests
 
 Run the Go backend against the TCP simulator. Exercise complete open/enumerate/synchronize/configure/start/read/stop/drain workflows, including failures. Use real sockets so partial delivery and cancellation are tested.
