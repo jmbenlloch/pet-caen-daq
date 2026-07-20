@@ -11,6 +11,7 @@ Build a reliable, observable, testable DAQ for four CAEN DT5202 boards behind a 
 - Backend: Go.
 - API: Protocol Buffers and ConnectRPC, managed with Buf. The `.proto` definitions are the contract and must not be duplicated manually in Go or TypeScript.
 - Version-one telemetry: ConnectRPC server streaming with snapshot-based reconnect behavior. Do not add Centrifugo unless a later ADR establishes a concrete scaling or pub/sub requirement.
+- Storage: development uses a JSON run manifest plus JSON Lines event records and optional byte-exact raw capture. The first production writer will use HDF5. Acquisition and decoding must depend on project storage interfaces, not either file implementation.
 - Frontend: Vue.js with TypeScript and Tailwind CSS.
 - Frontend integration and browser end-to-end tests: Playwright.
 - Hardware development: a simulator must support development and CI without physical CAEN hardware.
@@ -63,6 +64,7 @@ FERSlib and JANUS are reference implementations and comparison oracles only. Do 
 - Do not write `VR_ENABLED_LINKS` or automate the DT5215 private web interface in version one. Report provisioning mismatches with instructions to use the web interface.
 - On shutdown or error, attempt an orderly acquisition stop and drain while preserving the original error.
 - Never discard raw bytes solely because decoding failed. Record the failure and retain evidence when configured to capture raw data.
+- Do not use YAML or a monolithic JSON array for acquisition output. YAML is reserved for human-authored tooling/configuration where appropriate; growing event output uses one independently parseable JSON object per line.
 
 ## Protocol evidence policy
 
@@ -86,6 +88,7 @@ Tests and documentation must not silently upgrade an inference to a verified fac
 - Define byte order explicitly and test it with golden bytes.
 - Keep wire encoders/decoders independent of FERSlib data structures. Translate protocol bytes into project-owned immutable types.
 - Model acquisition as an explicit state machine. Reject invalid transitions.
+- Keep decoded events as project-owned typed values. Storage writers consume those values; decoders must not produce HDF5-, JSON-, or file-layout-specific structures.
 - Use bounded queues and state the backpressure/overflow policy.
 - Use structured logging with run ID, device, chain, node, operation, and error fields where applicable.
 - Never log credentials or unrestricted event payloads by default.

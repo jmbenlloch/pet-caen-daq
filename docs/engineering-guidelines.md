@@ -48,6 +48,11 @@ For version one, use the core Connect-Web streaming API for telemetry. Do not as
 - Write through temporary/incomplete artifacts and finalize atomically when feasible.
 - A crash must leave a detectable incomplete run rather than a seemingly valid completed run.
 - Decoding must be replayable offline with no hardware.
+- Use JSON for bounded run metadata, never for an indefinitely growing in-memory event array.
+- Use JSON Lines as the lightweight development event stream: one versioned event envelope per line, written incrementally.
+- Enforce maximum line/record sizes and define fixed rules for representing 64-bit integers without browser/JavaScript precision loss.
+- Do not use YAML for machine-produced event data. Its richer parsing surface and weak fit for large append-only numeric streams provide no benefit here.
+- The JSON Lines and HDF5 adapters must consume the same internal event model and must not leak file-format types into acquisition/decoder packages.
 
 ## Observability
 

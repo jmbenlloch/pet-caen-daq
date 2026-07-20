@@ -10,7 +10,7 @@ This roadmap orders discovery and risk reduction. It does not commit to dates.
 - Add the Buf module, lint, breaking-change, and generation configuration.
 - Decide monorepo build commands and generated-code policy.
 - Define the initial protobuf API and configuration units.
-- Record the remaining ADR for storage format; native protocol ownership and version-one telemetry transport are decided.
+- Specify and test the lightweight JSON/JSON Lines development format; HDF5 is the first production storage target.
 
 Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 
@@ -25,6 +25,7 @@ Exit criterion: skeleton choices are explicit, reproducible, and reviewed.
 - Validate the provisioned four-link/one-node topology and return actionable errors without attempting persistent link activation.
 - Add raw capture/replay fixtures.
 - Implement and test a JANUS processed-list format 3.4 reader against the production Run 54 prefix for compatibility and cross-checking.
+- Implement the JSON manifest, JSON Lines event writer/reader, incomplete-run marker, and deterministic offline replay without HDF5.
 
 Exit criterion: a Go test can perform a complete simulated test-pulse run and deterministically reproduce decoded events.
 
@@ -35,6 +36,7 @@ Exit criterion: a Go test can perform a complete simulated test-pulse run and de
 - Implement snapshot-based ConnectRPC telemetry streaming, sequence/staleness handling, and browser reconnection tests.
 - Implement configuration validation, run control, health, and telemetry services.
 - Persist run metadata and raw data with crash/incomplete-run handling.
+- Keep storage behind an interface and add failure/backpressure integration tests using the lightweight writer.
 - Add integration, cancellation, disconnect, and recovery tests.
 
 Exit criterion: generated clients can operate complete simulated runs and inspect artifacts.
@@ -66,9 +68,18 @@ Exit criterion: protocol paths used by the first production milestone are captur
 
 Exit criterion: acceptance criteria on the real system pass with retained evidence.
 
+## Phase 6: production HDF5 storage
+
+- Define the HDF5 schema, datasets, chunking, compression, metadata, and compatibility/version policy from measured run characteristics and analysis needs.
+- Implement the HDF5 writer behind the established storage interface.
+- Convert/replay golden and hardware runs into HDF5 and cross-check counts, values, metadata, interruption handling, and performance.
+- Package the native HDF5 dependency in reproducible production and test containers without making it a dependency of ordinary protocol/unit workflows.
+
+Exit criterion: production acceptance runs produce validated HDF5 artifacts suitable for downstream analysis.
+
 ## Deferred questions
 
-- Which processed storage format best fits downstream analysis?
+- Which HDF5 dataset organization, chunking, compression, and analysis compatibility requirements apply?
 - What authentication boundary and deployment environment are required?
 - What measured scale or pub/sub requirement would justify introducing Centrifugo after version one?
 - After version one, is there sufficient need and a supported interface to automate DT5215 web provisioning?

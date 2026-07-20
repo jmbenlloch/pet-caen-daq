@@ -89,7 +89,27 @@ Separates stream ingestion, framing, decoding, monitoring, and storage with boun
 
 ### Run repository
 
-Stores immutable run identity and snapshot metadata: requested/effective configuration, topology, board IDs, firmware versions, software revision, start/stop times, termination reason, counters, warnings, and output artifacts. Storage technology remains undecided.
+Stores immutable run identity and snapshot metadata: requested/effective configuration, topology, board IDs, firmware versions, software revision, start/stop times, termination reason, counters, warnings, and output artifacts.
+
+Storage is phased behind project-owned interfaces:
+
+- During development, each run has a bounded JSON manifest, an append-only JSON Lines decoded-event stream, and an optional byte-exact raw capture.
+- The first production version adds an HDF5 writer as the primary analysis file.
+- Offline conversion/replay reads the development/raw representation and can produce HDF5 without hardware.
+
+Acquisition completion does not depend on a specific writer. Writers report health/backpressure, finalize or mark incomplete artifacts, and preserve the original failure when shutdown encounters more than one error.
+
+The initial run directory is expected to resemble:
+
+```text
+run-<id>/
+  manifest.json
+  events.jsonl
+  wire.raw          # optional byte-exact capture
+  incomplete        # present until successful finalization
+```
+
+`events.jsonl` contains one independently parseable event envelope per line. Every envelope carries a schema version and event kind. Readers stream line by line, enforce maximum record sizes, report the exact failing line/offset, and treat a truncated final line as an incomplete run rather than silently accepting it. Numeric representation rules for 64-bit counters, timestamps, and identifiers will be fixed by golden tests before the format is declared stable.
 
 ### ConnectRPC service
 
@@ -161,3 +181,4 @@ The bundled FERSlib/JANUS source remains valuable evidence and an offline compar
 - Graceful shutdown with stop/drain deadlines.
 - Reproducible containers and generated code.
 - No CI dependency on physical hardware.
+- HDF5 confined to the production storage adapter and its integration/container tests; protocol, decoder, simulator, API, and ordinary unit tests must not require it.
