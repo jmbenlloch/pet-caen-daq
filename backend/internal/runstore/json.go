@@ -9,6 +9,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
 )
 
 const SchemaVersion = 1
@@ -35,6 +37,7 @@ type Writer struct {
 	events   *os.File
 	manifest Manifest
 	closed   bool
+	raw      *rawcapture.Writer
 }
 
 func Create(parent string, manifest Manifest) (*Writer, error) {
@@ -61,6 +64,34 @@ func Create(parent string, manifest Manifest) (*Writer, error) {
 	return w, nil
 }
 func (w *Writer) Directory() string { return w.dir }
+func (w *Writer) EnableRawCapture() error {
+	if w.closed {
+		return errors.New("run writer is closed")
+	}
+	if w.raw != nil {
+		return errors.New("raw capture is already enabled")
+	}
+	f, err := os.OpenFile(filepath.Join(w.dir, "wire.raw"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	if err != nil {
+		return fmt.Errorf("create raw capture: %w", err)
+	}
+	capture, err := rawcapture.NewWriter(f)
+	if err != nil {
+		f.Close()
+		return err
+	}
+	w.raw = capture
+	return nil
+}
+func (w *Writer) AppendRaw(batch []byte) error {
+	if w.closed {
+		return errors.New("run writer is closed")
+	}
+	if w.raw == nil {
+		return errors.New("raw capture is not enabled")
+	}
+	return w.raw.Append(batch)
+}
 func (w *Writer) Append(e Envelope) error {
 	if w.closed {
 		return errors.New("run writer is closed")
@@ -91,6 +122,11 @@ func (w *Writer) Finalize(completedAt, reason string) error {
 	if err := w.events.Close(); err != nil {
 		return fmt.Errorf("close events: %w", err)
 	}
+	if w.raw != nil {
+		if err := w.raw.Close(); err != nil {
+			return err
+		}
+	}
 	w.manifest.CompletedAt = completedAt
 	w.manifest.TerminationReason = reason
 	if err := w.writeManifest(); err != nil {
@@ -106,7 +142,13 @@ func (w *Writer) Abort() error {
 		return nil
 	}
 	w.closed = true
-	return w.events.Close()
+	eventsErr := w.events.Close()
+	if w.raw != nil {
+		if rawErr := w.raw.Close(); eventsErr == nil {
+			eventsErr = rawErr
+		}
+	}
+	return eventsErr
 }
 func (w *Writer) writeManifest() error {
 	b, err := json.MarshalIndent(w.manifest, "", "  ")

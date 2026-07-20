@@ -9,11 +9,19 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
 )
 
 func TestRunLifecycleAndReplay(t *testing.T) {
 	w, err := Create(t.TempDir(), Manifest{RunID: "54-replay", StartedAt: "2026-07-17T11:06:37Z"})
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err = w.EnableRawCapture(); err != nil {
+		t.Fatal(err)
+	}
+	if err = w.AppendRaw([]byte{1, 2, 3, 4}); err != nil {
 		t.Fatal(err)
 	}
 	payload := json.RawMessage(`{"board":0,"trigger_id":"42"}`)
@@ -54,6 +62,19 @@ func TestRunLifecycleAndReplay(t *testing.T) {
 	}
 	if m.EventCount != 1 || m.TerminationReason != "completed" {
 		t.Fatalf("manifest = %#v", m)
+	}
+	rawFile, err := os.Open(filepath.Join(w.Directory(), "wire.raw"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rawFile.Close()
+	rawReader, err := rawcapture.NewReader(rawFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := rawReader.Next()
+	if err != nil || !bytes.Equal(raw, []byte{1, 2, 3, 4}) {
+		t.Fatalf("raw = %x, %v", raw, err)
 	}
 }
 func TestAbortLeavesIncompleteMarker(t *testing.T) {

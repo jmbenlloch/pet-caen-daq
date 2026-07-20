@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/simulator"
 )
 
@@ -67,6 +69,50 @@ func TestControlAndPartialStreamWorkflow(t *testing.T) {
 	}
 	if len(decoded.Energies) != 1 || decoded.Energies[0].HighGain != 123 || decoded.Energies[0].LowGain != 456 || len(decoded.Timings) != 1 || decoded.Timings[0].ToA != 789 {
 		t.Fatalf("decoded event = %#v", decoded)
+	}
+	if err = client.SendCommand(ctx, 0xff, 0xff, dt5215.CommandTestPulse, 0); err != nil {
+		t.Fatal(err)
+	}
+	var captured bytes.Buffer
+	capture, err := rawcapture.NewWriter(&captured)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for chain := 0; chain < 4; chain++ {
+		raw, events, err := client.ReadRawStreamBatch(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = capture.Append(raw); err != nil {
+			t.Fatal(err)
+		}
+		if len(events) != 1 || int(events[0].Chain) != chain {
+			t.Fatalf("test-pulse chain %d events = %#v", chain, events)
+		}
+		event, err := dt5202.DecodeSpectroscopy(events[0].Descriptor.Qualifier, events[0].Descriptor.TriggerID, events[0].Descriptor.Timestamp, events[0].Payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if event.Energies[0].HighGain != uint16(101+chain) || event.Energies[0].LowGain != uint16(201+chain) {
+			t.Fatalf("chain %d event = %#v", chain, event)
+		}
+	}
+	if err = capture.Close(); err != nil {
+		t.Fatal(err)
+	}
+	replay, err := rawcapture.NewReader(bytes.NewReader(captured.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for chain := 0; chain < 4; chain++ {
+		raw, err := replay.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		events, err := dt5215.DecodeStreamBatch(raw)
+		if err != nil || len(events) != 1 || int(events[0].Chain) != chain {
+			t.Fatalf("replay chain %d: %#v %v", chain, events, err)
+		}
 	}
 	if err = client.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStop, 0); err != nil {
 		t.Fatal(err)

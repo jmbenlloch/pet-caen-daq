@@ -10,6 +10,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 )
 
@@ -42,15 +43,16 @@ func ProductionTopology() Topology {
 }
 
 type Server struct {
-	control      net.Listener
-	stream       net.Listener
-	topology     Topology
-	done         chan struct{}
-	wg           sync.WaitGroup
-	once         sync.Once
-	mu           sync.Mutex
-	synchronized bool
-	streamData   chan []byte
+	control       net.Listener
+	stream        net.Listener
+	topology      Topology
+	done          chan struct{}
+	wg            sync.WaitGroup
+	once          sync.Once
+	mu            sync.Mutex
+	synchronized  bool
+	streamData    chan []byte
+	eventSequence uint64
 }
 
 func Start(controlAddress, streamAddress string, topology Topology) (*Server, error) {
@@ -284,22 +286,27 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 	if operation == "DCMD" {
 		return writeStatus(connection, 0)
 	}
-	targets := []*Board{}
+	type target struct {
+		chain, node int
+		board       *Board
+	}
+	targets := []target{}
 	if chain == 0xff && node == 0xff {
 		for c := range s.topology.Chains {
 			for n := range s.topology.Chains[c] {
-				targets = append(targets, &s.topology.Chains[c][n])
+				targets = append(targets, target{c, n, &s.topology.Chains[c][n]})
 			}
 		}
 	} else if chain >= dt5215.MaxChains || int(node) >= len(s.topology.Chains[chain]) {
 		return writeStatus(connection, 2)
 	} else {
-		targets = append(targets, &s.topology.Chains[chain][node])
+		targets = append(targets, target{int(chain), int(node), &s.topology.Chains[chain][node]})
 	}
 	if command == dt5215.CommandAcquisitionStart && !s.synchronized {
 		return writeStatus(connection, 10)
 	}
-	for _, board := range targets {
+	for _, target := range targets {
+		board := target.board
 		switch command {
 		case dt5215.CommandAcquisitionStart:
 			board.Status = 2
@@ -308,12 +315,38 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 		case dt5215.CommandGlobalReset:
 			board.Status = 1
 			board.Registers = make(map[uint32]uint32)
-		case dt5215.CommandResetTime, dt5215.CommandSoftwareTrigger, dt5215.CommandTestPulse, dt5215.CommandClearData, dt5215.CommandSync:
+		case dt5215.CommandTestPulse:
+			if board.Status != 2 {
+				return writeStatus(connection, 10)
+			}
+			s.eventSequence++
+			batch := testPulseBatch(uint8(target.chain), uint8(target.node), s.eventSequence)
+			select {
+			case s.streamData <- batch:
+			default:
+				return writeStatus(connection, 11)
+			}
+		case dt5215.CommandResetTime, dt5215.CommandSoftwareTrigger, dt5215.CommandClearData, dt5215.CommandSync:
 		default:
 			return writeStatus(connection, 22)
 		}
 	}
 	return writeStatus(connection, 0)
+}
+func testPulseBatch(chain, node uint8, sequence uint64) []byte {
+	payload := make([]byte, 16)
+	binary.LittleEndian.PutUint64(payload, uint64(1)<<chain)
+	binary.LittleEndian.PutUint32(payload[8:], uint32(100+sequence)|(uint32(200+sequence)<<16))
+	binary.LittleEndian.PutUint32(payload[12:], uint32(5+chain)<<25|uint32(10+chain)<<16|uint32(300+sequence))
+	batch := make([]byte, 12+32+len(payload))
+	binary.LittleEndian.PutUint32(batch, 0xffffffff)
+	binary.LittleEndian.PutUint32(batch[4:], 0xffffffff)
+	binary.LittleEndian.PutUint32(batch[8:], uint32(chain)|(1<<8))
+	binary.LittleEndian.PutUint32(batch[12:], uint32(len(payload)/4))
+	binary.LittleEndian.PutUint32(batch[24:], uint32(sequence<<16))
+	binary.LittleEndian.PutUint32(batch[40:], uint32(node)|uint32(dt5202.QualifierSpectroscopy|dt5202.QualifierTiming|dt5202.QualifierBothGains)<<8)
+	copy(batch[44:], payload)
+	return batch
 }
 func writeStatus(w io.Writer, status uint32) error {
 	response := make([]byte, 4)

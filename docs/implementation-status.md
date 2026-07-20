@@ -66,4 +66,17 @@ Implemented on 2026-07-20:
 - native DT5202 spectroscopy and spectroscopy-plus-timing payload decoding for single- and both-gain layouts, time references, first-hit timing behavior, and malformed input, with fuzz coverage;
 - an integration workflow that round-trips a register, proves acquisition start is rejected before synchronization, synchronizes and starts four boards, receives a deliberately fragmented descriptor batch, decodes its synthetic test-pulse energy/timing event, and stops all boards.
 
-The simulator stream is currently explicitly queued by tests; command-triggered deterministic event generation and stop/drain behavior remain. Complete production configuration translation and the 1,144-bit Citiroc streams are also still outstanding.
+At this point simulator batches could be explicitly queued by tests, but command-triggered generation and stop/drain behavior remained. Complete production configuration translation and the 1,144-bit Citiroc streams were also still outstanding.
+
+## Phase 1 raw capture and command-triggered test pulses
+
+Implemented on 2026-07-20:
+
+- a versioned `wire.raw` format with an eight-byte `PETRAW` magic/version header and independently length-delimited, CRC32-protected DT5215 batches;
+- bounded streaming capture/replay with byte-exact deterministic output and record/offset diagnostics for invalid versions, truncation, invalid sizes, and checksum failures;
+- optional raw capture integrated into the development run writer, synchronized and closed before the incomplete-run marker can be removed;
+- byte-exact raw batch access alongside typed stream events, ensuring capture occurs without reconstructing wire evidence from decoded values;
+- command-triggered deterministic simulator test pulses for every running production board;
+- a real-socket integration path that starts four boards, issues one broadcast test pulse, captures four raw batches, decodes their energy/timing events live, and deterministically replays the captured batches offline.
+
+The simulator still needs explicit drain completion/fault behavior and broader event qualifiers. The raw format stores complete validated DT5215 batches; retaining malformed or connection-truncated byte fragments will require a lower-level transport journal if hardware validation shows that evidence is needed.
