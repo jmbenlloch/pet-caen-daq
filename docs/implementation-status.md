@@ -102,3 +102,5 @@ Implemented on 2026-07-20:
 - source-confirmed individual-channel and broadcast-address conversion with byte-exact tests.
 
 This map intentionally excludes registers belonging only to other FERS board families and peripheral-internal sub-register spaces. Production configuration translation and Citiroc stream construction build on this vocabulary and remain incomplete.
+
+The production configuration's complete 103-assignment document is also covered by an explicit semantic-owner catalog. Unknown or misspelled settings now fail classification with their source line instead of being silently ignored. Ownership does not yet imply implementation: hardware translation, run-control, storage, and analysis consumers must each prove requested-versus-effective behavior before configuration coverage is complete.

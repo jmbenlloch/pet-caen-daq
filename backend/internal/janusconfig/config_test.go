@@ -22,6 +22,13 @@ func TestParseProductionConfiguration(t *testing.T) {
 	if got, want := len(document.Assignments), 103; got != want {
 		t.Fatalf("assignment count = %d, want %d", got, want)
 	}
+	classified, err := document.Classify()
+	if err != nil {
+		t.Fatalf("Classify() error = %v", err)
+	}
+	if got, want := len(classified), len(document.Assignments); got != want {
+		t.Fatalf("classified assignment count = %d, want %d", got, want)
+	}
 	connections, err := document.Connections()
 	if err != nil {
 		t.Fatalf("Connections() error = %v", err)
@@ -36,6 +43,34 @@ func TestParseProductionConfiguration(t *testing.T) {
 	last := document.Assignments[len(document.Assignments)-1]
 	if last.Name != "TD_CoarseThreshold" || last.Index == nil || *last.Index != 3 || last.Value != "178" {
 		t.Fatalf("last assignment = %#v", last)
+	}
+}
+
+func TestClassifyRejectsUnknownSetting(t *testing.T) {
+	document, err := Parse(strings.NewReader("AcquisitionMode SPECTROSCOPY\nAcquistionMode COUNTING\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = document.Classify()
+	if err == nil || !strings.Contains(err.Error(), `line 2: unsupported JANUS setting "AcquistionMode"`) {
+		t.Fatalf("Classify() error = %v", err)
+	}
+}
+
+func TestClassifyDeclaresSubsystemOwners(t *testing.T) {
+	document, err := Parse(strings.NewReader("Open[0] usb:172.16.0.11:tdl:0:0\nHG_Gain 55\nPresetTime 10\nOF_RawData 1\nEHistoNbin 4K\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	classified, err := document.Classify()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Owner{OwnerTopology, OwnerHardware, OwnerRunControl, OwnerStorage, OwnerAnalysis}
+	for i := range want {
+		if classified[i].Owner != want[i] {
+			t.Errorf("assignment %d owner = %q, want %q", i, classified[i].Owner, want[i])
+		}
 	}
 }
 
