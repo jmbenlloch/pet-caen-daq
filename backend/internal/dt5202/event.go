@@ -14,21 +14,25 @@ const (
 )
 
 type Energy struct {
-	Channel                                uint8
-	LowGain, HighGain                      uint16
-	HasLowGain, HasHighGain, Discriminator bool
+	Channel       uint8  `json:"channel"`
+	LowGain       uint16 `json:"low_gain"`
+	HighGain      uint16 `json:"high_gain"`
+	HasLowGain    bool   `json:"has_low_gain"`
+	HasHighGain   bool   `json:"has_high_gain"`
+	Discriminator bool   `json:"discriminator"`
 }
 type Timing struct {
-	Channel uint8
-	ToA     uint16
-	ToT     uint16
+	Channel uint8  `json:"channel"`
+	ToA     uint16 `json:"toa"`
+	ToT     uint16 `json:"tot"`
 }
 type SpectroscopyEvent struct {
-	TriggerID, Timestamp uint64
-	ChannelMask          uint64
-	Energies             []Energy
-	Timings              []Timing
-	TimeReference        *uint32
+	TriggerID     uint64   `json:"trigger_id,string"`
+	Timestamp     uint64   `json:"timestamp,string"`
+	ChannelMask   uint64   `json:"channel_mask,string"`
+	Energies      []Energy `json:"energies"`
+	Timings       []Timing `json:"timings,omitempty"`
+	TimeReference *uint32  `json:"time_reference,omitempty"`
 }
 
 // DecodeSpectroscopy decodes a descriptor payload for spectroscopy, optionally

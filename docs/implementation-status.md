@@ -80,3 +80,15 @@ Implemented on 2026-07-20:
 - a real-socket integration path that starts four boards, issues one broadcast test pulse, captures four raw batches, decodes their energy/timing events live, and deterministically replays the captured batches offline.
 
 The simulator still needs explicit drain completion/fault behavior and broader event qualifiers. The raw format stores complete validated DT5215 batches; retaining malformed or connection-truncated byte fragments will require a lower-level transport journal if hardware validation shows that evidence is needed.
+
+## Phase 1 persisted test-pulse run
+
+Implemented on 2026-07-20:
+
+- a storage-independent test-pulse acquisition coordinator with the explicit sequence synchronize, clear stream, start, pulse, bounded drain, and stop;
+- unconditional stop after successful start, with stop failures joined to rather than replacing the primary acquisition failure;
+- raw capture before descriptor CRC validation or event decoding, followed by duplicate/unexpected-chain checks and typed spectroscopy/timing decoding;
+- JSONL decoded-event persistence with stable snake-case fields and all 64-bit identifiers, timestamps, masks, and sequences represented as decimal strings;
+- a complete simulator-backed persisted run integration test that produces four decoded events plus four raw batches, finalizes the manifest, removes the incomplete marker, and deterministically replays every raw event.
+
+This completes the initial Phase 1 test-pulse vertical slice for the currently implemented spectroscopy/timing path. It is intentionally a bounded one-pulse coordinator, not the Phase 2 long-running acquisition state machine. Remaining Phase 1 protocol breadth includes production configuration/Citiroc translation, other DT5202 event qualifiers, and simulator drain/fault modes.

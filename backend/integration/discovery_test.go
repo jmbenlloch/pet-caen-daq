@@ -6,17 +6,89 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/simulator"
 )
+
+func TestPersistedTestPulseRun(t *testing.T) {
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	run, err := runstore.Create(t.TempDir(), runstore.Manifest{RunID: "simulated-test-pulse", StartedAt: "2026-07-20T00:00:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = run.EnableRawCapture(); err != nil {
+		t.Fatal(err)
+	}
+	if err = acquisition.RunTestPulse(ctx, client, run, 4); err != nil {
+		run.Abort()
+		t.Fatal(err)
+	}
+	if err = run.Finalize("2026-07-20T00:00:01Z", "completed"); err != nil {
+		t.Fatal(err)
+	}
+	eventsFile, err := os.Open(filepath.Join(run.Directory(), "events.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer eventsFile.Close()
+	eventReader := runstore.NewReader(eventsFile, 0)
+	for sequence := uint64(1); sequence <= 4; sequence++ {
+		event, err := eventReader.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if event.Sequence != sequence {
+			t.Fatalf("sequence = %d, want %d", event.Sequence, sequence)
+		}
+	}
+	if _, err = eventReader.Next(); err != io.EOF {
+		t.Fatalf("events end = %v", err)
+	}
+	rawFile, err := os.Open(filepath.Join(run.Directory(), "wire.raw"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rawFile.Close()
+	replay, err := rawcapture.NewReader(rawFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for chain := 0; chain < 4; chain++ {
+		batch, err := replay.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		events, err := dt5215.DecodeStreamBatch(batch)
+		if err != nil || len(events) != 1 || int(events[0].Chain) != chain {
+			t.Fatalf("raw chain %d: %#v %v", chain, events, err)
+		}
+	}
+	if _, err = os.Stat(filepath.Join(run.Directory(), "incomplete")); !os.IsNotExist(err) {
+		t.Fatalf("incomplete marker: %v", err)
+	}
+}
 
 func TestControlAndPartialStreamWorkflow(t *testing.T) {
 	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())

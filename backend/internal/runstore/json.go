@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
 )
 
@@ -91,6 +93,20 @@ func (w *Writer) AppendRaw(batch []byte) error {
 		return errors.New("raw capture is not enabled")
 	}
 	return w.raw.Append(batch)
+}
+func (w *Writer) AppendDecoded(wire dt5215.StreamEvent, event dt5202.SpectroscopyEvent) error {
+	payload, err := json.Marshal(struct {
+		Chain     uint8                    `json:"chain"`
+		Node      uint8                    `json:"node"`
+		Qualifier uint8                    `json:"qualifier"`
+		TriggerID uint64                   `json:"trigger_id,string"`
+		Timestamp uint64                   `json:"timestamp,string"`
+		Event     dt5202.SpectroscopyEvent `json:"event"`
+	}{Chain: wire.Chain, Node: wire.Descriptor.Node, Qualifier: wire.Descriptor.Qualifier, TriggerID: wire.Descriptor.TriggerID, Timestamp: wire.Descriptor.Timestamp, Event: event})
+	if err != nil {
+		return fmt.Errorf("encode decoded event: %w", err)
+	}
+	return w.Append(Envelope{Kind: "spectroscopy_timing", Sequence: w.manifest.EventCount + 1, Payload: payload})
 }
 func (w *Writer) Append(e Envelope) error {
 	if w.closed {
