@@ -1,0 +1,61 @@
+version: "3"
+
+env:
+  GOCACHE: "{{.ROOT_DIR}}/.cache/go-build"
+  GOMODCACHE: "{{.ROOT_DIR}}/.cache/go-mod"
+
+vars:
+  GO_PACKAGES: ./...
+
+tasks:
+  default:
+    desc: List available project tasks
+    cmds:
+      - task --list
+
+  generate:
+    desc: Generate protobuf and ConnectRPC Go bindings
+    cmds:
+      - buf generate
+
+  format:
+    desc: Format project source
+    cmds:
+      - gofmt -w backend
+
+  format:check:
+    desc: Check source formatting without modifying files
+    cmds:
+      - test -z "$(gofmt -l backend)"
+
+  lint:
+    desc: Run static and schema checks
+    deps: [format:check]
+    cmds:
+      - go vet {{.GO_PACKAGES}}
+      - buf lint
+
+  test:unit:
+    desc: Run Go unit tests
+    cmds:
+      - go test {{.GO_PACKAGES}}
+
+  test:integration:
+    desc: Run Go integration tests
+    cmds:
+      - go test -tags=integration ./backend/integration/...
+
+  test:
+    desc: Run all tests that do not require hardware
+    deps: [test:unit, test:integration]
+
+  build:
+    desc: Build backend and simulator commands
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq
+      - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
+
+  ci:
+    desc: Run the required local equivalent of CI
+    deps: [lint, test, build]

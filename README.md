@@ -10,9 +10,15 @@ The planned system has:
 - a deterministic DT5215/DT5202 simulator;
 - unit, integration, protocol-conformance, and end-to-end tests.
 
-This repository is currently in its documentation and architecture-definition phase. No production implementation has been selected or scaffolded yet.
+The first protocol vertical slice is implemented: the backend parses the production JANUS configuration, connects to the DT5215 control and data ports, discovers and validates the provisioned four-link topology, and reads board identity/status registers. A deterministic TCP simulator exercises the same native binary protocol in integration tests.
 
-Project workflows will use [Task](https://taskfile.dev/docs/installation) through a root `Taskfile.yml`. Until implementation scaffolding begins, installation follows the official Task documentation; the project version will be pinned when the initial toolchain is selected.
+Project workflows use [Task](https://taskfile.dev/docs/installation) through the root `Taskfile.yml`.
+
+```sh
+task generate
+task test
+task ci
+```
 
 ## Start here
 
@@ -24,6 +30,7 @@ Project workflows will use [Task](https://taskfile.dev/docs/installation) throug
 - [Production JANUS fixture provenance](test/fixtures/janus/README.md)
 - [Production Run 54 replay fixture](test/fixtures/runs/run54/README.md)
 - [Implementation roadmap](docs/roadmap.md)
+- [Current implementation status](docs/implementation-status.md)
 
 ## Current hardware boundary
 

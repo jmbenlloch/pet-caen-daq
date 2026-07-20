@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package pet.caen.daq.v1;
+
+option go_package = "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1;daqv1";
+
+service SystemService {
+  rpc GetSystemSnapshot(GetSystemSnapshotRequest) returns (GetSystemSnapshotResponse) {}
+  rpc ValidateConfiguration(ValidateConfigurationRequest) returns (ValidateConfigurationResponse) {}
+}
+
+message GetSystemSnapshotRequest {}
+
+message GetSystemSnapshotResponse {
+  string instance_id = 1;
+  SystemState state = 2;
+  repeated Chain chains = 3;
+}
+
+enum SystemState {
+  SYSTEM_STATE_UNSPECIFIED = 0;
+  SYSTEM_STATE_DISCONNECTED = 1;
+  SYSTEM_STATE_IDLE = 2;
+  SYSTEM_STATE_FAULT = 3;
+}
+
+message Chain {
+  uint32 index = 1;
+  bool enabled = 2;
+  repeated Board boards = 3;
+}
+
+message Board {
+  uint32 node = 1;
+  uint32 product_id = 2;
+  uint32 fpga_firmware = 3;
+}
+
+message ValidateConfigurationRequest {
+  string janus_configuration = 1;
+}
+
+message ValidateConfigurationResponse {
+  bool valid = 1;
+  repeated string errors = 2;
+}
