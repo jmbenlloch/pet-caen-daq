@@ -5,7 +5,8 @@ This roadmap orders discovery and risk reduction. It does not commit to dates.
 ## Phase 0: repository and decisions
 
 - Establish project guidance and protocol evidence notes.
-- Select pinned Go, Node, Vue, Tailwind, protobuf, Buf, ConnectRPC, and test-tool versions.
+- Select pinned Go, Node, Vue, Tailwind, ConnectRPC, Buf CLI/plugin, and test-tool versions.
+- Add the Buf module, lint, breaking-change, and generation configuration.
 - Decide monorepo build commands and generated-code policy.
 - Define the initial protobuf API and configuration units.
 - Record ADRs for FERSlib integration, storage format, and telemetry transport.

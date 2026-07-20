@@ -9,7 +9,7 @@ Build a reliable, observable, testable DAQ for four CAEN DT5202 boards behind a 
 ## Required architecture
 
 - Backend: Go.
-- API: Protocol Buffers and ConnectRPC. The `.proto` definitions are the contract and must not be duplicated manually in Go or TypeScript.
+- API: Protocol Buffers and ConnectRPC, managed with Buf. The `.proto` definitions are the contract and must not be duplicated manually in Go or TypeScript.
 - Frontend: Vue.js with TypeScript and Tailwind CSS.
 - Hardware development: a simulator must support development and CI without physical CAEN hardware.
 - Deployment and reproducible tooling may use Docker and Docker Compose.
@@ -82,6 +82,7 @@ Tests and documentation must not silently upgrade an inference to a verified fac
 - Never log credentials or unrestricted event payloads by default.
 - Frontend code must be TypeScript, accessible, and resilient to reconnects and stale state.
 - Generated protobuf/Connect files must be reproducible and must not be hand-edited.
+- Use Buf for protobuf linting, breaking-change detection, dependency management, and code generation. Do not invoke language-specific protobuf generators through parallel ad hoc scripts.
 
 ## Test requirements
 

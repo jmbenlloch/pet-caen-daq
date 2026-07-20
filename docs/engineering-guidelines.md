@@ -4,6 +4,10 @@
 
 Define public messages and services in `api/` before implementing cross-component behavior. Use protobuf package names and versioned API namespaces deliberately. Prefer additive API evolution; never reuse removed field numbers. Validate requests in the backend even if the UI already validates them.
 
+Buf is the protobuf toolchain entry point. The repository will use committed Buf configuration for module/dependency management, linting, compatibility checks, and generation of Go and TypeScript ConnectRPC bindings. Generation must be deterministic and exposed through one documented project command.
+
+CI must run `buf lint`, verify generated files are current, and run `buf breaking` against the configured baseline once the first API is published. Exceptions to lint or compatibility policy require an explanation in the change that introduces them.
+
 ConnectRPC unary methods suit commands and snapshots. Server streams suit state/telemetry updates where supported by the deployment path. Design reconnect semantics: a client that reconnects must obtain a complete snapshot before applying incremental updates.
 
 ## Configuration
@@ -57,7 +61,7 @@ Logs complement metrics and must contain actionable context, not duplicate every
 
 ## Dependencies and generated artifacts
 
-- Pin direct dependency and tool versions.
+- Pin direct dependency and tool versions, including the Buf CLI and protobuf plugins.
 - Prefer maintained, narrowly scoped dependencies.
 - Commit generated API code only if the chosen build/consumer workflow requires it; whichever policy is selected must be consistent and checked in CI.
 - Docker images should be multi-stage, run as non-root, and contain only runtime requirements.
