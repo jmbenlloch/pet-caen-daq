@@ -1,0 +1,33 @@
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Go
+/bin/
+*.test
+coverage*.out
+
+# Node/Vue
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Generated runtime data
+data/
+*.log
+*.pcap
+*.pcapng
+*.frd
+
+# Local tooling
+.cache/
+.tmp/
