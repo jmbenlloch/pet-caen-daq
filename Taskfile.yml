@@ -56,6 +56,17 @@ tasks:
       - go build -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq
       - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
 
+  build-win:
+    desc: Build backend and simulator commands for Windows on amd64
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: "0"
+    cmds:
+      - mkdir -p bin
+      - go build -o bin/pet-caen-daq.exe ./backend/cmd/pet-caen-daq
+      - go build -o bin/caen-simulator.exe ./backend/cmd/caen-simulator
+
   ci:
     desc: Run the required local equivalent of CI
     deps: [lint, test, build]
