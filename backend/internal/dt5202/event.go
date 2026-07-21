@@ -398,7 +398,9 @@ func DecodeService(timestamp uint64, payload []byte) (ServiceEvent, error) {
 			return ServiceEvent{}, fmt.Errorf("service HV section needs %d bytes, got %d", need, len(p))
 		}
 		v := float64(binary.LittleEndian.Uint32(p)) / 10000
-		i := float64(binary.LittleEndian.Uint32(p[4:])) / 10000
+		// The wire value is scaled by 10,000 in mA. The project API exposes
+		// hv_current_a, so convert the decoded monitor value to amperes.
+		i := float64(binary.LittleEndian.Uint32(p[4:])) / 10000000
 		statusWord := binary.LittleEndian.Uint32(p[8:])
 		det := float64(statusWord&0x1fff) * 256 / 10000
 		hv := float64((statusWord>>13)&0x1fff) * 256 / 10000

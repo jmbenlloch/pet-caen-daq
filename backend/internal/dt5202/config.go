@@ -191,7 +191,29 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
-	acqControl := acqMode | tot<<8 | gainSelect<<12 | validationMode<<24 | trgID<<26 | countingMode<<27 | cntZS<<30
+	// JANUS/FERSlib defaults DT5202 service events to 3: HV monitoring and
+	// counters. Preserve that behavior when older configuration files omit the
+	// setting, while allowing an explicit operator override.
+	serviceEvents := uint32(3)
+	if a, ok := values["EnableServiceEvents"]; ok {
+		switch strings.ToUpper(strings.TrimSpace(a.Value)) {
+		case "DISABLED":
+			serviceEvents = 0
+		case "ENABLED":
+			serviceEvents = 3
+		default:
+			v, parseErr := strconv.ParseUint(strings.TrimSpace(a.Value), 0, 2)
+			if parseErr != nil {
+				return ConfigurationPlan{}, fmt.Errorf("line %d: EnableServiceEvents must be DISABLED, ENABLED, or a value from 0 to 3", a.Line)
+			}
+			serviceEvents = uint32(v)
+		}
+	}
+	if acqMode == 4 {
+		// FERSlib restricts counting mode to the HV service section.
+		serviceEvents &= 1
+	}
+	acqControl := acqMode | tot<<8 | gainSelect<<12 | serviceEvents<<18 | validationMode<<24 | trgID<<26 | countingMode<<27 | cntZS<<30
 
 	mask0, err := u32("ChEnableMask0", 32)
 	if err != nil {

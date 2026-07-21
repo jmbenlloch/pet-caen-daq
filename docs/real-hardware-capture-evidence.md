@@ -68,6 +68,8 @@ The `go_data_taking*.pcap` series records successive native run-control correcti
 - `wire.raw` (38,796,980 bytes): `721e280831636d6d00679267f428ce146ff20a51e3dd3b934a764db4988c9376`;
 - `transport.journal` (46,926,672 bytes): `9858234f2b0ce1296eb9a45c1aa46ec20ef0b2a7f4e2c52ddae4223dafa2f093`.
 
+That reference run predates native service-event enablement and therefore contains no qualifier-`0x2f` monitoring records. The production planner now matches the JANUS/FERSlib default by setting acquisition-control bits 18--19 to `3` (HV monitoring plus counters) when `EnableServiceEvents` is absent. Explicit values `DISABLED`, `ENABLED`, or `0`--`3` are supported; counting mode is restricted to the HV service section as in FERSlib. Service-event current is converted from the CAEN wire unit (10,000 counts per mA) to amperes for the public `hv_current_a` field.
+
 SiPM HV was enabled externally with JANUS before this run and JANUS was then disconnected. The native backend reported `hv_authorized=false`, so this sample proves acquisition with preserved externally established HV state, not native HV peripheral configuration or authorization.
 
 ### `go_concentrator_no_janus_web.pcap`

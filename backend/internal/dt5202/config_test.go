@@ -34,7 +34,7 @@ func TestPlanProductionConfiguration(t *testing.T) {
 			writes[write.Address] = write.Value
 		}
 		checks := map[Register]uint32{
-			AcquisitionControl: 0x40003003, RunMask: 1, TriggerMask: 0x41,
+			AcquisitionControl: 0x400c3003, RunMask: 1, TriggerMask: 0x41,
 			TimeReferenceMask: 0x40, TimeReferenceWindow: 2000, TimeReferenceDelay: 0x000fffc2,
 			DwellTime: 125000, TriggerLogicDefinition: 0x404, TimeCoarseThreshold: wantTD[board],
 			ChargeCoarseThreshold: 250, LowGainShapingTime: 0, HighGainShapingTime: 0,
@@ -74,6 +74,62 @@ func TestPlanProductionConfiguration(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestPlanProductionConfigurationServiceEventModes(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, mode, setting string
+		want                uint32
+	}{
+		{"default", "SPECT_TIMING", "", 3},
+		{"disabled", "SPECT_TIMING", "DISABLED", 0},
+		{"hv only", "SPECT_TIMING", "1", 1},
+		{"counters only", "SPECT_TIMING", "2", 2},
+		{"enabled", "SPECT_TIMING", "ENABLED", 3},
+		{"counting masks counters", "COUNTING", "3", 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			text := string(fixture) + "\nAcquisitionMode " + test.mode + "\n"
+			if test.setting != "" {
+				text += "EnableServiceEvents " + test.setting + "\n"
+			}
+			doc, parseErr := janusconfig.Parse(strings.NewReader(text))
+			if parseErr != nil {
+				t.Fatal(parseErr)
+			}
+			plan, planErr := PlanProductionConfiguration(doc, 0)
+			if planErr != nil {
+				t.Fatal(planErr)
+			}
+			var control uint32
+			for _, write := range plan.Writes {
+				if write.Address == AcquisitionControl {
+					control = write.Value
+				}
+			}
+			if got := (control >> 18) & 3; got != test.want {
+				t.Fatalf("service-event mode = %d, want %d (acquisition control %#08x)", got, test.want, control)
+			}
+		})
+	}
+}
+
+func TestPlanProductionConfigurationRejectsInvalidServiceEventMode(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := janusconfig.Parse(strings.NewReader(string(fixture) + "\nEnableServiceEvents 4\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = PlanProductionConfiguration(doc, 0); err == nil || !strings.Contains(err.Error(), "value from 0 to 3") {
+		t.Fatalf("PlanProductionConfiguration() error = %v", err)
 	}
 }
 

@@ -123,7 +123,7 @@ func TestDecodeServiceGoldenVersions(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := e.Service
-	if s.Version != 1 || s.Format != 3 || s.Status == nil || *s.Status != 0x4321 || s.BoardTemperature == nil || *s.BoardTemperature != 25 || s.HVVoltage == nil || *s.HVVoltage != 45.4 || !s.HVOn || !s.HVOverCurrent || s.HVRamping || s.HVOverVoltage || len(s.Counters) != 1 || s.Counters[0] != (ServiceCounter{7, 88}) || s.TORCount != 99 || s.QORCount != 111 {
+	if s.Version != 1 || s.Format != 3 || s.Status == nil || *s.Status != 0x4321 || s.BoardTemperature == nil || *s.BoardTemperature != 25 || s.HVVoltage == nil || *s.HVVoltage != 45.4 || s.HVCurrent == nil || *s.HVCurrent != 0.001 || !s.HVOn || !s.HVOverCurrent || s.HVRamping || s.HVOverVoltage || len(s.Counters) != 1 || s.Counters[0] != (ServiceCounter{7, 88}) || s.TORCount != 99 || s.QORCount != 111 {
 		t.Fatalf("service = %#v", s)
 	}
 	unknown, err := DecodeService(1, words(2<<24, 0x12345678))
