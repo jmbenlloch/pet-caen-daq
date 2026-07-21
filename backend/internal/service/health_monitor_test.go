@@ -15,11 +15,13 @@ type mutableRunHealth struct {
 	pipeline acquisition.PipelineStats
 	storage  runpipeline.StorageStats
 	boards   []runpipeline.BoardStats
+	elapsed  time.Duration
 }
 
 func (s *mutableRunHealth) PipelineStats() acquisition.PipelineStats { return s.pipeline }
 func (s *mutableRunHealth) StorageStats() runpipeline.StorageStats   { return s.storage }
 func (s *mutableRunHealth) BoardStats() []runpipeline.BoardStats     { return s.boards }
+func (s *mutableRunHealth) StatisticsElapsed() time.Duration         { return s.elapsed }
 
 func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 	publisher, _ := telemetry.NewPublisher("instance-a", &daqv1.TelemetrySnapshot{CurrentRun: &daqv1.RunSummary{RunId: "42"}, Chains: []*daqv1.Chain{{Index: 0, Boards: []*daqv1.Board{{Node: 0}}}}}, nil)
@@ -27,7 +29,8 @@ func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 	source := &mutableRunHealth{
 		pipeline: acquisition.PipelineStats{Capacity: 8, QueueDepth: 2, AcceptedBatches: 3},
 		storage:  runpipeline.StorageStats{Directory: "/runs/run-42", BytesWritten: 100, EventCount: 2, RawBatches: 1},
-		boards:   []runpipeline.BoardStats{{Chain: 0, Node: 0, EventCount: 2, FPGATemperature: &temperature, HVVoltage: &voltage, HVCurrent: &current, HVOn: true}},
+		boards:   []runpipeline.BoardStats{{Chain: 0, Node: 0, EventCount: 2, TriggerCount: 2, TriggerID: 9, DataBytes: 64, FPGATemperature: &temperature, HVVoltage: &voltage, HVCurrent: &current, HVOn: true}},
+		elapsed:  2 * time.Second,
 	}
 	ticks := make(chan time.Time)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -44,6 +47,9 @@ func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 	}
 	if first.Pipeline.GetQueueDepth() != 2 || first.Storage.GetBytesWritten() != 100 || first.CurrentRun.GetEventCount() != 2 || first.Chains[0].Boards[0].GetFpgaTemperatureC() != temperature || !first.Chains[0].Boards[0].GetHvOn() {
 		t.Fatalf("immediate snapshot = %+v", first)
+	}
+	if first.Statistics.GetElapsedMilliseconds() != 2000 || first.Statistics.Boards[0].GetTriggerId() != 9 || first.Statistics.Boards[0].GetDataBytes() != 64 {
+		t.Fatalf("statistics = %+v", first.Statistics)
 	}
 	source.pipeline.QueueDepth = 0
 	source.pipeline.DecodedEvents = 9

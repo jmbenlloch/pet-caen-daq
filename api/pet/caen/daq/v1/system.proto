@@ -138,6 +138,28 @@ message TelemetrySnapshot {
   PipelineTelemetry pipeline = 7;
   StorageTelemetry storage = 8;
   repeated Diagnostic diagnostics = 9;
+  StatisticsTelemetry statistics = 10;
+}
+
+message StatisticsTelemetry {
+  // Cumulative counters for the current run. Clients derive interval views by
+  // subtracting snapshots, so changing display mode never mutates acquisition.
+  uint64 elapsed_milliseconds = 1;
+  repeated BoardStatistics boards = 2;
+}
+
+message BoardStatistics {
+  uint32 chain = 1;
+  uint32 node = 2;
+  uint64 timestamp = 3;
+  uint64 trigger_id = 4;
+  uint64 trigger_count = 5;
+  uint64 lost_trigger_count = 6;
+  uint64 event_build_count = 7;
+  uint64 data_bytes = 8;
+  repeated uint64 channel_trigger_counts = 9;
+  repeated uint64 timestamp_counts = 10;
+  repeated uint64 pha_counts = 11;
 }
 
 enum SystemState {

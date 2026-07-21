@@ -77,6 +77,14 @@ multi-board enable rolls already-enabled targets back off. The channel adjustmen
 dialog calculates live `Vnom`, and `TempSensType` accepts either a named sensor
 or custom `c0 c1 c2` coefficients.
 
+The Statistics tab now consumes cumulative run evidence published with each
+complete telemetry snapshot. It provides JANUS-equivalent all-board timestamp,
+trigger ID/rate, lost-trigger percentage, event-build percentage, and data-rate
+columns; per-board 64-channel trigger, timestamp, and PHA views; and an Integral
+switch between cumulative counts and latest-interval rates. Typed global cards
+show pipeline, persistence, and elapsed-run statistics without resetting or
+commanding the active acquisition when the display mode changes.
+
 The run-control client now retains the authoritative completed `RunSummary`
 returned by `StopRun` rather than trying to reconstruct completion from the next
 telemetry snapshot. The dashboard presents the latest run's termination reason,

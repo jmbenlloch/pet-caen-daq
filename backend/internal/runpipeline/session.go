@@ -60,7 +60,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 			return nil, err
 		}
 	}
-	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, boards: make(map[boardKey]BoardStats)}
+	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: options.Now()}
 	pipeline, err := acquisition.NewPipeline(options.Capacity, options.Backpressure, sink)
 	if err != nil {
 		_ = writer.Abort()
@@ -166,6 +166,8 @@ type sink struct {
 	rawBatches atomic.Uint64
 	mu         sync.Mutex
 	boards     map[boardKey]BoardStats
+	now        func() time.Time
+	startedAt  time.Time
 }
 
 type boardKey struct{ chain, node uint8 }
@@ -185,6 +187,15 @@ type BoardStats struct {
 	HVOverCurrent       bool
 	HVOverVoltage       bool
 	AcquisitionStatus   *uint16
+	Timestamp           uint64
+	TriggerID           uint64
+	TriggerCount        uint64
+	LostTriggerCount    uint64
+	EventBuildCount     uint64
+	DataBytes           uint64
+	ChannelTriggerCount [dt5202.ChannelCount]uint64
+	TimestampCount      [dt5202.ChannelCount]uint64
+	PHACount            [dt5202.ChannelCount]uint64
 }
 
 func (s *sink) AppendRaw(raw []byte) error {
@@ -206,6 +217,17 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 	key := boardKey{chain: wire.Chain, node: wire.Descriptor.Node}
 	board := s.boards[key]
 	board.Chain, board.Node, board.EventCount = key.chain, key.node, board.EventCount+1
+	board.DataBytes += uint64(len(wire.Payload))
+	if event.Kind != dt5202.EventService {
+		board.EventBuildCount++
+		board.TriggerCount++
+		if board.TriggerCount > 1 && wire.Descriptor.TriggerID > board.TriggerID+1 {
+			board.LostTriggerCount += wire.Descriptor.TriggerID - board.TriggerID - 1
+		}
+		board.TriggerID = wire.Descriptor.TriggerID
+		board.Timestamp = wire.Descriptor.Timestamp
+	}
+	accumulateChannels(&board, event)
 	if service := event.Service; service != nil {
 		board.FPGATemperature = cloneFloat(service.FPGATemperature)
 		board.BoardTemperature = cloneFloat(service.BoardTemperature)
@@ -223,6 +245,36 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 	s.boards[key] = board
 	s.mu.Unlock()
 	return nil
+}
+
+func accumulateChannels(board *BoardStats, event dt5202.Event) {
+	switch event.Kind {
+	case dt5202.EventSpectroscopy:
+		for _, energy := range event.Spectroscopy.Energies {
+			board.PHACount[energy.Channel]++
+			board.TimestampCount[energy.Channel]++
+			if energy.Discriminator {
+				board.ChannelTriggerCount[energy.Channel]++
+			}
+		}
+	case dt5202.EventTiming:
+		for _, hit := range event.Timing.Hits {
+			board.ChannelTriggerCount[hit.Channel]++
+			board.TimestampCount[hit.Channel]++
+		}
+	case dt5202.EventCounting:
+		for _, count := range event.Counting.Counts {
+			board.ChannelTriggerCount[count.Channel] += uint64(count.Value)
+		}
+	case dt5202.EventService:
+		for _, counter := range event.Service.Counters {
+			board.ChannelTriggerCount[counter.Channel] += uint64(counter.Value)
+		}
+	}
+}
+
+func (s *Session) StatisticsElapsed() time.Duration {
+	return s.sink.now().Sub(s.sink.startedAt)
 }
 
 func (s *sink) BoardStats() []BoardStats {

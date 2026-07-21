@@ -19,6 +19,11 @@ type BoardHealthSource interface {
 	BoardStats() []runpipeline.BoardStats
 }
 
+type StatisticsSource interface {
+	BoardStats() []runpipeline.BoardStats
+	StatisticsElapsed() time.Duration
+}
+
 // HealthMonitor publishes one complete, coalesced snapshot per sample. Tick is
 // injectable for deterministic tests; production callers normally use Interval.
 type HealthMonitor struct {
@@ -78,7 +83,8 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 		snapshot.CurrentRun.Incomplete = !storage.Finalized
 	}
 	if boards, ok := m.Source.(BoardHealthSource); ok {
-		for _, observation := range boards.BoardStats() {
+		observations := boards.BoardStats()
+		for _, observation := range observations {
 			for _, chain := range snapshot.Chains {
 				if chain.Index != uint32(observation.Chain) {
 					continue
@@ -117,6 +123,23 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 				}
 			}
 		}
+		if statistics, ok := m.Source.(StatisticsSource); ok {
+			elapsed := statistics.StatisticsElapsed().Milliseconds()
+			if elapsed < 0 {
+				elapsed = 0
+			}
+			snapshot.Statistics = &daqv1.StatisticsTelemetry{ElapsedMilliseconds: uint64(elapsed)}
+			for _, observation := range observations {
+				snapshot.Statistics.Boards = append(snapshot.Statistics.Boards, &daqv1.BoardStatistics{
+					Chain: observationChain(observation), Node: uint32(observation.Node), Timestamp: observation.Timestamp,
+					TriggerId: observation.TriggerID, TriggerCount: observation.TriggerCount, LostTriggerCount: observation.LostTriggerCount,
+					EventBuildCount: observation.EventBuildCount, DataBytes: observation.DataBytes,
+					ChannelTriggerCounts: observation.ChannelTriggerCount[:], TimestampCounts: observation.TimestampCount[:], PhaCounts: observation.PHACount[:],
+				})
+			}
+		}
 	}
 	return m.Publisher.Publish(snapshot)
 }
+
+func observationChain(observation runpipeline.BoardStats) uint32 { return uint32(observation.Chain) }

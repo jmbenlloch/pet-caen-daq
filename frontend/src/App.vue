@@ -6,6 +6,7 @@ import BoardOverrides from './BoardOverrides.vue'
 import ChannelOverrides from './ChannelOverrides.vue'
 import MaskEditor from './MaskEditor.vue'
 import NumericField from './NumericField.vue'
+import StatisticsTab from './StatisticsTab.vue'
 import {
   isBooleanField,
   isMaskField,
@@ -761,6 +762,12 @@ onMounted(() => daq.connect())
           <p v-if="!daq.runHistory.value.length" class="empty">No stored runs found.</p>
         </div>
       </section>
+
+      <StatisticsTab
+        :statistics="daq.snapshot.value?.statistics"
+        :pipeline="daq.snapshot.value?.pipeline"
+        :storage="daq.snapshot.value?.storage"
+      />
 
       <section class="boards-section" aria-labelledby="boards-heading">
         <div class="section-title">

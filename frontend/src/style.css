@@ -933,6 +933,95 @@ textarea {
 .empty {
   color: #72869f;
 }
+.statistics {
+  margin-top: 32px;
+}
+.statistics-title {
+  align-items: flex-end;
+}
+.statistics-controls,
+.statistics-board-tabs,
+.statistics-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.statistics-controls {
+  align-items: flex-end;
+}
+.statistics-controls label:not(.switch) {
+  min-width: 180px;
+}
+.compact-switch {
+  min-height: 42px;
+}
+.statistics-summary {
+  margin: 20px 0;
+}
+.statistics-summary span {
+  display: flex;
+  flex-direction: column;
+  min-width: 130px;
+  border-left: 2px solid #31445d;
+  padding-left: 10px;
+  color: #8396ae;
+  font-size: 0.72rem;
+}
+.statistics-summary strong {
+  color: #e7eef7;
+  font-size: 1rem;
+}
+.statistics-board-tabs button[aria-selected='true'] {
+  border-color: #3acb9f;
+  background: #17372f;
+  color: #7be7c4;
+}
+.statistics-table-wrap {
+  margin-top: 16px;
+  overflow-x: auto;
+}
+.statistics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.statistics-table th,
+.statistics-table td {
+  border-bottom: 1px solid #26374d;
+  padding: 10px;
+  text-align: right;
+  white-space: nowrap;
+}
+.statistics-table th:first-child,
+.statistics-table td:first-child {
+  text-align: left;
+}
+.channel-statistics {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(86px, 1fr));
+  gap: 7px;
+  margin-top: 16px;
+}
+.channel-statistic {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #2a3d55;
+  border-radius: 6px;
+  padding: 8px;
+  text-align: right;
+}
+.channel-statistic span {
+  color: #7589a2;
+  font-size: 0.65rem;
+}
+.channel-statistic strong {
+  font-size: 0.78rem;
+}
+.statistics-caption {
+  grid-column: 1 / -1;
+  color: #8194ac;
+  font-size: 0.72rem;
+}
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -953,6 +1042,9 @@ textarea {
   }
   .artifacts {
     grid-template-columns: 1fr 1fr;
+  }
+  .channel-statistics {
+    grid-template-columns: repeat(4, minmax(80px, 1fr));
   }
 }
 @media (max-width: 620px) {
@@ -1042,5 +1134,8 @@ textarea {
   .mask-footer code {
     margin: 0 0 5px;
     text-align: center;
+  }
+  .channel-statistics {
+    grid-template-columns: repeat(2, minmax(90px, 1fr));
   }
 }

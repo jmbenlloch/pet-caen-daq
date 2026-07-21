@@ -121,3 +121,37 @@ func TestSessionRetainsLatestBoardServiceTelemetry(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSessionAccumulatesBoardAndChannelStatistics(t *testing.T) {
+	now := time.Unix(100, 0)
+	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return now }}}
+	created, err := factory.New("statistics", acquisition.RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := created.(*Session)
+	event := dt5202.Event{Kind: dt5202.EventSpectroscopy, Spectroscopy: &dt5202.SpectroscopyEvent{Energies: []dt5202.Energy{{Channel: 3, Discriminator: true}, {Channel: 7}}}}
+	if err := session.sink.AppendEvent(dt5215.StreamEvent{Chain: 1, Descriptor: dt5215.Descriptor{Node: 2, TriggerID: 10, Timestamp: 1000}, Payload: make([]byte, 24)}, event); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.sink.AppendEvent(dt5215.StreamEvent{Chain: 1, Descriptor: dt5215.Descriptor{Node: 2, TriggerID: 13, Timestamp: 1100}, Payload: make([]byte, 16)}, event); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(2 * time.Second)
+	stats := session.BoardStats()[0]
+	if stats.TriggerCount != 2 || stats.LostTriggerCount != 2 || stats.EventBuildCount != 2 || stats.TriggerID != 13 || stats.Timestamp != 1100 || stats.DataBytes != 40 {
+		t.Fatalf("board statistics = %+v", stats)
+	}
+	if stats.ChannelTriggerCount[3] != 2 || stats.TimestampCount[3] != 2 || stats.PHACount[3] != 2 || stats.PHACount[7] != 2 {
+		t.Fatalf("channel statistics = triggers %v timestamps %v pha %v", stats.ChannelTriggerCount, stats.TimestampCount, stats.PHACount)
+	}
+	if session.StatisticsElapsed() != 2*time.Second {
+		t.Fatalf("elapsed = %s", session.StatisticsElapsed())
+	}
+	if err := session.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Abort(); err != nil {
+		t.Fatal(err)
+	}
+}

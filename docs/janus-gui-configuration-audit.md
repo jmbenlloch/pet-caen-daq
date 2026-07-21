@@ -22,12 +22,13 @@ This report uses four implementation states:
   reason; it does not reproduce JANUS output/analysis behavior.
 - **Missing**: absent from the accepted schema, UI, or runtime.
 
-The frontend currently obtains definitions from comments in the loaded sample,
-not directly from `param_defs.txt`. Consequently every sample assignment is
-editable, options become selects when its comment contains `Options:`, known
-numeric fields get steppers/ranges, masks get a 64-channel editor, known board
-fields get four-board overrides, and seven channel fields get a 4 x 64 exception
-editor. Parameters absent from the sample do not appear.
+The frontend parses the checked-in `param_defs_5.0.0.txt` into a typed catalog
+and merges it with the loaded configuration. Catalog scope, choices, ranges,
+units, and activation dependencies therefore remain available even when the
+sample comments omit them. Masks get a 64-channel editor, board fields get four
+effective values and overrides, and channel fields get a 4 x 64 exception
+editor. A parameter still needs an assignment in the configuration document to
+appear in the editor; catalog-only defaults are not synthesized.
 
 ## Summary
 
@@ -38,18 +39,13 @@ discriminator, gain, shaping, probe, test-pulse, HV, per-board and per-channel
 settings are translated to native FPGA/Citiroc/HV operations and verified. The
 largest gaps are JANUS job scheduling, automatic stop modes, event building,
 online histograms, JANUS output formats/rotation, raw register access, and the
-full live statistics/log/HV-monitor experience.
+full historical log experience.
 
 High-priority frontend gaps after the current milestones are:
 
-1. Generate the form from a checked-in JANUS definition catalog instead of
-   relying on comments in one sample file.
-2. Add dependent enable/disable behavior (mode-specific fields, test-pulse and
+1. Add dependent enable/disable behavior (mode-specific fields, test-pulse and
    probe dependencies, jobs, output-size controls).
-3. Show effective per-channel values rather than only exception counts, notably
-   JANUS's computed `Vnom` for HV adjustment.
-4. Add safe live HV controls/monitoring and richer per-board telemetry.
-5. Decide whether run-control/output/analysis options will be implemented or
+2. Decide whether run-control/output/analysis options will be implemented or
    rejected instead of appearing operational merely because they parse.
 
 ## Connect tab
@@ -198,10 +194,10 @@ High-priority frontend gaps after the current milestones are:
 
 | Element | JANUS effect | pet-caen-daq status |
 |---|---|---|
-| Board selector + 64 channel cells | Displays per-channel live rate/count/statistic for one board. | **Missing.** Current telemetry has run-level event count and board health, not 64-channel live statistics. |
-| All Boards Statistics | Switches to a board table containing timestamp, trigger ID, trigger rate, lost trigger %, event-build %, and data rate. | **Partial.** Topology and run totals exist, but not this table or most metrics. |
-| Integral | Switches statistics between interval and integrated mode and commands JANUS (`I0/I1`). | **Missing.** |
-| Dynamic global statistics | JANUS creates labels/values announced by the DAQ process. | **Missing.** Diagnostics and snapshots use a fixed protobuf schema. |
+| Board selector + 64 channel cells | Displays per-channel live rate/count/statistic for one board. | **Complete.** Each active board has a 64-cell view. Trigger statistics accumulate discriminator/timing hits or hardware counter values; timestamp statistics accumulate timestamp-bearing channel hits; PHA statistics accumulate decoded channel energies. |
+| All Boards Statistics | Switches to a board table containing timestamp, trigger ID, trigger rate, lost trigger %, event-build %, and data rate. | **Complete.** Cumulative acquisition evidence supplies every table column and updates with the telemetry cadence. |
+| Integral | Switches statistics between interval and integrated mode and commands JANUS (`I0/I1`). | **Complete in equivalent form.** The switch selects cumulative counts or deltas/rates from consecutive snapshots without resetting acquisition counters. |
+| Dynamic global statistics | JANUS creates labels/values announced by the DAQ process. | **Complete for project runtime metrics.** Decoded events, accepted/rejected batches, persisted size, and elapsed run time are shown from typed telemetry. |
 
 ## Log tab
 
@@ -231,7 +227,7 @@ part of the operator-facing JANUS GUI and affect acquisition or analysis.
 | Binary-to-CSV converter | Selects JANUS binary files, optionally converts ToA/ToT to ns, optionally emits a file-name list, and invokes the converter. | **Missing.** Project artifacts use JSON Lines and have no JANUS binary writer/converter UI. |
 | Run number spinbox | Selects numeric run 0–10000 and participates in jobs/file naming. | **Replaced.** Web runs use a required path-safe string run ID plus requester identity. |
 | Plot Type | Selects PHA LG/HG, ToA, ToT, channel trigger rate, MCS, waveform, 2-D trigger/charge, staircase, or hold-delay plots. | **Missing.** No online plotting subsystem. |
-| Statistics Type | Selects channel trigger rate/count, timestamp rate/count, or PHA rate/count. | **Missing.** |
+| Statistics Type | Selects channel trigger rate/count, timestamp rate/count, or PHA rate/count. | **Complete.** Type selects the counter family and Integral selects count versus live interval rate. |
 | Apply | Saves changed controls and applies configuration when state permits. | **Replaced.** Validate and Start are explicit; Start applies the validated configuration transactionally. There is no separate mutate-hardware-only action in the web UI. |
 | Status/run LEDs and text | Shows JanusC connection/acquisition status and run activity. | **Complete in equivalent form.** The dashboard shows live/stale connection, system state, active run, sequence, and diagnostics. |
 | External configuration macros | Adds/removes multiple macro config files, enables selected files, orders them, and appends their overrides. | **Missing.** Only one resolved configuration document is loaded. |
@@ -263,13 +259,9 @@ part of the operator-facing JANUS GUI and affect acquisition or analysis.
 2. **Truthful runtime semantics:** mark automatic stop, event building, jobs,
    output formats, and analysis as unsupported during validation until each has
    an actual consumer; do not report them as applied solely because they parse.
-3. **Remaining scoped UI:** make all board/channel rendering catalog-driven,
-   show exception values and effective values, and add `Vnom` calculation.
-4. **Dependent controls:** mode-aware visibility and enabled state for counting,
+3. **Dependent controls:** mode-aware visibility and enabled state for counting,
    timing, spectroscopy, probes, test pulse, jobs, and output rotation.
-5. **Operational telemetry:** per-board HV monitor/ramp/fault state followed by
-   per-channel and all-board statistics.
-6. **Expert diagnostics:** if required, implement an explicitly authorized,
+4. **Expert diagnostics:** if required, implement an explicitly authorized,
    read-first register console with typed addresses and an immutable audit log;
    do not expose JANUS's unrestricted write/command interface by default.
 

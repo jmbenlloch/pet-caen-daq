@@ -22,6 +22,21 @@ function dashboardApi(): DaqApi {
         instanceId: 'backend-test',
         sequence: 7n,
         state: SystemState.READY,
+        statistics: {
+          elapsedMilliseconds: 2000n,
+          boards: [
+            {
+              chain: 0,
+              triggerId: 12n,
+              triggerCount: 10n,
+              eventBuildCount: 10n,
+              dataBytes: 2048n,
+              channelTriggerCounts: Array(64).fill(3n),
+              timestampCounts: Array(64).fill(2n),
+              phaCounts: Array(64).fill(1n),
+            },
+          ],
+        },
         chains: [
           {
             index: 0,
@@ -81,6 +96,8 @@ describe('operator dashboard', () => {
     expect(wrapper.text()).toContain('DT5202 · node 0')
     expect(wrapper.text()).toContain('24.5 °C')
     expect(wrapper.get('#history-heading').text()).toBe('Run history')
+    expect(wrapper.get('#statistics-heading').text()).toBe('Statistics')
+    expect(wrapper.text()).toContain('Trigger ID')
     expect(wrapper.text()).toContain('run-54')
     expect(wrapper.text()).toContain('events.jsonl · 4.0 KiB')
 
