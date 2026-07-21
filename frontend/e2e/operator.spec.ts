@@ -71,7 +71,15 @@ test('operator configures bounded values and channel masks without editing text'
   await expect(majority).toHaveValue('64')
   await majority.press('ArrowDown')
   await expect(majority).toHaveValue('63')
-  await page.getByRole('button', { name: 'Decrease MajorityLevel' }).click()
+  const decrease = page.getByRole('button', { name: 'Decrease MajorityLevel' })
+  const increase = page.getByRole('button', { name: 'Increase MajorityLevel' })
+  const [decreaseBox, increaseBox] = await Promise.all([
+    decrease.boundingBox(),
+    increase.boundingBox(),
+  ])
+  expect(decreaseBox?.width).toBeGreaterThanOrEqual(34)
+  expect(increaseBox?.width).toBe(decreaseBox?.width)
+  await decrease.click()
   await expect(majority).toHaveValue('62')
 
   await page.getByRole('button', { name: 'Edit source' }).click()

@@ -313,7 +313,7 @@ select:focus {
 }
 .stepper {
   display: grid;
-  grid-template-columns: 34px minmax(70px, 1fr) auto 34px;
+  grid-template-columns: 34px minmax(0, 1fr) auto 34px;
   align-items: center;
   overflow: hidden;
   border: 1px solid #30425b;
@@ -328,6 +328,7 @@ select:focus {
   border-color: #b94d5b;
 }
 .stepper input:not([type='checkbox']) {
+  grid-column: 2;
   min-width: 0;
   margin: 0;
   border: 0;
@@ -344,6 +345,9 @@ select:focus {
   -webkit-appearance: none;
 }
 .stepper button {
+  display: grid;
+  width: 34px;
+  place-items: center;
   align-self: stretch;
   border: 0;
   color: #b8c8da;
@@ -351,11 +355,18 @@ select:focus {
   font-size: 1rem;
   font-weight: 800;
 }
+.stepper button:first-child {
+  grid-column: 1;
+}
+.stepper button:last-child {
+  grid-column: 4;
+}
 .stepper button:hover {
   color: #72e2bd;
   background: #20354b;
 }
 .unit {
+  grid-column: 3;
   padding-right: 8px;
   color: #7f93aa;
   font-size: 0.7rem;
