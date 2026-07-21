@@ -23,6 +23,12 @@ type ConfigurationPlan struct {
 	Writes   []RegisterWrite
 	Citiroc  [2]CitirocChip
 	Deferred []string
+	Inactive []InactiveSetting
+}
+
+type InactiveSetting struct {
+	Name   string
+	Reason string
 }
 
 // ValidateReadback compares the final requested value at every written
@@ -267,6 +273,61 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if values["TestPulseSource"].Value == "OFF" {
 		tpAmp = 0
 	}
+	if _, err := choice("TestPulsePreamp", map[string]uint32{"LG": 1, "HG": 2, "BOTH": 3}); err != nil {
+		return ConfigurationPlan{}, err
+	}
+	destination, err := require("TestPulseDestination")
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	if destination.Value != "NONE" && destination.Value != "ALL" && destination.Value != "EVEN" && destination.Value != "ODD" {
+		fields := strings.Fields(destination.Value)
+		if len(fields) != 2 || fields[0] != "CH" {
+			return ConfigurationPlan{}, fmt.Errorf("line %d: TestPulseDestination has unsupported value %q", destination.Line, destination.Value)
+		}
+		channel, parseErr := strconv.Atoi(fields[1])
+		if parseErr != nil || channel < 0 || channel >= ChannelCount {
+			return ConfigurationPlan{}, fmt.Errorf("line %d: TestPulseDestination channel %q out of range", destination.Line, fields[1])
+		}
+	}
+	if _, err := u32("ZS_Threshold_LG", 16); err != nil {
+		return ConfigurationPlan{}, err
+	}
+	if _, err := u32("ZS_Threshold_HG", 16); err != nil {
+		return ConfigurationPlan{}, err
+	}
+	probeChannel0, err := u32("ProbeChannel0", 6)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	probeChannel1, err := u32("ProbeChannel1", 6)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	analogOptions := map[string]uint32{"OFF": 0, "FAST": 1, "SLOW_LG": 2, "SLOW_HG": 3, "PREAMP_HG": 4, "PREAMP_LG": 5}
+	analog0, err := choice("AnalogProbe0", analogOptions)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	analog1, err := choice("AnalogProbe1", analogOptions)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	digitalOptions := map[string]uint32{"OFF": 0xff, "PEAK_LG": 0x10, "PEAK_HG": 0x11, "HOLD": 0x16, "START_CONV": 0x12, "DATA_COMMIT": 0x21, "DATA_VALID": 0x20, "CLK_1024": 0, "VAL_WINDOW": 0x1a, "T_OR": 4, "Q_OR": 5}
+	digital0, err := choice("DigitalProbe0", digitalOptions)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	digital1, err := choice("DigitalProbe1", digitalOptions)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	analogValue := func(selection, channel uint32) uint32 {
+		if selection == 0 {
+			return 0
+		}
+		return 0x80 | channel | (selection-1)<<9
+	}
 	fastShaper, err := choice("FastShaperInput", map[string]uint32{"HG-PA": 0, "LG-PA": 1})
 	if err != nil {
 		return ConfigurationPlan{}, err
@@ -291,6 +352,9 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 		{ChargeDiscriminatorMaskLow, qdMask0}, {ChargeDiscriminatorMaskHigh, qdMask1},
 		{TimeDiscriminatorMaskLow, tdMask0}, {TimeDiscriminatorMaskHigh, tdMask1},
 		{HoldDelay, uint32(holdDelay / 8)}, {AnalogMuxSequenceControl, uint32(muxPeriod / 8)}, {TriggerHoldOff, uint32(holdOff / 8)},
+		{CitirocSlowControl, 0}, {CitirocProbe, analogValue(analog0, probeChannel0)},
+		{CitirocSlowControl, 0x200}, {CitirocProbe, analogValue(analog1, probeChannel1)},
+		{DigitalProbe, digital0 | digital1<<8},
 	}}
 	lg, err := u32("LG_Gain", 8)
 	if err != nil {
@@ -323,6 +387,25 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	common := CitirocCommon{DiscriminatorMask: qdMask0, LowShapingTime: uint8(lgShape), HighShapingTime: uint8(hgShape), ChargeCoarseThreshold: uint16(qd), TimeCoarseThreshold: uint16(td), FastShaperOnLowGain: fastShaper != 0, InputDACReference45V: hvRange != 0, PeakSensingExternalTrigger: true, OTAForceOn: true, NegativeTriggerPolarity: true}
 	plan.Citiroc = SplitCitirocChannels(citirocChannels, common)
 	plan.Citiroc[1].Common.DiscriminatorMask = qdMask1
-	plan.Deferred = []string{"HV_Vbias", "HV_Imax", "TempSensType", "TempFeedbackCoeff", "EnableTempFeedback", "Pedestal", "ZS_Threshold_LG", "ZS_Threshold_HG", "AnalogProbe0", "DigitalProbe0", "ProbeChannel0", "AnalogProbe1", "DigitalProbe1", "ProbeChannel1", "TestPulseDestination", "TestPulsePreamp"}
+	plan.Deferred = []string{"HV_Vbias", "HV_Imax", "TempSensType", "TempFeedbackCoeff", "EnableTempFeedback", "Pedestal"}
+	if acqMode == 1 {
+		plan.Deferred = append(plan.Deferred, "ZS_Threshold_LG", "ZS_Threshold_HG")
+	} else {
+		plan.Inactive = append(plan.Inactive,
+			InactiveSetting{"ZS_Threshold_LG", "JANUS applies energy zero suppression only in spectroscopy mode"},
+			InactiveSetting{"ZS_Threshold_HG", "JANUS applies energy zero suppression only in spectroscopy mode"})
+	}
+	if values["TestPulseSource"].Value == "OFF" {
+		plan.Inactive = append(plan.Inactive,
+			InactiveSetting{"TestPulseAmplitude", "test-pulse source is OFF; effective DAC is zero"},
+			InactiveSetting{"TestPulseDestination", "test-pulse source is OFF"},
+			InactiveSetting{"TestPulsePreamp", "test-pulse source is OFF"})
+	}
+	if analog0 == 0 {
+		plan.Inactive = append(plan.Inactive, InactiveSetting{"ProbeChannel0", "analog probe 0 is OFF"})
+	}
+	if analog1 == 0 {
+		plan.Inactive = append(plan.Inactive, InactiveSetting{"ProbeChannel1", "analog probe 1 is OFF"})
+	}
 	return plan, nil
 }

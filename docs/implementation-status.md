@@ -128,4 +128,15 @@ Implemented on 2026-07-20:
 - simulator modeling of per-chip `CMD_CFG_ASIC` effects and reset behavior; and
 - a real-socket integration test that plans, applies, reads back, and validates the complete production FPGA configuration on all four simulated DT5202 boards.
 
-The apply path currently covers the 349-write FPGA/Citiroc-register subset per board. HV-module peripheral commands, pedestal calibration, zero-suppression values that depend on measured pedestals, and probe sequencing remain explicit configuration gaps.
+The apply path currently covers the 354-write FPGA/Citiroc-register subset per board. HV-module peripheral commands, pedestal calibration, and spectroscopy-mode zero-suppression values that depend on measured pedestals remain explicit configuration gaps.
+
+## Phase 1 production probe and inactive-setting semantics
+
+Implemented on 2026-07-21:
+
+- source-confirmed analog-probe selection for both Citirocs, including channel selection and chip switching;
+- firmware-5-or-later digital-probe byte packing for both probe outputs;
+- strict validation of test-pulse destination/preamp and zero-suppression values even when their controlling mode makes them inactive; and
+- explicit requested-versus-effective reasons for production settings made inactive by `TestPulseSource OFF`, `AcquisitionMode SPECT_TIMING`, or disabled analog probes.
+
+The production fixture now distinguishes inactive settings from unsupported/deferred settings. Probe settings are applied and read back; energy zero-suppression remains deferred only for spectroscopy mode, where its effective values require pedestal calibration data.

@@ -3,6 +3,7 @@ package dt5202
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -25,7 +26,7 @@ func TestPlanProductionConfiguration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("board %d: %v", board, err)
 		}
-		if got, want := len(plan.Writes), 29+5*ChannelCount; got != want {
+		if got, want := len(plan.Writes), 34+5*ChannelCount; got != want {
 			t.Fatalf("board %d writes = %d, want %d", board, got, want)
 		}
 		writes := make(map[Register]uint32)
@@ -39,6 +40,7 @@ func TestPlanProductionConfiguration(t *testing.T) {
 			ChargeCoarseThreshold: 250, LowGainShapingTime: 0, HighGainShapingTime: 0,
 			IndividualRegister(LowGain, 63): 55, IndividualRegister(HighGain, 63): 55,
 			IndividualRegister(HVIndividualAdjustment, 63): 0x100,
+			DigitalProbe: 0xffff, CitirocProbe: 0,
 		}
 		for address, want := range checks {
 			if got := writes[address]; got != want {
@@ -47,6 +49,9 @@ func TestPlanProductionConfiguration(t *testing.T) {
 		}
 		if len(plan.Deferred) == 0 {
 			t.Fatalf("board %d has no explicit deferred settings", board)
+		}
+		if got, want := len(plan.Inactive), 7; got != want {
+			t.Fatalf("board %d inactive settings = %d, want %d: %#v", board, got, want, plan.Inactive)
 		}
 		for chip := range 2 {
 			stream, err := plan.Citiroc[chip].Stream()
@@ -62,6 +67,39 @@ func TestPlanProductionConfiguration(t *testing.T) {
 					t.Errorf("board %d chip %d field %d = %d, %v; want %d", board, chip, check.start, got, err, check.want)
 				}
 			}
+		}
+	}
+}
+
+func TestPlanProductionConfigurationPacksEnabledProbes(t *testing.T) {
+	f, err := os.Open(filepath.Join("..", "..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	doc, err := janusconfig.Parse(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc.Assignments = append(doc.Assignments,
+		janusconfig.Assignment{Name: "AnalogProbe0", Value: "FAST", Line: 1001},
+		janusconfig.Assignment{Name: "ProbeChannel0", Value: "12", Line: 1002},
+		janusconfig.Assignment{Name: "DigitalProbe0", Value: "Q_OR", Line: 1003},
+		janusconfig.Assignment{Name: "AnalogProbe1", Value: "PREAMP_LG", Line: 1004},
+		janusconfig.Assignment{Name: "ProbeChannel1", Value: "33", Line: 1005},
+		janusconfig.Assignment{Name: "DigitalProbe1", Value: "PEAK_HG", Line: 1006})
+	plan, err := PlanProductionConfiguration(doc, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTail := []RegisterWrite{{CitirocSlowControl, 0}, {CitirocProbe, 0x8c}, {CitirocSlowControl, 0x200}, {CitirocProbe, 0x8a1}, {DigitalProbe, 0x1105}}
+	got := plan.Writes[29:34]
+	if !reflect.DeepEqual(got, wantTail) {
+		t.Fatalf("probe writes = %#v, want %#v", got, wantTail)
+	}
+	for _, inactive := range plan.Inactive {
+		if inactive.Name == "ProbeChannel0" || inactive.Name == "ProbeChannel1" {
+			t.Fatalf("enabled probe marked inactive: %#v", inactive)
 		}
 	}
 }
