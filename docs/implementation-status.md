@@ -37,7 +37,9 @@ the backend on port 8080. Production static serving, run history/artifact views,
 and Playwright browser workflows remain subsequent Phase 3 slices.
 
 The text-only configuration box has been replaced by a searchable, categorized
-parameter editor initialized from the backend's exact startup JANUS document.
+parameter editor initialized immediately from the checked-in production sample,
+without requiring a file load or backend round trip. Operators can reset to the
+sample or explicitly replace it with the backend's exact startup JANUS document.
 It renders comment-documented choices as selects, binary settings as switches,
 free-form values with their units/ranges, and indexed assignments as explicit
 board/channel overrides. File import and an advanced source editor remain

@@ -27,7 +27,8 @@ export function parseConfiguration(source: string): ConfigurationDocument {
     const match = line.match(assignment)
     if (!match || line.trimStart().startsWith('#')) continue
     const help = (match[7] ?? '').replace(/^#\s*/, '').trim()
-    const optionsText = help.match(/Options?:\s*(.+?)(?:\.|$)/i)?.[1]
+    const optionsAt = Math.max(help.lastIndexOf('Options:'), help.lastIndexOf('Option:'))
+    const optionsText = optionsAt >= 0 ? help.slice(help.indexOf(':', optionsAt) + 1) : ''
     fields.push({
       id: `${match[2]}[${match[3] ?? 'default'}]@${index + 1}`,
       name: match[2],
@@ -35,7 +36,9 @@ export function parseConfiguration(source: string): ConfigurationDocument {
       section,
       value: match[5].trimEnd(),
       help,
-      options: optionsText ? optionsText.split(',').map((item) => item.trim()) : [],
+      options: optionsText
+        ? optionsText.split(',').map((item) => item.trim().replace(/\.$/, ''))
+        : [],
       line: index + 1,
     })
   }
@@ -57,5 +60,9 @@ export function updateConfiguration(
 }
 
 export function isBooleanField(field: ConfigurationField) {
-  return (field.value === '0' || field.value === '1') && field.options.length === 0
+  const booleanName =
+    field.name.startsWith('Enable') ||
+    field.name.startsWith('OF_') ||
+    field.name === 'RunNumber_AutoIncr'
+  return booleanName && (field.value === '0' || field.value === '1') && field.options.length === 0
 }

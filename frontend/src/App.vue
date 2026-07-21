@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import defaultConfiguration from '../../test/fixtures/janus/config_same4_v3_good.txt?raw'
 import { createDaqApi, type DaqApi } from './api'
 import {
   isBooleanField,
@@ -15,7 +16,7 @@ const props = defineProps<{ api?: DaqApi }>()
 const daq = useDaq(props.api ?? createDaqApi())
 const runId = ref('')
 const requestedBy = ref('operator')
-const configurationDocument = ref(parseConfiguration(''))
+const configurationDocument = ref(parseConfiguration(defaultConfiguration))
 const configuration = computed({
   get: () => configurationDocument.value.source,
   set: (source: string) => (configurationDocument.value = parseConfiguration(source)),
@@ -64,13 +65,13 @@ function setField(field: ConfigurationField, value: string) {
   configurationDocument.value = updateConfiguration(configurationDocument.value, field, value)
 }
 
-watch(
-  () => daq.configurationTemplate.value,
-  (template) => {
-    if (template && !configuration.value) configuration.value = template
-  },
-  { immediate: true },
-)
+function loadDefaultConfiguration() {
+  configuration.value = defaultConfiguration
+}
+
+function loadBackendConfiguration() {
+  if (daq.configurationTemplate.value) configuration.value = daq.configurationTemplate.value
+}
 
 onMounted(() => daq.connect())
 </script>
@@ -152,6 +153,17 @@ onMounted(() => daq.connect())
               </p>
             </div>
             <div class="config-tools">
+              <button class="link-button" type="button" @click="loadDefaultConfiguration">
+                Reset sample
+              </button>
+              <button
+                class="link-button"
+                type="button"
+                :disabled="!daq.configurationTemplate.value"
+                @click="loadBackendConfiguration"
+              >
+                Use backend config
+              </button>
               <button
                 class="link-button"
                 type="button"

@@ -46,7 +46,9 @@ directory. Artifact downloads are streamed through the generated RunService API
 and are limited to files recorded in each run's manifest.
 
 Run configuration uses a searchable, categorized parameter editor initialized
-from the exact JANUS document loaded by the backend. Documented options are
+immediately from the checked-in production sample; no file import is required.
+Operators can reset to that sample or replace it with the exact JANUS document
+loaded by the backend. Documented options are
 presented as choices, binary flags as switches, and indexed overrides identify
 their board or channel. Operators can still import a JANUS file or open the raw
 source editor; all paths produce the same text submitted to backend validation.

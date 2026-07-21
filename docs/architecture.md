@@ -145,8 +145,9 @@ The Vue application is a stateless client of the backend except for ephemeral pr
 
 Do not reproduce backend state transitions or hardware calculations in the frontend. Generated Connect clients and shared protobuf enums are the contract.
 
-The system service exposes the byte-exact startup JANUS configuration as the
-operator editor template. The frontend derives presentation-only fields,
+The frontend bundles the checked-in production JANUS fixture as its immediately
+available default and the system service exposes the byte-exact startup JANUS
+configuration as an alternate operator template. The frontend derives presentation-only fields,
 categories, choices, descriptions, and indexed overrides from that document;
 it does not calculate effective registers or decide whether a setting is safe.
 Edits preserve the JANUS document and are submitted as text to the authoritative

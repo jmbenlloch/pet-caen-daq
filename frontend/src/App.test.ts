@@ -84,12 +84,13 @@ describe('operator dashboard', () => {
     await wrapper.get('input[placeholder="run-0055"]').setValue('run-55')
     expect(wrapper.text()).toContain('PresetTime')
     expect(wrapper.text()).toContain('EnableJobs')
-    await wrapper.get('#PresetTime\\[default\\]\\@2').setValue('30')
-    await wrapper.get('#PresetTime\\[default\\]\\@2').trigger('change')
+    await wrapper.get('input[id^="PresetTime"]').setValue('30')
+    await wrapper.get('input[id^="PresetTime"]').trigger('change')
     await wrapper.get('button.primary').trigger('click')
     await flushPromises()
 
-    expect(api.validate).toHaveBeenCalledWith(expect.stringContaining('PresetTime 30'))
+    expect(api.validate).toHaveBeenCalledOnce()
+    expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/PresetTime\s+30/)
     expect(api.start).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: 'run-55',
