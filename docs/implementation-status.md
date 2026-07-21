@@ -1,5 +1,15 @@
 # Implementation status
 
+## Phase 2 acquisition service foundations
+
+Started on 2026-07-21:
+
+- a serialized system-level acquisition state machine now implements the documented disconnected, connection, configuration, run, drain, fault, and recovery lifecycle;
+- every accepted transition records a monotonic sequence, actor, timestamp, and previous/next state, while invalid or concurrent conflicting transitions are rejected without mutation; and
+- an ordered bounded event pipeline now makes backpressure policy explicit, supports blocking-with-cancellation or immediate rejection, copies submitted buffers, persists raw evidence before decoding, dispatches every DT5202 event qualifier, and surfaces decode/storage failures.
+
+These are internal orchestration primitives. They are not yet wired to a long-running coordinator or ConnectRPC service; the next Phase 2 slice will build run control and snapshot telemetry on these boundaries.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:
