@@ -117,3 +117,15 @@ Implemented on 2026-07-20:
 - the source-confirmed normal FPGA-assisted ASIC configuration sequence for both chips, including fail-fast error propagation.
 
 The production planner populates both chip representations with its effective 64-channel gains, fine thresholds, HV adjustments, shaping selections, discriminator thresholds/mask, fast-shaper source, and source-hardcoded common modes. The bundled host implementation delegates automatic stream synthesis to FPGA firmware, so it cannot provide a host-generated 36-word golden image. Layout comparisons use its `WriteCStoFileFormatted` field boundaries and the official Citiroc 1A slow-control table. Manual stream loading remains intentionally unavailable until all power-control values have explicit requested/default provenance; normal hardware configuration continues using FPGA-assisted loading.
+
+## Phase 1 configuration application and readback
+
+Implemented on 2026-07-20:
+
+- an explicit configuration-application boundary that can perform a JANUS-compatible hard reset, execute every ordered write, load both Citiroc ASICs, and read back every unique requested register;
+- fail-fast diagnostics carrying board, chain, node, write index, and register address, with no ASIC load after a failed register write;
+- requested-versus-effective validation over actual DT5215 register reads rather than only an in-memory snapshot;
+- simulator modeling of per-chip `CMD_CFG_ASIC` effects and reset behavior; and
+- a real-socket integration test that plans, applies, reads back, and validates the complete production FPGA configuration on all four simulated DT5202 boards.
+
+The apply path currently covers the 349-write FPGA/Citiroc-register subset per board. HV-module peripheral commands, pedestal calibration, zero-suppression values that depend on measured pedestals, and probe sequencing remain explicit configuration gaps.

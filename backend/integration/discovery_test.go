@@ -250,6 +250,53 @@ func TestProductionConfigurationDiscoversSimulatedTopology(t *testing.T) {
 	}
 }
 
+func TestProductionConfigurationAppliesAndValidatesFourBoards(t *testing.T) {
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	file, err := os.Open(filepath.Join("..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	document, err := janusconfig.Parse(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	wantThreshold := []uint32{181, 183, 179, 178}
+	for board := range 4 {
+		plan, err := dt5202.PlanProductionConfiguration(document, board)
+		if err != nil {
+			t.Fatalf("plan board %d: %v", board, err)
+		}
+		if err := dt5202.ApplyConfiguration(ctx, client, uint16(board), 0, plan, true); err != nil {
+			t.Fatalf("apply board %d: %v", board, err)
+		}
+		snapshot, err := server.BoardSnapshot(board, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := snapshot.Registers[uint32(dt5202.TimeCoarseThreshold)]; got != wantThreshold[board] {
+			t.Errorf("board %d TD threshold = %d, want %d", board, got, wantThreshold[board])
+		}
+		if got := snapshot.Registers[uint32(dt5202.IndividualRegister(dt5202.HighGain, 63))]; got != 55 {
+			t.Errorf("board %d channel 63 HG = %d", board, got)
+		}
+		if snapshot.CitirocLoads != [2]uint32{1, 1} {
+			t.Errorf("board %d Citiroc loads = %v", board, snapshot.CitirocLoads)
+		}
+	}
+}
+
 func TestDiscoveryRejectsUnexpectedEnabledLink(t *testing.T) {
 	topology := simulator.ProductionTopology()
 	topology.Chains[4] = []simulator.Board{{ProductID: 1, FirmwareRevision: 1, Status: 1}}

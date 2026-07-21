@@ -19,6 +19,7 @@ type Board struct {
 	FirmwareRevision uint32
 	Status           uint32
 	Registers        map[uint32]uint32
+	CitirocLoads     [2]uint32
 }
 
 type Topology struct {
@@ -75,6 +76,20 @@ func Start(controlAddress, streamAddress string, topology Topology) (*Server, er
 func (s *Server) ControlAddress() string        { return s.control.Addr().String() }
 func (s *Server) StreamAddress() string         { return s.stream.Addr().String() }
 func (s *Server) QueueStreamBatch(batch []byte) { s.streamData <- append([]byte(nil), batch...) }
+
+func (s *Server) BoardSnapshot(chain, node int) (Board, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if chain < 0 || chain >= len(s.topology.Chains) || node < 0 || node >= len(s.topology.Chains[chain]) {
+		return Board{}, fmt.Errorf("invalid board %d:%d", chain, node)
+	}
+	board := s.topology.Chains[chain][node]
+	board.Registers = make(map[uint32]uint32, len(s.topology.Chains[chain][node].Registers))
+	for address, value := range s.topology.Chains[chain][node].Registers {
+		board.Registers[address] = value
+	}
+	return board, nil
+}
 
 func (s *Server) Close() error {
 	var closeErr error
@@ -315,6 +330,7 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 		case dt5215.CommandGlobalReset:
 			board.Status = 1
 			board.Registers = make(map[uint32]uint32)
+			board.CitirocLoads = [2]uint32{}
 		case dt5215.CommandTestPulse:
 			if board.Status != 2 {
 				return writeStatus(connection, 10)
@@ -327,6 +343,9 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 				return writeStatus(connection, 11)
 			}
 		case dt5215.CommandResetTime, dt5215.CommandSoftwareTrigger, dt5215.CommandClearData, dt5215.CommandSync:
+		case uint32(dt5202.CommandConfigureASIC):
+			chip := (board.Registers[uint32(dt5202.CitirocSlowControl)] >> 9) & 1
+			board.CitirocLoads[chip]++
 		default:
 			return writeStatus(connection, 22)
 		}
