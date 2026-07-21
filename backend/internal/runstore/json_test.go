@@ -179,6 +179,18 @@ func TestFinalizeFailureRetainsIncompleteMarker(t *testing.T) {
 		t.Fatalf("incomplete marker missing: %v", err)
 	}
 }
+
+func TestCreateClassifiesDuplicateRunDirectory(t *testing.T) {
+	parent := t.TempDir()
+	first, err := Create(parent, Manifest{RunID: "duplicate"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Abort()
+	if _, err := Create(parent, Manifest{RunID: "duplicate"}); !errors.Is(err, ErrRunExists) {
+		t.Fatalf("duplicate error = %v", err)
+	}
+}
 func TestWriterRejectsUntypedEvent(t *testing.T) {
 	w, err := Create(t.TempDir(), Manifest{RunID: "missing-kind"})
 	if err != nil {

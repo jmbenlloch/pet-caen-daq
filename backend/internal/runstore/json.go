@@ -21,6 +21,8 @@ import (
 const SchemaVersion = 1
 const DefaultMaxRecordSize = 1 << 20
 
+var ErrRunExists = errors.New("run already exists")
+
 type Manifest struct {
 	SchemaVersion          int                        `json:"schema_version"`
 	RunID                  string                     `json:"run_id"`
@@ -67,6 +69,9 @@ func Create(parent string, manifest Manifest) (*Writer, error) {
 	manifest.SchemaVersion = SchemaVersion
 	dir := filepath.Join(parent, "run-"+manifest.RunID)
 	if err := os.Mkdir(dir, 0o750); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil, fmt.Errorf("%w: %s", ErrRunExists, manifest.RunID)
+		}
 		return nil, fmt.Errorf("create run directory: %w", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "incomplete"), []byte("run has not been finalized\n"), 0o640); err != nil {

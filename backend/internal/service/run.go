@@ -3,7 +3,9 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
 	"sync"
 	"time"
 
@@ -41,48 +43,76 @@ type RunService struct {
 	Configure      ConfigurationApplier
 	Boards         []configaudit.BoardEvidence
 	HealthInterval time.Duration
+	RunExists      func(string) (bool, error)
 
+	opMu          sync.Mutex
 	mu            sync.Mutex
 	current       *daqv1.RunSummary
+	completed     map[string]*daqv1.RunSummary
 	monitorCancel context.CancelFunc
 	monitorDone   chan error
 }
 
 func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest]) (*connect.Response[daqv1.StartRunResponse], error) {
+	if !s.opMu.TryLock() {
+		return nil, serviceError(connect.CodeAborted, "CONCURRENT_OPERATION", fmt.Errorf("another run-control operation is in progress"))
+	}
+	defer s.opMu.Unlock()
 	message := request.Msg
 	if message.GetRunId() == "" || message.GetRequestedBy() == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("run_id and requested_by are required"))
+		return nil, serviceError(connect.CodeInvalidArgument, "REQUIRED_IDENTITY", fmt.Errorf("run_id and requested_by are required"))
+	}
+	if !validRunID.MatchString(message.GetRunId()) {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_ID", fmt.Errorf("run_id must match %s", validRunID.String()))
+	}
+	if s.Controller.ActiveRunID() != "" {
+		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ALREADY_ACTIVE", fmt.Errorf("run %q is already active", s.Controller.ActiveRunID()))
+	}
+	if s.completedRun(message.GetRunId()) != nil {
+		return nil, serviceError(connect.CodeAlreadyExists, "DUPLICATE_RUN_ID", fmt.Errorf("run %q was already completed", message.GetRunId()))
+	}
+	if s.RunExists != nil {
+		exists, err := s.RunExists(message.GetRunId())
+		if err != nil {
+			return nil, serviceError(connect.CodeInternal, "RUN_STORAGE_INSPECTION_FAILED", err)
+		}
+		if exists {
+			return nil, serviceError(connect.CodeAlreadyExists, "RUN_DIRECTORY_EXISTS", fmt.Errorf("run directory for %q already exists", message.GetRunId()))
+		}
 	}
 	if issues := ValidateJANUSConfiguration(message.GetJanusConfiguration()); len(issues) != 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("configuration is invalid: %s", issues[0].GetMessage()))
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_CONFIGURATION", fmt.Errorf("configuration is invalid: %s", issues[0].GetMessage()))
 	}
 	if s.Configure == nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("run configuration application is unavailable"))
+		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_UNAVAILABLE", fmt.Errorf("run configuration application is unavailable"))
 	}
 	document, err := janusconfig.Parse(bytes.NewBufferString(message.GetJanusConfiguration()))
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_CONFIGURATION", err)
 	}
 	configured, err := s.Configure(ctx, document, message.GetRequestedBy())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("apply run configuration: %w", err))
+		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_APPLICATION_FAILED", fmt.Errorf("apply run configuration: %w", err))
 	}
 	if state := s.Controller.StateSnapshot().State; state != acquisition.StateReady {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("configuration completed in state %s, want ready", state))
+		return nil, serviceError(connect.CodeFailedPrecondition, "SYSTEM_NOT_READY", fmt.Errorf("configuration completed in state %s, want ready", state))
 	}
 	audit, err := configaudit.Build(document, configured.Plans, s.Boards)
 	if err != nil || !audit.Valid {
 		if err == nil {
 			err = fmt.Errorf("effective configuration audit rejected one or more settings")
 		}
-		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_AUDIT_FAILED", err)
 	}
 	options := acquisition.RunOptions{
 		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
 	}
 	if err := s.Controller.Start(ctx, message.GetRunId(), message.GetRequestedBy(), options); err != nil {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+		if errors.Is(err, runstore.ErrRunExists) {
+			return nil, serviceError(connect.CodeAlreadyExists, "RUN_DIRECTORY_EXISTS", err)
+		}
+		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_START_FAILED", err)
 	}
 	run := &daqv1.RunSummary{RunId: message.GetRunId(), StartedAt: timestamppb.New(s.now()), Incomplete: true}
 	s.mu.Lock()
@@ -94,19 +124,29 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 }
 
 func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1.StopRunRequest]) (*connect.Response[daqv1.StopRunResponse], error) {
+	if !s.opMu.TryLock() {
+		return nil, serviceError(connect.CodeAborted, "CONCURRENT_OPERATION", fmt.Errorf("another run-control operation is in progress"))
+	}
+	defer s.opMu.Unlock()
 	message := request.Msg
 	if message.GetRunId() == "" || message.GetRequestedBy() == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("run_id and requested_by are required"))
+		return nil, serviceError(connect.CodeInvalidArgument, "REQUIRED_IDENTITY", fmt.Errorf("run_id and requested_by are required"))
 	}
 	active := s.Controller.ActiveRunID()
-	if active == "" || active != message.GetRunId() {
-		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("run %q is not active", message.GetRunId()))
+	if active == "" {
+		if completed := s.completedRun(message.GetRunId()); completed != nil {
+			return connect.NewResponse(&daqv1.StopRunResponse{Run: completed, Snapshot: s.Telemetry.Snapshot()}), nil
+		}
+		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_NOT_ACTIVE", fmt.Errorf("run %q is not active", message.GetRunId()))
+	}
+	if active != message.GetRunId() {
+		return nil, serviceError(connect.CodeFailedPrecondition, "ACTIVE_RUN_MISMATCH", fmt.Errorf("active run is %q, not %q", active, message.GetRunId()))
 	}
 	pipeline := s.Controller.ActivePipeline()
 	if err := s.Controller.Stop(ctx, message.GetRequestedBy()); err != nil {
 		s.stopMonitor()
 		s.publish(s.currentRun())
-		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_STOP_FAILED", err)
 	}
 	s.stopMonitor()
 	run := s.currentRun()
@@ -123,9 +163,28 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 	}
 	s.mu.Lock()
 	s.current = nil
+	if s.completed == nil {
+		s.completed = make(map[string]*daqv1.RunSummary)
+	}
+	s.completed[run.GetRunId()] = proto.Clone(run).(*daqv1.RunSummary)
 	s.mu.Unlock()
 	snapshot := s.publish(nil)
 	return connect.NewResponse(&daqv1.StopRunResponse{Run: run, Snapshot: snapshot}), nil
+}
+
+var validRunID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
+
+func serviceError(code connect.Code, diagnostic string, err error) error {
+	return connect.NewError(code, fmt.Errorf("[%s] %w", diagnostic, err))
+}
+
+func (s *RunService) completedRun(runID string) *daqv1.RunSummary {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.completed == nil || s.completed[runID] == nil {
+		return nil
+	}
+	return proto.Clone(s.completed[runID]).(*daqv1.RunSummary)
 }
 
 func (s *RunService) startMonitor() {

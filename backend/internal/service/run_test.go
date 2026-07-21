@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
+	"google.golang.org/protobuf/proto"
 )
 
 type fakeRunController struct {
@@ -151,5 +153,65 @@ func TestRunServiceOwnsHealthMonitorThroughStop(t *testing.T) {
 	service.mu.Unlock()
 	if !stopped {
 		t.Fatal("health monitor did not stop")
+	}
+}
+
+func TestRunServiceStopIsIdempotentAndCompletedIDCannotRestart(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady}
+	service := newRunService(t, controller)
+	request := connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology})
+	if _, err := service.StartRun(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	stopRequest := connect.NewRequest(&daqv1.StopRunRequest{RunId: "42", RequestedBy: "operator"})
+	first, err := service.StopRun(context.Background(), stopRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.StopRun(context.Background(), stopRequest)
+	if err != nil || !proto.Equal(first.Msg.GetRun(), second.Msg.GetRun()) {
+		t.Fatalf("first=%+v second=%+v error=%v", first.Msg, second, err)
+	}
+	_, err = service.StartRun(context.Background(), request)
+	if connect.CodeOf(err) != connect.CodeAlreadyExists || !strings.Contains(err.Error(), "[DUPLICATE_RUN_ID]") {
+		t.Fatalf("code=%v error=%v", connect.CodeOf(err), err)
+	}
+}
+
+func TestRunServiceRejectsExistingDirectoryAndUnsafeID(t *testing.T) {
+	service := newRunService(t, &fakeRunController{state: acquisition.StateReady})
+	service.RunExists = func(string) (bool, error) { return true, nil }
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology}))
+	if connect.CodeOf(err) != connect.CodeAlreadyExists || !strings.Contains(err.Error(), "[RUN_DIRECTORY_EXISTS]") {
+		t.Fatalf("code=%v error=%v", connect.CodeOf(err), err)
+	}
+	_, err = service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "../escape", RequestedBy: "operator", JanusConfiguration: validTopology}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "[INVALID_RUN_ID]") {
+		t.Fatalf("code=%v error=%v", connect.CodeOf(err), err)
+	}
+}
+
+func TestRunServiceRejectsConcurrentOperation(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady}
+	service := newRunService(t, controller)
+	entered, release := make(chan struct{}), make(chan struct{})
+	service.Configure = func(context.Context, *janusconfig.Document, string) (acquisition.ConfigurationResult, error) {
+		close(entered)
+		<-release
+		return acquisition.ConfigurationResult{Plans: []dt5202.ConfigurationPlan{{Board: 0}}}, nil
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology}))
+		done <- err
+	}()
+	<-entered
+	_, err := service.StopRun(context.Background(), connect.NewRequest(&daqv1.StopRunRequest{RunId: "42", RequestedBy: "operator"}))
+	if connect.CodeOf(err) != connect.CodeAborted || !strings.Contains(err.Error(), "[CONCURRENT_OPERATION]") {
+		t.Fatalf("code=%v error=%v", connect.CodeOf(err), err)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
