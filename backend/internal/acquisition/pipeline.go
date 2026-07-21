@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
@@ -48,6 +49,21 @@ type Pipeline struct {
 	submitters sync.WaitGroup
 	stopOnce   sync.Once
 	closeOnce  sync.Once
+	accepted   atomic.Uint64
+	rejected   atomic.Uint64
+	decoded    atomic.Uint64
+	decodeFail atomic.Uint64
+	sinkFail   atomic.Uint64
+}
+
+type PipelineStats struct {
+	Capacity        int
+	QueueDepth      int
+	AcceptedBatches uint64
+	RejectedBatches uint64
+	DecodedEvents   uint64
+	DecodeFailures  uint64
+	SinkFailures    uint64
 }
 
 func NewPipeline(capacity int, policy BackpressurePolicy, sink PipelineSink) (*Pipeline, error) {
@@ -81,20 +97,31 @@ func (p *Pipeline) Submit(ctx context.Context, batch PipelineBatch) (err error) 
 	if p.policy == BackpressureReject {
 		select {
 		case queue <- batch:
+			p.accepted.Add(1)
 			return nil
 		case <-stop:
 			return p.result()
 		default:
+			p.rejected.Add(1)
 			return ErrPipelineFull
 		}
 	}
 	select {
 	case queue <- batch:
+		p.accepted.Add(1)
 		return nil
 	case <-stop:
 		return p.result()
 	case <-ctx.Done():
 		return ctx.Err()
+	}
+}
+
+func (p *Pipeline) Stats() PipelineStats {
+	return PipelineStats{
+		Capacity: cap(p.queue), QueueDepth: len(p.queue),
+		AcceptedBatches: p.accepted.Load(), RejectedBatches: p.rejected.Load(),
+		DecodedEvents: p.decoded.Load(), DecodeFailures: p.decodeFail.Load(), SinkFailures: p.sinkFail.Load(),
 	}
 }
 
@@ -138,14 +165,18 @@ func (p *Pipeline) closeQueueAfterSubmitters() {
 
 func (p *Pipeline) process(batch PipelineBatch) error {
 	if err := p.sink.AppendRaw(batch.Raw); err != nil {
+		p.sinkFail.Add(1)
 		return fmt.Errorf("capture raw batch: %w", err)
 	}
 	for _, wire := range batch.Events {
 		decoded, err := dt5202.DecodeEvent(wire.Descriptor.Qualifier, wire.Descriptor.TriggerID, wire.Descriptor.Timestamp, wire.Payload)
 		if err != nil {
+			p.decodeFail.Add(1)
 			return fmt.Errorf("decode chain %d node %d: %w", wire.Chain, wire.Descriptor.Node, err)
 		}
+		p.decoded.Add(1)
 		if err := p.sink.AppendEvent(wire, decoded); err != nil {
+			p.sinkFail.Add(1)
 			return fmt.Errorf("store chain %d node %d event: %w", wire.Chain, wire.Descriptor.Node, err)
 		}
 	}

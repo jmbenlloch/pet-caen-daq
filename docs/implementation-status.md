@@ -26,6 +26,8 @@ A storage-backed run-session factory now creates one development run directory a
 
 Restart inspection now scans run storage read-only for `incomplete` markers, reads manifests through a strict size bound, validates schema and directory/run identity, and deterministically reports valid unfinished runs separately from corrupt recovery metadata. It never repairs or removes evidence automatically. The telemetry adapter marks storage degraded and publishes warning/error diagnostics so operators can explicitly inspect, replay, or recover each artifact set.
 
+The bounded pipeline now exposes race-safe operational counters for capacity/depth, accepted and rejected batches, decoded events, decode failures, and raw/event sink failures. Backpressure rejection counts only actual full-queue rejection, while cancellation and closure remain distinct outcomes. A service adapter copies these values into complete telemetry snapshots and promotes sink failure to storage fault without introducing protobuf dependencies into acquisition.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:

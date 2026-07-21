@@ -119,4 +119,36 @@ func TestPipelineReturnsSinkFailure(t *testing.T) {
 	if err := pipeline.Close(); !errors.Is(err, sentinel) {
 		t.Fatalf("close error = %v", err)
 	}
+	stats := pipeline.Stats()
+	if stats.AcceptedBatches != 1 || stats.SinkFailures != 1 || stats.DecodedEvents != 0 {
+		t.Fatalf("stats = %+v", stats)
+	}
+}
+
+func TestPipelineStatsCountAcceptanceRejectionAndDecodeFailure(t *testing.T) {
+	sink := &pipelineSink{blockRaw: make(chan struct{}), entered: make(chan struct{})}
+	pipeline, _ := NewPipeline(1, BackpressureReject, sink)
+	if err := pipeline.Submit(context.Background(), PipelineBatch{Raw: []byte{1}}); err != nil {
+		t.Fatal(err)
+	}
+	<-sink.entered
+	bad := PipelineBatch{Raw: []byte{2}, Events: []dt5215.StreamEvent{{Descriptor: dt5215.Descriptor{Qualifier: 0x7e}}}}
+	if err := pipeline.Submit(context.Background(), bad); err != nil {
+		t.Fatal(err)
+	}
+	if err := pipeline.Submit(context.Background(), PipelineBatch{Raw: []byte{3}}); !errors.Is(err, ErrPipelineFull) {
+		t.Fatalf("full submit = %v", err)
+	}
+	stats := pipeline.Stats()
+	if stats.Capacity != 1 || stats.QueueDepth != 1 || stats.AcceptedBatches != 2 || stats.RejectedBatches != 1 {
+		t.Fatalf("queued stats = %+v", stats)
+	}
+	close(sink.blockRaw)
+	if err := pipeline.Close(); err == nil {
+		t.Fatal("expected decode failure")
+	}
+	stats = pipeline.Stats()
+	if stats.QueueDepth != 0 || stats.DecodeFailures != 1 || stats.DecodedEvents != 0 {
+		t.Fatalf("final stats = %+v", stats)
+	}
 }
