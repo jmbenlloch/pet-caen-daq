@@ -1,0 +1,11 @@
+{
+  "evidence": "source-confirmed synthetic fixture",
+  "source": "FERSlib.c FERS_ReadPedestalsFromFlash and FERS_WritePedestals",
+  "page": 4,
+  "format": 0,
+  "calibration_date": "2026-07-21",
+  "dc_offsets": [2750, 2750, 2750, 2750],
+  "low_gain": "100 through 163",
+  "high_gain": "200 through 263",
+  "note": "Synthetic byte-exact layout fixture; not captured from hardware."
+}

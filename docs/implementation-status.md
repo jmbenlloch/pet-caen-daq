@@ -209,3 +209,14 @@ Implemented on 2026-07-21:
 - missing start service events, missing drain completion, and stalled-drain scenarios.
 
 Every fault is deterministic and consumed only by its matching operation class, so unrelated control and stream activity cannot reorder a scenario. Real-socket integration tests assert the corresponding timeout, cancellation, EOF, framing, CRC, and incomplete-drain diagnostics. Fault behavior remains a test facility and does not change the source-confirmed normal protocol path.
+
+## Phase 1 native pedestal flash loading
+
+Implemented on 2026-07-21:
+
+- a strictly read-only AT45DB321 main-memory page-read sequence for protected DT5202 pedestal page 4, using only opcode `0xD2` and SPI dummy clocks;
+- exact validation of the 272-byte format-0 page, including `P` tag, Gregorian calibration date, four valid 12-bit DC offsets, and 64 little-endian LG plus 64 HG values within the 14-bit energy range;
+- an immutable result carrying page, format, date, offsets, and provenance-tagged calibration without automatically applying DC offsets or exposing any flash program/erase operation; and
+- a byte-exact synthetic source-confirmed fixture with metadata, malformed-page and I/O tests, parser fuzz coverage, and a four-board real-socket simulator integration test.
+
+The simulator models the read transaction and rejects the page-program opcode. Protected flash is never modified. Fixture contents are synthetic from the bundled source layout rather than hardware-captured evidence; authoritative page captures remain scheduled for Phase 4.

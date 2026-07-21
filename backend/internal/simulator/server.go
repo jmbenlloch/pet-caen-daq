@@ -25,6 +25,8 @@ type Board struct {
 	hvSelector       uint32
 	CommonPedestal   uint16
 	Pedestal         dt5202.PedestalCalibration
+	protectedFlash   map[uint16][]byte
+	spi              flashReadState
 }
 
 type Topology struct {
@@ -49,6 +51,7 @@ func ProductionTopology() Topology {
 			topology.Chains[chain][0].Pedestal.LowGain[channel] = 50
 			topology.Chains[chain][0].Pedestal.HighGain[channel] = 50
 		}
+		topology.Chains[chain][0].protectedFlash = map[uint16][]byte{dt5202.PedestalFlashPage: simulatorPedestalPage(&topology.Chains[chain][0])}
 	}
 	return topology
 }
@@ -338,7 +341,7 @@ func (s *Server) handleReadRegister(connection net.Conn) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	board := s.topology.Chains[chain][node]
+	board := &s.topology.Chains[chain][node]
 	var value uint32
 	switch address {
 	case dt5215.RegisterProductID:
@@ -347,6 +350,8 @@ func (s *Server) handleReadRegister(connection net.Conn) error {
 		value = board.FirmwareRevision
 	case dt5215.RegisterAcquisitionStatus:
 		value = board.Status
+	case uint32(dt5202.SPIData):
+		value = board.readSPI()
 	default:
 		value = board.Registers[address]
 	}
@@ -372,6 +377,11 @@ func (s *Server) handleWriteRegister(connection net.Conn) error {
 		return writeStatus(connection, 22)
 	}
 	board := &s.topology.Chains[chain][node]
+	if address == uint32(dt5202.SPIData) {
+		if err := board.writeSPI(value); err != nil {
+			return writeStatus(connection, 22)
+		}
+	}
 	if board.Registers == nil {
 		board.Registers = make(map[uint32]uint32)
 	}
@@ -462,6 +472,7 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 			board.CitirocLoads = [2]uint32{}
 			board.HVRegisters = make(map[uint32]uint32)
 			board.hvSelector = 0
+			board.spi = flashReadState{}
 		case dt5215.CommandTestPulse:
 			if board.Status != 2 {
 				return writeStatus(connection, 10)

@@ -368,6 +368,40 @@ func TestProductionConfigurationDiscoversSimulatedTopology(t *testing.T) {
 	}
 }
 
+func TestNativePedestalFlashLoadingIsReadOnly(t *testing.T) {
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	for chain := uint16(0); chain < 4; chain++ {
+		calibration, err := dt5202.LoadPedestalCalibration(ctx, client, chain, 0)
+		if err != nil {
+			t.Fatalf("chain %d: %v", chain, err)
+		}
+		if calibration.Page != 4 || calibration.CalibrationDate.Format("2006-01-02") != "2026-07-21" || calibration.DCOffsets != [4]uint16{2750, 2750, 2750, 2750} || calibration.Calibration.LowGain[63] != 50 || calibration.Calibration.HighGain[63] != 50 {
+			t.Fatalf("chain %d calibration=%#v", chain, calibration)
+		}
+		snapshot, err := server.BoardSnapshot(int(chain), 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, applied := snapshot.Registers[uint32(dt5202.DCOffset)]; applied {
+			t.Fatalf("chain %d loader applied DC offset", chain)
+		}
+	}
+	if err := client.WriteRegister(ctx, 0, 0, uint32(dt5202.SPIData), 0x100|0x82); err == nil {
+		t.Fatal("simulator accepted protected flash program opcode")
+	}
+}
+
 func TestProductionConfigurationAppliesAndValidatesFourBoards(t *testing.T) {
 	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
 	if err != nil {
