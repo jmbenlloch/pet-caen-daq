@@ -56,6 +56,8 @@ type RunService struct {
 	completed     map[string]*daqv1.RunSummary
 	monitorCancel context.CancelFunc
 	monitorDone   chan error
+	presetCancel  context.CancelFunc
+	presetDone    chan struct{}
 }
 
 func (s *RunService) ListRuns(_ context.Context, request *connect.Request[daqv1.ListRunsRequest]) (*connect.Response[daqv1.ListRunsResponse], error) {
@@ -169,6 +171,10 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if err != nil {
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_CONFIGURATION", err)
 	}
+	stopPolicy, err := parsePresetStop(document)
+	if err != nil {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_STOP_POLICY", err)
+	}
 	configured, err := s.Configure(ctx, document, message.GetRequestedBy())
 	if err != nil {
 		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_APPLICATION_FAILED", fmt.Errorf("apply run configuration: %w", err))
@@ -193,12 +199,16 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		}
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_START_FAILED", err)
 	}
-	run := &daqv1.RunSummary{RunId: message.GetRunId(), StartedAt: timestamppb.New(s.now()), Incomplete: true}
+	run := &daqv1.RunSummary{
+		RunId: message.GetRunId(), StartedAt: timestamppb.New(s.now()), Incomplete: true,
+		StopMode: stopPolicy.mode, PresetTimeMilliseconds: uint64(stopPolicy.duration.Milliseconds()), PresetEventCount: stopPolicy.eventCount,
+	}
 	s.mu.Lock()
 	s.current = run
 	s.mu.Unlock()
 	snapshot := s.publish(run)
 	s.startMonitor()
+	s.startPresetMonitor(message.GetRunId(), stopPolicy)
 	return connect.NewResponse(&daqv1.StartRunResponse{Run: run, Snapshot: snapshot}), nil
 }
 
@@ -221,20 +231,34 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 	if active != message.GetRunId() {
 		return nil, serviceError(connect.CodeFailedPrecondition, "ACTIVE_RUN_MISMATCH", fmt.Errorf("active run is %q, not %q", active, message.GetRunId()))
 	}
+	return s.stopActive(ctx, message.GetRunId(), message.GetRequestedBy(), "operator_stop")
+}
+
+func (s *RunService) stopActive(ctx context.Context, runID, requestedBy, reason string) (*connect.Response[daqv1.StopRunResponse], error) {
 	pipeline := s.Controller.ActivePipeline()
-	if err := s.Controller.Stop(ctx, message.GetRequestedBy()); err != nil {
+	var err error
+	if controller, ok := s.Controller.(interface {
+		StopWithReason(context.Context, string, string) error
+	}); ok {
+		err = controller.StopWithReason(ctx, requestedBy, reason)
+	} else {
+		err = s.Controller.Stop(ctx, requestedBy)
+	}
+	if err != nil {
 		s.stopMonitor()
+		s.stopPresetMonitor()
 		s.publish(s.currentRun())
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_STOP_FAILED", err)
 	}
 	s.stopMonitor()
+	s.stopPresetMonitor()
 	run := s.currentRun()
 	if run == nil {
-		run = &daqv1.RunSummary{RunId: message.GetRunId()}
+		run = &daqv1.RunSummary{RunId: runID}
 	}
 	run.CompletedAt = timestamppb.New(s.now())
 	run.Incomplete = false
-	run.TerminationReason = "operator_stop"
+	run.TerminationReason = reason
 	if source, ok := pipeline.(interface {
 		Stats() runpipeline.StorageStats
 	}); ok {
@@ -255,6 +279,8 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 	s.completed[run.GetRunId()] = proto.Clone(run).(*daqv1.RunSummary)
 	s.mu.Unlock()
 	snapshot := s.publish(nil)
+	snapshot.LatestCompletedRun = proto.Clone(run).(*daqv1.RunSummary)
+	snapshot = s.Telemetry.Publish(snapshot)
 	return connect.NewResponse(&daqv1.StopRunResponse{Run: run, Snapshot: snapshot}), nil
 }
 
@@ -294,6 +320,74 @@ func (s *RunService) stopMonitor() {
 	s.mu.Lock()
 	cancel, done := s.monitorCancel, s.monitorDone
 	s.monitorCancel, s.monitorDone = nil, nil
+	s.mu.Unlock()
+	if cancel == nil {
+		return
+	}
+	cancel()
+	<-done
+}
+
+func (s *RunService) startPresetMonitor(runID string, policy presetStopPolicy) {
+	if policy.mode == "MANUAL" {
+		return
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	s.mu.Lock()
+	s.presetCancel, s.presetDone = cancel, done
+	s.mu.Unlock()
+	go func() {
+		defer close(done)
+		trigger := false
+		if policy.mode == "PRESET_TIME" {
+			timer := time.NewTimer(policy.duration)
+			defer timer.Stop()
+			select {
+			case <-ctx.Done():
+				return
+			case <-timer.C:
+				trigger = true
+			}
+		} else {
+			interval := s.HealthInterval
+			if interval <= 0 || interval > 100*time.Millisecond {
+				interval = 100 * time.Millisecond
+			}
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+			for !trigger {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					trigger = pipelineEventCount(s.Controller.ActivePipeline()) >= policy.eventCount
+				}
+			}
+		}
+		if trigger {
+			go s.automaticStop(runID, policy.mode)
+		}
+	}()
+}
+
+func (s *RunService) automaticStop(runID, mode string) {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
+	if s.Controller.ActiveRunID() != runID {
+		return
+	}
+	reason := "preset_time"
+	if mode == "PRESET_COUNTS" {
+		reason = "preset_counts"
+	}
+	_, _ = s.stopActive(context.Background(), runID, "preset-stop", reason)
+}
+
+func (s *RunService) stopPresetMonitor() {
+	s.mu.Lock()
+	cancel, done := s.presetCancel, s.presetDone
+	s.presetCancel, s.presetDone = nil, nil
 	s.mu.Unlock()
 	if cancel == nil {
 		return

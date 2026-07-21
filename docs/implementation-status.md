@@ -85,6 +85,15 @@ switch between cumulative counts and latest-interval rates. Typed global cards
 show pipeline, persistence, and elapsed-run statistics without resetting or
 commanding the active acquisition when the display mode changes.
 
+Run stop policy is now enforced by the backend from the submitted JANUS
+`StopRunMode`, `PresetTime`, and `PresetCounts` settings. Positive unit-aware
+time limits and positive integral event limits trigger the same serialized
+hardware stop, drain, pipeline close, artifact finalization, and Ready-state
+publication as an operator stop, with distinct persisted termination reasons.
+The run-control frontend exposes this policy directly, shows the active target
+and remaining time/events, and keeps manual Stop and drain enabled in every
+preset mode.
+
 The run-control client now retains the authoritative completed `RunSummary`
 returned by `StopRun` rather than trying to reconstruct completion from the next
 telemetry snapshot. The dashboard presents the latest run's termination reason,

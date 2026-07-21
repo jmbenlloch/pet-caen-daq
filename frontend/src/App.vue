@@ -66,6 +66,23 @@ const configurationErrors = computed(() =>
     .map((field) => ({ field, error: numericError(field) }))
     .filter((item) => item.error),
 )
+const stopMode = computed(() => globalValue('StopRunMode') ?? 'MANUAL')
+const presetTime = computed(() => globalValue('PresetTime') ?? '0')
+const presetCounts = computed(() => globalValue('PresetCounts') ?? '0')
+const stopPolicyError = computed(() => {
+  if (stopMode.value === 'PRESET_TIME' && !(Number.parseFloat(presetTime.value) > 0))
+    return 'Preset time must be greater than zero.'
+  if (stopMode.value === 'PRESET_COUNTS' && !(Number(presetCounts.value) > 0))
+    return 'Preset event count must be a positive integer.'
+  return ''
+})
+const configuredStopPolicy = computed(() => {
+  const mode = globalValue('StopRunMode') ?? 'MANUAL'
+  if (mode === 'PRESET_TIME') return `Automatic stop after ${globalValue('PresetTime') ?? '0'} s`
+  if (mode === 'PRESET_COUNTS')
+    return `Automatic stop after ${globalValue('PresetCounts') ?? '0'} events`
+  return 'Manual stop'
+})
 
 const state = computed(() => stateLabel[daq.snapshot.value?.state ?? 0])
 const boards = computed(() =>
@@ -86,6 +103,13 @@ async function loadConfiguration(event: Event) {
 
 function setField(field: ConfigurationField, value: string) {
   configurationDocument.value = updateConfiguration(configurationDocument.value, field, value)
+}
+
+function setGlobalField(name: string, value: string) {
+  const field = configurationDocument.value.fields.find(
+    (candidate) => candidate.name === name && candidate.index === undefined,
+  )
+  if (field) setField(field, value)
 }
 
 function openMask(field: ConfigurationField) {
@@ -238,6 +262,19 @@ function effectiveBoardNumericValues(name: string) {
   return result
 }
 
+function activeStopPolicy() {
+  const run = daq.snapshot.value?.currentRun
+  if (!run || run.stopMode === 'MANUAL' || !run.stopMode) return 'Manual stop enabled'
+  if (run.stopMode === 'PRESET_COUNTS') {
+    const remaining =
+      run.presetEventCount > run.eventCount ? run.presetEventCount - run.eventCount : 0n
+    return `Stops at ${compact(run.presetEventCount)} events · ${compact(remaining)} remaining · manual stop enabled`
+  }
+  const started = run.startedAt ? Number(run.startedAt.seconds) * 1000 : Date.now()
+  const remaining = Math.max(Number(run.presetTimeMilliseconds) - (Date.now() - started), 0)
+  return `Stops after ${(Number(run.presetTimeMilliseconds) / 1000).toFixed(1)} s · ${(remaining / 1000).toFixed(1)} s remaining · manual stop enabled`
+}
+
 function applyBoardOverrides(values: Record<number, string>) {
   if (!activeBoardField.value) return
   for (let board = 0; board < 4; board++) {
@@ -309,6 +346,7 @@ onMounted(() => daq.connect())
           <span>Active run</span>
           <strong>{{ daq.snapshot.value.currentRun.runId }}</strong>
           <span>{{ compact(daq.snapshot.value.currentRun.eventCount) }} events</span>
+          <small>{{ activeStopPolicy() }}</small>
         </div>
         <div v-else class="run-now quiet"><span>No active run</span></div>
       </section>
@@ -344,7 +382,39 @@ onMounted(() => daq.connect())
               Requested by
               <input v-model.trim="requestedBy" autocomplete="name" />
             </label>
+            <label>
+              Run stop
+              <select
+                :value="stopMode"
+                @change="setGlobalField('StopRunMode', ($event.target as HTMLSelectElement).value)"
+              >
+                <option value="MANUAL">Manual only</option>
+                <option value="PRESET_TIME">After elapsed time</option>
+                <option value="PRESET_COUNTS">After event count</option>
+              </select>
+            </label>
+            <label v-if="stopMode === 'PRESET_TIME'">
+              Preset time (seconds)
+              <input
+                :value="Number.parseFloat(presetTime)"
+                type="number"
+                min="0.001"
+                step="1"
+                @change="setGlobalField('PresetTime', ($event.target as HTMLInputElement).value)"
+              />
+            </label>
+            <label v-if="stopMode === 'PRESET_COUNTS'">
+              Preset event count
+              <input
+                :value="presetCounts"
+                type="number"
+                min="1"
+                step="1"
+                @change="setGlobalField('PresetCounts', ($event.target as HTMLInputElement).value)"
+              />
+            </label>
           </div>
+          <p v-if="stopPolicyError" class="field-error" role="alert">{{ stopPolicyError }}</p>
 
           <div class="config-heading">
             <div>
@@ -589,11 +659,18 @@ onMounted(() => daq.connect())
             >
           </div>
 
+          <p class="stop-policy-summary" role="status">{{ configuredStopPolicy }}</p>
+
           <div class="actions">
             <button
               class="secondary"
               type="button"
-              :disabled="daq.busy.value || !configuration || configurationErrors.length > 0"
+              :disabled="
+                daq.busy.value ||
+                !configuration ||
+                configurationErrors.length > 0 ||
+                !!stopPolicyError
+              "
               @click="daq.validate(configuration)"
             >
               Validate
@@ -606,7 +683,8 @@ onMounted(() => daq.connect())
                 !runId ||
                 !requestedBy ||
                 !configuration ||
-                configurationErrors.length > 0
+                configurationErrors.length > 0 ||
+                !!stopPolicyError
               "
               @click="
                 daq.startRun({ runId, requestedBy, configuration, captureRaw, journalTransport })

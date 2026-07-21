@@ -76,11 +76,11 @@ High-priority frontend gaps after the current milestones are:
 | `StartRunMode` | Selects asynchronous, TDL, external-run, GPS, or chain start synchronization. | Global combo: ASYNC, TDL, TDL_EXTRUN, TDL_GPS, CHAIN_T0, CHAIN_T1. | **Partial.** The sample subset is selectable and audited, but the coordinator uses its fixed synchronized native start sequence rather than dispatching every JANUS mode. |
 | `ExtRunSource` | Selects the DT5215 external-run input. | Global combo: SYNC-IN, LEMO_RA/RB/FA/FB. | **Missing.** Not in the sample or accepted catalog. |
 | `GPSTimeUTC` + Calendar | UTC timestamp for GPS start; Calendar opens a date/time picker. | Global ISO-8601 string. | **Missing.** |
-| `StopRunMode` | Manual, elapsed-time, or event-count stop policy. | Global combo. | **Partial.** Parsed/audited; operator stop exists, but preset time/count do not autonomously stop the run. |
+| `StopRunMode` | Manual, elapsed-time, or event-count stop policy. | Global combo. | **Complete.** A dedicated run-control selector configures the policy; the backend monitors authoritative elapsed time/event totals and invokes normal stop/drain/finalization automatically. Manual stop remains available in every mode. |
 | `EventBuildingMode` | Disables building or sorts/groups by trigger timestamp or trigger ID. | Global combo. | **Partial.** Parsed/audited; no JANUS online event builder. Events are persisted in received order. |
 | `TstampCoincWindow` | Coincidence window for timestamp event building. | Global float with time unit. | **Partial.** Range input exists; inactive when building is disabled and no builder consumes it. |
-| `PresetTime` | Duration used by PRESET_TIME. | Global time. | **Partial.** UI range input and audit only; no automatic stop. |
-| `PresetCounts` | Count used by PRESET_COUNTS. | Global non-negative number. | **Partial.** UI range input and audit only; no automatic stop. |
+| `PresetTime` | Duration used by PRESET_TIME. | Global positive time. | **Complete.** Dedicated seconds input plus unit-aware source parsing (`s`, `ms`, `us`, `ns`); zero/invalid values are rejected before hardware start. Completion is recorded as `preset_time`. |
+| `PresetCounts` | Count used by PRESET_COUNTS. | Global positive integer. | **Complete.** Dedicated bounded integer input; the backend stops when persisted decoded-event count reaches the target and records `preset_counts`. |
 | `JobFirstRun` | First run number in a job. | Global integer. | **Partial.** Editable/audited; no scheduler. |
 | `JobLastRun` | Last run number in a job. | Global integer. | **Partial.** Editable/audited; no scheduler. |
 | `RunSleep` | Delay between job runs. | Global time. | **Partial.** Editable/audited; no scheduler. |

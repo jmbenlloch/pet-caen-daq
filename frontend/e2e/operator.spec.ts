@@ -58,6 +58,34 @@ test('operator receives structured validation feedback before hardware mutation'
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
 })
 
+test('backend automatically stops runs at time and event presets while manual stop remains available', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
+
+  const timedRun = `preset-time-${Date.now()}`
+  await page.getByLabel('Run stop').selectOption('PRESET_TIME')
+  await page.getByLabel('Preset time (seconds)').fill('1')
+  await page.getByLabel('Run ID').fill(timedRun)
+  await page.getByRole('button', { name: 'Start run' }).click()
+  await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Stop and drain' })).toBeEnabled()
+  await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: timedRun })).toBeVisible()
+  await expect(page.getByText('preset_time', { exact: true })).toBeVisible()
+
+  const countedRun = `preset-count-${Date.now()}`
+  await page.getByLabel('Run stop').selectOption('PRESET_COUNTS')
+  await page.getByLabel('Preset event count').fill('3')
+  await page.getByLabel('Run ID').fill(countedRun)
+  await page.getByRole('button', { name: 'Start run' }).click()
+  await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: countedRun })).toBeVisible()
+  await expect(page.getByText('preset_counts', { exact: true })).toBeVisible()
+})
+
 test('operator configures bounded values and channel masks without editing text', async ({
   page,
 }) => {

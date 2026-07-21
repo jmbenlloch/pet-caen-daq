@@ -1230,19 +1230,20 @@ func (x *DownloadArtifactResponse) GetData() []byte {
 }
 
 type TelemetrySnapshot struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	InstanceId    string                 `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
-	Sequence      uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
-	ObservedAt    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
-	State         SystemState            `protobuf:"varint,4,opt,name=state,proto3,enum=pet.caen.daq.v1.SystemState" json:"state,omitempty"`
-	CurrentRun    *RunSummary            `protobuf:"bytes,5,opt,name=current_run,json=currentRun,proto3" json:"current_run,omitempty"`
-	Chains        []*Chain               `protobuf:"bytes,6,rep,name=chains,proto3" json:"chains,omitempty"`
-	Pipeline      *PipelineTelemetry     `protobuf:"bytes,7,opt,name=pipeline,proto3" json:"pipeline,omitempty"`
-	Storage       *StorageTelemetry      `protobuf:"bytes,8,opt,name=storage,proto3" json:"storage,omitempty"`
-	Diagnostics   []*Diagnostic          `protobuf:"bytes,9,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
-	Statistics    *StatisticsTelemetry   `protobuf:"bytes,10,opt,name=statistics,proto3" json:"statistics,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	InstanceId         string                 `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
+	Sequence           uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	ObservedAt         *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	State              SystemState            `protobuf:"varint,4,opt,name=state,proto3,enum=pet.caen.daq.v1.SystemState" json:"state,omitempty"`
+	CurrentRun         *RunSummary            `protobuf:"bytes,5,opt,name=current_run,json=currentRun,proto3" json:"current_run,omitempty"`
+	Chains             []*Chain               `protobuf:"bytes,6,rep,name=chains,proto3" json:"chains,omitempty"`
+	Pipeline           *PipelineTelemetry     `protobuf:"bytes,7,opt,name=pipeline,proto3" json:"pipeline,omitempty"`
+	Storage            *StorageTelemetry      `protobuf:"bytes,8,opt,name=storage,proto3" json:"storage,omitempty"`
+	Diagnostics        []*Diagnostic          `protobuf:"bytes,9,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
+	Statistics         *StatisticsTelemetry   `protobuf:"bytes,10,opt,name=statistics,proto3" json:"statistics,omitempty"`
+	LatestCompletedRun *RunSummary            `protobuf:"bytes,11,opt,name=latest_completed_run,json=latestCompletedRun,proto3" json:"latest_completed_run,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *TelemetrySnapshot) Reset() {
@@ -1341,6 +1342,13 @@ func (x *TelemetrySnapshot) GetDiagnostics() []*Diagnostic {
 func (x *TelemetrySnapshot) GetStatistics() *StatisticsTelemetry {
 	if x != nil {
 		return x.Statistics
+	}
+	return nil
+}
+
+func (x *TelemetrySnapshot) GetLatestCompletedRun() *RunSummary {
+	if x != nil {
+		return x.LatestCompletedRun
 	}
 	return nil
 }
@@ -1524,17 +1532,20 @@ func (x *BoardStatistics) GetPhaCounts() []uint64 {
 }
 
 type RunSummary struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	RunId             string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
-	StartedAt         *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
-	CompletedAt       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
-	TerminationReason string                 `protobuf:"bytes,4,opt,name=termination_reason,json=terminationReason,proto3" json:"termination_reason,omitempty"`
-	EventCount        uint64                 `protobuf:"varint,5,opt,name=event_count,json=eventCount,proto3" json:"event_count,omitempty"`
-	RawBatchCount     uint64                 `protobuf:"varint,6,opt,name=raw_batch_count,json=rawBatchCount,proto3" json:"raw_batch_count,omitempty"`
-	Incomplete        bool                   `protobuf:"varint,7,opt,name=incomplete,proto3" json:"incomplete,omitempty"`
-	Artifacts         []*Artifact            `protobuf:"bytes,8,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	RunId                  string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	StartedAt              *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	CompletedAt            *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	TerminationReason      string                 `protobuf:"bytes,4,opt,name=termination_reason,json=terminationReason,proto3" json:"termination_reason,omitempty"`
+	EventCount             uint64                 `protobuf:"varint,5,opt,name=event_count,json=eventCount,proto3" json:"event_count,omitempty"`
+	RawBatchCount          uint64                 `protobuf:"varint,6,opt,name=raw_batch_count,json=rawBatchCount,proto3" json:"raw_batch_count,omitempty"`
+	Incomplete             bool                   `protobuf:"varint,7,opt,name=incomplete,proto3" json:"incomplete,omitempty"`
+	Artifacts              []*Artifact            `protobuf:"bytes,8,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
+	StopMode               string                 `protobuf:"bytes,9,opt,name=stop_mode,json=stopMode,proto3" json:"stop_mode,omitempty"`
+	PresetTimeMilliseconds uint64                 `protobuf:"varint,10,opt,name=preset_time_milliseconds,json=presetTimeMilliseconds,proto3" json:"preset_time_milliseconds,omitempty"`
+	PresetEventCount       uint64                 `protobuf:"varint,11,opt,name=preset_event_count,json=presetEventCount,proto3" json:"preset_event_count,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *RunSummary) Reset() {
@@ -1621,6 +1632,27 @@ func (x *RunSummary) GetArtifacts() []*Artifact {
 		return x.Artifacts
 	}
 	return nil
+}
+
+func (x *RunSummary) GetStopMode() string {
+	if x != nil {
+		return x.StopMode
+	}
+	return ""
+}
+
+func (x *RunSummary) GetPresetTimeMilliseconds() uint64 {
+	if x != nil {
+		return x.PresetTimeMilliseconds
+	}
+	return 0
+}
+
+func (x *RunSummary) GetPresetEventCount() uint64 {
+	if x != nil {
+		return x.PresetEventCount
+	}
+	return 0
 }
 
 type Artifact struct {
@@ -2219,7 +2251,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12#\n" +
 	"\rartifact_name\x18\x02 \x01(\tR\fartifactName\".\n" +
 	"\x18DownloadArtifactResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data\"\xb1\x04\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\"\x80\x05\n" +
 	"\x11TelemetrySnapshot\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1a\n" +
@@ -2236,7 +2268,8 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\n" +
 	"statistics\x18\n" +
 	" \x01(\v2$.pet.caen.daq.v1.StatisticsTelemetryR\n" +
-	"statistics\"\x82\x01\n" +
+	"statistics\x12M\n" +
+	"\x14latest_completed_run\x18\v \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x12latestCompletedRun\"\x82\x01\n" +
 	"\x13StatisticsTelemetry\x121\n" +
 	"\x14elapsed_milliseconds\x18\x01 \x01(\x04R\x13elapsedMilliseconds\x128\n" +
 	"\x06boards\x18\x02 \x03(\v2 .pet.caen.daq.v1.BoardStatisticsR\x06boards\"\x96\x03\n" +
@@ -2255,7 +2288,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x10timestamp_counts\x18\n" +
 	" \x03(\x04R\x0ftimestampCounts\x12\x1d\n" +
 	"\n" +
-	"pha_counts\x18\v \x03(\x04R\tphaCounts\"\xee\x02\n" +
+	"pha_counts\x18\v \x03(\x04R\tphaCounts\"\xf3\x03\n" +
 	"\n" +
 	"RunSummary\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x129\n" +
@@ -2269,7 +2302,11 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\n" +
 	"incomplete\x18\a \x01(\bR\n" +
 	"incomplete\x127\n" +
-	"\tartifacts\x18\b \x03(\v2\x19.pet.caen.daq.v1.ArtifactR\tartifacts\"i\n" +
+	"\tartifacts\x18\b \x03(\v2\x19.pet.caen.daq.v1.ArtifactR\tartifacts\x12\x1b\n" +
+	"\tstop_mode\x18\t \x01(\tR\bstopMode\x128\n" +
+	"\x18preset_time_milliseconds\x18\n" +
+	" \x01(\x04R\x16presetTimeMilliseconds\x12,\n" +
+	"\x12preset_event_count\x18\v \x01(\x04R\x10presetEventCount\"i\n" +
 	"\bArtifact\x12\x12\n" +
 	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
@@ -2440,39 +2477,40 @@ var file_pet_caen_daq_v1_system_proto_depIdxs = []int32{
 	31, // 17: pet.caen.daq.v1.TelemetrySnapshot.storage:type_name -> pet.caen.daq.v1.StorageTelemetry
 	32, // 18: pet.caen.daq.v1.TelemetrySnapshot.diagnostics:type_name -> pet.caen.daq.v1.Diagnostic
 	24, // 19: pet.caen.daq.v1.TelemetrySnapshot.statistics:type_name -> pet.caen.daq.v1.StatisticsTelemetry
-	25, // 20: pet.caen.daq.v1.StatisticsTelemetry.boards:type_name -> pet.caen.daq.v1.BoardStatistics
-	33, // 21: pet.caen.daq.v1.RunSummary.started_at:type_name -> google.protobuf.Timestamp
-	33, // 22: pet.caen.daq.v1.RunSummary.completed_at:type_name -> google.protobuf.Timestamp
-	27, // 23: pet.caen.daq.v1.RunSummary.artifacts:type_name -> pet.caen.daq.v1.Artifact
-	2,  // 24: pet.caen.daq.v1.Chain.health:type_name -> pet.caen.daq.v1.HealthStatus
-	29, // 25: pet.caen.daq.v1.Chain.boards:type_name -> pet.caen.daq.v1.Board
-	2,  // 26: pet.caen.daq.v1.Board.health:type_name -> pet.caen.daq.v1.HealthStatus
-	2,  // 27: pet.caen.daq.v1.StorageTelemetry.health:type_name -> pet.caen.daq.v1.HealthStatus
-	3,  // 28: pet.caen.daq.v1.Diagnostic.severity:type_name -> pet.caen.daq.v1.DiagnosticSeverity
-	33, // 29: pet.caen.daq.v1.Diagnostic.observed_at:type_name -> google.protobuf.Timestamp
-	4,  // 30: pet.caen.daq.v1.SystemService.GetSystemSnapshot:input_type -> pet.caen.daq.v1.GetSystemSnapshotRequest
-	5,  // 31: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:input_type -> pet.caen.daq.v1.GetConfigurationTemplateRequest
-	8,  // 32: pet.caen.daq.v1.SystemService.ValidateConfiguration:input_type -> pet.caen.daq.v1.ValidateConfigurationRequest
-	11, // 33: pet.caen.daq.v1.SystemService.StreamTelemetry:input_type -> pet.caen.daq.v1.StreamTelemetryRequest
-	13, // 34: pet.caen.daq.v1.SystemService.SetHighVoltage:input_type -> pet.caen.daq.v1.SetHighVoltageRequest
-	15, // 35: pet.caen.daq.v1.RunService.StartRun:input_type -> pet.caen.daq.v1.StartRunRequest
-	17, // 36: pet.caen.daq.v1.RunService.StopRun:input_type -> pet.caen.daq.v1.StopRunRequest
-	19, // 37: pet.caen.daq.v1.RunService.ListRuns:input_type -> pet.caen.daq.v1.ListRunsRequest
-	21, // 38: pet.caen.daq.v1.RunService.DownloadArtifact:input_type -> pet.caen.daq.v1.DownloadArtifactRequest
-	7,  // 39: pet.caen.daq.v1.SystemService.GetSystemSnapshot:output_type -> pet.caen.daq.v1.GetSystemSnapshotResponse
-	6,  // 40: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:output_type -> pet.caen.daq.v1.GetConfigurationTemplateResponse
-	9,  // 41: pet.caen.daq.v1.SystemService.ValidateConfiguration:output_type -> pet.caen.daq.v1.ValidateConfigurationResponse
-	12, // 42: pet.caen.daq.v1.SystemService.StreamTelemetry:output_type -> pet.caen.daq.v1.StreamTelemetryResponse
-	14, // 43: pet.caen.daq.v1.SystemService.SetHighVoltage:output_type -> pet.caen.daq.v1.SetHighVoltageResponse
-	16, // 44: pet.caen.daq.v1.RunService.StartRun:output_type -> pet.caen.daq.v1.StartRunResponse
-	18, // 45: pet.caen.daq.v1.RunService.StopRun:output_type -> pet.caen.daq.v1.StopRunResponse
-	20, // 46: pet.caen.daq.v1.RunService.ListRuns:output_type -> pet.caen.daq.v1.ListRunsResponse
-	22, // 47: pet.caen.daq.v1.RunService.DownloadArtifact:output_type -> pet.caen.daq.v1.DownloadArtifactResponse
-	39, // [39:48] is the sub-list for method output_type
-	30, // [30:39] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	26, // 20: pet.caen.daq.v1.TelemetrySnapshot.latest_completed_run:type_name -> pet.caen.daq.v1.RunSummary
+	25, // 21: pet.caen.daq.v1.StatisticsTelemetry.boards:type_name -> pet.caen.daq.v1.BoardStatistics
+	33, // 22: pet.caen.daq.v1.RunSummary.started_at:type_name -> google.protobuf.Timestamp
+	33, // 23: pet.caen.daq.v1.RunSummary.completed_at:type_name -> google.protobuf.Timestamp
+	27, // 24: pet.caen.daq.v1.RunSummary.artifacts:type_name -> pet.caen.daq.v1.Artifact
+	2,  // 25: pet.caen.daq.v1.Chain.health:type_name -> pet.caen.daq.v1.HealthStatus
+	29, // 26: pet.caen.daq.v1.Chain.boards:type_name -> pet.caen.daq.v1.Board
+	2,  // 27: pet.caen.daq.v1.Board.health:type_name -> pet.caen.daq.v1.HealthStatus
+	2,  // 28: pet.caen.daq.v1.StorageTelemetry.health:type_name -> pet.caen.daq.v1.HealthStatus
+	3,  // 29: pet.caen.daq.v1.Diagnostic.severity:type_name -> pet.caen.daq.v1.DiagnosticSeverity
+	33, // 30: pet.caen.daq.v1.Diagnostic.observed_at:type_name -> google.protobuf.Timestamp
+	4,  // 31: pet.caen.daq.v1.SystemService.GetSystemSnapshot:input_type -> pet.caen.daq.v1.GetSystemSnapshotRequest
+	5,  // 32: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:input_type -> pet.caen.daq.v1.GetConfigurationTemplateRequest
+	8,  // 33: pet.caen.daq.v1.SystemService.ValidateConfiguration:input_type -> pet.caen.daq.v1.ValidateConfigurationRequest
+	11, // 34: pet.caen.daq.v1.SystemService.StreamTelemetry:input_type -> pet.caen.daq.v1.StreamTelemetryRequest
+	13, // 35: pet.caen.daq.v1.SystemService.SetHighVoltage:input_type -> pet.caen.daq.v1.SetHighVoltageRequest
+	15, // 36: pet.caen.daq.v1.RunService.StartRun:input_type -> pet.caen.daq.v1.StartRunRequest
+	17, // 37: pet.caen.daq.v1.RunService.StopRun:input_type -> pet.caen.daq.v1.StopRunRequest
+	19, // 38: pet.caen.daq.v1.RunService.ListRuns:input_type -> pet.caen.daq.v1.ListRunsRequest
+	21, // 39: pet.caen.daq.v1.RunService.DownloadArtifact:input_type -> pet.caen.daq.v1.DownloadArtifactRequest
+	7,  // 40: pet.caen.daq.v1.SystemService.GetSystemSnapshot:output_type -> pet.caen.daq.v1.GetSystemSnapshotResponse
+	6,  // 41: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:output_type -> pet.caen.daq.v1.GetConfigurationTemplateResponse
+	9,  // 42: pet.caen.daq.v1.SystemService.ValidateConfiguration:output_type -> pet.caen.daq.v1.ValidateConfigurationResponse
+	12, // 43: pet.caen.daq.v1.SystemService.StreamTelemetry:output_type -> pet.caen.daq.v1.StreamTelemetryResponse
+	14, // 44: pet.caen.daq.v1.SystemService.SetHighVoltage:output_type -> pet.caen.daq.v1.SetHighVoltageResponse
+	16, // 45: pet.caen.daq.v1.RunService.StartRun:output_type -> pet.caen.daq.v1.StartRunResponse
+	18, // 46: pet.caen.daq.v1.RunService.StopRun:output_type -> pet.caen.daq.v1.StopRunResponse
+	20, // 47: pet.caen.daq.v1.RunService.ListRuns:output_type -> pet.caen.daq.v1.ListRunsResponse
+	22, // 48: pet.caen.daq.v1.RunService.DownloadArtifact:output_type -> pet.caen.daq.v1.DownloadArtifactResponse
+	40, // [40:49] is the sub-list for method output_type
+	31, // [31:40] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_pet_caen_daq_v1_system_proto_init() }

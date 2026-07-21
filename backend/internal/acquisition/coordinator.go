@@ -175,6 +175,10 @@ func (c *Coordinator) watchPipeline(run *activeRun, notifier RunPipelineNotifier
 }
 
 func (c *Coordinator) Stop(ctx context.Context, actor string) error {
+	return c.StopWithReason(ctx, actor, "operator_stop")
+}
+
+func (c *Coordinator) StopWithReason(ctx context.Context, actor, reason string) error {
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
 	c.mu.Lock()
@@ -208,7 +212,7 @@ func (c *Coordinator) Stop(ctx context.Context, actor string) error {
 	result = JoinStopError(result, run.pipeline.Close())
 	if result == nil {
 		if finalizer, ok := run.pipeline.(RunPipelineFinalizer); ok {
-			result = finalizer.Finalize(time.Now().UTC().Format(time.RFC3339Nano), "operator_stop")
+			result = finalizer.Finalize(time.Now().UTC().Format(time.RFC3339Nano), reason)
 		}
 	}
 	if result != nil {

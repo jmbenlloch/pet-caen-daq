@@ -139,6 +139,7 @@ message TelemetrySnapshot {
   StorageTelemetry storage = 8;
   repeated Diagnostic diagnostics = 9;
   StatisticsTelemetry statistics = 10;
+  RunSummary latest_completed_run = 11;
 }
 
 message StatisticsTelemetry {
@@ -186,6 +187,9 @@ message RunSummary {
   uint64 raw_batch_count = 6;
   bool incomplete = 7;
   repeated Artifact artifacts = 8;
+  string stop_mode = 9;
+  uint64 preset_time_milliseconds = 10;
+  uint64 preset_event_count = 11;
 }
 
 message Artifact {

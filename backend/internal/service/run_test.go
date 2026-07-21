@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,7 +28,7 @@ type fakeRunController struct {
 	pipeline acquisition.RunPipeline
 }
 
-type serviceHealthPipeline struct{}
+type serviceHealthPipeline struct{ events atomic.Uint64 }
 
 func (*serviceHealthPipeline) Submit(context.Context, acquisition.PipelineBatch) error { return nil }
 func (*serviceHealthPipeline) Close() error                                            { return nil }
@@ -36,6 +37,9 @@ func (*serviceHealthPipeline) PipelineStats() acquisition.PipelineStats {
 }
 func (*serviceHealthPipeline) StorageStats() runpipeline.StorageStats {
 	return runpipeline.StorageStats{Directory: "/runs/run-42"}
+}
+func (p *serviceHealthPipeline) Stats() runpipeline.StorageStats {
+	return runpipeline.StorageStats{Directory: "/runs/run-42", EventCount: p.events.Load()}
 }
 func (*serviceHealthPipeline) Artifacts() []runstore.Artifact {
 	return []runstore.Artifact{{Kind: "decoded_events", Name: "events.jsonl", SizeBytes: 123, SHA256: "abc"}}
@@ -153,6 +157,48 @@ func TestRunServiceOwnsHealthMonitorThroughStop(t *testing.T) {
 	service.mu.Unlock()
 	if !stopped {
 		t.Fatal("health monitor did not stop")
+	}
+}
+
+func TestRunServicePresetTimeStopsAndPublishesCompletion(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
+	service := newRunService(t, controller)
+	service.HealthInterval = time.Hour
+	configuration := validTopology + "StopRunMode PRESET_TIME\nPresetTime 20 ms\n"
+	start, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "timed", RequestedBy: "operator", JanusConfiguration: configuration}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if start.Msg.Run.GetStopMode() != "PRESET_TIME" || start.Msg.Run.GetPresetTimeMilliseconds() != 20 {
+		t.Fatalf("run policy = %+v", start.Msg.Run)
+	}
+	deadline := time.Now().Add(time.Second)
+	for service.Telemetry.Snapshot().GetLatestCompletedRun() == nil && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	snapshot := service.Telemetry.Snapshot()
+	if controller.ActiveRunID() != "" || snapshot.GetState() != daqv1.SystemState_SYSTEM_STATE_READY || snapshot.GetLatestCompletedRun().GetTerminationReason() != "preset_time" {
+		t.Fatalf("controller=%+v snapshot=%+v", controller, snapshot)
+	}
+}
+
+func TestRunServicePresetCountsStopsAtAuthoritativeEventCount(t *testing.T) {
+	pipeline := &serviceHealthPipeline{}
+	controller := &fakeRunController{state: acquisition.StateReady, pipeline: pipeline}
+	service := newRunService(t, controller)
+	service.HealthInterval = time.Millisecond
+	configuration := validTopology + "StopRunMode PRESET_COUNTS\nPresetCounts 3\n"
+	if _, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "counted", RequestedBy: "operator", JanusConfiguration: configuration})); err != nil {
+		t.Fatal(err)
+	}
+	pipeline.events.Store(3)
+	deadline := time.Now().Add(time.Second)
+	for service.Telemetry.Snapshot().GetLatestCompletedRun() == nil && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	completed := service.Telemetry.Snapshot().GetLatestCompletedRun()
+	if controller.ActiveRunID() != "" || completed.GetTerminationReason() != "preset_counts" || completed.GetEventCount() != 3 {
+		t.Fatalf("controller=%+v completed=%+v", controller, completed)
 	}
 }
 

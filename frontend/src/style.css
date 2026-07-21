@@ -1022,6 +1022,13 @@ textarea {
   color: #8194ac;
   font-size: 0.72rem;
 }
+.stop-policy-summary {
+  border-left: 3px solid #3acb9f;
+  margin: 14px 0 0;
+  padding: 8px 12px;
+  color: #a9bad0;
+  font-size: 0.78rem;
+}
 .visually-hidden {
   position: absolute;
   width: 1px;
