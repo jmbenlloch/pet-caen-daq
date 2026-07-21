@@ -60,6 +60,8 @@ test('operator configures bounded values and channel masks without editing text'
   await page.getByRole('button', { name: 'Configure channels' }).click()
   const mask = page.getByRole('dialog', { name: 'ChEnableMask' })
   await expect(mask.getByText('64 enabled')).toBeVisible()
+  await mask.getByLabel('Target').selectOption('2')
+  await expect(mask.getByText(/64 enabled · inherited/)).toBeVisible()
   await mask.getByRole('button', { name: 'Channel 0', exact: true }).click()
   await expect(mask.getByText('63 enabled')).toBeVisible()
   await mask.getByRole('button', { name: 'Apply mask' }).click()
@@ -82,8 +84,18 @@ test('operator configures bounded values and channel masks without editing text'
   await decrease.click()
   await expect(majority).toHaveValue('62')
 
+  await page.getByLabel('Find a parameter').fill('TD_FineThreshold')
+  await page.getByRole('button', { name: 'Per-channel overrides' }).click()
+  const channels = page.getByRole('dialog', { name: 'TD_FineThreshold' })
+  await channels.getByRole('combobox').selectOption('2')
+  await channels.getByLabel('TD_FineThreshold board 2 channel 17', { exact: true }).fill('9')
+  await channels.getByRole('button', { name: 'Apply overrides' }).click()
+
   await page.getByRole('button', { name: 'Edit source' }).click()
   await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
-    /ChEnableMask0\s+0xFFFFFFFE/,
+    /ChEnableMask0\[2\]\s+0xFFFFFFFE/,
+  )
+  await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
+    /TD_FineThreshold\[2\]\[17\]\s+9/,
   )
 })

@@ -11,11 +11,14 @@ type PedestalCalibration struct {
 }
 
 type PedestalPlan struct {
-	Common               uint16
-	AcquisitionMode      uint32
-	ZeroSuppressLowGain  uint16
-	ZeroSuppressHighGain uint16
-	Calibration          *PedestalCalibration
+	Common                       uint16
+	AcquisitionMode              uint32
+	ZeroSuppressLowGain          uint16
+	ZeroSuppressHighGain         uint16
+	ZeroSuppressLowGainChannels  [ChannelCount]uint16
+	ZeroSuppressHighGainChannels [ChannelCount]uint16
+	PerChannel                   bool
+	Calibration                  *PedestalCalibration
 }
 
 // WithPedestalCalibration supplies the protected-flash calibration evidence
@@ -34,8 +37,13 @@ func (p ConfigurationPlan) WithPedestalCalibration(calibration PedestalCalibrati
 	p.Deferred = remaining
 	if p.Pedestal.AcquisitionMode == 1 {
 		for channel := uint8(0); channel < ChannelCount; channel++ {
-			lg := zeroSuppressionValue(p.Pedestal.ZeroSuppressLowGain, p.Pedestal.Common, calibration.LowGain[channel])
-			hg := zeroSuppressionValue(p.Pedestal.ZeroSuppressHighGain, p.Pedestal.Common, calibration.HighGain[channel])
+			requestedLG, requestedHG := p.Pedestal.ZeroSuppressLowGain, p.Pedestal.ZeroSuppressHighGain
+			if p.Pedestal.PerChannel {
+				requestedLG = p.Pedestal.ZeroSuppressLowGainChannels[channel]
+				requestedHG = p.Pedestal.ZeroSuppressHighGainChannels[channel]
+			}
+			lg := zeroSuppressionValue(requestedLG, p.Pedestal.Common, calibration.LowGain[channel])
+			hg := zeroSuppressionValue(requestedHG, p.Pedestal.Common, calibration.HighGain[channel])
 			p.Writes = append(p.Writes, RegisterWrite{IndividualRegister(ZeroSuppressionLowGain, channel), uint32(lg)}, RegisterWrite{IndividualRegister(ZeroSuppressionHighGain, channel), uint32(hg)})
 		}
 	}

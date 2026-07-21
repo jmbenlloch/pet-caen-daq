@@ -119,6 +119,47 @@ func TestPlanProductionConfigurationServiceEventModes(t *testing.T) {
 	}
 }
 
+func TestPlanProductionConfigurationAppliesPerChannelOverrides(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := janusconfig.Parse(strings.NewReader(string(fixture) + "\n" +
+		"TD_FineThreshold[0][7] 9\n" +
+		"QD_FineThreshold[0][7] 8\n" +
+		"HG_Gain[0][7] 42\n" +
+		"LG_Gain[0][7] 41\n" +
+		"HV_IndivAdj[0][7] 17\n" +
+		"ZS_Threshold_HG[0][7] 77\n" +
+		"TD_FineThreshold[1][7] 3\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := PlanProductionConfiguration(doc, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writes := make(map[Register]uint32)
+	for _, write := range plan.Writes {
+		writes[write.Address] = write.Value
+	}
+	for address, want := range map[Register]uint32{
+		IndividualRegister(TimeFineThreshold, 7):      9,
+		IndividualRegister(ChargeFineThreshold, 7):    8,
+		IndividualRegister(HighGain, 7):               42,
+		IndividualRegister(LowGain, 7):                41,
+		IndividualRegister(HVIndividualAdjustment, 7): 0x111,
+		IndividualRegister(TimeFineThreshold, 8):      0,
+	} {
+		if got := writes[address]; got != want {
+			t.Errorf("register %#x = %d, want %d", address, got, want)
+		}
+	}
+	if got := plan.Pedestal.ZeroSuppressHighGainChannels[7]; got != 77 {
+		t.Fatalf("channel 7 HG zero suppression = %d", got)
+	}
+}
+
 func TestPlanProductionConfigurationRejectsInvalidServiceEventMode(t *testing.T) {
 	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
 	if err != nil {

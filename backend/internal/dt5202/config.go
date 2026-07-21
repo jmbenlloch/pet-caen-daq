@@ -74,8 +74,23 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 		return ConfigurationPlan{}, fmt.Errorf("invalid board index %d", board)
 	}
 	values := make(map[string]janusconfig.Assignment)
+	channelValues := make(map[int]map[string]janusconfig.Assignment)
 	for _, a := range doc.Assignments {
-		if a.Index == nil || *a.Index == board {
+		if a.Channel != nil {
+			if a.Index == nil {
+				return ConfigurationPlan{}, fmt.Errorf("line %d: channel override %s requires a board index", a.Line, a.Name)
+			}
+			if *a.Index != board {
+				continue
+			}
+			if *a.Channel < 0 || *a.Channel >= ChannelCount {
+				return ConfigurationPlan{}, fmt.Errorf("line %d: %s channel %d outside range [0,63]", a.Line, a.Name, *a.Channel)
+			}
+			if channelValues[*a.Channel] == nil {
+				channelValues[*a.Channel] = make(map[string]janusconfig.Assignment)
+			}
+			channelValues[*a.Channel][a.Name] = a
+		} else if a.Index == nil || *a.Index == board {
 			values[a.Name] = a
 		}
 	}
@@ -165,6 +180,25 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 			return fmt.Errorf("%s %d outside production range [%d,%d]", name, value, minimum, maximum)
 		}
 		return nil
+	}
+	channelUints := func(name string, defaultValue, minimum, maximum uint32) ([ChannelCount]uint32, error) {
+		values := [ChannelCount]uint32{}
+		for channel := range ChannelCount {
+			values[channel] = defaultValue
+			assignment, ok := channelValues[channel][name]
+			if !ok {
+				continue
+			}
+			parsed, parseErr := strconv.ParseUint(strings.TrimSpace(assignment.Value), 0, 32)
+			if parseErr != nil {
+				return values, fmt.Errorf("line %d: %s[%d][%d]: %w", assignment.Line, name, board, channel, parseErr)
+			}
+			if err := boundedUint(fmt.Sprintf("%s[%d][%d]", name, board, channel), uint32(parsed), minimum, maximum); err != nil {
+				return values, err
+			}
+			values[channel] = uint32(parsed)
+		}
+		return values, nil
 	}
 
 	acqMode, err := choice("AcquisitionMode", map[string]uint32{"SPECTROSCOPY": 1, "TIMING_CSTART": 2, "SPECT_TIMING": 3, "COUNTING": 4, "WAVEFORM": 8, "TIMING_CSTOP": 0x12})
@@ -441,6 +475,10 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	hvAdjustments, err := channelUints("HV_IndivAdj", hvAdjustment, 0, 255)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
 	hvVoltage, err := decimalUnit("HV_Vbias", map[string]float64{"uV": 1e-6, "mV": 1e-3, "V": 1})
 	if err != nil {
 		return ConfigurationPlan{}, err
@@ -511,11 +549,19 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err := boundedUint("LG_Gain", lg, 1, 63); err != nil {
 		return ConfigurationPlan{}, err
 	}
+	lgChannels, err := channelUints("LG_Gain", lg, 1, 63)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
 	hg, err := u32("HG_Gain", 8)
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
 	if err := boundedUint("HG_Gain", hg, 1, 63); err != nil {
+		return ConfigurationPlan{}, err
+	}
+	hgChannels, err := channelUints("HG_Gain", hg, 1, 63)
+	if err != nil {
 		return ConfigurationPlan{}, err
 	}
 	qfine, err := u32("QD_FineThreshold", 8)
@@ -525,6 +571,10 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err := boundedUint("QD_FineThreshold", qfine, 0, 15); err != nil {
 		return ConfigurationPlan{}, err
 	}
+	qfineChannels, err := channelUints("QD_FineThreshold", qfine, 0, 15)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
 	tfine, err := u32("TD_FineThreshold", 8)
 	if err != nil {
 		return ConfigurationPlan{}, err
@@ -532,23 +582,39 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err := boundedUint("TD_FineThreshold", tfine, 0, 15); err != nil {
 		return ConfigurationPlan{}, err
 	}
+	tfineChannels, err := channelUints("TD_FineThreshold", tfine, 0, 15)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	zsLowChannels, err := channelUints("ZS_Threshold_LG", zsLow, 0, 65535)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	zsHighChannels, err := channelUints("ZS_Threshold_HG", zsHigh, 0, 65535)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
 	var citirocChannels [ChannelCount]CitirocChannel
 	for ch := uint8(0); ch < ChannelCount; ch++ {
-		hvValue := uint32(0x100 | hvAdjustment)
+		hvValue := uint32(0x100 | hvAdjustments[ch])
 		if hvRange == 2 {
 			hvValue = 0x1ff
 		}
 		plan.Writes = append(plan.Writes,
-			RegisterWrite{IndividualRegister(LowGain, ch), lg}, RegisterWrite{IndividualRegister(HighGain, ch), hg},
-			RegisterWrite{IndividualRegister(ChargeFineThreshold, ch), qfine}, RegisterWrite{IndividualRegister(TimeFineThreshold, ch), tfine},
+			RegisterWrite{IndividualRegister(LowGain, ch), lgChannels[ch]}, RegisterWrite{IndividualRegister(HighGain, ch), hgChannels[ch]},
+			RegisterWrite{IndividualRegister(ChargeFineThreshold, ch), qfineChannels[ch]}, RegisterWrite{IndividualRegister(TimeFineThreshold, ch), tfineChannels[ch]},
 			RegisterWrite{IndividualRegister(HVIndividualAdjustment, ch), hvValue})
-		citirocChannels[ch] = CitirocChannel{TimeFineThreshold: uint8(tfine), ChargeFineThreshold: uint8(qfine), HVAdjustment: uint16(hvValue), HighGain: uint8(hg), LowGain: uint8(lg)}
+		citirocChannels[ch] = CitirocChannel{TimeFineThreshold: uint8(tfineChannels[ch]), ChargeFineThreshold: uint8(qfineChannels[ch]), HVAdjustment: uint16(hvValue), HighGain: uint8(hgChannels[ch]), LowGain: uint8(lgChannels[ch])}
 	}
 	common := CitirocCommon{DiscriminatorMask: qdMask0, LowShapingTime: uint8(lgShape), HighShapingTime: uint8(hgShape), ChargeCoarseThreshold: uint16(qd), TimeCoarseThreshold: uint16(td), FastShaperOnLowGain: fastShaper != 0, InputDACReference45V: hvRange != 0, PeakSensingExternalTrigger: true, OTAForceOn: true, NegativeTriggerPolarity: true}
 	plan.Citiroc = SplitCitirocChannels(citirocChannels, common)
 	plan.Citiroc[1].Common.DiscriminatorMask = qdMask1
 	plan.HV = buildHVPlan(hvVoltage, hvCurrent, coefficients, feedbackEnable != 0, feedbackCoefficient)
-	plan.Pedestal = PedestalPlan{Common: uint16(commonPedestal), AcquisitionMode: acqMode, ZeroSuppressLowGain: uint16(zsLow), ZeroSuppressHighGain: uint16(zsHigh)}
+	plan.Pedestal = PedestalPlan{Common: uint16(commonPedestal), AcquisitionMode: acqMode, ZeroSuppressLowGain: uint16(zsLow), ZeroSuppressHighGain: uint16(zsHigh), PerChannel: true}
+	for channel := range ChannelCount {
+		plan.Pedestal.ZeroSuppressLowGainChannels[channel] = uint16(zsLowChannels[channel])
+		plan.Pedestal.ZeroSuppressHighGainChannels[channel] = uint16(zsHighChannels[channel])
+	}
 	plan.Deferred = []string{"Pedestal"}
 	if acqMode == 1 {
 		plan.Deferred = append(plan.Deferred, "ZS_Threshold_LG", "ZS_Threshold_HG")

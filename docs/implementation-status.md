@@ -55,6 +55,15 @@ values block frontend validation/start, and the backend independently rejects
 out-of-range majority, trigger-width, discriminator, gain, test-pulse, and
 active-probe settings before configuration planning.
 
+JANUS board/channel inheritance is now implemented rather than merely displayed.
+Mask dialogs select Global or Board 0–3 and create paired board overrides only
+when edited. Channel-scoped HV adjustment, timing/charge fine thresholds,
+high/low gains, and zero-suppression thresholds expose a board-specific
+64-channel exception grid. The parser accepts `Parameter[board][channel]`, and
+the DT5202 planner applies those values to the exact channel register, Citiroc
+stream field, or pedestal-dependent zero-suppression write while other channels
+retain the general value.
+
 The run-control client now retains the authoritative completed `RunSummary`
 returned by `StopRun` rather than trying to reconstruct completion from the next
 telemetry snapshot. The dashboard presents the latest run's termination reason,

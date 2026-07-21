@@ -16,8 +16,11 @@ import (
 type Assignment struct {
 	Name  string
 	Index *int
-	Value string
-	Line  int
+	// Channel is present only for JANUS Parameter[board][channel]
+	// assignments. Index remains the board index for compatibility.
+	Channel *int
+	Value   string
+	Line    int
 }
 
 // Document is an ordered JANUS configuration document.
@@ -64,15 +67,16 @@ func Parse(r io.Reader) (*Document, error) {
 			return nil, fmt.Errorf("line %d: assignment %q has no value", lineNumber, key)
 		}
 
-		name, index, err := parseKey(key)
+		name, index, channel, err := parseKey(key)
 		if err != nil {
 			return nil, fmt.Errorf("line %d: %w", lineNumber, err)
 		}
 		doc.Assignments = append(doc.Assignments, Assignment{
-			Name:  name,
-			Index: index,
-			Value: value,
-			Line:  lineNumber,
+			Name:    name,
+			Index:   index,
+			Channel: channel,
+			Value:   value,
+			Line:    lineNumber,
 		})
 	}
 	if err := scanner.Err(); err != nil {
@@ -81,22 +85,41 @@ func Parse(r io.Reader) (*Document, error) {
 	return doc, nil
 }
 
-func parseKey(key string) (string, *int, error) {
+func parseKey(key string) (string, *int, *int, error) {
 	open := strings.IndexByte(key, '[')
 	if open < 0 {
 		if key == "" {
-			return "", nil, fmt.Errorf("empty parameter name")
+			return "", nil, nil, fmt.Errorf("empty parameter name")
 		}
-		return key, nil, nil
+		return key, nil, nil, nil
 	}
-	if !strings.HasSuffix(key, "]") || open == 0 {
-		return "", nil, fmt.Errorf("invalid indexed parameter %q", key)
+	if open == 0 {
+		return "", nil, nil, fmt.Errorf("invalid indexed parameter %q", key)
 	}
-	value, err := strconv.Atoi(key[open+1 : len(key)-1])
-	if err != nil || value < 0 {
-		return "", nil, fmt.Errorf("invalid index in parameter %q", key)
+	name := key[:open]
+	rest := key[open:]
+	indexes := make([]int, 0, 2)
+	for rest != "" {
+		if rest[0] != '[' {
+			return "", nil, nil, fmt.Errorf("invalid indexed parameter %q", key)
+		}
+		close := strings.IndexByte(rest, ']')
+		if close < 2 {
+			return "", nil, nil, fmt.Errorf("invalid indexed parameter %q", key)
+		}
+		value, err := strconv.Atoi(rest[1:close])
+		if err != nil || value < 0 || len(indexes) == 2 {
+			return "", nil, nil, fmt.Errorf("invalid index in parameter %q", key)
+		}
+		indexes = append(indexes, value)
+		rest = rest[close+1:]
 	}
-	return key[:open], &value, nil
+	index := indexes[0]
+	if len(indexes) == 1 {
+		return name, &index, nil, nil
+	}
+	channel := indexes[1]
+	return name, &index, &channel, nil
 }
 
 // Connections parses every indexed Open assignment. Direct board connections
@@ -107,6 +130,9 @@ func (d *Document) Connections() ([]Connection, error) {
 	for _, assignment := range d.Assignments {
 		if assignment.Name != "Open" {
 			continue
+		}
+		if assignment.Channel != nil {
+			return nil, fmt.Errorf("line %d: Open accepts only a board index", assignment.Line)
 		}
 		if assignment.Index == nil {
 			return nil, fmt.Errorf("line %d: Open must have a board index", assignment.Line)

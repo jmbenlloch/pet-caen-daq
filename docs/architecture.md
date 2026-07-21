@@ -156,6 +156,12 @@ Frontend ranges and steppers provide immediate input guidance, while the backend
 independently enforces safety- and representation-relevant bounds before it can
 produce an effective hardware plan.
 
+JANUS override semantics are preserved end to end. A single index addresses a
+board (`Parameter[board]`); two indexes address a channel on a board
+(`Parameter[board][channel]`). The planner applies the unindexed general value,
+then board and channel exceptions for the selected target. Blank UI exception
+cells mean inheritance and are omitted from the serialized document.
+
 ## Simulator
 
 The simulator should listen on the same DT5215 TCP ports and reproduce observable command and stream behavior. It needs deterministic modes for:

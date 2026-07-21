@@ -5,6 +5,7 @@ import {
   masksFromBits,
   numericConstraint,
   numericError,
+  setConfigurationValue,
   parseConfiguration,
   updateConfiguration,
 } from './configuration'
@@ -62,5 +63,16 @@ describe('JANUS configuration editor', () => {
     expect(bits[63]).toBe(true)
     expect(bits.filter(Boolean)).toHaveLength(2)
     expect(masksFromBits(bits)).toEqual(['0x00000001', '0x80000000'])
+  })
+
+  it('adds, updates, and removes JANUS board/channel overrides', () => {
+    let document = parseConfiguration('TD_FineThreshold 0 # general\n')
+    document = setConfigurationValue(document, 'TD_FineThreshold', 2, 17, '9')
+    expect(document.source).toContain('TD_FineThreshold[2][17] 9 # operator override')
+    expect(document.fields.at(-1)).toMatchObject({ index: '2', channel: '17', value: '9' })
+    document = setConfigurationValue(document, 'TD_FineThreshold', 2, 17, '8')
+    expect(document.source.match(/TD_FineThreshold\[2\]\[17\]/g)).toHaveLength(1)
+    document = setConfigurationValue(document, 'TD_FineThreshold', 2, 17, undefined)
+    expect(document.source).not.toContain('[2][17]')
   })
 })

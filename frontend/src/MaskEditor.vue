@@ -2,13 +2,21 @@
 import { computed, ref, watch } from 'vue'
 import { maskBits, masksFromBits } from './configuration'
 
-const props = defineProps<{ title: string; low: string; high: string }>()
-const emit = defineEmits<{ apply: [low: string, high: string]; close: [] }>()
-const bits = ref(maskBits(props.low, props.high))
-watch(
-  () => [props.low, props.high],
-  () => (bits.value = maskBits(props.low, props.high)),
+export interface MaskVariant {
+  target: string
+  label: string
+  low: string
+  high: string
+  inherited: boolean
+}
+const props = defineProps<{ title: string; variants: MaskVariant[] }>()
+const emit = defineEmits<{ apply: [target: string, low: string, high: string]; close: [] }>()
+const target = ref(props.variants[0]?.target ?? 'global')
+const selected = computed(
+  () => props.variants.find((variant) => variant.target === target.value) ?? props.variants[0],
 )
+const bits = ref(maskBits(selected.value.low, selected.value.high))
+watch(target, () => (bits.value = maskBits(selected.value.low, selected.value.high)))
 const enabled = computed(() => bits.value.filter(Boolean).length)
 
 function setAll(value: boolean) {
@@ -20,7 +28,7 @@ function toggle(channel: number) {
   bits.value = next
 }
 function apply() {
-  emit('apply', ...masksFromBits(bits.value))
+  emit('apply', target.value, ...masksFromBits(bits.value))
 }
 </script>
 
@@ -37,9 +45,17 @@ function apply() {
           <p class="eyebrow">64 detector channels</p>
           <h2 :id="`${title}-heading`">{{ title }}</h2>
         </div>
-        <strong>{{ enabled }} enabled</strong>
+        <label class="board-select"
+          >Target
+          <select v-model="target">
+            <option v-for="variant in variants" :key="variant.target" :value="variant.target">
+              {{ variant.label }}
+            </option>
+          </select>
+        </label>
       </div>
       <div class="mask-actions">
+        <span>{{ enabled }} enabled<span v-if="selected.inherited"> · inherited</span></span>
         <button type="button" @click="setAll(true)">Enable all</button>
         <button type="button" @click="setAll(false)">Disable all</button>
         <button type="button" @click="bits = bits.map((value) => !value)">Invert</button>

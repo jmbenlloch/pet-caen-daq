@@ -55,7 +55,10 @@ source editor; all paths produce the same text submitted to backend validation.
 Numeric parameters use bounded steppers with visible ranges and increments;
 native number inputs support typing and Arrow Up/Down. The three paired 64-bit
 channel masks open an accessible 8×8 selector with bulk enable, disable, and
-invert operations.
+invert operations and Global/Board 0–3 targets. Channel-scoped settings retain
+a general value and provide per-board 64-channel exception grids; blank cells
+inherit the general value and explicit exceptions use JANUS
+`Parameter[board][channel]` syntax.
 
 On Windows, after starting the backend, a bounded evidence-capturing hardware run
 can be launched with `scripts\take-data.ps1`. Pass `-PeriodicTestPulse` to submit

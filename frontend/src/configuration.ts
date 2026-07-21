@@ -2,6 +2,7 @@ export interface ConfigurationField {
   id: string
   name: string
   index?: string
+  channel?: string
   section: string
   value: string
   help: string
@@ -58,7 +59,18 @@ export interface ConfigurationDocument {
   fields: ConfigurationField[]
 }
 
-const assignment = /^(\s*)([A-Za-z][A-Za-z0-9_]*)(?:\[([^\]]+)\])?(\s+)(.*?)(\s*)(#.*)?$/
+const assignment =
+  /^(\s*)([A-Za-z][A-Za-z0-9_]*)(?:\[([^\]]+)\])?(?:\[([^\]]+)\])?(\s+)(.*?)(\s*)(#.*)?$/
+
+const channelScopedParameters = new Set([
+  'HV_IndivAdj',
+  'TD_FineThreshold',
+  'QD_FineThreshold',
+  'HG_Gain',
+  'LG_Gain',
+  'ZS_Threshold_LG',
+  'ZS_Threshold_HG',
+])
 
 export function parseConfiguration(source: string): ConfigurationDocument {
   const fields: ConfigurationField[] = []
@@ -70,15 +82,16 @@ export function parseConfiguration(source: string): ConfigurationDocument {
     if (heading && !heading.startsWith('params File')) section = heading
     const match = line.match(assignment)
     if (!match || line.trimStart().startsWith('#')) continue
-    const help = (match[7] ?? '').replace(/^#\s*/, '').trim()
+    const help = (match[8] ?? '').replace(/^#\s*/, '').trim()
     const optionsAt = Math.max(help.lastIndexOf('Options:'), help.lastIndexOf('Option:'))
     const optionsText = optionsAt >= 0 ? help.slice(help.indexOf(':', optionsAt) + 1) : ''
     fields.push({
-      id: `${match[2]}[${match[3] ?? 'default'}]@${index + 1}`,
+      id: `${match[2]}[${match[3] ?? 'default'}]${match[4] === undefined ? '' : `[${match[4]}]`}@${index + 1}`,
       name: match[2],
       index: match[3],
+      channel: match[4],
       section,
-      value: match[5].trimEnd(),
+      value: match[6].trimEnd(),
       help,
       options: optionsText
         ? optionsText.split(',').map((item) => item.trim().replace(/\.$/, ''))
@@ -99,8 +112,41 @@ export function updateConfiguration(
   const match = lines[lineIndex]?.match(assignment)
   if (!match) return document
   lines[lineIndex] =
-    `${match[1]}${match[2]}${match[3] === undefined ? '' : `[${match[3]}]`}${match[4]}${value}${match[6]}${match[7] ?? ''}`
+    `${match[1]}${match[2]}${match[3] === undefined ? '' : `[${match[3]}]`}${match[4] === undefined ? '' : `[${match[4]}]`}${match[5]}${value}${match[7]}${match[8] ?? ''}`
   return parseConfiguration(lines.join(document.source.includes('\r\n') ? '\r\n' : '\n'))
+}
+
+export function setConfigurationValue(
+  document: ConfigurationDocument,
+  name: string,
+  index: number | undefined,
+  channel: number | undefined,
+  value: string | undefined,
+) {
+  const existing = document.fields.find(
+    (field) =>
+      field.name === name &&
+      field.index === (index === undefined ? undefined : String(index)) &&
+      field.channel === (channel === undefined ? undefined : String(channel)),
+  )
+  if (existing && value !== undefined) return updateConfiguration(document, existing, value)
+  const newline = document.source.includes('\r\n') ? '\r\n' : '\n'
+  if (existing && value === undefined) {
+    const lines = document.source.split(/\r?\n/)
+    lines.splice(existing.line - 1, 1)
+    return parseConfiguration(lines.join(newline))
+  }
+  if (value === undefined) return document
+  const key = `${name}${index === undefined ? '' : `[${index}]`}${channel === undefined ? '' : `[${channel}]`}`
+  return parseConfiguration(
+    `${document.source.replace(/\s*$/, '')}${newline}${key} ${value} # operator override${newline}`,
+  )
+}
+
+export function parameterScope(field: ConfigurationField): 'global' | 'board' | 'channel' {
+  if (channelScopedParameters.has(field.name)) return 'channel'
+  if (isMaskField(field) || field.name === 'TD_CoarseThreshold') return 'board'
+  return 'global'
 }
 
 export function isBooleanField(field: ConfigurationField) {

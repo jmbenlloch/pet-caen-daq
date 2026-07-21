@@ -429,6 +429,64 @@ select:focus {
   overflow: auto;
   padding: 24px;
 }
+.channel-dialog {
+  width: min(900px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 24px;
+}
+.board-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #91a4ba;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.board-select select {
+  width: auto;
+  min-width: 110px;
+  padding: 7px 9px;
+}
+.mask-actions > span,
+.channel-help {
+  color: #7f93aa;
+  font-size: 0.72rem;
+}
+.channel-help {
+  margin-top: 14px;
+}
+.channel-help strong {
+  color: #dce7f4;
+}
+.channel-values {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+.channel-values label {
+  color: #8498af;
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+.channel-values input:not([type='checkbox']) {
+  margin-top: 4px;
+  padding: 7px 5px;
+  text-align: center;
+}
+.channel-overrides-button {
+  grid-column: 2;
+  justify-self: end;
+  margin-top: -12px;
+  padding: 4px 8px;
+  border: 1px solid #34465f;
+  border-radius: 6px;
+  color: #72dcb9;
+  background: transparent;
+  font-size: 0.67rem;
+  font-weight: 800;
+}
 .mask-heading,
 .mask-actions,
 .mask-footer {
@@ -823,6 +881,9 @@ textarea {
   .mask-footer {
     align-items: stretch;
     flex-direction: column;
+  }
+  .channel-values {
+    grid-template-columns: repeat(4, 1fr);
   }
   .mask-footer code {
     margin: 0 0 5px;

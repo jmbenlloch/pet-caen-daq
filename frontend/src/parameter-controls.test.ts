@@ -24,11 +24,22 @@ describe('parameter controls', () => {
 
   it('edits 64 channels with bulk actions and emits paired hexadecimal masks', async () => {
     const wrapper = mount(MaskEditor, {
-      props: { title: 'Channel mask', low: '0x00000000', high: '0x00000000' },
+      props: {
+        title: 'Channel mask',
+        variants: [
+          {
+            target: 'global',
+            label: 'Global',
+            low: '0x00000000',
+            high: '0x00000000',
+            inherited: false,
+          },
+        ],
+      },
     })
     await wrapper.get('button[aria-label="Channel 0"]').trigger('click')
     await wrapper.get('button[aria-label="Channel 63"]').trigger('click')
     await wrapper.get('button.primary').trigger('click')
-    expect(wrapper.emitted('apply')).toEqual([['0x00000001', '0x80000000']])
+    expect(wrapper.emitted('apply')).toEqual([['global', '0x00000001', '0x80000000']])
   })
 })

@@ -84,6 +84,17 @@ func TestParsePreservesValuesContainingSpaces(t *testing.T) {
 	}
 }
 
+func TestParseBoardAndChannelOverride(t *testing.T) {
+	document, err := Parse(strings.NewReader("TD_FineThreshold[2][17] 9\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := document.Assignments[0]
+	if a.Name != "TD_FineThreshold" || a.Index == nil || *a.Index != 2 || a.Channel == nil || *a.Channel != 17 || a.Value != "9" {
+		t.Fatalf("assignment = %#v", a)
+	}
+}
+
 func TestParseRejectsMissingValue(t *testing.T) {
 	_, err := Parse(strings.NewReader("AcquisitionMode\n"))
 	if err == nil {

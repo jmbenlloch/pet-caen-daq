@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import defaultConfiguration from '../../test/fixtures/janus/config_same4_v3_good.txt?raw'
 import { createDaqApi, type DaqApi } from './api'
+import ChannelOverrides from './ChannelOverrides.vue'
 import MaskEditor from './MaskEditor.vue'
 import NumericField from './NumericField.vue'
 import {
@@ -9,7 +10,9 @@ import {
   isMaskField,
   numericConstraint,
   numericError,
+  parameterScope,
   parseConfiguration,
+  setConfigurationValue,
   updateConfiguration,
   type ConfigurationField,
 } from './configuration'
@@ -33,6 +36,7 @@ const selectedSection = ref('All')
 const parameterSearch = ref('')
 const showRawConfiguration = ref(false)
 const activeMask = ref<{ low: ConfigurationField; high: ConfigurationField }>()
+const activeChannelField = ref<ConfigurationField>()
 
 const sections = computed(() => [
   'All',
@@ -42,7 +46,8 @@ const visibleFields = computed(() => {
   const query = parameterSearch.value.trim().toLowerCase()
   return configurationDocument.value.fields.filter(
     (field) =>
-      !(isMaskField(field) && field.name.endsWith('1')) &&
+      !(isMaskField(field) && (field.name.endsWith('1') || field.index !== undefined)) &&
+      field.channel === undefined &&
       (selectedSection.value === 'All' || field.section === selectedSection.value) &&
       (!query ||
         field.name.toLowerCase().includes(query) ||
@@ -85,24 +90,82 @@ function openMask(field: ConfigurationField) {
   if (high) activeMask.value = { low: field, high }
 }
 
-function applyMask(low: string, high: string) {
+function maskVariants() {
+  if (!activeMask.value) return []
+  const variants = []
+  for (let target = -1; target < 4; target++) {
+    const index = target < 0 ? undefined : String(target)
+    const low = configurationDocument.value.fields.find(
+      (field) =>
+        field.name === activeMask.value?.low.name &&
+        field.index === index &&
+        field.channel === undefined,
+    )
+    const high = configurationDocument.value.fields.find(
+      (field) =>
+        field.name === activeMask.value?.high.name &&
+        field.index === index &&
+        field.channel === undefined,
+    )
+    variants.push({
+      target: target < 0 ? 'global' : String(target),
+      label: target < 0 ? 'Global' : `Board ${target}`,
+      low: low?.value ?? activeMask.value.low.value,
+      high: high?.value ?? activeMask.value.high.value,
+      inherited: target >= 0 && (!low || !high),
+    })
+  }
+  return variants
+}
+
+function applyMask(target: string, low: string, high: string) {
   if (!activeMask.value) return
-  configurationDocument.value = updateConfiguration(
+  const index = target === 'global' ? undefined : Number(target)
+  configurationDocument.value = setConfigurationValue(
     configurationDocument.value,
-    activeMask.value.low,
+    activeMask.value.low.name,
+    index,
+    undefined,
     low,
   )
-  const refreshedHigh = configurationDocument.value.fields.find(
-    (field) =>
-      field.name === activeMask.value?.high.name && field.index === activeMask.value?.high.index,
+  configurationDocument.value = setConfigurationValue(
+    configurationDocument.value,
+    activeMask.value.high.name,
+    index,
+    undefined,
+    high,
   )
-  if (refreshedHigh)
-    configurationDocument.value = updateConfiguration(
-      configurationDocument.value,
-      refreshedHigh,
-      high,
-    )
   activeMask.value = undefined
+}
+
+function channelOverrides(field: ConfigurationField) {
+  const result: Record<number, Record<number, string>> = {}
+  for (const candidate of configurationDocument.value.fields) {
+    if (
+      candidate.name !== field.name ||
+      candidate.index === undefined ||
+      candidate.channel === undefined
+    )
+      continue
+    const board = Number(candidate.index)
+    result[board] ??= {}
+    result[board][Number(candidate.channel)] = candidate.value
+  }
+  return result
+}
+
+function applyChannelOverrides(board: number, values: Record<number, string>) {
+  if (!activeChannelField.value) return
+  for (let channel = 0; channel < 64; channel++) {
+    configurationDocument.value = setConfigurationValue(
+      configurationDocument.value,
+      activeChannelField.value.name,
+      board,
+      channel,
+      values[channel],
+    )
+  }
+  activeChannelField.value = undefined
 }
 
 function loadDefaultConfiguration() {
@@ -305,6 +368,14 @@ onMounted(() => daq.connect())
                   :value="field.value"
                   @change="setField(field, ($event.target as HTMLInputElement).value)"
                 />
+                <button
+                  v-if="parameterScope(field) === 'channel'"
+                  type="button"
+                  class="channel-overrides-button secondary"
+                  @click="activeChannelField = field"
+                >
+                  Per-channel overrides
+                </button>
               </article>
               <p v-if="!visibleFields.length" class="empty">No parameters match this filter.</p>
             </div>
@@ -576,10 +647,17 @@ onMounted(() => daq.connect())
     <MaskEditor
       v-if="activeMask"
       :title="`${activeMask.low.name.replace(/0$/, '')}${activeMask.low.index === undefined ? '' : ` · override ${activeMask.low.index}`}`"
-      :low="activeMask.low.value"
-      :high="activeMask.high.value"
+      :variants="maskVariants()"
       @apply="applyMask"
       @close="activeMask = undefined"
+    />
+    <ChannelOverrides
+      v-if="activeChannelField && numericConstraint(activeChannelField)"
+      :field="activeChannelField"
+      :constraint="numericConstraint(activeChannelField)!"
+      :overrides="channelOverrides(activeChannelField)"
+      @apply="applyChannelOverrides"
+      @close="activeChannelField = undefined"
     />
   </div>
 </template>
