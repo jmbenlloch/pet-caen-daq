@@ -30,6 +30,8 @@ The bounded pipeline now exposes race-safe operational counters for capacity/dep
 
 Storage-backed run sessions now expose race-safe decoded-event and raw-batch counts, artifact bytes currently present on disk, run-directory identity, finalization state, and the last observed pipeline/storage error. A service adapter publishes storage health and updates the current run's persisted counters and incomplete state. File inspection ignores symlinks and remains observational; it does not alter durability or finalization behavior.
 
+A cancellable run-health monitor now samples the active storage-backed pipeline immediately and at a configured cadence, coalescing pipeline and storage measurements into one complete telemetry publication per sample. Its tick source is injectable for deterministic tests, slow telemetry consumers remain isolated by the snapshot publisher, and monitor cancellation exits without manufacturing an acquisition fault.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:

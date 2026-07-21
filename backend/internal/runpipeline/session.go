@@ -130,6 +130,9 @@ func (s *Session) Stats() StorageStats {
 	return stats
 }
 
+func (s *Session) PipelineStats() acquisition.PipelineStats { return s.pipeline.Stats() }
+func (s *Session) StorageStats() StorageStats               { return s.Stats() }
+
 func (s *Session) recordError(err error) {
 	if err == nil {
 		return
