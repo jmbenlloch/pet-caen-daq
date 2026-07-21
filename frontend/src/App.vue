@@ -271,6 +271,51 @@ onMounted(() => daq.connect())
         </div>
       </section>
 
+      <section class="completed panel" aria-labelledby="history-heading">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Persistent storage</p>
+            <h2 id="history-heading">Run history</h2>
+          </div>
+          <button
+            class="link-button"
+            type="button"
+            :disabled="daq.busy.value"
+            @click="daq.refreshHistory()"
+          >
+            Refresh
+          </button>
+        </div>
+        <div class="artifacts" aria-label="Stored runs">
+          <article
+            v-for="run in daq.runHistory.value"
+            :key="run.runId"
+            class="artifact history-run"
+          >
+            <div>
+              <strong>{{ run.runId }}</strong>
+              <span
+                >{{ compact(run.eventCount) }} events ·
+                {{ run.terminationReason || (run.incomplete ? 'Incomplete' : 'Completed') }}</span
+              >
+            </div>
+            <div class="history-actions">
+              <button
+                v-for="artifact in run.artifacts"
+                :key="artifact.name"
+                class="link-button"
+                type="button"
+                :disabled="daq.busy.value"
+                @click="daq.downloadArtifact(run.runId, artifact.name)"
+              >
+                {{ artifact.name }} · {{ bytes(artifact.sizeBytes) }}
+              </button>
+            </div>
+          </article>
+          <p v-if="!daq.runHistory.value.length" class="empty">No stored runs found.</p>
+        </div>
+      </section>
+
       <section class="boards-section" aria-labelledby="boards-heading">
         <div class="section-title">
           <div>

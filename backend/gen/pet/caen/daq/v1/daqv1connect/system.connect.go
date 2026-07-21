@@ -48,6 +48,11 @@ const (
 	RunServiceStartRunProcedure = "/pet.caen.daq.v1.RunService/StartRun"
 	// RunServiceStopRunProcedure is the fully-qualified name of the RunService's StopRun RPC.
 	RunServiceStopRunProcedure = "/pet.caen.daq.v1.RunService/StopRun"
+	// RunServiceListRunsProcedure is the fully-qualified name of the RunService's ListRuns RPC.
+	RunServiceListRunsProcedure = "/pet.caen.daq.v1.RunService/ListRuns"
+	// RunServiceDownloadArtifactProcedure is the fully-qualified name of the RunService's
+	// DownloadArtifact RPC.
+	RunServiceDownloadArtifactProcedure = "/pet.caen.daq.v1.RunService/DownloadArtifact"
 )
 
 // SystemServiceClient is a client for the pet.caen.daq.v1.SystemService service.
@@ -176,6 +181,8 @@ func (UnimplementedSystemServiceHandler) StreamTelemetry(context.Context, *conne
 type RunServiceClient interface {
 	StartRun(context.Context, *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error)
 	StopRun(context.Context, *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error)
+	ListRuns(context.Context, *connect.Request[v1.ListRunsRequest]) (*connect.Response[v1.ListRunsResponse], error)
+	DownloadArtifact(context.Context, *connect.Request[v1.DownloadArtifactRequest]) (*connect.ServerStreamForClient[v1.DownloadArtifactResponse], error)
 }
 
 // NewRunServiceClient constructs a client for the pet.caen.daq.v1.RunService service. By default,
@@ -201,13 +208,27 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceMethods.ByName("StopRun")),
 			connect.WithClientOptions(opts...),
 		),
+		listRuns: connect.NewClient[v1.ListRunsRequest, v1.ListRunsResponse](
+			httpClient,
+			baseURL+RunServiceListRunsProcedure,
+			connect.WithSchema(runServiceMethods.ByName("ListRuns")),
+			connect.WithClientOptions(opts...),
+		),
+		downloadArtifact: connect.NewClient[v1.DownloadArtifactRequest, v1.DownloadArtifactResponse](
+			httpClient,
+			baseURL+RunServiceDownloadArtifactProcedure,
+			connect.WithSchema(runServiceMethods.ByName("DownloadArtifact")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // runServiceClient implements RunServiceClient.
 type runServiceClient struct {
-	startRun *connect.Client[v1.StartRunRequest, v1.StartRunResponse]
-	stopRun  *connect.Client[v1.StopRunRequest, v1.StopRunResponse]
+	startRun         *connect.Client[v1.StartRunRequest, v1.StartRunResponse]
+	stopRun          *connect.Client[v1.StopRunRequest, v1.StopRunResponse]
+	listRuns         *connect.Client[v1.ListRunsRequest, v1.ListRunsResponse]
+	downloadArtifact *connect.Client[v1.DownloadArtifactRequest, v1.DownloadArtifactResponse]
 }
 
 // StartRun calls pet.caen.daq.v1.RunService.StartRun.
@@ -220,10 +241,22 @@ func (c *runServiceClient) StopRun(ctx context.Context, req *connect.Request[v1.
 	return c.stopRun.CallUnary(ctx, req)
 }
 
+// ListRuns calls pet.caen.daq.v1.RunService.ListRuns.
+func (c *runServiceClient) ListRuns(ctx context.Context, req *connect.Request[v1.ListRunsRequest]) (*connect.Response[v1.ListRunsResponse], error) {
+	return c.listRuns.CallUnary(ctx, req)
+}
+
+// DownloadArtifact calls pet.caen.daq.v1.RunService.DownloadArtifact.
+func (c *runServiceClient) DownloadArtifact(ctx context.Context, req *connect.Request[v1.DownloadArtifactRequest]) (*connect.ServerStreamForClient[v1.DownloadArtifactResponse], error) {
+	return c.downloadArtifact.CallServerStream(ctx, req)
+}
+
 // RunServiceHandler is an implementation of the pet.caen.daq.v1.RunService service.
 type RunServiceHandler interface {
 	StartRun(context.Context, *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error)
 	StopRun(context.Context, *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error)
+	ListRuns(context.Context, *connect.Request[v1.ListRunsRequest]) (*connect.Response[v1.ListRunsResponse], error)
+	DownloadArtifact(context.Context, *connect.Request[v1.DownloadArtifactRequest], *connect.ServerStream[v1.DownloadArtifactResponse]) error
 }
 
 // NewRunServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -245,12 +278,28 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceMethods.ByName("StopRun")),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceListRunsHandler := connect.NewUnaryHandler(
+		RunServiceListRunsProcedure,
+		svc.ListRuns,
+		connect.WithSchema(runServiceMethods.ByName("ListRuns")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceDownloadArtifactHandler := connect.NewServerStreamHandler(
+		RunServiceDownloadArtifactProcedure,
+		svc.DownloadArtifact,
+		connect.WithSchema(runServiceMethods.ByName("DownloadArtifact")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/pet.caen.daq.v1.RunService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RunServiceStartRunProcedure:
 			runServiceStartRunHandler.ServeHTTP(w, r)
 		case RunServiceStopRunProcedure:
 			runServiceStopRunHandler.ServeHTTP(w, r)
+		case RunServiceListRunsProcedure:
+			runServiceListRunsHandler.ServeHTTP(w, r)
+		case RunServiceDownloadArtifactProcedure:
+			runServiceDownloadArtifactHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -266,4 +315,12 @@ func (UnimplementedRunServiceHandler) StartRun(context.Context, *connect.Request
 
 func (UnimplementedRunServiceHandler) StopRun(context.Context, *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.StopRun is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) ListRuns(context.Context, *connect.Request[v1.ListRunsRequest]) (*connect.Response[v1.ListRunsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.ListRuns is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) DownloadArtifact(context.Context, *connect.Request[v1.DownloadArtifactRequest], *connect.ServerStream[v1.DownloadArtifactResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.DownloadArtifact is not implemented"))
 }

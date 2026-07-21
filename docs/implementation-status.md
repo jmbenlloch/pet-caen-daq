@@ -36,6 +36,13 @@ headers, the application shell is never cached, missing file-like resources stay
 404s, and extensionless browser routes receive the SPA shell. Development
 continues to use Vite's same-origin proxy; no broad CORS policy was introduced.
 
+Persistent run history is now an explicit `RunService` API rather than a
+telemetry reconstruction. The backend reads bounded versioned manifests,
+returns the newest runs first, reports corrupt storage instead of hiding it,
+and streams downloads only for regular artifact files recorded by a finalized
+manifest. The dashboard loads that history across backend restarts and offers
+the recorded decoded, raw, and transport-journal artifacts for download.
+
 ## Phase 2 acquisition service foundations
 
 Started on 2026-07-21:

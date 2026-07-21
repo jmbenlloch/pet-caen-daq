@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sync"
 	"time"
@@ -44,6 +47,7 @@ type RunService struct {
 	Boards         []configaudit.BoardEvidence
 	HealthInterval time.Duration
 	RunExists      func(string) (bool, error)
+	RunParent      string
 
 	opMu          sync.Mutex
 	mu            sync.Mutex
@@ -51,6 +55,80 @@ type RunService struct {
 	completed     map[string]*daqv1.RunSummary
 	monitorCancel context.CancelFunc
 	monitorDone   chan error
+}
+
+func (s *RunService) ListRuns(_ context.Context, request *connect.Request[daqv1.ListRunsRequest]) (*connect.Response[daqv1.ListRunsResponse], error) {
+	limit := int(request.Msg.GetLimit())
+	if limit == 0 {
+		limit = 50
+	}
+	if limit < 1 || limit > 100 {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_LIMIT", fmt.Errorf("limit must be between 1 and 100"))
+	}
+	if s.RunParent == "" {
+		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_HISTORY_UNAVAILABLE", fmt.Errorf("run storage is not configured"))
+	}
+	manifests, err := runstore.ListManifests(s.RunParent, limit)
+	if err != nil {
+		return nil, serviceError(connect.CodeInternal, "RUN_HISTORY_INSPECTION_FAILED", err)
+	}
+	response := &daqv1.ListRunsResponse{Runs: make([]*daqv1.RunSummary, 0, len(manifests))}
+	for _, manifest := range manifests {
+		response.Runs = append(response.Runs, manifestSummary(s.RunParent, manifest))
+	}
+	return connect.NewResponse(response), nil
+}
+
+func (s *RunService) DownloadArtifact(_ context.Context, request *connect.Request[daqv1.DownloadArtifactRequest], stream *connect.ServerStream[daqv1.DownloadArtifactResponse]) error {
+	runID, name := request.Msg.GetRunId(), request.Msg.GetArtifactName()
+	if !validRunID.MatchString(runID) || name == "" || filepath.Base(name) != name {
+		return serviceError(connect.CodeInvalidArgument, "INVALID_ARTIFACT_IDENTITY", fmt.Errorf("a valid run_id and artifact_name are required"))
+	}
+	if s.RunParent == "" {
+		return serviceError(connect.CodeFailedPrecondition, "RUN_HISTORY_UNAVAILABLE", fmt.Errorf("run storage is not configured"))
+	}
+	file, _, err := runstore.OpenArtifact(s.RunParent, runID, name)
+	if errors.Is(err, runstore.ErrRunNotFound) || errors.Is(err, runstore.ErrArtifactNotFound) {
+		return serviceError(connect.CodeNotFound, "ARTIFACT_NOT_FOUND", err)
+	}
+	if err != nil {
+		return serviceError(connect.CodeInternal, "ARTIFACT_OPEN_FAILED", err)
+	}
+	defer file.Close()
+	buffer := make([]byte, 64<<10)
+	for {
+		count, readErr := file.Read(buffer)
+		if count > 0 {
+			if err := stream.Send(&daqv1.DownloadArtifactResponse{Data: append([]byte(nil), buffer[:count]...)}); err != nil {
+				return err
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			return nil
+		}
+		if readErr != nil {
+			return serviceError(connect.CodeInternal, "ARTIFACT_READ_FAILED", readErr)
+		}
+	}
+}
+
+func manifestSummary(parent string, manifest runstore.Manifest) *daqv1.RunSummary {
+	run := &daqv1.RunSummary{
+		RunId: manifest.RunID, TerminationReason: manifest.TerminationReason,
+		EventCount: manifest.EventCount, RawBatchCount: manifest.RawBatchCount,
+	}
+	if value, err := time.Parse(time.RFC3339Nano, manifest.StartedAt); err == nil {
+		run.StartedAt = timestamppb.New(value)
+	}
+	if value, err := time.Parse(time.RFC3339Nano, manifest.CompletedAt); err == nil {
+		run.CompletedAt = timestamppb.New(value)
+	}
+	_, err := os.Lstat(filepath.Join(parent, "run-"+manifest.RunID, "incomplete"))
+	run.Incomplete = err == nil
+	for _, artifact := range manifest.Artifacts {
+		run.Artifacts = append(run.Artifacts, &daqv1.Artifact{Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256})
+	}
+	return run
 }
 
 func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest]) (*connect.Response[daqv1.StartRunResponse], error) {

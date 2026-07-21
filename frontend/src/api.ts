@@ -16,6 +16,8 @@ export interface DaqApi {
   validate(configuration: string): Promise<{ valid: boolean; issues: ValidationIssue[] }>
   start(request: StartRunRequest): Promise<RunCommandResult>
   stop(request: StopRunRequest): Promise<RunCommandResult>
+  listRuns(limit?: number): Promise<RunSummary[]>
+  downloadArtifact(runId: string, artifactName: string): Promise<Blob>
 }
 
 export interface RunCommandResult {
@@ -48,6 +50,24 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     async stop(request) {
       const response = await runs.stopRun(request)
       return { run: response.run, snapshot: response.snapshot }
+    },
+    async listRuns(limit = 50) {
+      return (await runs.listRuns({ limit })).runs
+    },
+    async downloadArtifact(runId, artifactName) {
+      const chunks: Uint8Array[] = []
+      let size = 0
+      for await (const response of runs.downloadArtifact({ runId, artifactName })) {
+        chunks.push(response.data)
+        size += response.data.byteLength
+      }
+      const data = new Uint8Array(size)
+      let offset = 0
+      for (const chunk of chunks) {
+        data.set(chunk, offset)
+        offset += chunk.byteLength
+      }
+      return new Blob([data], { type: 'application/octet-stream' })
     },
   }
 }

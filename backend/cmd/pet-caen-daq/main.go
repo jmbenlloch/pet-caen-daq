@@ -153,6 +153,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 			}
 			return false, err
 		},
+		RunParent: *runParent,
 		Configure: func(configureCtx context.Context, runDocument *janusconfig.Document, actor string) (acquisition.ConfigurationResult, error) {
 			return configurator.Configure(configureCtx, runDocument, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: *authorizeHV})
 		},

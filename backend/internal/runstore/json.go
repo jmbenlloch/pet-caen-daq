@@ -31,6 +31,7 @@ type Manifest struct {
 	CompletedAt            string                     `json:"completed_at,omitempty"`
 	TerminationReason      string                     `json:"termination_reason,omitempty"`
 	EventCount             uint64                     `json:"event_count,string"`
+	RawBatchCount          uint64                     `json:"raw_batch_count,string,omitempty"`
 	CaptureRaw             bool                       `json:"capture_raw"`
 	JournalTransport       bool                       `json:"journal_transport"`
 	RequestedConfiguration string                     `json:"requested_configuration,omitempty"`
@@ -136,7 +137,11 @@ func (w *Writer) AppendRaw(batch []byte) error {
 	if w.raw == nil {
 		return errors.New("raw capture is not enabled")
 	}
-	return w.raw.Append(batch)
+	if err := w.raw.Append(batch); err != nil {
+		return err
+	}
+	w.manifest.RawBatchCount++
+	return nil
 }
 func (w *Writer) AppendDecoded(wire dt5215.StreamEvent, event dt5202.SpectroscopyEvent) error {
 	payload, err := json.Marshal(struct {

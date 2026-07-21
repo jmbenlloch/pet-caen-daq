@@ -19,6 +19,8 @@ service SystemService {
 service RunService {
   rpc StartRun(StartRunRequest) returns (StartRunResponse) {}
   rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {}
+  rpc DownloadArtifact(DownloadArtifactRequest) returns (stream DownloadArtifactResponse) {}
 }
 
 message GetSystemSnapshotRequest {}
@@ -84,6 +86,25 @@ message StopRunRequest {
 message StopRunResponse {
   RunSummary run = 1;
   TelemetrySnapshot snapshot = 2;
+}
+
+message ListRunsRequest {
+  // Zero uses the server default. Servers may enforce a lower maximum.
+  uint32 limit = 1;
+}
+
+message ListRunsResponse {
+  // Runs are ordered newest first using completion time, then start time and ID.
+  repeated RunSummary runs = 1;
+}
+
+message DownloadArtifactRequest {
+  string run_id = 1;
+  string artifact_name = 2;
+}
+
+message DownloadArtifactResponse {
+  bytes data = 1;
 }
 
 message TelemetrySnapshot {

@@ -45,6 +45,8 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
     start: vi.fn().mockResolvedValue({}),
     stop: vi.fn().mockResolvedValue({}),
+    listRuns: vi.fn().mockResolvedValue([]),
+    downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
     ...overrides,
   }
 }

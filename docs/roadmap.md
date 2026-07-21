@@ -45,6 +45,11 @@ Exit criterion: generated clients can operate complete simulated runs and inspec
 
 ## Phase 3: operator frontend
 
+Progress as of 2026-07-21: the operator dashboard, reconnect/staleness behavior,
+guarded configuration and run controls, embedded production serving, persistent
+run-history listing, and manifest-authorized artifact downloads are implemented.
+Playwright browser workflows remain the next Phase 3 slice.
+
 - Build topology/status, configuration, run control, monitoring, fault, and run-history views.
 - Implement reconnect and stale-state behavior.
 - Add unit/component tests and Playwright integration/end-to-end tests against the backend plus simulator.

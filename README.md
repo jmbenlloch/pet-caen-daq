@@ -40,6 +40,10 @@ The frontend directory is optional. When enabled, the backend validates it at
 startup, serves browser routes through `index.html`, and keeps ConnectRPC on the
 same HTTP origin.
 
+The operator dashboard also lists persisted runs from the configured `-runs`
+directory. Artifact downloads are streamed through the generated RunService API
+and are limited to files recorded in each run's manifest.
+
 ## Start here
 
 - [Project instructions](AGENTS.md)

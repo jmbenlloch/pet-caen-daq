@@ -3,7 +3,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
 import type { DaqApi } from './api'
-import { HealthStatus, SystemState, TelemetrySnapshotSchema } from './gen/pet/caen/daq/v1/system_pb'
+import {
+  HealthStatus,
+  RunSummarySchema,
+  SystemState,
+  TelemetrySnapshotSchema,
+} from './gen/pet/caen/daq/v1/system_pb'
 
 async function* pendingTelemetry() {
   yield* []
@@ -46,6 +51,15 @@ function dashboardApi(): DaqApi {
       }),
     }),
     stop: vi.fn().mockResolvedValue({}),
+    listRuns: vi.fn().mockResolvedValue([
+      create(RunSummarySchema, {
+        runId: 'run-54',
+        eventCount: 256n,
+        terminationReason: 'operator_stop',
+        artifacts: [{ kind: 'decoded_events', name: 'events.jsonl', sizeBytes: 4096n }],
+      }),
+    ]),
+    downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
   }
 }
 
@@ -58,6 +72,9 @@ describe('operator dashboard', () => {
     expect(wrapper.get('#system-heading').text()).toBe('Ready')
     expect(wrapper.text()).toContain('DT5202 · node 0')
     expect(wrapper.text()).toContain('24.5 °C')
+    expect(wrapper.get('#history-heading').text()).toBe('Run history')
+    expect(wrapper.text()).toContain('run-54')
+    expect(wrapper.text()).toContain('events.jsonl · 4.0 KiB')
 
     await wrapper.get('input[placeholder="run-0055"]').setValue('run-55')
     await wrapper.get('#configuration').setValue('Open TDlink 0 0')

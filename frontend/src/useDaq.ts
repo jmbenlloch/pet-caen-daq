@@ -20,6 +20,7 @@ export function useDaq(api: DaqApi) {
   const busy = ref(false)
   const validationIssues = ref<ValidationIssue[]>([])
   const latestCompletedRun = ref<RunSummary>()
+  const runHistory = ref<RunSummary[]>([])
   let streamController: AbortController | undefined
   let staleTimer: number | undefined
   let reconnectTimer: number | undefined
@@ -40,6 +41,7 @@ export function useDaq(api: DaqApi) {
     streamController?.abort()
     streamController = new AbortController()
     try {
+      void refreshHistory()
       accept(await api.snapshot())
       for await (const next of api.telemetry(streamController.signal)) accept(next)
       if (!streamController.signal.aborted) throw new Error('Telemetry stream ended')
@@ -49,6 +51,32 @@ export function useDaq(api: DaqApi) {
       stale.value = true
       error.value = reason instanceof Error ? reason.message : String(reason)
       reconnectTimer = window.setTimeout(connect, 2_000)
+    }
+  }
+
+  async function refreshHistory() {
+    try {
+      runHistory.value = await api.listRuns(50)
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    }
+  }
+
+  async function downloadArtifact(runId: string, artifactName: string) {
+    busy.value = true
+    error.value = ''
+    try {
+      const blob = await api.downloadArtifact(runId, artifactName)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = artifactName
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      busy.value = false
     }
   }
 
@@ -106,6 +134,7 @@ export function useDaq(api: DaqApi) {
       const result = await api.stop(create(StopRunRequestSchema, { runId, requestedBy }))
       accept(result.snapshot)
       if (result.run) latestCompletedRun.value = result.run
+      await refreshHistory()
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {
@@ -130,6 +159,7 @@ export function useDaq(api: DaqApi) {
     busy: readonly(busy),
     validationIssues: readonly(validationIssues),
     latestCompletedRun: readonly(latestCompletedRun),
+    runHistory: readonly(runHistory),
     canStart: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     canStop: computed(() => snapshot.value?.state === SystemState.RUNNING && !busy.value),
     connect,
@@ -137,5 +167,7 @@ export function useDaq(api: DaqApi) {
     validate,
     startRun,
     stopRun,
+    refreshHistory,
+    downloadArtifact,
   }
 }
