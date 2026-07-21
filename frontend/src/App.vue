@@ -11,6 +11,7 @@ import {
   isMaskField,
   numericConstraint,
   numericError,
+  parameterActive,
   parameterScope,
   parseConfiguration,
   setConfigurationValue,
@@ -60,6 +61,7 @@ const visibleFields = computed(() => {
 })
 const configurationErrors = computed(() =>
   configurationDocument.value.fields
+    .filter((field) => parameterActive(configurationDocument.value, field))
     .map((field) => ({ field, error: numericError(field) }))
     .filter((item) => item.error),
 )

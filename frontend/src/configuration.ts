@@ -17,37 +17,7 @@ export interface NumericConstraint {
   integer: boolean
 }
 
-interface NumericDefinition extends Omit<NumericConstraint, 'integer'> {
-  unitScales?: Record<string, number>
-}
-
 const timeScales = { ns: 1, us: 1e3, ms: 1e6, s: 1e9 }
-
-const numericConstraints: Record<string, NumericDefinition> = {
-  HV_Vbias: { min: 20, max: 85, step: 0.1, unitScales: { V: 1, mV: 1e-3, uV: 1e-6 } },
-  HV_Imax: { min: 0, step: 0.1, unitScales: { mA: 1, uA: 1e-3, A: 1e3 } },
-  HV_IndivAdj: { min: 0, max: 255, step: 1 },
-  TstampCoincWindow: { min: 0, step: 1 },
-  PresetTime: { min: 0, step: 1 },
-  PresetCounts: { min: 0, step: 1 },
-  JobFirstRun: { min: 0, step: 1 },
-  JobLastRun: { min: 0, step: 1 },
-  ChTrg_Width: { min: 0, max: 2032, step: 8, unitScales: timeScales },
-  Tlogic_Width: { min: 0, step: 8, unitScales: timeScales },
-  MajorityLevel: { min: 1, max: 64, step: 1 },
-  TD_CoarseThreshold: { min: 0, max: 2047, step: 1 },
-  QD_CoarseThreshold: { min: 0, max: 2047, step: 1 },
-  TD_FineThreshold: { min: 0, max: 15, step: 1 },
-  QD_FineThreshold: { min: 0, max: 15, step: 1 },
-  HG_Gain: { min: 1, max: 63, step: 1 },
-  LG_Gain: { min: 1, max: 63, step: 1 },
-  Pedestal: { min: 0, max: 16383, step: 1 },
-  ZS_Threshold_LG: { min: 0, max: 65535, step: 1 },
-  ZS_Threshold_HG: { min: 0, max: 65535, step: 1 },
-  ProbeChannel0: { min: 0, max: 31, step: 1 },
-  ProbeChannel1: { min: 0, max: 63, step: 1 },
-  TestPulseAmplitude: { min: 0, max: 4095, step: 1 },
-}
 
 export interface NumericValue {
   number: number
@@ -62,18 +32,6 @@ export interface ConfigurationDocument {
 const assignment =
   /^(\s*)([A-Za-z][A-Za-z0-9_]*)(?:\[([^\]]+)\])?(?:\[([^\]]+)\])?(\s+)(.*?)(\s*)(#.*)?$/
 
-const channelScopedParameters = new Set([
-  'HV_IndivAdj',
-  'TD_FineThreshold',
-  'QD_FineThreshold',
-  'HG_Gain',
-  'LG_Gain',
-  'ZS_Threshold_LG',
-  'ZS_Threshold_HG',
-])
-
-const boardScopedParameters = new Set(['HV_Vbias', 'HV_Imax', 'TD_CoarseThreshold'])
-
 export function parseConfiguration(source: string): ConfigurationDocument {
   const fields: ConfigurationField[] = []
   let section = 'Connection'
@@ -84,7 +42,9 @@ export function parseConfiguration(source: string): ConfigurationDocument {
     if (heading && !heading.startsWith('params File')) section = heading
     const match = line.match(assignment)
     if (!match || line.trimStart().startsWith('#')) continue
-    const help = (match[8] ?? '').replace(/^#\s*/, '').trim()
+    const catalog = janusParameterCatalog.get(match[2])
+    const commentHelp = (match[8] ?? '').replace(/^#\s*/, '').trim()
+    const help = catalog?.description || commentHelp
     const optionsAt = Math.max(help.lastIndexOf('Options:'), help.lastIndexOf('Option:'))
     const optionsText = optionsAt >= 0 ? help.slice(help.indexOf(':', optionsAt) + 1) : ''
     fields.push({
@@ -92,12 +52,13 @@ export function parseConfiguration(source: string): ConfigurationDocument {
       name: match[2],
       index: match[3],
       channel: match[4],
-      section,
+      section: catalog?.section ?? section,
       value: match[6].trimEnd(),
       help,
-      options: optionsText
-        ? optionsText.split(',').map((item) => item.trim().replace(/\.$/, ''))
-        : [],
+      options:
+        catalog?.options.length || !optionsText
+          ? [...(catalog?.options ?? [])]
+          : optionsText.split(',').map((item) => item.trim().replace(/\.$/, '')),
       line: index + 1,
     })
   }
@@ -146,31 +107,47 @@ export function setConfigurationValue(
 }
 
 export function parameterScope(field: ConfigurationField): 'global' | 'board' | 'channel' {
-  if (channelScopedParameters.has(field.name)) return 'channel'
-  if (isMaskField(field) || boardScopedParameters.has(field.name)) return 'board'
-  return 'global'
+  return janusParameterCatalog.get(field.name)?.scope ?? 'global'
+}
+
+export function parameterActive(document: ConfigurationDocument, field: ConfigurationField) {
+  const dependency = janusParameterCatalog.get(field.name)?.activeWhen
+  if (!dependency) return true
+  const controller = [...document.fields]
+    .reverse()
+    .find(
+      (candidate) =>
+        candidate.name === dependency.parameter &&
+        candidate.index === undefined &&
+        candidate.channel === undefined,
+    )
+  return !controller || dependency.values.includes(controller.value)
 }
 
 export function isBooleanField(field: ConfigurationField) {
-  const booleanName =
-    field.name.startsWith('Enable') ||
-    field.name.startsWith('OF_') ||
-    field.name === 'RunNumber_AutoIncr'
-  return booleanName && (field.value === '0' || field.value === '1') && field.options.length === 0
+  return janusParameterCatalog.get(field.name)?.widget === 'boolean'
 }
 
 export function numericConstraint(field: ConfigurationField): NumericConstraint | undefined {
   if (field.options.length || isBooleanField(field) || isMaskField(field)) return undefined
   const parsed = parseNumericValue(field.value)
   if (!parsed) return undefined
-  const explicit = numericConstraints[field.name]
-  if (!explicit) return undefined
-  const scale = explicit.unitScales?.[parsed.unit] ?? 1
+  const explicit = janusParameterCatalog.get(field.name)
+  if (!explicit || explicit.step === undefined) return undefined
+  const unitScales =
+    field.name === 'HV_Vbias'
+      ? { V: 1, mV: 1e-3, uV: 1e-6 }
+      : field.name === 'HV_Imax'
+        ? { mA: 1, uA: 1e-3, A: 1e3 }
+        : explicit.units?.some((unit) => unit === 'ns')
+          ? timeScales
+          : undefined
+  const scale = unitScales?.[parsed.unit as keyof typeof unitScales] ?? 1
   return {
     min: explicit.min === undefined ? undefined : explicit.min / scale,
     max: explicit.max === undefined ? undefined : explicit.max / scale,
     step: explicit.step / scale,
-    integer: Number.isInteger(explicit.step / scale) && parsed.unit === '',
+    integer: explicit.widget === 'integer' && parsed.unit === '',
   }
 }
 
@@ -232,3 +209,4 @@ export function masksFromBits(bits: boolean[]): [string, string] {
     string,
   ]
 }
+import { janusParameterCatalog } from './janus/catalog'

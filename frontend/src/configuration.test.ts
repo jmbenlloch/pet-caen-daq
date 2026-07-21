@@ -28,7 +28,14 @@ describe('JANUS configuration editor', () => {
     expect(document.fields[0]).toMatchObject({
       name: 'AcquisitionMode',
       section: 'AcqMode',
-      options: ['SPECTROSCOPY', 'SPECT_TIMING', 'COUNTING'],
+      options: [
+        'SPECTROSCOPY',
+        'SPECT_TIMING',
+        'TIMING_CSTART',
+        'TIMING_CSTOP',
+        'COUNTING',
+        'WAVEFORM',
+      ],
     })
     expect(isBooleanField(document.fields[1])).toBe(true)
     expect(isBooleanField(document.fields[2])).toBe(false)
@@ -53,7 +60,7 @@ describe('JANUS configuration editor', () => {
     expect(numericError(field)).toBe('')
 
     const time = parseConfiguration('ChTrg_Width 2 us # width').fields[0]
-    expect(numericConstraint(time)).toMatchObject({ min: 0, max: 2.032, step: 0.008 })
+    expect(numericConstraint(time)).toMatchObject({ min: 0.008, max: 2.032, step: 0.008 })
     expect(numericError(time)).toBe('')
   })
 
