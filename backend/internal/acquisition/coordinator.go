@@ -10,6 +10,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 type CoordinatorHardware interface {
@@ -43,13 +44,22 @@ type RunPipelineAborter interface {
 	Abort() error
 }
 
+type RunTransportJournal interface {
+	TransportJournal() transportjournal.Sink
+}
+
+type StreamJournalHardware interface {
+	SetStreamJournal(transportjournal.Sink, string, func() time.Time)
+}
+
 type activeRun struct {
-	id       string
-	ctx      context.Context
-	cancel   context.CancelFunc
-	done     chan struct{}
-	pipeline RunPipeline
-	readErr  error
+	id              string
+	ctx             context.Context
+	cancel          context.CancelFunc
+	done            chan struct{}
+	pipeline        RunPipeline
+	readErr         error
+	journalAttached bool
 }
 
 // Coordinator owns one long-running acquisition and serializes start/stop.
@@ -94,23 +104,34 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 	if err != nil {
 		return c.failStart(fmt.Errorf("create run pipeline: %w", err), actor, nil)
 	}
+	journalAttached := false
+	if options.JournalTransport {
+		provider, ok := pipeline.(RunTransportJournal)
+		hardware, hardwareOK := c.hardware.(StreamJournalHardware)
+		if !ok || !hardwareOK || provider.TransportJournal() == nil {
+			return c.failStart(fmt.Errorf("transport journal requested but pipeline or stream hardware does not support attachment"), actor, pipeline)
+		}
+		hardware.SetStreamJournal(provider.TransportJournal(), "run-"+runID, nil)
+		journalAttached = true
+	}
 	if err = c.hardware.Synchronize(ctx); err != nil {
-		return c.failStart(fmt.Errorf("synchronize: %w", err), actor, pipeline)
+		return c.failStartAttached(fmt.Errorf("synchronize: %w", err), actor, pipeline, journalAttached)
 	}
 	if err = c.hardware.ClearStream(ctx); err != nil {
-		return c.failStart(fmt.Errorf("clear stream: %w", err), actor, pipeline)
+		return c.failStartAttached(fmt.Errorf("clear stream: %w", err), actor, pipeline, journalAttached)
 	}
 	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, 0); err != nil {
-		return c.failStart(fmt.Errorf("start acquisition: %w", err), actor, pipeline)
+		return c.failStartAttached(fmt.Errorf("start acquisition: %w", err), actor, pipeline, journalAttached)
 	}
 	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
-	run := &activeRun{id: runID, ctx: runCtx, cancel: cancel, done: make(chan struct{}), pipeline: pipeline}
+	run := &activeRun{id: runID, ctx: runCtx, cancel: cancel, done: make(chan struct{}), pipeline: pipeline, journalAttached: journalAttached}
 	c.mu.Lock()
 	c.active = run
 	c.lastErr = nil
 	c.mu.Unlock()
 	if _, err = c.states.Move(StateRunning, actor); err != nil {
 		cancel()
+		c.detachJournal(journalAttached)
 		_ = pipeline.Close()
 		return c.recordFault(err, actor)
 	}
@@ -149,6 +170,7 @@ func (c *Coordinator) Stop(ctx context.Context, actor string) error {
 	})
 	cancel()
 	result := JoinStopError(run.readErr, drainErr)
+	c.detachJournal(run.journalAttached)
 	result = JoinStopError(result, run.pipeline.Close())
 	if result == nil {
 		if finalizer, ok := run.pipeline.(RunPipelineFinalizer); ok {
@@ -237,6 +259,7 @@ func (c *Coordinator) watch(run *activeRun) {
 	})
 	cancel()
 	err := JoinStopError(run.readErr, cleanupErr)
+	c.detachJournal(run.journalAttached)
 	err = JoinStopError(err, run.pipeline.Close())
 	err = JoinStopError(err, abortPipeline(run.pipeline))
 	c.clearActive(run, err)
@@ -248,6 +271,20 @@ func (c *Coordinator) failStart(primary error, actor string, pipeline RunPipelin
 		primary = JoinStopError(primary, abortPipeline(pipeline))
 	}
 	return c.recordFault(primary, actor)
+}
+
+func (c *Coordinator) failStartAttached(primary error, actor string, pipeline RunPipeline, attached bool) error {
+	c.detachJournal(attached)
+	return c.failStart(primary, actor, pipeline)
+}
+
+func (c *Coordinator) detachJournal(attached bool) {
+	if !attached {
+		return
+	}
+	if hardware, ok := c.hardware.(StreamJournalHardware); ok {
+		hardware.SetStreamJournal(nil, "", nil)
+	}
 }
 
 func abortPipeline(pipeline RunPipeline) error {

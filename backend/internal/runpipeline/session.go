@@ -16,6 +16,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 type Options struct {
@@ -144,6 +145,7 @@ func (s *Session) Stats() StorageStats {
 func (s *Session) PipelineStats() acquisition.PipelineStats { return s.pipeline.Stats() }
 func (s *Session) StorageStats() StorageStats               { return s.Stats() }
 func (s *Session) BoardStats() []BoardStats                 { return s.sink.BoardStats() }
+func (s *Session) TransportJournal() transportjournal.Sink  { return s.writer.TransportJournal() }
 
 func (s *Session) recordError(err error) {
 	if err == nil {

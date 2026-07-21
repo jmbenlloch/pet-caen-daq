@@ -38,6 +38,8 @@ The backend command now runs a long-lived HTTP ConnectRPC service after parsing/
 
 `StartRun` now applies the exact submitted JANUS configuration through the same production configurator before acquisition and refuses to start unless application returns the system to `ready`. Each run receives its requested raw-capture and transport-journal choices rather than backend-wide defaults. The development manifest records the requesting actor, byte-exact requested configuration, effective per-board plans, complete configuration audit, and the effective evidence-capture choices.
 
+When transport journaling is requested, the coordinator attaches the run writer below DT5215 stream framing before any acquisition read and keeps it attached through orderly stop-and-drain. It detaches the sink before finalization or abort on successful stops, start failures, and asynchronous stream failures, preventing writes to a closed journal while preserving fragments and framing/termination evidence from malformed or truncated transport.
+
 An HTTP integration test now uses the checked-in generated ConnectRPC client against the mounted system handler. It verifies the unary complete snapshot, the stream's immediate initial snapshot, a live sequence/state/run update, cancellation, and a new connection receiving the latest complete snapshot rather than replaying deltas.
 
 ## Vertical slice 1: read-only topology discovery

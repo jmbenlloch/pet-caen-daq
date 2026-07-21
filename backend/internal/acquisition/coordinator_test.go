@@ -10,6 +10,7 @@ import (
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 type coordinatorHardware struct {
@@ -18,6 +19,13 @@ type coordinatorHardware struct {
 	readCount int
 	readErr   error
 	startErr  error
+	journals  []transportjournal.Sink
+}
+
+func (h *coordinatorHardware) SetStreamJournal(sink transportjournal.Sink, _ string, _ func() time.Time) {
+	h.mu.Lock()
+	h.journals = append(h.journals, sink)
+	h.mu.Unlock()
 }
 
 // The coordinator and configurator deliberately share the production client,
@@ -64,13 +72,41 @@ type coordinatorPipeline struct {
 	closed    bool
 	finalized bool
 	aborted   bool
+	journal   transportjournal.Sink
 }
+
+func (p *coordinatorPipeline) TransportJournal() transportjournal.Sink { return p.journal }
+
+type coordinatorJournal struct{}
+
+func (*coordinatorJournal) AppendRecord(transportjournal.Record) error { return nil }
 
 func (p *coordinatorPipeline) Submit(_ context.Context, batch PipelineBatch) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.batches = append(p.batches, batch)
 	return nil
+}
+
+func TestCoordinatorAttachesJournalThroughDrainAndDetachesBeforeFinalize(t *testing.T) {
+	hardware := &coordinatorHardware{}
+	states, _ := NewStateMachine(StateReady, nil)
+	pipeline := &coordinatorPipeline{journal: &coordinatorJournal{}}
+	coordinator, err := NewCoordinator(states, hardware, func(string, RunOptions) (RunPipeline, error) { return pipeline, nil }, 1, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{JournalTransport: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Stop(context.Background(), "operator"); err != nil {
+		t.Fatal(err)
+	}
+	hardware.mu.Lock()
+	defer hardware.mu.Unlock()
+	if len(hardware.journals) != 2 || hardware.journals[0] == nil || hardware.journals[1] != nil {
+		t.Fatalf("journal attachments = %#v", hardware.journals)
+	}
 }
 func (p *coordinatorPipeline) Close() error {
 	p.mu.Lock()
