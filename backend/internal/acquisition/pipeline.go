@@ -125,6 +125,9 @@ func (p *Pipeline) Stats() PipelineStats {
 	}
 }
 
+func (p *Pipeline) Done() <-chan struct{} { return p.done }
+func (p *Pipeline) Err() error            { return p.result() }
+
 func (p *Pipeline) Close() error {
 	p.mu.Lock()
 	if !p.closed {

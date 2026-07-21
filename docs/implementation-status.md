@@ -46,6 +46,8 @@ Startup discovery now treats any board carrying the acquisition-running status a
 
 A generated ConnectRPC client integration test now exercises the complete simulator-backed service workflow: static validation of the production JANUS document, configuration application on all four boards, run start with raw and journal evidence, live test-pulse telemetry, operator stop/drain, and finalized artifact inspection. It verifies the manifest's requested/effective configuration and audit, JSON Lines event count, raw replay, journal presence, and every returned size/SHA-256 digest against the on-disk bytes.
 
+Failure/backpressure coverage now spans both bounded-queue policies, cancellation while blocked, injected disk/sink and finalization failures, decode failure with complete raw retention, stream disconnect/truncation/malformed framing with transport-journal replay, and missing completion/service or stalled drain. Real-socket coordinator tests prove asynchronous decode/storage completion faults cancel an otherwise blocked stream reader immediately, retain the `incomplete` marker, and preserve either the complete raw batch or lower-level malformed transport evidence. Required artifacts that disappear during finalization now fail the run instead of being silently omitted.
+
 An HTTP integration test now uses the checked-in generated ConnectRPC client against the mounted system handler. It verifies the unary complete snapshot, the stream's immediate initial snapshot, a live sequence/state/run update, cancellation, and a new connection receiving the latest complete snapshot rather than replaying deltas.
 
 ## Vertical slice 1: read-only topology discovery

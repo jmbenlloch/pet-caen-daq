@@ -44,6 +44,11 @@ type RunPipelineAborter interface {
 	Abort() error
 }
 
+type RunPipelineNotifier interface {
+	Done() <-chan struct{}
+	Err() error
+}
+
 type RunTransportJournal interface {
 	TransportJournal() transportjournal.Sink
 }
@@ -58,6 +63,7 @@ type activeRun struct {
 	cancel          context.CancelFunc
 	done            chan struct{}
 	pipeline        RunPipeline
+	errMu           sync.Mutex
 	readErr         error
 	journalAttached bool
 }
@@ -136,8 +142,19 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 		return c.recordFault(err, actor)
 	}
 	go c.readLoop(run)
+	if notifier, ok := pipeline.(RunPipelineNotifier); ok {
+		go c.watchPipeline(run, notifier)
+	}
 	go c.watch(run)
 	return nil
+}
+
+func (c *Coordinator) watchPipeline(run *activeRun, notifier RunPipelineNotifier) {
+	<-notifier.Done()
+	if err := notifier.Err(); err != nil {
+		run.setError(fmt.Errorf("run pipeline: %w", err))
+		run.cancel()
+	}
 }
 
 func (c *Coordinator) Stop(ctx context.Context, actor string) error {
@@ -169,7 +186,7 @@ func (c *Coordinator) Stop(ctx context.Context, actor string) error {
 		return run.pipeline.Submit(drainCtx, PipelineBatch{Raw: raw, Events: events})
 	})
 	cancel()
-	result := JoinStopError(run.readErr, drainErr)
+	result := JoinStopError(run.error(), drainErr)
 	c.detachJournal(run.journalAttached)
 	result = JoinStopError(result, run.pipeline.Close())
 	if result == nil {
@@ -226,14 +243,14 @@ func (c *Coordinator) readLoop(run *activeRun) {
 			if run.ctx.Err() != nil {
 				return
 			}
-			run.readErr = fmt.Errorf("read stream batch: %w", err)
+			run.setError(fmt.Errorf("read stream batch: %w", err))
 			return
 		}
 		if err = run.pipeline.Submit(run.ctx, PipelineBatch{Raw: raw, Events: events}); err != nil {
 			if run.ctx.Err() != nil {
 				return
 			}
-			run.readErr = fmt.Errorf("submit stream batch: %w", err)
+			run.setError(fmt.Errorf("submit stream batch: %w", err))
 			return
 		}
 	}
@@ -241,7 +258,8 @@ func (c *Coordinator) readLoop(run *activeRun) {
 
 func (c *Coordinator) watch(run *activeRun) {
 	<-run.done
-	if run.readErr == nil {
+	readErr := run.error()
+	if readErr == nil {
 		return
 	}
 	c.opMu.Lock()
@@ -252,17 +270,31 @@ func (c *Coordinator) watch(run *activeRun) {
 	if !current {
 		return
 	}
-	_ = c.recordFault(run.readErr, "backend")
+	_ = c.recordFault(readErr, "backend")
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), c.drainTimeout)
 	_, cleanupErr := StopAndDrain(cleanupCtx, c.hardware, c.expectedChains, func(raw []byte, events []dt5215.StreamEvent) error {
 		return run.pipeline.Submit(cleanupCtx, PipelineBatch{Raw: raw, Events: events})
 	})
 	cancel()
-	err := JoinStopError(run.readErr, cleanupErr)
+	err := JoinStopError(readErr, cleanupErr)
 	c.detachJournal(run.journalAttached)
 	err = JoinStopError(err, run.pipeline.Close())
 	err = JoinStopError(err, abortPipeline(run.pipeline))
 	c.clearActive(run, err)
+}
+
+func (r *activeRun) setError(err error) {
+	r.errMu.Lock()
+	if r.readErr == nil {
+		r.readErr = err
+	}
+	r.errMu.Unlock()
+}
+
+func (r *activeRun) error() error {
+	r.errMu.Lock()
+	defer r.errMu.Unlock()
+	return r.readErr
 }
 
 func (c *Coordinator) failStart(primary error, actor string, pipeline RunPipeline) error {

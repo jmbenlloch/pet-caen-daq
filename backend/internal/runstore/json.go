@@ -224,14 +224,17 @@ func (w *Writer) Finalize(completedAt, reason string) error {
 }
 
 func (w *Writer) finalizedArtifacts() ([]Artifact, error) {
-	names := []struct{ name, kind string }{{"events.jsonl", "decoded_events"}, {"wire.raw", "raw_capture"}, {"transport.journal", "transport_journal"}}
+	names := []struct{ name, kind string }{{"events.jsonl", "decoded_events"}}
+	if w.raw != nil {
+		names = append(names, struct{ name, kind string }{"wire.raw", "raw_capture"})
+	}
+	if w.journal != nil {
+		names = append(names, struct{ name, kind string }{"transport.journal", "transport_journal"})
+	}
 	artifacts := make([]Artifact, 0, len(names))
 	for _, candidate := range names {
 		path := filepath.Join(w.dir, candidate.name)
 		file, err := os.Open(path)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
 		if err != nil {
 			return nil, fmt.Errorf("open artifact %s: %w", candidate.name, err)
 		}

@@ -163,6 +163,22 @@ func TestWriterPersistsEveryTypedEventKind(t *testing.T) {
 		}
 	}
 }
+
+func TestFinalizeFailureRetainsIncompleteMarker(t *testing.T) {
+	w, err := Create(t.TempDir(), Manifest{RunID: "lost-events"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(w.Directory(), "events.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Finalize("2026-07-21T00:00:00Z", "operator_stop"); err == nil || !strings.Contains(err.Error(), "open artifact events.jsonl") {
+		t.Fatalf("finalize error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(w.Directory(), "incomplete")); err != nil {
+		t.Fatalf("incomplete marker missing: %v", err)
+	}
+}
 func TestWriterRejectsUntypedEvent(t *testing.T) {
 	w, err := Create(t.TempDir(), Manifest{RunID: "missing-kind"})
 	if err != nil {

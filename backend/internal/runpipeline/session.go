@@ -147,6 +147,8 @@ func (s *Session) StorageStats() StorageStats               { return s.Stats() }
 func (s *Session) BoardStats() []BoardStats                 { return s.sink.BoardStats() }
 func (s *Session) TransportJournal() transportjournal.Sink  { return s.writer.TransportJournal() }
 func (s *Session) Artifacts() []runstore.Artifact           { return s.writer.Artifacts() }
+func (s *Session) Done() <-chan struct{}                    { return s.pipeline.Done() }
+func (s *Session) Err() error                               { return s.pipeline.Err() }
 
 func (s *Session) recordError(err error) {
 	if err == nil {
