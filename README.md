@@ -83,6 +83,7 @@ under the container's `/tmp`.
 - [Production Run 54 replay fixture](test/fixtures/runs/run54/README.md)
 - [Implementation roadmap](docs/roadmap.md)
 - [Current implementation status](docs/implementation-status.md)
+- [JANUS GUI configuration and feature audit](docs/janus-gui-configuration-audit.md)
 
 ## Current hardware boundary
 
