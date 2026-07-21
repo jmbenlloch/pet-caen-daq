@@ -14,6 +14,8 @@ The Phase 2 protobuf contract now defines coarse start/stop operations, structur
 
 The internal telemetry publisher and ConnectRPC system adapter now implement the snapshot contract. Publisher-owned instance identity, monotonic sequence, and observation time prevent callers from forging stream ordering; every subscriber immediately receives the current full snapshot, including after reconnect. Slow subscribers retain only the newest independently usable update, cannot backpressure acquisition, and are removed on cancellation. A shared staleness predicate covers missing, invalid, and over-age observations.
 
+The ConnectRPC configuration-validation method now uses the same lossless JANUS parser, semantic-owner catalog, and four-link production-topology rules as backend startup. It reports structured severity, field, source-line, and message diagnostics while retaining the deprecated string error list for existing clients. This endpoint performs static validation only; firmware-, readback-, and pedestal-dependent effective-configuration validation remains part of configuration application against discovered boards.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:

@@ -30,6 +30,15 @@ func (s *SystemService) GetSystemSnapshot(_ context.Context, _ *connect.Request[
 	return connect.NewResponse(response), nil
 }
 
+func (s *SystemService) ValidateConfiguration(_ context.Context, request *connect.Request[daqv1.ValidateConfigurationRequest]) (*connect.Response[daqv1.ValidateConfigurationResponse], error) {
+	issues := ValidateJANUSConfiguration(request.Msg.GetJanusConfiguration())
+	return connect.NewResponse(&daqv1.ValidateConfigurationResponse{
+		Valid:  len(issues) == 0,
+		Errors: legacyErrors(issues),
+		Issues: issues,
+	}), nil
+}
+
 func (s *SystemService) StreamTelemetry(ctx context.Context, _ *connect.Request[daqv1.StreamTelemetryRequest], stream *connect.ServerStream[daqv1.StreamTelemetryResponse]) error {
 	updates := s.Source.Subscribe(ctx)
 	for {
