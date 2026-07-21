@@ -12,6 +12,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
 )
 
@@ -33,6 +34,9 @@ func (*serviceHealthPipeline) PipelineStats() acquisition.PipelineStats {
 }
 func (*serviceHealthPipeline) StorageStats() runpipeline.StorageStats {
 	return runpipeline.StorageStats{Directory: "/runs/run-42"}
+}
+func (*serviceHealthPipeline) Artifacts() []runstore.Artifact {
+	return []runstore.Artifact{{Kind: "decoded_events", Name: "events.jsonl", SizeBytes: 123, SHA256: "abc"}}
 }
 
 func (c *fakeRunController) Start(_ context.Context, runID, _ string, options acquisition.RunOptions) error {
@@ -70,7 +74,7 @@ func newRunService(t *testing.T, controller *fakeRunController) *RunService {
 }
 
 func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
-	controller := &fakeRunController{state: acquisition.StateReady}
+	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
 	service := newRunService(t, controller)
 	start, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology, CaptureRaw: true, JournalTransport: true}))
 	if err != nil {
@@ -88,6 +92,9 @@ func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
 	}
 	if stop.Msg.Snapshot.State != daqv1.SystemState_SYSTEM_STATE_READY || stop.Msg.Snapshot.CurrentRun != nil || stop.Msg.Run.Incomplete || stop.Msg.Run.TerminationReason != "operator_stop" {
 		t.Fatalf("stop response = %+v", stop.Msg)
+	}
+	if len(stop.Msg.Run.Artifacts) != 1 || stop.Msg.Run.Artifacts[0].GetName() != "events.jsonl" || stop.Msg.Run.Artifacts[0].GetSizeBytes() != 123 || stop.Msg.Run.Artifacts[0].GetSha256() != "abc" {
+		t.Fatalf("artifacts = %+v", stop.Msg.Run.Artifacts)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -101,6 +102,7 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 	if active == "" || active != message.GetRunId() {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("run %q is not active", message.GetRunId()))
 	}
+	pipeline := s.Controller.ActivePipeline()
 	if err := s.Controller.Stop(ctx, message.GetRequestedBy()); err != nil {
 		s.stopMonitor()
 		s.publish(s.currentRun())
@@ -114,6 +116,11 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 	run.CompletedAt = timestamppb.New(s.now())
 	run.Incomplete = false
 	run.TerminationReason = "operator_stop"
+	if source, ok := pipeline.(interface{ Artifacts() []runstore.Artifact }); ok {
+		for _, artifact := range source.Artifacts() {
+			run.Artifacts = append(run.Artifacts, &daqv1.Artifact{Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256})
+		}
+	}
 	s.mu.Lock()
 	s.current = nil
 	s.mu.Unlock()

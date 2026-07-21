@@ -2,8 +2,10 @@ package runstore
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -76,6 +78,19 @@ func TestRunLifecycleAndReplay(t *testing.T) {
 	}
 	if m.ConfigurationAudit == nil || len(m.ConfigurationAudit.Settings) != 1 || m.ConfigurationAudit.Settings[0].Name != "OF_RunInfo" {
 		t.Fatalf("configuration audit was not preserved: %#v", m.ConfigurationAudit)
+	}
+	if len(m.Artifacts) != 3 {
+		t.Fatalf("artifacts = %#v", m.Artifacts)
+	}
+	for _, artifact := range m.Artifacts {
+		artifactData, err := os.ReadFile(filepath.Join(w.Directory(), artifact.Name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		digest := sha256.Sum256(artifactData)
+		if artifact.SizeBytes != uint64(len(artifactData)) || artifact.SHA256 != fmt.Sprintf("%x", digest) || len(artifact.SHA256) != 64 {
+			t.Fatalf("artifact=%+v bytes=%d digest=%x", artifact, len(artifactData), digest)
+		}
 	}
 	rawFile, err := os.Open(filepath.Join(w.Directory(), "wire.raw"))
 	if err != nil {

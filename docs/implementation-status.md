@@ -40,6 +40,8 @@ The backend command now runs a long-lived HTTP ConnectRPC service after parsing/
 
 When transport journaling is requested, the coordinator attaches the run writer below DT5215 stream framing before any acquisition read and keeps it attached through orderly stop-and-drain. It detaches the sink before finalization or abort on successful stops, start failures, and asynchronous stream failures, preventing writes to a closed journal while preserving fragments and framing/termination evidence from malformed or truncated transport.
 
+Finalization now calculates exact sizes and SHA-256 digests after closing each stable payload artifact: decoded JSON Lines, optional complete-batch raw capture, and optional transport journal. The manifest persists those records and a successful `StopRun` returns the same artifact metadata in `RunSummary`; the manifest deliberately does not self-hash because embedding its own digest would be circular.
+
 An HTTP integration test now uses the checked-in generated ConnectRPC client against the mounted system handler. It verifies the unary complete snapshot, the stream's immediate initial snapshot, a live sequence/state/run update, cancellation, and a new connection receiving the latest complete snapshot rather than replaying deltas.
 
 ## Vertical slice 1: read-only topology discovery

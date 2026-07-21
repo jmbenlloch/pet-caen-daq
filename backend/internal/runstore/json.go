@@ -3,6 +3,7 @@ package runstore
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,14 @@ type Manifest struct {
 	RequestedConfiguration string                     `json:"requested_configuration,omitempty"`
 	EffectiveConfiguration []dt5202.ConfigurationPlan `json:"effective_configuration,omitempty"`
 	ConfigurationAudit     *configaudit.Report        `json:"configuration_audit,omitempty"`
+	Artifacts              []Artifact                 `json:"artifacts,omitempty"`
+}
+
+type Artifact struct {
+	Kind      string `json:"kind"`
+	Name      string `json:"name"`
+	SizeBytes uint64 `json:"size_bytes"`
+	SHA256    string `json:"sha256"`
 }
 
 type Envelope struct {
@@ -74,7 +83,8 @@ func Create(parent string, manifest Manifest) (*Writer, error) {
 	w.events = f
 	return w, nil
 }
-func (w *Writer) Directory() string { return w.dir }
+func (w *Writer) Directory() string     { return w.dir }
+func (w *Writer) Artifacts() []Artifact { return append([]Artifact(nil), w.manifest.Artifacts...) }
 func (w *Writer) EnableTransportJournal() error {
 	if w.closed {
 		return errors.New("run writer is closed")
@@ -197,6 +207,11 @@ func (w *Writer) Finalize(completedAt, reason string) error {
 			return err
 		}
 	}
+	artifacts, err := w.finalizedArtifacts()
+	if err != nil {
+		return err
+	}
+	w.manifest.Artifacts = artifacts
 	w.manifest.CompletedAt = completedAt
 	w.manifest.TerminationReason = reason
 	if err := w.writeManifest(); err != nil {
@@ -206,6 +221,32 @@ func (w *Writer) Finalize(completedAt, reason string) error {
 		return fmt.Errorf("remove incomplete marker: %w", err)
 	}
 	return nil
+}
+
+func (w *Writer) finalizedArtifacts() ([]Artifact, error) {
+	names := []struct{ name, kind string }{{"events.jsonl", "decoded_events"}, {"wire.raw", "raw_capture"}, {"transport.journal", "transport_journal"}}
+	artifacts := make([]Artifact, 0, len(names))
+	for _, candidate := range names {
+		path := filepath.Join(w.dir, candidate.name)
+		file, err := os.Open(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("open artifact %s: %w", candidate.name, err)
+		}
+		hash := sha256.New()
+		size, copyErr := io.Copy(hash, file)
+		closeErr := file.Close()
+		if copyErr != nil {
+			return nil, fmt.Errorf("hash artifact %s: %w", candidate.name, copyErr)
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("close artifact %s: %w", candidate.name, closeErr)
+		}
+		artifacts = append(artifacts, Artifact{Kind: candidate.kind, Name: candidate.name, SizeBytes: uint64(size), SHA256: fmt.Sprintf("%x", hash.Sum(nil))})
+	}
+	return artifacts, nil
 }
 func (w *Writer) Abort() error {
 	if w.closed {

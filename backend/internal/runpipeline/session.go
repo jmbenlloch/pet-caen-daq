@@ -146,6 +146,7 @@ func (s *Session) PipelineStats() acquisition.PipelineStats { return s.pipeline.
 func (s *Session) StorageStats() StorageStats               { return s.Stats() }
 func (s *Session) BoardStats() []BoardStats                 { return s.sink.BoardStats() }
 func (s *Session) TransportJournal() transportjournal.Sink  { return s.writer.TransportJournal() }
+func (s *Session) Artifacts() []runstore.Artifact           { return s.writer.Artifacts() }
 
 func (s *Session) recordError(err error) {
 	if err == nil {
