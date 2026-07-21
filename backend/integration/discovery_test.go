@@ -278,6 +278,18 @@ func TestProductionConfigurationAppliesAndValidatesFourBoards(t *testing.T) {
 		if err != nil {
 			t.Fatalf("plan board %d: %v", board, err)
 		}
+		calibration := dt5202.PedestalCalibration{Source: "deterministic simulator calibration"}
+		for channel := range dt5202.ChannelCount {
+			calibration.LowGain[channel] = 50
+			calibration.HighGain[channel] = 50
+		}
+		plan, err = plan.WithPedestalCalibration(calibration)
+		if err != nil {
+			t.Fatalf("complete board %d calibration: %v", board, err)
+		}
+		if len(plan.Deferred) != 0 {
+			t.Fatalf("board %d deferred settings = %#v", board, plan.Deferred)
+		}
 		if err := dt5202.ApplyConfiguration(ctx, client, uint16(board), 0, plan, true); err != nil {
 			t.Fatalf("apply board %d: %v", board, err)
 		}

@@ -53,6 +53,9 @@ func TestPlanProductionConfiguration(t *testing.T) {
 		if plan.HV.VoltageV != 45.4 || plan.HV.CurrentLimitMA != 1 || plan.HV.TemperatureCoefficients != [3]float64{0, 50, 0} || plan.HV.TemperatureFeedback || len(plan.HV.Transactions) != 15 {
 			t.Fatalf("board %d HV plan = %#v", board, plan.HV)
 		}
+		if plan.Pedestal.Common != 50 || plan.Pedestal.AcquisitionMode != 3 || plan.Pedestal.ZeroSuppressLowGain != 50 || plan.Pedestal.ZeroSuppressHighGain != 50 {
+			t.Fatalf("board %d pedestal plan = %#v", board, plan.Pedestal)
+		}
 		if got, want := len(plan.Inactive), 7; got != want {
 			t.Fatalf("board %d inactive settings = %d, want %d: %#v", board, got, want, plan.Inactive)
 		}

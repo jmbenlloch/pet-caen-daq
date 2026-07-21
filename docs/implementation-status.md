@@ -153,3 +153,15 @@ Implemented on 2026-07-21:
 - simulator-backed application of the production 45.4 V, 1.0 mA, TMP37, feedback-disabled plan on all four boards.
 
 HV application is deliberately separate from ordinary FPGA configuration so callers must explicitly authorize the safety-relevant setpoint operation. This completes production fixture translation except for pedestal calibration; spectroscopy-only zero suppression remains dependent on those measured pedestal values.
+
+## Phase 1 pedestal and zero-suppression semantics
+
+Implemented on 2026-07-21:
+
+- an immutable, provenance-tagged 64-channel LG/HG pedestal calibration model;
+- source-compatible host-side energy correction with zero/14-bit saturation;
+- explicit completion of the production `Pedestal` request from supplied board calibration evidence;
+- per-channel spectroscopy-mode LG/HG zero-suppression translation, including disabled thresholds and source-compatible unsigned wrapping; and
+- confirmation that spectroscopy-plus-timing leaves energy-only zero suppression inactive while still applying host-side pedestal correction.
+
+With deterministic calibration evidence supplied, the complete production fixture has no deferred hardware-owned settings in the four-board simulator integration path. Reading the protected pedestal flash page natively remains necessary before real-hardware configuration; no code writes or modifies calibration flash.

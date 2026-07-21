@@ -158,6 +158,12 @@ The DT5202 HV module is accessed indirectly through `a_hv_regaddr` and `a_hv_reg
 
 The source-confirmed hard-configuration sequence initializes the bus, selects PID precision through peripheral register 30, writes voltage register 2 twice, current-limit register 5 twice, temperature coefficients 7/8/9 twice, and feedback coefficient/enable registers 28/1 twice. Repeated writes reproduce FERSlib's workaround for unreliable first accesses. Applying this plan is a separate explicit operation because changing HV setpoints is safety-relevant; ordinary FPGA configuration does not implicitly perform it.
 
+## Pedestal calibration semantics
+
+`Pedestal` is not a DT5202 register. FERSlib loads 64 low-gain and 64 high-gain calibration values from a protected flash page during board connection, then corrects decoded energy as `raw + common_pedestal - channel_calibration`, clamped to the energy range. The Go decoder preserves raw values and exposes this correction as a separate pure step requiring calibration provenance.
+
+In spectroscopy mode only, FPGA zero-suppression thresholds are derived per channel as `requested_threshold - common_pedestal + channel_calibration` and assigned to an unsigned 16-bit register value. Spectroscopy-plus-timing intentionally does not program these thresholds because suppressing only energy would produce partial events. The planner requires a provenance-tagged calibration before completing pedestal and spectroscopy zero-suppression semantics; it never writes protected flash.
+
 The user configuration vocabulary and units are completely represented by `Config_t` in `FERS_config.h`, parsing in `FERS_paramparser.c`, and the example/definition files under `bin/`. `FERS_LoadConfigFile`, `FERS_SetParam`, `FERS_GetParam`, and `FERS_configure` are suitable first-version APIs even if JANUS itself is not used.
 
 ## Run-control sequence for this topology

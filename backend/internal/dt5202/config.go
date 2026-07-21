@@ -23,6 +23,7 @@ type ConfigurationPlan struct {
 	Writes   []RegisterWrite
 	Citiroc  [2]CitirocChip
 	HV       HVPlan
+	Pedestal PedestalPlan
 	Deferred []string
 	Inactive []InactiveSetting
 }
@@ -313,10 +314,16 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 			return ConfigurationPlan{}, fmt.Errorf("line %d: TestPulseDestination channel %q out of range", destination.Line, fields[1])
 		}
 	}
-	if _, err := u32("ZS_Threshold_LG", 16); err != nil {
+	zsLow, err := u32("ZS_Threshold_LG", 16)
+	if err != nil {
 		return ConfigurationPlan{}, err
 	}
-	if _, err := u32("ZS_Threshold_HG", 16); err != nil {
+	zsHigh, err := u32("ZS_Threshold_HG", 16)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	commonPedestal, err := u32("Pedestal", 14)
+	if err != nil {
 		return ConfigurationPlan{}, err
 	}
 	probeChannel0, err := u32("ProbeChannel0", 6)
@@ -458,6 +465,7 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	plan.Citiroc = SplitCitirocChannels(citirocChannels, common)
 	plan.Citiroc[1].Common.DiscriminatorMask = qdMask1
 	plan.HV = buildHVPlan(hvVoltage, hvCurrent, coefficients, feedbackEnable != 0, feedbackCoefficient)
+	plan.Pedestal = PedestalPlan{Common: uint16(commonPedestal), AcquisitionMode: acqMode, ZeroSuppressLowGain: uint16(zsLow), ZeroSuppressHighGain: uint16(zsHigh)}
 	plan.Deferred = []string{"Pedestal"}
 	if acqMode == 1 {
 		plan.Deferred = append(plan.Deferred, "ZS_Threshold_LG", "ZS_Threshold_HG")

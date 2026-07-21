@@ -35,8 +35,9 @@ type SpectroscopyEvent struct {
 	TimeReference *uint32  `json:"time_reference,omitempty"`
 }
 
-// DecodeSpectroscopy decodes a descriptor payload for spectroscopy, optionally
-// with timing. Pedestal correction is intentionally a later configuration step.
+// DecodeSpectroscopy decodes raw spectroscopy values, optionally with timing.
+// ApplyPedestalCalibration performs the separate source-compatible host-side
+// correction once the board's protected-flash calibration is available.
 func DecodeSpectroscopy(qualifier uint8, triggerID, timestamp uint64, payload []byte) (SpectroscopyEvent, error) {
 	if qualifier&QualifierSpectroscopy == 0 {
 		return SpectroscopyEvent{}, fmt.Errorf("qualifier 0x%02x is not spectroscopy", qualifier)
