@@ -28,8 +28,13 @@ const (
 	CommandSoftwareTrigger  uint32 = 0x14
 	CommandGlobalReset      uint32 = 0x15
 	CommandTestPulse        uint32 = 0x16
+	CommandResetPeriodic    uint32 = 0x17
 	CommandClearData        uint32 = 0x18
 	CommandSync             uint32 = 0x1c
+
+	// TDLCommandDelay is the capture-verified FERSlib broadcast delay. One
+	// hardware unit is 10 ns, so this schedules execution 10 ms later.
+	TDLCommandDelay uint32 = 1_000_000
 )
 
 var littleEndian = binary.LittleEndian
@@ -43,6 +48,15 @@ type ChainInfo struct {
 	ByteCount   uint64
 	EventRateHz float32
 	Megabits    float32
+}
+
+// EnumerationInfo is the capture-verified 12-byte ENUM reply. The DT5215
+// returns a third word after the status and node count. FERSlib consumes the
+// word but does not assign it semantics, so keep it as evidence rather than
+// guessing what it represents.
+type EnumerationInfo struct {
+	NodeCount uint32
+	Word2     uint32
 }
 
 type BoardInfo struct {
@@ -88,18 +102,35 @@ func EncodeEnumerateRequest(chain uint16) ([]byte, error) {
 	return request, nil
 }
 
-func DecodeEnumerateResponse(response []byte) (nodeCount uint32, err error) {
-	if len(response) != 8 {
-		return 0, fmt.Errorf("ENUM response length = %d, want 8", len(response))
+func EncodeChainControlRequest(chain uint16, enable bool, tokenInterval uint32) ([]byte, error) {
+	if chain >= MaxChains {
+		return nil, fmt.Errorf("chain %d out of range", chain)
+	}
+	request := make([]byte, 12)
+	copy(request, "CCNT")
+	littleEndian.PutUint16(request[4:6], chain)
+	if enable {
+		littleEndian.PutUint16(request[6:8], 1)
+	}
+	littleEndian.PutUint32(request[8:12], tokenInterval)
+	return request, nil
+}
+
+func DecodeEnumerateResponse(response []byte) (EnumerationInfo, error) {
+	if len(response) != 12 {
+		return EnumerationInfo{}, fmt.Errorf("ENUM response length = %d, want 12", len(response))
 	}
 	if status := littleEndian.Uint32(response[0:4]); status != StatusOK {
-		return 0, &StatusError{Operation: "ENUM", Status: status}
+		return EnumerationInfo{}, &StatusError{Operation: "ENUM", Status: status}
 	}
-	nodeCount = littleEndian.Uint32(response[4:8])
-	if nodeCount > MaxNodes {
-		return 0, fmt.Errorf("ENUM node count = %d, maximum %d", nodeCount, MaxNodes)
+	info := EnumerationInfo{
+		NodeCount: littleEndian.Uint32(response[4:8]),
+		Word2:     littleEndian.Uint32(response[8:12]),
 	}
-	return nodeCount, nil
+	if info.NodeCount > MaxNodes {
+		return EnumerationInfo{}, fmt.Errorf("ENUM node count = %d, maximum %d", info.NodeCount, MaxNodes)
+	}
+	return info, nil
 }
 
 func EncodeReadRegisterRequest(chain, node uint16, address uint32) ([]byte, error) {

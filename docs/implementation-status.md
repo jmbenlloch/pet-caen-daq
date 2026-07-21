@@ -89,6 +89,8 @@ The backend command now runs a long-lived HTTP ConnectRPC service after parsing/
 
 `StartRun` now applies the exact submitted JANUS configuration through the same production configurator before acquisition and refuses to start unless application returns the system to `ready`. Each run receives its requested raw-capture and transport-journal choices rather than backend-wide defaults. The development manifest records the requesting actor, byte-exact requested configuration, effective per-board plans, complete configuration audit, and the effective evidence-capture choices.
 
+The command binds its local ConnectRPC/HTTP listener before connecting to or configuring hardware. A busy, reserved, or permission-denied listen address therefore fails without changing board state, and the diagnostic identifies the `-listen` override.
+
 When transport journaling is requested, the coordinator attaches the run writer below DT5215 stream framing before any acquisition read and keeps it attached through orderly stop-and-drain. It detaches the sink before finalization or abort on successful stops, start failures, and asynchronous stream failures, preventing writes to a closed journal while preserving fragments and framing/termination evidence from malformed or truncated transport.
 
 Finalization now calculates exact sizes and SHA-256 digests after closing each stable payload artifact: decoded JSON Lines, optional complete-batch raw capture, and optional transport journal. The manifest persists those records and a successful `StopRun` returns the same artifact metadata in `RunSummary`; the manifest deliberately does not self-hash because embedding its own digest would be circular.
@@ -103,15 +105,15 @@ Run-control service errors now use stable bracketed diagnostic codes with consis
 
 An HTTP integration test now uses the checked-in generated ConnectRPC client against the mounted system handler. It verifies the unary complete snapshot, the stream's immediate initial snapshot, a live sequence/state/run update, cancellation, and a new connection receiving the latest complete snapshot rather than replaying deltas.
 
-## Vertical slice 1: read-only topology discovery
+## Vertical slice 1: topology discovery and runtime link initialization
 
 Implemented on 2026-07-20:
 
 - lossless parsing of JANUS assignment syntax, including indexed settings, comments, repeated settings, and the production Windows/CRLF fixture;
 - extraction and validation of the four production `Open` connections (TDlinks 0–3, node 0);
-- exact little-endian codecs for DT5215 `CINF`, `ENUM`, and `RREG` requests and responses;
+- exact little-endian codecs for DT5215 `CINF`, `ENUM`, and `RREG` requests and responses; the capture-verified `ENUM` reply is 12 bytes and its third, semantically unknown word is retained as evidence;
 - simultaneous connection to TCP 9760 for slow control and TCP 9000 for the data stream;
-- read-only validation that links 0–3 are enabled and links 4–7 are disabled, as required by the version-one web-provisioning decision;
+- validation that links 0–3 are enabled and links 4–7 are disabled, as required by the version-one web-provisioning decision;
 - enumeration of exactly one DT5202 on each production link;
 - reads of product ID, FPGA firmware revision, and acquisition status registers;
 - a typed Go topology returned as JSON by the initial command-line backend;
@@ -119,9 +121,9 @@ Implemented on 2026-07-20:
 - golden codec and configuration-parser unit tests plus simulator-backed integration tests, including incorrect provisioning and pre-enumeration link states;
 - an initial Buf API module and generated Go/ConnectRPC bindings for configuration validation and system snapshots.
 
-The implementation does not use FERSlib or cgo. It does not configure persistent DT5215 link activation: operators must provision links 0–3 enabled and links 4–7 disabled through the concentrator web interface before startup. Discovery sends `ENUM`, but no register writes.
+The implementation does not use FERSlib or cgo. It does not configure persistent DT5215 link activation: operators must provision links 0–3 enabled and links 4–7 disabled through the concentrator web interface before startup. Discovery preserves already-ready links. If an expected enabled link reports pre-enumeration state 1 or 2, discovery performs the capture-verified runtime `RLNK`, `ENUM`, and `SNT0` sequence, refreshes `CINF`, and requires exactly one ready board per expected chain. These runtime operations do not replace web provisioning.
 
-Protocol constants and behavior remain source-derived until checked against a real packet capture and hardware. In particular, DT5215 link-status numeric meanings beyond zero meaning disabled are provisional.
+The 2026-07-21 real-hardware evidence and patch history are indexed in [Real-hardware capture evidence](real-hardware-capture-evidence.md). Capture-verified facts include the 12-byte `ENUM` reply, reset/enumeration/synchronization timing, four-board identity/status reads, complete startup configuration, the signed 20-bit time-reference-delay readback, JANUS HV-on traffic, and JANUS plus native acquisition traffic. Opt-in conformance tests decode 18,784 events from the first JANUS stream, 158,417 from the second, and all 87,989 events in the finalized native raw run. Unobserved error/status meanings remain provisional.
 
 ## Run locally
 
@@ -145,7 +147,7 @@ task build
 
 Start the simulator in one terminal and run the DAQ command in another. The simulator command defaults to loopback ports 9760 and 9000; integration tests request ephemeral ports so they can run concurrently.
 
-The next protocol work should add the complete configuration/register-write sequence, Citiroc configuration bitstream, acquisition state machine, data-stream framing, and Run 54 processed-event compatibility decoder. Each step should retain captured raw bytes so it can later be compared with the real PCAP.
+Subsequent phases added the complete configuration/register-write sequence, FPGA-assisted Citiroc loading and readback, the acquisition state machine, data-stream framing, and Run 54 processed-event compatibility decoding. A real four-board native run now verifies configuration, runtime chain control, 87,989 decoded events, persistence, stop/drain, artifact finalization, and deterministic raw replay. Explicitly authorized native HV configuration remains the principal real-hardware safety validation gap.
 
 ## Phase 1 offline decoding and development storage
 
@@ -209,6 +211,8 @@ This map intentionally excludes registers belonging only to other FERS board fam
 The production configuration's complete 103-assignment document is also covered by an explicit semantic-owner catalog. Unknown or misspelled settings now fail classification with their source line instead of being silently ignored. Ownership does not yet imply implementation: hardware translation, run-control, storage, and analysis consumers must each prove requested-versus-effective behavior before configuration coverage is complete.
 
 The production DT5202 FPGA subset now has a pure configuration planner. It applies global values followed by per-board overrides, performs strict option/unit/range parsing, and emits ordered effective register writes using the 8 ns DT5202 clock. The production fixture yields 349 writes per board, including 64-channel gains, fine discriminator thresholds, and HV adjustments, with distinct effective timing thresholds of 181, 183, 179, and 178. Plans can compare their final requested values with a register readback snapshot and diagnose exact missing or mismatched addresses. Settings requiring pedestal calibration reads, probe sequencing, or HV peripheral commands remain explicitly deferred in each plan.
+
+Capture-verified DT5202 readback masks the time-reference delay register to a signed 20-bit two's-complement field. The planner now emits and validates that effective representation (`-500 ns` becomes `0x000fffc2`) instead of expecting the host-side 32-bit sign extension written by JANUS.
 
 ## Phase 1 Citiroc layout and automatic loading
 
@@ -292,7 +296,7 @@ Implemented on 2026-07-21:
 - source-compatible timing-reference, leading-edge-only, ToT, T-OR/Q-OR, waveform-probe, temperature, HV-monitor/status, board-status, and service-counter field translations; and
 - byte-exact golden vectors, explicit unsupported-qualifier diagnostics, bounded timing/test data, malformed/truncated/oversized-event tests, and qualifier-dispatch fuzz coverage.
 
-These layouts are `source-confirmed` against the bundled JANUS/FERSlib decoder; real DT5215 capture compatibility remains scheduled for Phase 4. The Go decoder deliberately rejects out-of-range and duplicate channel entries that FERSlib silently ignores or overwrites, and bounds fixed-size vendor arrays before decoding.
+These layouts are `source-confirmed` against the bundled JANUS/FERSlib decoder. Real DT5215 compatibility is established for spectroscopy/timing qualifiers `0x23` and `0x33` plus service qualifier `0x2f`: the two JANUS captures and native raw run provide 265,190 successfully decoded events. Other event families still require real-capture evidence. The Go decoder deliberately rejects out-of-range and duplicate channel entries that FERSlib silently ignores or overwrites, and bounds fixed-size vendor arrays before decoding.
 
 ## Phase 1 expanded simulator event behavior
 

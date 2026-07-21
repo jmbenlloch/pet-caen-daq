@@ -13,6 +13,7 @@ import (
 type TestPulseHardware interface {
 	Synchronize(context.Context) error
 	ClearStream(context.Context) error
+	ControlChain(context.Context, uint16, bool, uint32) error
 	SendCommand(context.Context, uint16, uint16, uint32, uint32) error
 	ReadRawStreamBatch(context.Context) ([]byte, []dt5215.StreamEvent, error)
 }
@@ -34,8 +35,24 @@ func RunTestPulse(ctx context.Context, hardware TestPulseHardware, sink TestPuls
 	if err = hardware.ClearStream(ctx); err != nil {
 		return fmt.Errorf("clear stream: %w", err)
 	}
-	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, 0); err != nil {
+	for chain := 0; chain < expectedChains; chain++ {
+		if err = hardware.ControlChain(ctx, uint16(chain), false, 0); err != nil {
+			return fmt.Errorf("disable chain %d readout train: %w", chain, err)
+		}
+	}
+	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetTime, dt5215.TDLCommandDelay); err != nil {
+		return fmt.Errorf("reset acquisition time: %w", err)
+	}
+	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetPeriodic, dt5215.TDLCommandDelay); err != nil {
+		return fmt.Errorf("reset periodic trigger: %w", err)
+	}
+	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, dt5215.TDLCommandDelay); err != nil {
 		return fmt.Errorf("start acquisition: %w", err)
+	}
+	for chain := 0; chain < expectedChains; chain++ {
+		if err = hardware.ControlChain(ctx, uint16(chain), true, 0x100); err != nil {
+			return fmt.Errorf("enable chain %d readout train: %w", chain, err)
+		}
 	}
 	defer func() {
 		drainCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
@@ -60,7 +77,7 @@ func RunTestPulse(ctx context.Context, hardware TestPulseHardware, sink TestPuls
 		})
 		err = JoinStopError(err, stopErr)
 	}()
-	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandTestPulse, 0); err != nil {
+	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandTestPulse, dt5215.TDLCommandDelay); err != nil {
 		return fmt.Errorf("send test pulse: %w", err)
 	}
 	seen := make(map[uint8]bool, expectedChains)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
@@ -25,21 +26,36 @@ type DrainResult struct {
 	CompletedChains int
 }
 
-// StopAndDrain sends an idempotent broadcast stop and reads until each expected
-// chain emits a service event whose acquisition status is ready. Context
-// cancellation or deadline is the authoritative bound for a stalled drain.
+const drainIdleTimeout = 100 * time.Millisecond
+
+// StopAndDrain sends an idempotent broadcast stop and reads until every observed
+// pending batch is delivered and the stream has remained silent for the
+// capture/source-confirmed FERSlib NODATA_TIMEOUT. Service-ready events are
+// retained as an optional early completion signal. The caller deadline remains
+// the authoritative upper bound for a stream that never becomes idle.
 func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains int, handle BatchHandler) (DrainResult, error) {
 	if expectedChains < 1 || expectedChains > dt5215.MaxChains {
 		return DrainResult{}, fmt.Errorf("expected chain count %d out of range", expectedChains)
 	}
-	if err := hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStop, 0); err != nil {
+	if err := hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStop, dt5215.TDLCommandDelay); err != nil {
 		return DrainResult{}, fmt.Errorf("stop acquisition: %w", err)
 	}
 	completed := make(map[uint8]bool, expectedChains)
 	var result DrainResult
 	for len(completed) < expectedChains {
-		raw, events, err := hardware.ReadRawStreamBatch(ctx)
+		idleDeadline := time.Now().Add(drainIdleTimeout)
+		canDeclareIdle := true
+		if parentDeadline, ok := ctx.Deadline(); ok && !parentDeadline.After(idleDeadline) {
+			canDeclareIdle = false
+		}
+		readCtx, cancelRead := context.WithTimeout(ctx, drainIdleTimeout)
+		raw, events, err := hardware.ReadRawStreamBatch(readCtx)
+		cancelRead()
 		if err != nil {
+			if canDeclareIdle && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+				result.CompletedChains = expectedChains
+				return result, nil
+			}
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), expectedChains, ctxErr)
 			}

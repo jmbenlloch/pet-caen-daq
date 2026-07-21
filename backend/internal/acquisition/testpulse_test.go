@@ -16,6 +16,9 @@ type fakeHardware struct {
 
 func (f *fakeHardware) Synchronize(context.Context) error { return nil }
 func (f *fakeHardware) ClearStream(context.Context) error { return nil }
+func (f *fakeHardware) ControlChain(context.Context, uint16, bool, uint32) error {
+	return nil
+}
 func (f *fakeHardware) SendCommand(_ context.Context, _, _ uint16, c, _ uint32) error {
 	f.commands = append(f.commands, c)
 	if c == dt5215.CommandAcquisitionStop {
@@ -46,7 +49,7 @@ func TestRunTestPulseStopsAfterReadFailure(t *testing.T) {
 	if !errors.Is(err, sentinel) {
 		t.Fatalf("error = %v", err)
 	}
-	want := []uint32{dt5215.CommandAcquisitionStart, dt5215.CommandTestPulse, dt5215.CommandAcquisitionStop}
+	want := []uint32{dt5215.CommandResetTime, dt5215.CommandResetPeriodic, dt5215.CommandAcquisitionStart, dt5215.CommandTestPulse, dt5215.CommandAcquisitionStop}
 	if len(hardware.commands) != len(want) {
 		t.Fatalf("commands = %v", hardware.commands)
 	}

@@ -14,6 +14,8 @@ func TestEncodeRequestsGolden(t *testing.T) {
 	}{
 		{"chain info", func() ([]byte, error) { return EncodeChainInfoRequest(3) }, "43494e460300"},
 		{"enumerate", func() ([]byte, error) { return EncodeEnumerateRequest(2) }, "454e554d0200"},
+		{"disable chain", func() ([]byte, error) { return EncodeChainControlRequest(2, false, 0) }, "43434e540200000000000000"},
+		{"enable chain", func() ([]byte, error) { return EncodeChainControlRequest(3, true, 0x100) }, "43434e540300010000010000"},
 		{"read register", func() ([]byte, error) {
 			return EncodeReadRegisterRequest(1, 0, RegisterProductID)
 		}, "525245470100000000040001"},
@@ -54,10 +56,24 @@ func TestDecodeChainInfo(t *testing.T) {
 }
 
 func TestDecodeEnumerateStatus(t *testing.T) {
-	response := make([]byte, 8)
+	response := make([]byte, 12)
 	littleEndian.PutUint32(response[0:4], StatusChainDisabled)
 	_, err := DecodeEnumerateResponse(response)
 	if !IsStatus(err, StatusChainDisabled) {
 		t.Fatalf("error = %v, want chain-disabled status", err)
+	}
+}
+
+func TestDecodeEnumerateCaptureVerifiedReply(t *testing.T) {
+	response, err := hex.DecodeString("00000000010000003c000000")
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := DecodeEnumerateResponse(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.NodeCount != 1 || info.Word2 != 60 {
+		t.Fatalf("decoded ENUM = %#v", info)
 	}
 }

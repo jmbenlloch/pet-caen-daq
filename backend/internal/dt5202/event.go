@@ -14,6 +14,7 @@ const (
 	QualifierWaveform     uint8 = 0x08
 	QualifierStart        uint8 = 0x0f
 	QualifierBothGains    uint8 = 0x10
+	QualifierLeadingEdge  uint8 = 0x20
 	QualifierCommonStop   uint8 = 0x12
 	QualifierStreaming    uint8 = 0x22
 	QualifierService      uint8 = 0x2f
@@ -125,6 +126,7 @@ type ServiceEvent struct {
 	Counters            []ServiceCounter `json:"counters,omitempty"`
 	TORCount            uint32           `json:"t_or_count"`
 	QORCount            uint32           `json:"q_or_count"`
+	UnknownPayload      []byte           `json:"unknown_payload,omitempty"`
 }
 
 type TestEvent struct {
@@ -167,7 +169,7 @@ func DecodeEvent(qualifier uint8, triggerID, timestamp uint64, payload []byte) (
 			return Event{}, err
 		}
 	case qualifier&0x0f == QualifierSpectroscopy || qualifier&0x0f == QualifierSpectroscopy|QualifierTiming:
-		if qualifier & ^uint8(0x93) != 0 {
+		if qualifier & ^uint8(0xb3) != 0 {
 			return Event{}, fmt.Errorf("unsupported spectroscopy qualifier 0x%02x", qualifier)
 		}
 		v, err := DecodeSpectroscopy(qualifier, triggerID, timestamp, payload)
@@ -201,7 +203,7 @@ func DecodeSpectroscopy(qualifier uint8, triggerID, timestamp uint64, payload []
 	if qualifier&0x0f != QualifierSpectroscopy && qualifier&0x0f != QualifierSpectroscopy|QualifierTiming {
 		return SpectroscopyEvent{}, fmt.Errorf("qualifier 0x%02x is not spectroscopy", qualifier)
 	}
-	if qualifier & ^uint8(0x93) != 0 {
+	if qualifier & ^uint8(0xb3) != 0 {
 		return SpectroscopyEvent{}, fmt.Errorf("unsupported spectroscopy qualifier 0x%02x", qualifier)
 	}
 	minimum := 8
@@ -378,9 +380,7 @@ func DecodeService(timestamp uint64, payload []byte) (ServiceEvent, error) {
 	header := binary.LittleEndian.Uint32(payload)
 	e := ServiceEvent{Timestamp: timestamp, Version: uint8(header >> 24), Format: uint8((header >> 12) & 0xf)}
 	if e.Version > 1 {
-		if len(payload) != 4 {
-			return ServiceEvent{}, fmt.Errorf("unsupported service version %d has %d trailing bytes", e.Version, len(payload)-4)
-		}
+		e.UnknownPayload = append([]byte(nil), payload[4:]...)
 		return e, nil
 	}
 	fpga := float64(header&0xfff)*503.975/4096 - 273.15

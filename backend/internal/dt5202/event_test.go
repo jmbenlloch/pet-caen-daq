@@ -1,6 +1,7 @@
 package dt5202
 
 import (
+	"bytes"
 	"encoding/binary"
 	"strings"
 	"testing"
@@ -20,6 +21,17 @@ func TestDecodeSpectroscopyTimingBothGains(t *testing.T) {
 	}
 	if len(e.Energies) != 2 || e.Energies[0].HighGain != 100 || e.Energies[0].LowGain != 200 || !e.Energies[0].Discriminator || len(e.Timings) != 1 || e.Timings[0].Channel != 5 || e.Timings[0].ToA != 222 || e.Timings[0].ToT != 17 || e.TimeReference == nil || *e.TimeReference != 1234 {
 		t.Fatalf("event = %#v", e)
+	}
+}
+
+func TestDecodeSpectroscopyAcceptsCapturedLeadingEdgeQualifier(t *testing.T) {
+	p := words(1, 0, 123, 3<<25|0x1234)
+	e, err := DecodeEvent(QualifierLeadingEdge|QualifierSpectroscopy|QualifierTiming, 9, 10, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.Kind != EventSpectroscopy || len(e.Spectroscopy.Energies) != 1 || len(e.Spectroscopy.Timings) != 1 {
+		t.Fatalf("decoded event = %#v", e)
 	}
 }
 func TestDecodeSpectroscopySingleGainPacked(t *testing.T) {
@@ -114,8 +126,8 @@ func TestDecodeServiceGoldenVersions(t *testing.T) {
 	if s.Version != 1 || s.Format != 3 || s.Status == nil || *s.Status != 0x4321 || s.BoardTemperature == nil || *s.BoardTemperature != 25 || s.HVVoltage == nil || *s.HVVoltage != 45.4 || !s.HVOn || !s.HVOverCurrent || s.HVRamping || s.HVOverVoltage || len(s.Counters) != 1 || s.Counters[0] != (ServiceCounter{7, 88}) || s.TORCount != 99 || s.QORCount != 111 {
 		t.Fatalf("service = %#v", s)
 	}
-	unknown, err := DecodeService(1, words(2<<24))
-	if err != nil || unknown.Version != 2 || unknown.FPGATemperature != nil {
+	unknown, err := DecodeService(1, words(2<<24, 0x12345678))
+	if err != nil || unknown.Version != 2 || unknown.FPGATemperature != nil || !bytes.Equal(unknown.UnknownPayload, words(0x12345678)) {
 		t.Fatalf("unknown service = %#v, %v", unknown, err)
 	}
 }
@@ -159,7 +171,6 @@ func TestDecodeEventRejectsUnsupportedAndMalformed(t *testing.T) {
 		{"bad count channel", QualifierCounting, words(66 << 24), "channel 66"},
 		{"truncated service HV", QualifierService, words(1 << 12), "HV section"},
 		{"service trailing", QualifierService, words(0, 1), "unexpected trailing"},
-		{"new service trailing", QualifierService, words(2<<24, 1), "unsupported service version"},
 		{"oversized test", QualifierTest, make([]byte, (MaxTestWords+1)*4), "test word count"},
 		{"oversized", QualifierWaveform, make([]byte, MaxEventPayloadBytes+4), "exceeds"},
 	}

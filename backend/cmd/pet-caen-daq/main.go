@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -76,11 +77,18 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	if *pipelineCapacity <= 0 || *drainTimeout <= 0 {
 		return fmt.Errorf("pipeline capacity and drain timeout must be positive")
 	}
+	listener, err := listenHTTP(*listenAddress)
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
 	if err := os.MkdirAll(*runParent, 0o750); err != nil {
 		return fmt.Errorf("create run storage parent: %w", err)
 	}
 
-	discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	// Real DT5215 link reset, four-chain enumeration, and synchronization take
+	// about 36 seconds in capture-verified production hardware.
+	discoveryCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	client, err := dt5215.Dial(discoveryCtx, *controlAddress, *streamAddress)
 	if err != nil {
 		cancel()
@@ -92,6 +100,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		client.Close()
 		return err
 	}
+	printDiscoveredDevices(output, topology)
 	defer client.Close()
 
 	states, _ := acquisition.NewStateMachine(acquisition.StateIdle, nil)
@@ -106,7 +115,10 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	coordinator.SetFaultObserver(func(fault error) { service.PublishCoordinatorFault(publisher, fault, nil) })
+	coordinator.SetFaultObserver(func(fault error) {
+		service.PublishCoordinatorFault(publisher, fault, nil)
+		fmt.Fprintf(output, "acquisition fault: %v\n", fault)
+	})
 	recoveryBoards := make([]acquisition.RecoveryBoard, 0, len(topology.Boards))
 	for _, board := range topology.Boards {
 		recoveryBoards = append(recoveryBoards, acquisition.RecoveryBoard{Chain: board.Chain, Node: board.Node, Status: board.AcquisitionState})
@@ -170,7 +182,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		}
 		mux.Handle("/", frontendHandler)
 	}
-	server := &http.Server{Addr: *listenAddress, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 
 	serverCtx, stopServer := context.WithCancel(ctx)
 	defer stopServer()
@@ -182,8 +194,8 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		defer shutdownCancel()
 		_ = server.Shutdown(shutdownCtx)
 	}()
-	fmt.Fprintf(output, "PET CAEN DAQ instance=%s listen=%s state=ready hv_authorized=%t frontend=%t\n", publisher.Snapshot().GetInstanceId(), *listenAddress, *authorizeHV, *frontendDirectory != "")
-	err = server.ListenAndServe()
+	fmt.Fprintf(output, "PET CAEN DAQ instance=%s listen=%s state=ready hv_authorized=%t frontend=%t\n", publisher.Snapshot().GetInstanceId(), listener.Addr(), *authorizeHV, *frontendDirectory != "")
+	err = server.Serve(listener)
 	if errors.Is(err, http.ErrServerClosed) {
 		<-shutdownDone
 		return nil
@@ -191,6 +203,22 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	stopServer()
 	<-shutdownDone
 	return err
+}
+
+func printDiscoveredDevices(output io.Writer, topology dt5215.Topology) {
+	fmt.Fprintf(output, "devices found=%d\n", len(topology.Boards))
+	for _, board := range topology.Boards {
+		fmt.Fprintf(output, "device chain=%d node=%d product_id=%d fpga_firmware=%#08x acquisition_status=%#08x\n",
+			board.Chain, board.Node, board.ProductID, board.FirmwareRevision, board.AcquisitionState)
+	}
+}
+
+func listenHTTP(address string) (net.Listener, error) {
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		return nil, fmt.Errorf("bind API listener %s: %w; stop the process using that address or select another one with -listen, for example -listen 127.0.0.1:8081", address, err)
+	}
+	return listener, nil
 }
 
 func topologySnapshot(topology dt5215.Topology) *daqv1.TelemetrySnapshot {

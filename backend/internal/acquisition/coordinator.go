@@ -16,6 +16,7 @@ import (
 type CoordinatorHardware interface {
 	Synchronize(context.Context) error
 	ClearStream(context.Context) error
+	ControlChain(context.Context, uint16, bool, uint32) error
 	SendCommand(context.Context, uint16, uint16, uint32, uint32) error
 	ReadRawStreamBatch(context.Context) ([]byte, []dt5215.StreamEvent, error)
 }
@@ -126,8 +127,24 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 	if err = c.hardware.ClearStream(ctx); err != nil {
 		return c.failStartAttached(fmt.Errorf("clear stream: %w", err), actor, pipeline, journalAttached)
 	}
-	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, 0); err != nil {
+	for chain := 0; chain < c.expectedChains; chain++ {
+		if err = c.hardware.ControlChain(ctx, uint16(chain), false, 0); err != nil {
+			return c.failStartAttached(fmt.Errorf("disable chain %d readout train: %w", chain, err), actor, pipeline, journalAttached)
+		}
+	}
+	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetTime, dt5215.TDLCommandDelay); err != nil {
+		return c.failStartAttached(fmt.Errorf("reset acquisition time: %w", err), actor, pipeline, journalAttached)
+	}
+	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetPeriodic, dt5215.TDLCommandDelay); err != nil {
+		return c.failStartAttached(fmt.Errorf("reset periodic trigger: %w", err), actor, pipeline, journalAttached)
+	}
+	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, dt5215.TDLCommandDelay); err != nil {
 		return c.failStartAttached(fmt.Errorf("start acquisition: %w", err), actor, pipeline, journalAttached)
+	}
+	for chain := 0; chain < c.expectedChains; chain++ {
+		if err = c.hardware.ControlChain(ctx, uint16(chain), true, 0x100); err != nil {
+			return c.failStartAttached(fmt.Errorf("enable chain %d readout train: %w", chain, err), actor, pipeline, journalAttached)
+		}
 	}
 	runCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	run := &activeRun{id: runID, ctx: runCtx, cancel: cancel, done: make(chan struct{}), pipeline: pipeline, journalAttached: journalAttached}

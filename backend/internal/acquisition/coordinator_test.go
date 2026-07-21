@@ -39,6 +39,9 @@ func (h *coordinatorHardware) ReadRegister(context.Context, uint16, uint16, uint
 
 func (h *coordinatorHardware) Synchronize(context.Context) error { return nil }
 func (h *coordinatorHardware) ClearStream(context.Context) error { return nil }
+func (h *coordinatorHardware) ControlChain(context.Context, uint16, bool, uint32) error {
+	return nil
+}
 func (h *coordinatorHardware) SendCommand(_ context.Context, _, _ uint16, command, _ uint32) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

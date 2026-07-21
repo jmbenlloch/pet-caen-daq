@@ -35,7 +35,7 @@ func TestPlanProductionConfiguration(t *testing.T) {
 		}
 		checks := map[Register]uint32{
 			AcquisitionControl: 0x40003003, RunMask: 1, TriggerMask: 0x41,
-			TimeReferenceMask: 0x40, TimeReferenceWindow: 2000, TimeReferenceDelay: 0xffffffc2,
+			TimeReferenceMask: 0x40, TimeReferenceWindow: 2000, TimeReferenceDelay: 0x000fffc2,
 			DwellTime: 125000, TriggerLogicDefinition: 0x404, TimeCoarseThreshold: wantTD[board],
 			ChargeCoarseThreshold: 250, LowGainShapingTime: 0, HighGainShapingTime: 0,
 			IndividualRegister(LowGain, 63): 55, IndividualRegister(HighGain, 63): 55,
@@ -73,6 +73,31 @@ func TestPlanProductionConfiguration(t *testing.T) {
 					t.Errorf("board %d chip %d field %d = %d, %v; want %d", board, chip, check.start, got, err, check.want)
 				}
 			}
+		}
+	}
+}
+
+func TestEncodeTimeReferenceDelayUsesHardwareTwentyBitField(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		ns   float64
+		want uint32
+	}{
+		{"captured negative delay", -500, 0x000fffc2},
+		{"zero", 0, 0},
+		{"largest positive", ((1 << 19) - 1) * 8, 0x0007ffff},
+		{"smallest negative", -(1 << 19) * 8, 0x00080000},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := encodeTimeReferenceDelay(test.ns)
+			if err != nil || got != test.want {
+				t.Fatalf("encodeTimeReferenceDelay(%g) = %#x, %v; want %#x", test.ns, got, err, test.want)
+			}
+		})
+	}
+	for _, ns := range []float64{-(1<<19)*8 - 8, (1 << 19) * 8} {
+		if _, err := encodeTimeReferenceDelay(ns); err == nil {
+			t.Fatalf("encodeTimeReferenceDelay(%g) accepted an out-of-range value", ns)
 		}
 	}
 }

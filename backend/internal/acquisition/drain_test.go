@@ -79,6 +79,13 @@ func TestStopAndDrainMissingCompletion(t *testing.T) {
 	}
 }
 
+func TestStopAndDrainCompletesAfterCaptureVerifiedIdlePeriod(t *testing.T) {
+	result, err := StopAndDrain(context.Background(), &scriptedDrainHardware{stall: true}, 4, nil)
+	if err != nil || result.CompletedChains != 4 || result.Batches != 0 {
+		t.Fatalf("result=%#v error=%v", result, err)
+	}
+}
+
 func TestStopAndDrainTimeoutAndCancellation(t *testing.T) {
 	for _, test := range []struct {
 		name string

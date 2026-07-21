@@ -253,6 +253,8 @@ func (s *Server) serveControl(connection net.Conn) {
 			err = s.handleChainInfo(writer)
 		case "ENUM":
 			err = s.handleEnumerate(writer)
+		case "CCNT":
+			err = s.handleChainControl(writer)
 		case "RREG":
 			err = s.handleReadRegister(writer)
 		case "WREG":
@@ -267,6 +269,11 @@ func (s *Server) serveControl(connection net.Conn) {
 		case "RLNK":
 			s.mu.Lock()
 			s.synchronized = false
+			for chain := range s.topology.LinkStatuses {
+				if s.topology.LinkStatuses[chain] != 0 {
+					s.topology.LinkStatuses[chain] = 1
+				}
+			}
 			s.mu.Unlock()
 			err = writeStatus(writer, 0)
 		case "CLRS":
@@ -278,6 +285,18 @@ func (s *Server) serveControl(connection net.Conn) {
 			return
 		}
 	}
+}
+
+func (s *Server) handleChainControl(connection net.Conn) error {
+	rest := make([]byte, 8)
+	if _, err := io.ReadFull(connection, rest); err != nil {
+		return err
+	}
+	chain := binary.LittleEndian.Uint16(rest[0:2])
+	if chain >= dt5215.MaxChains {
+		return writeStatus(connection, 2)
+	}
+	return writeStatus(connection, 0)
 }
 
 func (s *Server) readChain(reader io.Reader) (uint16, error) {
@@ -316,12 +335,16 @@ func (s *Server) handleEnumerate(connection net.Conn) error {
 	if err != nil {
 		return err
 	}
-	response := make([]byte, 8)
+	response := make([]byte, 12)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	boards := s.topology.Chains[chain]
 	if len(boards) == 0 {
 		binary.LittleEndian.PutUint32(response[0:4], dt5215.StatusChainDisabled)
 	} else {
 		binary.LittleEndian.PutUint32(response[4:8], uint32(len(boards)))
+		binary.LittleEndian.PutUint32(response[8:12], 60+uint32(chain))
+		s.topology.LinkStatuses[chain] = 4
 	}
 	return writeAll(connection, response)
 }
@@ -491,7 +514,7 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 			default:
 				return writeStatus(connection, 11)
 			}
-		case dt5215.CommandResetTime, dt5215.CommandSoftwareTrigger, dt5215.CommandClearData, dt5215.CommandSync:
+		case dt5215.CommandResetTime, dt5215.CommandResetPeriodic, dt5215.CommandSoftwareTrigger, dt5215.CommandClearData, dt5215.CommandSync:
 		case uint32(dt5202.CommandConfigureASIC):
 			chip := (board.Registers[uint32(dt5202.CitirocSlowControl)] >> 9) & 1
 			board.CitirocLoads[chip]++

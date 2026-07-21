@@ -68,6 +68,14 @@ The same protocol fixtures should be consumable by parser tests and simulator re
 
 The simulator supports validated FIFO one-shot fault scripts rather than relying on timing races. Tests can target a control opcode or the next stream batch with an exact delay, timeout, disconnect, partial reply, truncated stream position, malformed descriptor, invalid extent, CRC flag, missing service/completion event, or stalled drain. Multi-step offsets such as disconnecting after a particular descriptor row can be expressed as an exact stream byte position.
 
+## Real-capture conformance
+
+Run `task test:capture` to replay the external `pcap/janus_data_taking.pcap` fixture. Set `JANUS_DATA_TAKING_PCAP` to select another named golden capture, including `janus_data_taking_2.pcap`. The test separates independent TCP flows, reconstructs each DT5215 server stream, rejects sequence gaps, verifies the combined SHA-256 digest and golden event totals, and passes every batch and event through the production DT5215 and DT5202 decoders.
+
+The same target also replays the complete native `run-go-native-detector-hvon-003/wire.raw` artifact when present, or the path selected by `NATIVE_RUN_RAW_CAPTURE`. Its golden profile verifies 36,255 CRC-protected batches and 87,989 production-decoded events.
+
+These tests are opt-in because the immutable PCAP and native-run artifacts are large and stored outside this repository. They validate framing, CRCs, event decoding, exact totals, and artifact integrity against both JANUS-generated and native Go-controlled real-hardware traffic.
+
 ## CI quality gates
 
 The critical operator workflow runs with `task test:e2e`. Locally this uses the

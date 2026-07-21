@@ -25,8 +25,11 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
-	deadline := time.Now().Add(defaultOperationTimeout)
-	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+	// An acquisition stream may legitimately remain silent indefinitely. Control
+	// operation timeouts do not apply here; only a caller deadline or cancellation
+	// may interrupt the read. Stop-and-drain supplies its own bounded context.
+	var deadline time.Time
+	if d, ok := ctx.Deadline(); ok {
 		deadline = d
 	}
 	if err := c.stream.SetReadDeadline(deadline); err != nil {

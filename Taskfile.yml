@@ -49,6 +49,11 @@ tasks:
     cmds:
       - go test -tags=integration ./backend/integration/...
 
+  test:capture:
+    desc: Replay the external JANUS data-taking PCAP through production decoders
+    cmds:
+      - go test -tags=integration,capture ./backend/integration/... -run 'Test(JANUSDataTakingCaptureConformance|NativeRunRawCaptureConformance)' -v
+
   test:
     desc: Run all tests that do not require hardware
     deps: [test:unit, test:integration]

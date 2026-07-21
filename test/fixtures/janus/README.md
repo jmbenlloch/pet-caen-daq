@@ -2,7 +2,7 @@
 
 ## `config_same4_v3_good.txt`
 
-- Evidence classification: production-proven input; its translation to native commands remains to be capture/hardware verified.
+- Evidence classification: production-proven input; the four-board native startup translation is capture-verified for the 2026-07-21 hardware sample, while authorized HV application and native acquisition remain to be captured.
 - Origin: produced on and supplied from the existing Windows PET CAEN production system.
 - Operational history: used for production data acquisition with the Windows build of JANUS 5.0.0.
 - Cross-platform expectation: the Windows and Linux JANUS packages have the same version number and are expected to use compatible configuration and hardware protocols. This expectation must still be checked against source, captures, and hardware rather than assumed from the version string alone.
@@ -11,9 +11,9 @@
 - SHA-256: `c472a36aefb2d6956a10bbcaab97515258a7779f96d62caa0e6e39e01e49675d`.
 - Original format: ASCII with CRLF line endings; intentionally preserved byte-for-byte.
 
-This is a golden parser and configuration-translation fixture. Tests should copy it to temporary storage when mutation is necessary and must not rewrite the committed file.
+This is a golden parser and configuration-translation fixture. Tests should copy it to temporary storage when mutation is necessary and must not rewrite the committed file. The 2026-07-21 real-hardware PCAPs associated with this configuration and their byte-exact hashes are indexed in `docs/real-hardware-capture-evidence.md`.
 
-The file proves that these settings were accepted and used by JANUS, not yet that every source-derived register value in the native implementation is correct. Future validation should associate this exact configuration hash with:
+The file proves that these settings were accepted and used by JANUS. The indexed 2026-07-21 captures additionally verify the native four-board startup configuration and identify the DT5202's effective 20-bit `TrefDelay` representation. Future captures should continue to associate this exact configuration hash with:
 
 - JANUS and FERSlib versions;
 - DT5215 system/firmware version;

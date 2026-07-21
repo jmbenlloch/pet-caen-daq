@@ -13,7 +13,12 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
-const defaultOperationTimeout = 3 * time.Second
+const (
+	defaultOperationTimeout = 3 * time.Second
+	resetOperationTimeout   = 5 * time.Second
+	enumOperationTimeout    = 10 * time.Second
+	syncOperationTimeout    = 10 * time.Second
+)
 
 // Client owns one DT5215 control connection and one stream connection.
 type Client struct {
@@ -76,15 +81,22 @@ func (c *Client) sendCommand(ctx context.Context, delayed bool, chain, node uint
 	}
 	return DecodeStatusResponse(op, response)
 }
-func (c *Client) Synchronize(ctx context.Context) error { return c.simple(ctx, "SNT0") }
-func (c *Client) ResetLinks(ctx context.Context) error  { return c.simple(ctx, "RLNK") }
+func (c *Client) Synchronize(ctx context.Context) error {
+	return c.simpleWithTimeout(ctx, "SNT0", syncOperationTimeout)
+}
+func (c *Client) ResetLinks(ctx context.Context) error {
+	return c.simpleWithTimeout(ctx, "RLNK", resetOperationTimeout)
+}
 func (c *Client) ClearStream(ctx context.Context) error { return c.simple(ctx, "CLRS") }
 func (c *Client) simple(ctx context.Context, operation string) error {
+	return c.simpleWithTimeout(ctx, operation, defaultOperationTimeout)
+}
+func (c *Client) simpleWithTimeout(ctx context.Context, operation string, timeout time.Duration) error {
 	request, err := EncodeSimpleRequest(operation)
 	if err != nil {
 		return err
 	}
-	response, err := c.exchange(ctx, request, 4)
+	response, err := c.exchangeWithTimeout(ctx, request, 4, timeout)
 	if err != nil {
 		return fmt.Errorf("%s: %w", operation, err)
 	}
@@ -129,16 +141,28 @@ func (c *Client) ChainInfo(ctx context.Context, chain uint16) (ChainInfo, error)
 	return DecodeChainInfoResponse(response)
 }
 
-func (c *Client) Enumerate(ctx context.Context, chain uint16) (uint32, error) {
+func (c *Client) Enumerate(ctx context.Context, chain uint16) (EnumerationInfo, error) {
 	request, err := EncodeEnumerateRequest(chain)
 	if err != nil {
-		return 0, err
+		return EnumerationInfo{}, err
 	}
-	response, err := c.exchange(ctx, request, 8)
+	response, err := c.exchangeWithTimeout(ctx, request, 12, enumOperationTimeout)
 	if err != nil {
-		return 0, fmt.Errorf("chain %d ENUM: %w", chain, err)
+		return EnumerationInfo{}, fmt.Errorf("chain %d ENUM: %w", chain, err)
 	}
 	return DecodeEnumerateResponse(response)
+}
+
+func (c *Client) ControlChain(ctx context.Context, chain uint16, enable bool, tokenInterval uint32) error {
+	request, err := EncodeChainControlRequest(chain, enable, tokenInterval)
+	if err != nil {
+		return err
+	}
+	response, err := c.exchange(ctx, request, 4)
+	if err != nil {
+		return fmt.Errorf("chain %d CCNT: %w", chain, err)
+	}
+	return DecodeStatusResponse("CCNT", response)
 }
 
 func (c *Client) ReadRegister(ctx context.Context, chain, node uint16, address uint32) (uint32, error) {
@@ -154,13 +178,17 @@ func (c *Client) ReadRegister(ctx context.Context, chain, node uint16, address u
 }
 
 func (c *Client) exchange(ctx context.Context, request []byte, responseSize int) ([]byte, error) {
+	return c.exchangeWithTimeout(ctx, request, responseSize, defaultOperationTimeout)
+}
+
+func (c *Client) exchangeWithTimeout(ctx context.Context, request []byte, responseSize int, timeout time.Duration) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	deadline := time.Now().Add(defaultOperationTimeout)
+	deadline := time.Now().Add(timeout)
 	if contextDeadline, ok := ctx.Deadline(); ok && contextDeadline.Before(deadline) {
 		deadline = contextDeadline
 	}
@@ -215,12 +243,14 @@ func writeAll(writer io.Writer, data []byte) error {
 
 // Topology is the discovered and validated version-one system topology.
 type Topology struct {
-	Chains [MaxChains]ChainInfo
-	Boards []BoardInfo
+	Chains       [MaxChains]ChainInfo
+	Enumerations [MaxChains]EnumerationInfo
+	Boards       []BoardInfo
 }
 
-// DiscoverProductionTopology verifies web provisioning before reading board
-// identity/status registers. It performs no writes.
+// DiscoverProductionTopology verifies web provisioning, initializes enabled
+// links when CINF reports a pre-enumeration state, and reads board identity and
+// status registers.
 func (c *Client) DiscoverProductionTopology(ctx context.Context, expected []janusconfig.Connection) (Topology, error) {
 	if err := janusconfig.ValidateProductionTopology(expected); err != nil {
 		return Topology{}, fmt.Errorf("expected topology: %w", err)
@@ -231,6 +261,7 @@ func (c *Client) DiscoverProductionTopology(ctx context.Context, expected []janu
 	}
 
 	var topology Topology
+	requiresEnumeration := false
 	for chain := 0; chain < MaxChains; chain++ {
 		info, err := c.ChainInfo(ctx, uint16(chain))
 		if err != nil {
@@ -251,15 +282,50 @@ func (c *Client) DiscoverProductionTopology(ctx context.Context, expected []janu
 		if !wanted {
 			continue
 		}
-		nodes, err := c.Enumerate(ctx, uint16(chain))
-		if err != nil {
-			return Topology{}, err
+		if info.Status == 1 || info.Status == 2 {
+			requiresEnumeration = true
 		}
-		if nodes != 1 || info.BoardCount != 1 {
-			return Topology{}, fmt.Errorf("TDlink %d has %d enumerated nodes and reports %d boards; expected exactly one", chain, nodes, info.BoardCount)
+	}
+
+	if requiresEnumeration {
+		if err := c.ResetLinks(ctx); err != nil {
+			return Topology{}, fmt.Errorf("initialize TDlinks: %w", err)
+		}
+		for chain := 0; chain < MaxChains; chain++ {
+			if _, wanted := expectedByChain[chain]; !wanted {
+				continue
+			}
+			enumeration, err := c.Enumerate(ctx, uint16(chain))
+			if err != nil {
+				return Topology{}, err
+			}
+			topology.Enumerations[chain] = enumeration
+			if enumeration.NodeCount != 1 {
+				return Topology{}, fmt.Errorf("TDlink %d enumerated %d nodes; expected exactly one", chain, enumeration.NodeCount)
+			}
+		}
+		if err := c.Synchronize(ctx); err != nil {
+			return Topology{}, fmt.Errorf("synchronize enumerated TDlinks: %w", err)
+		}
+		for chain := 0; chain < MaxChains; chain++ {
+			info, err := c.ChainInfo(ctx, uint16(chain))
+			if err != nil {
+				return Topology{}, err
+			}
+			topology.Chains[chain] = info
+		}
+	}
+
+	for chain := 0; chain < MaxChains; chain++ {
+		connection, wanted := expectedByChain[chain]
+		if !wanted {
+			continue
+		}
+		info := topology.Chains[chain]
+		if info.Status == 1 || info.Status == 2 || info.BoardCount != 1 {
+			return Topology{}, fmt.Errorf("TDlink %d is not ready after discovery (status %d, boards %d); expected exactly one board", chain, info.Status, info.BoardCount)
 		}
 
-		connection := expectedByChain[chain]
 		productID, err := c.ReadRegister(ctx, uint16(chain), uint16(connection.Node), RegisterProductID)
 		if err != nil {
 			return Topology{}, err

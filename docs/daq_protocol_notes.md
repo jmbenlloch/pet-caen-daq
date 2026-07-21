@@ -6,6 +6,8 @@ Status: repository study, 2026-07-20. This note records what is directly support
 
 The information missing from the public manuals is present in the source distribution bundled with JANUS 5.0.0. In particular, `janus/Janus_5202_5.0.0_20260713_linux/ferslib/src/FERS_LLtdl.c` constructs every DT5215 slow-control request byte by byte, `FERS_readout.c` parses the concentrator stream and DT5202 events, and `FERS_configure_5202.c` translates acquisition settings into register writes and the Citiroc configuration bitstream.
 
+The byte-exact real-hardware PCAP inventory, findings, and resulting corrections are recorded in [Real-hardware capture evidence](real-hardware-capture-evidence.md).
+
 The project decision is to implement the transport, protocol, configuration, acquisition sequencing, and decoding natively in Go. FERSlib will not be a runtime dependency. Its included source is reference evidence and may be used as a comparison oracle while developing tests.
 
 The DT5215's USB-C connection is a USB Ethernet gadget, not the direct-DT5202 USB bulk protocol implemented in `FERS_LLusb.cpp`. On Linux the manual gives the concentrator gadget address as `172.16.1.11` (Windows: `172.16.0.11`). FERSlib opens ordinary TCP sockets to that address.
@@ -71,8 +73,8 @@ The four ASCII opcode bytes are followed by packed little-endian binary fields. 
 | Concentrator virtual-register read | `CRRG`, u32 address @4 (8 B) | u32 status, u32 data |
 | Chain information | `CINF`, u16 chain @4 (6 B) | 40 B requested; fields consumed are status u16, board count u16, RTT float32, event count u64, byte count u64, event rate float32, Mbit/s float32 |
 | Chain control | `CCNT`, u16 chain @4, u16 enable @6, u32 token interval @8 (12 B) | u32 status |
-| Enumerate one chain | `ENUM`, u16 chain @4 (6 B) | u32 status, u32 node count |
-| Synchronize chains | `SNT0` (4 B) | u32 status, then eight float32 values (one per chain) |
+| Enumerate one chain | `ENUM`, u16 chain @4 (6 B) | 12 B: u32 status, u32 node count, u32 word with unknown semantics |
+| Synchronize chains | `SNT0` (4 B) | u32 status |
 | Reset links | `RLNK` (4 B) | u32 status |
 | Clear concentrator stream | `CLRS` (4 B) | u32 status |
 | Version information | `VERS` (4 B) | u32 byte count, then a variable binary block parsed by `LLtdl_GetCncInfo` |
@@ -150,6 +152,8 @@ This is important: setting gains is not just one register write. Values particip
 
 The project-owned Citiroc representation is now implemented in `backend/internal/dt5202/citiroc.go`. It uses the same least-significant-bit-first word convention as `ReadSCbsFromFile`, covers all 1,144 positions documented by the bundled `WriteCStoFileFormatted`, and maps board channels 0--31 to chip 0 and 32--63 to chip 1. The 15-bit channel preamplifier field is source-confirmed against the official Citiroc 1A datasheet: six HG-gain bits, six LG-gain bits, HG/LG calibration enables, and preamplifier disable.
 
+Real DT5202 readback establishes that `a_tref_delay` (`0x01000048`) stores a signed 20-bit two's-complement count in 8 ns ticks. For `TrefDelay -500 ns`, JANUS writes the sign-extended value `0xffffffc2`, while the FPGA reads back the effective field value `0x000fffc2`. The native planner validates the signed 20-bit range and writes that effective representation directly.
+
 Normal JANUS configuration does not construct or upload these words on the host. FPGA firmware builds the stream from the DT5202 configuration registers. The source-confirmed production command sequence is therefore a write of `a_scbs_ctrl=0`, `CMD_CFG_ASIC`, a write of `a_scbs_ctrl=0x200`, and a second `CMD_CFG_ASIC`. The Go implementation follows that sequence. Its verification path also ports `ReadSCbsFromChip`: select the chip with manual-load bit 8 clear, issue `CMD_CFG_ASIC`, select and read each of the 36 words through `a_scbs_data`, validate the unused high byte, and restore `a_scbs_ctrl`.
 
 The official Citiroc 1A V2.53 datasheet, section 8.2 and tables 5 and 7, is authoritative for the 1,144-bit ordering and for enable/power-mode semantics. It does not specify the DT5202 FPGA's generated defaults. JANUS explicitly forces only bit 1133 (`Testb_Otaq`, output OTA buffer force-on) among those power controls; the remaining automatic-stream power values are firmware-owned and therefore need captured readback rather than inferred defaults. The project records that provenance for every power-control bit and performs an exact full-stream comparison, but keeps manual loading unavailable until real-board fixtures establish those values.
@@ -175,7 +179,7 @@ The user configuration vocabulary and units are completely represented by `Confi
 The implemented safe sequence is more than start/stop commands:
 
 1. Open every connection path. Opening reads board information/calibration flash, restores DC offsets, establishes the concentrator connection, and sends acquisition stop to recover from an earlier run.
-2. Enumerate the enabled TDlink chains and map `(concentrator, chain, node)` to board handles.
+2. Read all chain states. If any enabled chain is in pre-enumeration state 1 or 2, reset the links, enumerate every enabled chain, synchronize them, and refresh all chain states; otherwise preserve the already-ready links. Map `(concentrator, chain, node)` to board handles.
 3. Synchronize TDlink chains. TDL start is rejected unless synchronization completed.
 4. Load configuration, apply hard configuration, and initialize readout for every board.
 5. Before a run, flush each board/concentrator and clear CRC counters.
@@ -186,7 +190,7 @@ The implemented safe sequence is more than start/stop commands:
 
 FERSlib exposes this as `FERS_OpenDevice`, `FERS_LoadConfigFile` or `FERS_SetParam`, `FERS_configure`, `FERS_InitReadout`, `FERS_SyncTDLchains`, `FERS_StartAcquisition`, `FERS_GetEvent`, `FERS_StopAcquisition`, `FERS_CloseReadout`, and `FERS_CloseDevice`. Exact declarations and error values are in `FERSlib.h`.
 
-FERSlib's TDlink receive thread enters `RXSTATUS_EMPTYING` after stop and declares itself idle after a no-data timeout or a stop timeout; the bundled source does not establish a DT5215 wire-level end marker. The Go simulator therefore uses a ready-status service event per chain as an explicit, deterministic drain-completion contract. This is `inferred`, not source-confirmed hardware behavior. Production drain remains deadline-bounded, and Phase 4 must replace or verify the completion rule using real stream/control captures.
+FERSlib's TDlink receive thread enters `RXSTATUS_EMPTYING` after stop and declares itself idle after `NODATA_TIMEOUT` (100 ms without data), with a separate 500 ms forced-stop bound. Native `go_data_taking_2.pcap` confirms that DT5215 provides no wire-level end marker or ready service event for an idle stopped run. Native drain therefore delivers every complete pending batch and completes after 100 ms of stream silence, while its caller deadline remains the authoritative upper bound for continuous or stalled input.
 
 ## DT5215 stream framing (TCP 9000)
 
@@ -244,6 +248,8 @@ After the common header, words 5--6 are a 64-bit channel mask. Energy entries fo
 
 Words 1--4 contain trigger ID and timestamp. Payload entries use bits 31:24 as channel and bits 23:0 as count. Channels 0--63 are physical channels, 64 is T-OR, and 65 is Q-OR. Qualifier bit 7 adds a relative-timestamp word before counts.
 
+The real `janus_data_taking.pcap` stream uses qualifier `0x23` for spectroscopy plus timing with the leading-edge flag. Its low nibble is `DTQ_TSPECT`; FERSlib accepts the upper `0x20` flag for this event family. The native decoder preserves and accepts that capture-verified qualifier.
+
 ### Timing list
 
 Word 5 contains the fine part of the time reference; FERSlib forms `Tref = (coarse_timestamp << 4) | (word5 & 0xf)`. Hits start at word 6. Bits 31:25 are channel. In leading-edge-only format (qualifier high nibble `0x2`), bits 24:0 are timestamp. Otherwise bits 15:0 are timestamp and bits 24:16 are 9-bit ToT.
@@ -256,7 +262,7 @@ Each sample word contains HG bits 13:0, LG bits 27:14, and four digital-probe bi
 
 The decoder supports test payloads and multiple service-event versions. Service data include FPGA/board/detector/HV temperatures, HV voltage/current/status, acquisition status, and optional per-channel/T-OR/Q-OR counters. This format has version-dependent branches; port the decoder rather than relying on a short prose summary. JANUS expects service events roughly once per second and warns after about two seconds without one.
 
-The native Go decoder now covers every DT5202 branch above. It accepts source-confirmed service versions 0 and 1, preserves the version and format of a header-only future-version event, and rejects unexpected future-version payload fields until their layout is known. Unlike the bundled C decoder, it diagnoses unsupported qualifier combinations, invalid/duplicate channel entries, truncated sections, fixed-array overflow attempts, and payloads beyond the normalized 64 KiB event boundary.
+The native Go decoder now covers every DT5202 branch above. It accepts source-confirmed service versions 0 and 1. The second real data-taking capture contains one service event each with version `0xfe` and `0xff` plus trailing words. Matching FERSlib's forward-version behavior, the decoder accepts these events while retaining their unknown payload bytes losslessly instead of interpreting them. Unlike the bundled C decoder, it diagnoses unsupported qualifier combinations, invalid/duplicate channel entries, truncated known-version sections, fixed-array overflow attempts, and payloads beyond the normalized 64 KiB event boundary.
 
 ## Raw capture and JANUS files are different layers
 
@@ -304,7 +310,7 @@ Still requiring validation or a vendor clarification:
 These are the next study steps, before architecture selection:
 
 1. Record exact installed firmware, board IDs, chain/node enumeration, and the JANUS configuration used for a known-good run.
-2. Capture traffic on the DT5215 USB network interface with `tcpdump`/Wireshark while JANUS opens, configures, starts, triggers, stops, and closes. This validates byte order and provides golden request/reply/stream fixtures.
+2. Extend the existing capture set with a Go-controlled run that opens, configures, starts, receives events, stops, drains, and closes; compare it with `janus_data_taking.pcap`.
 3. Enable FERSlib debug/raw capture and save the same run as `.frd`; replay it using offline mode and compare event counts and decoded fields.
 4. Build a small read-only probe using FERSlib: open concentrator, enumerate, read board identity/firmware/status/temperatures, and close. Avoid writes initially.
 5. Add controlled writes to a harmless register, then configuration and a test-pulse run. Compare register dumps using the supplied `Dump_ParamAndConfig.txt`/`Dump_RawData.txt` macros.

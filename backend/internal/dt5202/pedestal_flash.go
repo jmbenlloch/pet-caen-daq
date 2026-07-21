@@ -78,16 +78,26 @@ type PedestalFlashReader interface {
 // LoadPedestalCalibration performs only the AT45DB321 main-memory page-read
 // sequence. It never sends a program, erase, or status-write opcode.
 func LoadPedestalCalibration(ctx context.Context, reader PedestalFlashReader, chain, node uint16) (PedestalFlashCalibration, error) {
-	write := func(value uint32) error {
-		if err := reader.WriteRegister(ctx, chain, node, uint32(SPIData), value); err != nil {
+	write := func(writeCtx context.Context, value uint32) error {
+		if err := reader.WriteRegister(writeCtx, chain, node, uint32(SPIData), value); err != nil {
 			return fmt.Errorf("pedestal flash SPI write 0x%03x: %w", value, err)
 		}
 		return nil
 	}
+	// Deassert chip select before starting so a process canceled during an
+	// earlier transaction cannot leave the next read at a stale flash offset.
+	if err := write(ctx, 0); err != nil {
+		return PedestalFlashCalibration{}, err
+	}
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		defer cancel()
+		_ = write(cleanupCtx, 0)
+	}()
 	address := uint32(PedestalFlashPage) << 10
 	sequence := []uint32{flashKeepEnabled | flashPageReadCommand, flashKeepEnabled | (address>>16)&0xff, flashKeepEnabled | (address>>8)&0xff, flashKeepEnabled | address&0xff, flashKeepEnabled, flashKeepEnabled, flashKeepEnabled, flashKeepEnabled}
 	for _, value := range sequence {
-		if err := write(value); err != nil {
+		if err := write(ctx, value); err != nil {
 			return PedestalFlashCalibration{}, err
 		}
 	}
@@ -97,7 +107,7 @@ func LoadPedestalCalibration(ctx context.Context, reader PedestalFlashReader, ch
 		if index == len(page)-1 {
 			value = 0
 		}
-		if err := write(value); err != nil {
+		if err := write(ctx, value); err != nil {
 			return PedestalFlashCalibration{}, err
 		}
 		read, err := reader.ReadRegister(ctx, chain, node, uint32(SPIData))

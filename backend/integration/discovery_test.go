@@ -635,7 +635,16 @@ func TestDiscoveryEnumeratesEnabledPreEnumerationState(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if _, err := client.DiscoverProductionTopology(ctx, connections); err != nil {
+	discovered, err := client.DiscoverProductionTopology(ctx, connections)
+	if err != nil {
 		t.Fatalf("discover pre-enumeration topology: %v", err)
+	}
+	for chain := 0; chain < 4; chain++ {
+		if discovered.Enumerations[chain].NodeCount != 1 || discovered.Enumerations[chain].Word2 != uint32(60+chain) {
+			t.Fatalf("chain %d enumeration = %#v", chain, discovered.Enumerations[chain])
+		}
+		if discovered.Chains[chain].Status != 4 || discovered.Chains[chain].BoardCount != 1 {
+			t.Fatalf("chain %d refreshed info = %#v", chain, discovered.Chains[chain])
+		}
 	}
 }

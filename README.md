@@ -45,6 +45,11 @@ The operator dashboard also lists persisted runs from the configured `-runs`
 directory. Artifact downloads are streamed through the generated RunService API
 and are limited to files recorded in each run's manifest.
 
+On Windows, after starting the backend, a bounded evidence-capturing hardware run
+can be launched with `scripts\take-data.ps1`. Pass `-PeriodicTestPulse` to submit
+an in-memory `TestPulseSource PTRG` override without modifying the configuration
+file; omit it for ordinary detector acquisition.
+
 `task test:e2e` builds the commands and frontend, then runs the pinned
 Playwright Chromium container against a real simulator-backed backend. It uses
 dedicated loopback ports and stores all transient runs and failure artifacts
@@ -57,6 +62,7 @@ under the container's `/tmp`.
 - [Engineering guidelines](docs/engineering-guidelines.md)
 - [Testing strategy](docs/testing-strategy.md)
 - [Protocol evidence and hardware notes](docs/daq_protocol_notes.md)
+- [Real-hardware captures and patch history](docs/real-hardware-capture-evidence.md)
 - [Production JANUS fixture provenance](test/fixtures/janus/README.md)
 - [Production Run 54 replay fixture](test/fixtures/runs/run54/README.md)
 - [Implementation roadmap](docs/roadmap.md)
@@ -64,4 +70,4 @@ under the container's `/tmp`.
 
 ## Current hardware boundary
 
-The DT5215 USB connection presents an Ethernet network interface. The known JANUS/FERSlib implementation communicates with the concentrator over TCP ports 9760 (slow control) and 9000 (data stream). The existing protocol study is based on the FERSlib source distributed with JANUS 5.0.0 and must be validated against real packet captures before protocol behavior is declared verified.
+The DT5215 USB connection presents an Ethernet network interface. JANUS/FERSlib and the native backend communicate with the concentrator over TCP ports 9760 (slow control) and 9000 (data stream). The protocol implementation combines source evidence from FERSlib 5.0.0 with the indexed 2026-07-21 real-hardware captures; individual facts retain their explicit evidence classification.

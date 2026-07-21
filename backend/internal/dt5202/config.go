@@ -10,6 +10,8 @@ import (
 
 const ChannelCount = 64
 
+const timeReferenceDelayMask uint32 = (1 << 20) - 1
+
 type RegisterWrite struct {
 	Address Register
 	Value   uint32
@@ -31,6 +33,17 @@ type ConfigurationPlan struct {
 type InactiveSetting struct {
 	Name   string
 	Reason string
+}
+
+// encodeTimeReferenceDelay converts nanoseconds to 8 ns clock ticks and then
+// encodes the signed value in the DT5202 register's capture-verified 20-bit
+// two's-complement field. The FPGA discards bits 31:20 on write.
+func encodeTimeReferenceDelay(ns float64) (uint32, error) {
+	ticks := int64(ns / 8)
+	if ticks < -(1<<19) || ticks > (1<<19)-1 {
+		return 0, fmt.Errorf("TrefDelay %.6g ns is outside the signed 20-bit DT5202 range", ns)
+	}
+	return uint32(int32(ticks)) & timeReferenceDelayMask, nil
 }
 
 // ValidateReadback compares the final requested value at every written
@@ -241,6 +254,10 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	trefDelayRegister, err := encodeTimeReferenceDelay(trefDelay)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
 	holdDelay, err := timeNS("HoldDelay")
 	if err != nil {
 		return ConfigurationPlan{}, err
@@ -423,7 +440,7 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 		{ChannelTriggerWidth, uint32(chWidth / 8)}, {TriggerLogicWidth, uint32(logicWidth / 8)},
 		{T0OutputMask, t0}, {T1OutputMask, t1}, {DwellTime, uint32(period / 8)}, {TriggerMask, triggerMask},
 		{RunMask, 1}, {TimeReferenceMask, trefMask}, {TimeReferenceWindow, uint32(trefWindow * 2)},
-		{TimeReferenceDelay, uint32(int32(trefDelay / 8))}, {TriggerLogicDefinition, majority<<8 | logic},
+		{TimeReferenceDelay, trefDelayRegister}, {TriggerLogicDefinition, majority<<8 | logic},
 		{VetoMask, vetoMask}, {ValidationMask, validationMask}, {TestPulseControl, tpSource}, {TestPulseDAC, tpAmp},
 		{ChargeCoarseThreshold, qd}, {TimeCoarseThreshold, td}, {LowGainShapingTime, lgShape}, {HighGainShapingTime, hgShape},
 		{ChargeDiscriminatorMaskLow, qdMask0}, {ChargeDiscriminatorMaskHigh, qdMask1},

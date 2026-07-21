@@ -18,6 +18,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -234,6 +235,13 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 	run.CompletedAt = timestamppb.New(s.now())
 	run.Incomplete = false
 	run.TerminationReason = "operator_stop"
+	if source, ok := pipeline.(interface {
+		Stats() runpipeline.StorageStats
+	}); ok {
+		stats := source.Stats()
+		run.EventCount = stats.EventCount
+		run.RawBatchCount = stats.RawBatches
+	}
 	if source, ok := pipeline.(interface{ Artifacts() []runstore.Artifact }); ok {
 		for _, artifact := range source.Artifacts() {
 			run.Artifacts = append(run.Artifacts, &daqv1.Artifact{Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256})

@@ -137,7 +137,7 @@ func TestGeneratedClientsCompleteSimulatedRunAndInspectArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if stop.Msg.GetSnapshot().GetState() != daqv1.SystemState_SYSTEM_STATE_READY || stop.Msg.GetRun().GetIncomplete() || len(stop.Msg.GetRun().GetArtifacts()) != 3 {
+	if stop.Msg.GetSnapshot().GetState() != daqv1.SystemState_SYSTEM_STATE_READY || stop.Msg.GetRun().GetIncomplete() || stop.Msg.GetRun().GetEventCount() < 4 || stop.Msg.GetRun().GetRawBatchCount() < 4 || len(stop.Msg.GetRun().GetArtifacts()) != 3 {
 		t.Fatalf("stop=%+v", stop.Msg)
 	}
 

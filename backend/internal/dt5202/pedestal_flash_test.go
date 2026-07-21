@@ -97,8 +97,8 @@ func TestLoadPedestalCalibrationUsesReadOnlySPISequence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPrefix := []uint32{0x1d2, 0x100, 0x110, 0x100, 0x100, 0x100, 0x100, 0x100}
-	if len(fake.writes) != len(wantPrefix)+PedestalFlashPageBytes {
+	wantPrefix := []uint32{0, 0x1d2, 0x100, 0x110, 0x100, 0x100, 0x100, 0x100, 0x100}
+	if len(fake.writes) != len(wantPrefix)+PedestalFlashPageBytes+1 {
 		t.Fatalf("write clocks=%d", len(fake.writes))
 	}
 	for index, want := range wantPrefix {
@@ -106,7 +106,7 @@ func TestLoadPedestalCalibrationUsesReadOnlySPISequence(t *testing.T) {
 			t.Fatalf("write %d=%#x want %#x", index, fake.writes[index], want)
 		}
 	}
-	for index, value := range fake.writes[len(wantPrefix):] {
+	for index, value := range fake.writes[len(wantPrefix) : len(fake.writes)-1] {
 		want := uint32(0x100)
 		if index == PedestalFlashPageBytes-1 {
 			want = 0
@@ -114,6 +114,9 @@ func TestLoadPedestalCalibrationUsesReadOnlySPISequence(t *testing.T) {
 		if value != want {
 			t.Fatalf("read clock %d=%#x want %#x", index, value, want)
 		}
+	}
+	if fake.writes[len(fake.writes)-1] != 0 {
+		t.Fatalf("final chip-select write=%#x, want 0", fake.writes[len(fake.writes)-1])
 	}
 	if fake.reads != PedestalFlashPageBytes || got.Calibration.Source != "DT5202 protected flash page 4 at chain 2 node 3" {
 		t.Fatalf("reads=%d calibration=%#v", fake.reads, got)
