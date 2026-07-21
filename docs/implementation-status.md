@@ -24,6 +24,8 @@ The development run writer now directly implements the bounded pipeline's typed 
 
 A storage-backed run-session factory now creates one development run directory and bounded pipeline per coordinator run. It records the start time, optionally captures complete raw batches, persists every typed event, drains accepted work before closing, and exposes an explicit finalize/abort choice. The coordinator finalizes and removes `incomplete` only after successful stop/drain and pipeline closure; start, stream, decode, storage, or finalization failures abort while retaining the marker and primary error.
 
+Restart inspection now scans run storage read-only for `incomplete` markers, reads manifests through a strict size bound, validates schema and directory/run identity, and deterministically reports valid unfinished runs separately from corrupt recovery metadata. It never repairs or removes evidence automatically. The telemetry adapter marks storage degraded and publishes warning/error diagnostics so operators can explicitly inspect, replay, or recover each artifact set.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:
