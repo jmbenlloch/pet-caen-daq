@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { isBooleanField, parseConfiguration, updateConfiguration } from './configuration'
+import {
+  isBooleanField,
+  maskBits,
+  masksFromBits,
+  numericConstraint,
+  numericError,
+  parseConfiguration,
+  updateConfiguration,
+} from './configuration'
 
 const source = [
   '# ------------------------------------------------------------------------------------------',
@@ -32,5 +40,27 @@ describe('JANUS configuration editor', () => {
     const changed = updateConfiguration(document, document.fields[4], '181')
     expect(changed.source).toContain('TD_CoarseThreshold[2] 181 # board override')
     expect(changed.source).toContain('AcquisitionMode SPECT_TIMING # Acquisition mode')
+  })
+
+  it('enforces numeric bounds and increments from JANUS parameter semantics', () => {
+    const field = parseConfiguration('MajorityLevel 65 # Majority Level (1 to 64)').fields[0]
+    expect(numericConstraint(field)).toMatchObject({ min: 1, max: 64, step: 1, integer: true })
+    expect(numericError(field)).toBe('Maximum: 64.')
+    field.value = '4.5'
+    expect(numericError(field)).toBe('Enter a whole number.')
+    field.value = '4'
+    expect(numericError(field)).toBe('')
+
+    const time = parseConfiguration('ChTrg_Width 2 us # width').fields[0]
+    expect(numericConstraint(time)).toMatchObject({ min: 0, max: 2.032, step: 0.008 })
+    expect(numericError(time)).toBe('')
+  })
+
+  it('round-trips the paired 32-bit masks used by the JANUS channel screen', () => {
+    const bits = maskBits('0x00000001', '0x80000000')
+    expect(bits[0]).toBe(true)
+    expect(bits[63]).toBe(true)
+    expect(bits.filter(Boolean)).toHaveLength(2)
+    expect(masksFromBits(bits)).toEqual(['0x00000001', '0x80000000'])
   })
 })

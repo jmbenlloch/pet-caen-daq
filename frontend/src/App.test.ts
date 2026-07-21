@@ -84,6 +84,9 @@ describe('operator dashboard', () => {
     await wrapper.get('input[placeholder="run-0055"]').setValue('run-55')
     expect(wrapper.text()).toContain('PresetTime')
     expect(wrapper.text()).toContain('EnableJobs')
+    expect(
+      wrapper.findAll('button').some((button) => button.text().includes('Configure channels')),
+    ).toBe(true)
     await wrapper.get('input[id^="PresetTime"]').setValue('30')
     await wrapper.get('input[id^="PresetTime"]').trigger('change')
     await wrapper.get('button.primary').trigger('click')

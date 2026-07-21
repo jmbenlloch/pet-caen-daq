@@ -152,6 +152,9 @@ categories, choices, descriptions, and indexed overrides from that document;
 it does not calculate effective registers or decide whether a setting is safe.
 Edits preserve the JANUS document and are submitted as text to the authoritative
 backend parser, semantic audit, validation, and configuration application path.
+Frontend ranges and steppers provide immediate input guidance, while the backend
+independently enforces safety- and representation-relevant bounds before it can
+produce an effective hardware plan.
 
 ## Simulator
 

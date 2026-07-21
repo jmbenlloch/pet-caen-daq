@@ -2,6 +2,7 @@ package dt5202
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -159,6 +160,12 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 		}
 		return value, nil
 	}
+	boundedUint := func(name string, value, minimum, maximum uint32) error {
+		if value < minimum || value > maximum {
+			return fmt.Errorf("%s %d outside production range [%d,%d]", name, value, minimum, maximum)
+		}
+		return nil
+	}
 
 	acqMode, err := choice("AcquisitionMode", map[string]uint32{"SPECTROSCOPY": 1, "TIMING_CSTART": 2, "SPECT_TIMING": 3, "COUNTING": 4, "WAVEFORM": 8, "TIMING_CSTOP": 0x12})
 	if err != nil {
@@ -252,6 +259,9 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	if err := boundedUint("MajorityLevel", majority, 1, 64); err != nil {
+		return ConfigurationPlan{}, err
+	}
 	logic, err := choice("TriggerLogic", map[string]uint32{"OR64": 0, "AND2_OR32": 1, "OR32_AND2": 2, "OR16_AND4": 3, "MAJ64": 4, "MAJ32_AND2": 5, "OR_QUAD": 6})
 	if err != nil {
 		return ConfigurationPlan{}, err
@@ -259,6 +269,9 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	chWidth, err := timeNS("ChTrg_Width")
 	if err != nil {
 		return ConfigurationPlan{}, err
+	}
+	if chWidth < 0 || chWidth > 2032 || math.Abs(math.Mod(chWidth, 8)) > 1e-9 {
+		return ConfigurationPlan{}, fmt.Errorf("ChTrg_Width %.6g ns must be 0 or an 8 ns increment up to 2032 ns", chWidth)
 	}
 	logicWidth, err := timeNS("Tlogic_Width")
 	if err != nil {
@@ -296,8 +309,14 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	if err := boundedUint("QD_CoarseThreshold", qd, 0, 2047); err != nil {
+		return ConfigurationPlan{}, err
+	}
 	td, err := u32("TD_CoarseThreshold", 16)
 	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	if err := boundedUint("TD_CoarseThreshold", td, 0, 2047); err != nil {
 		return ConfigurationPlan{}, err
 	}
 	qdMask0, err := u32("Q_DiscrMask0", 32)
@@ -331,6 +350,9 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	}
 	tpAmp, err := u32("TestPulseAmplitude", 16)
 	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	if err := boundedUint("TestPulseAmplitude", tpAmp, 0, 4095); err != nil {
 		return ConfigurationPlan{}, err
 	}
 	if values["TestPulseSource"].Value == "OFF" {
@@ -381,6 +403,16 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	analog1, err := choice("AnalogProbe1", analogOptions)
 	if err != nil {
 		return ConfigurationPlan{}, err
+	}
+	if analog0 != 0 {
+		if err := boundedUint("ProbeChannel0", probeChannel0, 0, 31); err != nil {
+			return ConfigurationPlan{}, err
+		}
+	}
+	if analog1 != 0 {
+		if err := boundedUint("ProbeChannel1", probeChannel1, 32, 63); err != nil {
+			return ConfigurationPlan{}, err
+		}
 	}
 	digitalOptions := map[string]uint32{"OFF": 0xff, "PEAK_LG": 0x10, "PEAK_HG": 0x11, "HOLD": 0x16, "START_CONV": 0x12, "DATA_COMMIT": 0x21, "DATA_VALID": 0x20, "CLK_1024": 0, "VAL_WINDOW": 0x1a, "T_OR": 4, "Q_OR": 5}
 	digital0, err := choice("DigitalProbe0", digitalOptions)
@@ -476,16 +508,28 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	if err := boundedUint("LG_Gain", lg, 1, 63); err != nil {
+		return ConfigurationPlan{}, err
+	}
 	hg, err := u32("HG_Gain", 8)
 	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	if err := boundedUint("HG_Gain", hg, 1, 63); err != nil {
 		return ConfigurationPlan{}, err
 	}
 	qfine, err := u32("QD_FineThreshold", 8)
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	if err := boundedUint("QD_FineThreshold", qfine, 0, 15); err != nil {
+		return ConfigurationPlan{}, err
+	}
 	tfine, err := u32("TD_FineThreshold", 8)
 	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	if err := boundedUint("TD_FineThreshold", tfine, 0, 15); err != nil {
 		return ConfigurationPlan{}, err
 	}
 	var citirocChannels [ChannelCount]CitirocChannel

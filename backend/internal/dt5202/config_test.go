@@ -133,6 +133,34 @@ func TestPlanProductionConfigurationRejectsInvalidServiceEventMode(t *testing.T)
 	}
 }
 
+func TestPlanProductionConfigurationRejectsOutOfRangeOperatorValues(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, overrides, want string
+	}{
+		{"majority", "MajorityLevel 65\n", "MajorityLevel 65 outside production range [1,64]"},
+		{"channel width step", "ChTrg_Width 10 ns\n", "8 ns increment"},
+		{"coarse threshold", "TD_CoarseThreshold 2048\n", "range [0,2047]"},
+		{"fine threshold", "QD_FineThreshold 16\n", "range [0,15]"},
+		{"gain", "HG_Gain 64\n", "range [1,63]"},
+		{"test pulse DAC", "TestPulseAmplitude 4096\n", "range [0,4095]"},
+		{"active probe channel", "AnalogProbe1 FAST\nProbeChannel1 31\n", "range [32,63]"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			doc, parseErr := janusconfig.Parse(strings.NewReader(string(fixture) + "\n" + test.overrides))
+			if parseErr != nil {
+				t.Fatal(parseErr)
+			}
+			if _, planErr := PlanProductionConfiguration(doc, 0); planErr == nil || !strings.Contains(planErr.Error(), test.want) {
+				t.Fatalf("PlanProductionConfiguration() error = %v, want %q", planErr, test.want)
+			}
+		})
+	}
+}
+
 func TestEncodeTimeReferenceDelayUsesHardwareTwentyBitField(t *testing.T) {
 	for _, test := range []struct {
 		name string

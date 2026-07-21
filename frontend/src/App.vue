@@ -2,8 +2,13 @@
 import { computed, onMounted, ref } from 'vue'
 import defaultConfiguration from '../../test/fixtures/janus/config_same4_v3_good.txt?raw'
 import { createDaqApi, type DaqApi } from './api'
+import MaskEditor from './MaskEditor.vue'
+import NumericField from './NumericField.vue'
 import {
   isBooleanField,
+  isMaskField,
+  numericConstraint,
+  numericError,
   parseConfiguration,
   updateConfiguration,
   type ConfigurationField,
@@ -27,6 +32,7 @@ const configFile = ref<HTMLInputElement>()
 const selectedSection = ref('All')
 const parameterSearch = ref('')
 const showRawConfiguration = ref(false)
+const activeMask = ref<{ low: ConfigurationField; high: ConfigurationField }>()
 
 const sections = computed(() => [
   'All',
@@ -36,6 +42,7 @@ const visibleFields = computed(() => {
   const query = parameterSearch.value.trim().toLowerCase()
   return configurationDocument.value.fields.filter(
     (field) =>
+      !(isMaskField(field) && field.name.endsWith('1')) &&
       (selectedSection.value === 'All' || field.section === selectedSection.value) &&
       (!query ||
         field.name.toLowerCase().includes(query) ||
@@ -43,6 +50,11 @@ const visibleFields = computed(() => {
         field.value.toLowerCase().includes(query)),
   )
 })
+const configurationErrors = computed(() =>
+  configurationDocument.value.fields
+    .map((field) => ({ field, error: numericError(field) }))
+    .filter((item) => item.error),
+)
 
 const state = computed(() => stateLabel[daq.snapshot.value?.state ?? 0])
 const boards = computed(() =>
@@ -63,6 +75,34 @@ async function loadConfiguration(event: Event) {
 
 function setField(field: ConfigurationField, value: string) {
   configurationDocument.value = updateConfiguration(configurationDocument.value, field, value)
+}
+
+function openMask(field: ConfigurationField) {
+  const highName = field.name.replace(/0$/, '1')
+  const high = configurationDocument.value.fields.find(
+    (candidate) => candidate.name === highName && candidate.index === field.index,
+  )
+  if (high) activeMask.value = { low: field, high }
+}
+
+function applyMask(low: string, high: string) {
+  if (!activeMask.value) return
+  configurationDocument.value = updateConfiguration(
+    configurationDocument.value,
+    activeMask.value.low,
+    low,
+  )
+  const refreshedHigh = configurationDocument.value.fields.find(
+    (field) =>
+      field.name === activeMask.value?.high.name && field.index === activeMask.value?.high.index,
+  )
+  if (refreshedHigh)
+    configurationDocument.value = updateConfiguration(
+      configurationDocument.value,
+      refreshedHigh,
+      high,
+    )
+  activeMask.value = undefined
 }
 
 function loadDefaultConfiguration() {
@@ -234,6 +274,12 @@ onMounted(() => daq.connect())
                   />
                   <span>{{ field.value === '1' ? 'Enabled' : 'Disabled' }}</span>
                 </label>
+                <div v-else-if="isMaskField(field)" class="mask-summary">
+                  <code>{{ field.value }}</code>
+                  <button type="button" class="secondary" @click="openMask(field)">
+                    Configure channels
+                  </button>
+                </div>
                 <select
                   v-else-if="field.options.length"
                   :id="field.id"
@@ -247,6 +293,12 @@ onMounted(() => daq.connect())
                     {{ option }}
                   </option>
                 </select>
+                <NumericField
+                  v-else-if="numericConstraint(field)"
+                  :field="field"
+                  :constraint="numericConstraint(field)!"
+                  @change="setField(field, $event)"
+                />
                 <input
                   v-else
                   :id="field.id"
@@ -256,6 +308,17 @@ onMounted(() => daq.connect())
               </article>
               <p v-if="!visibleFields.length" class="empty">No parameters match this filter.</p>
             </div>
+          </div>
+          <div v-if="configurationErrors.length" class="configuration-errors" role="alert">
+            <strong
+              >{{ configurationErrors.length }} parameter value{{
+                configurationErrors.length === 1 ? '' : 's'
+              }}
+              outside the allowed range</strong
+            >
+            <span v-for="item in configurationErrors.slice(0, 3)" :key="item.field.id"
+              >{{ item.field.name }}: {{ item.error }}</span
+            >
           </div>
           <textarea
             v-else
@@ -295,7 +358,7 @@ onMounted(() => daq.connect())
             <button
               class="secondary"
               type="button"
-              :disabled="daq.busy.value || !configuration"
+              :disabled="daq.busy.value || !configuration || configurationErrors.length > 0"
               @click="daq.validate(configuration)"
             >
               Validate
@@ -303,7 +366,13 @@ onMounted(() => daq.connect())
             <button
               class="primary"
               type="button"
-              :disabled="!daq.canStart.value || !runId || !requestedBy || !configuration"
+              :disabled="
+                !daq.canStart.value ||
+                !runId ||
+                !requestedBy ||
+                !configuration ||
+                configurationErrors.length > 0
+              "
               @click="
                 daq.startRun({ runId, requestedBy, configuration, captureRaw, journalTransport })
               "
@@ -504,5 +573,13 @@ onMounted(() => daq.connect())
         </div>
       </section>
     </main>
+    <MaskEditor
+      v-if="activeMask"
+      :title="`${activeMask.low.name.replace(/0$/, '')}${activeMask.low.index === undefined ? '' : ` · override ${activeMask.low.index}`}`"
+      :low="activeMask.low.value"
+      :high="activeMask.high.value"
+      @apply="applyMask"
+      @close="activeMask = undefined"
+    />
   </div>
 </template>

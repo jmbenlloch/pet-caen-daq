@@ -52,6 +52,10 @@ loaded by the backend. Documented options are
 presented as choices, binary flags as switches, and indexed overrides identify
 their board or channel. Operators can still import a JANUS file or open the raw
 source editor; all paths produce the same text submitted to backend validation.
+Numeric parameters use bounded steppers with visible ranges and increments;
+native number inputs support typing and Arrow Up/Down. The three paired 64-bit
+channel masks open an accessible 8×8 selector with bulk enable, disable, and
+invert operations.
 
 On Windows, after starting the backend, a bounded evidence-capturing hardware run
 can be launched with `scripts\take-data.ps1`. Pass `-PeriodicTestPulse` to submit

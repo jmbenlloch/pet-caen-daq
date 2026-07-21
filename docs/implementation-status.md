@@ -46,6 +46,15 @@ board/channel overrides. File import and an advanced source editor remain
 available, and every edit still passes through the same backend validation and
 effective-configuration audit before hardware mutation.
 
+The editor now follows the useful JANUS control patterns found in the bundled
+5.0.0 GUI: channel-enable, timing-logic, and charge-discriminator mask pairs use
+an accessible 64-channel grid with enable-all, disable-all, and invert actions;
+bounded numeric settings show their accepted interval and increment and provide
+minus/plus controls alongside native keyboard-editable number inputs. Invalid
+values block frontend validation/start, and the backend independently rejects
+out-of-range majority, trigger-width, discriminator, gain, test-pulse, and
+active-probe settings before configuration planning.
+
 The run-control client now retains the authoritative completed `RunSummary`
 returned by `StopRun` rather than trying to reconstruct completion from the next
 telemetry snapshot. The dashboard presents the latest run's termination reason,
