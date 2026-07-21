@@ -4,6 +4,11 @@ package runpipeline
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
@@ -49,42 +54,112 @@ func (f Factory) New(runID string) (acquisition.RunPipeline, error) {
 		_ = writer.Abort()
 		return nil, err
 	}
-	return &Session{pipeline: pipeline, writer: writer}, nil
+	return &Session{pipeline: pipeline, writer: writer, sink: sink}, nil
 }
 
 type Session struct {
-	pipeline *acquisition.Pipeline
-	writer   *runstore.Writer
+	pipeline  *acquisition.Pipeline
+	writer    *runstore.Writer
+	sink      *sink
+	mu        sync.Mutex
+	lastErr   error
+	finalized bool
+}
+
+type StorageStats struct {
+	Directory    string
+	BytesWritten uint64
+	EventCount   uint64
+	RawBatches   uint64
+	Finalized    bool
+	LastError    string
 }
 
 func (s *Session) Submit(ctx context.Context, batch acquisition.PipelineBatch) error {
-	return s.pipeline.Submit(ctx, batch)
+	err := s.pipeline.Submit(ctx, batch)
+	s.recordError(err)
+	return err
 }
 
 // Close drains and closes event processing; the coordinator then explicitly
 // chooses Finalize or Abort so a processing failure cannot remove incomplete.
-func (s *Session) Close() error { return s.pipeline.Close() }
-
-func (s *Session) Finalize(completedAt, reason string) error {
-	return s.writer.Finalize(completedAt, reason)
+func (s *Session) Close() error {
+	err := s.pipeline.Close()
+	s.recordError(err)
+	return err
 }
 
-func (s *Session) Abort() error { return s.writer.Abort() }
+func (s *Session) Finalize(completedAt, reason string) error {
+	err := s.writer.Finalize(completedAt, reason)
+	s.mu.Lock()
+	if err != nil {
+		s.lastErr = err
+	} else {
+		s.finalized = true
+	}
+	s.mu.Unlock()
+	return err
+}
+
+func (s *Session) Abort() error {
+	err := s.writer.Abort()
+	s.recordError(err)
+	return err
+}
 
 func (s *Session) Directory() string { return s.writer.Directory() }
+
+func (s *Session) Stats() StorageStats {
+	stats := StorageStats{Directory: s.Directory(), EventCount: s.sink.events.Load(), RawBatches: s.sink.rawBatches.Load()}
+	_ = filepath.WalkDir(stats.Directory, func(_ string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		info, infoErr := entry.Info()
+		if infoErr == nil && info.Mode().IsRegular() {
+			stats.BytesWritten += uint64(info.Size())
+		}
+		return nil
+	})
+	s.mu.Lock()
+	stats.Finalized = s.finalized
+	if s.lastErr != nil {
+		stats.LastError = s.lastErr.Error()
+	}
+	s.mu.Unlock()
+	return stats
+}
+
+func (s *Session) recordError(err error) {
+	if err == nil {
+		return
+	}
+	s.mu.Lock()
+	s.lastErr = err
+	s.mu.Unlock()
+}
 
 type sink struct {
 	writer     *runstore.Writer
 	captureRaw bool
+	events     atomic.Uint64
+	rawBatches atomic.Uint64
 }
 
 func (s *sink) AppendRaw(raw []byte) error {
-	if !s.captureRaw {
-		return nil
+	if s.captureRaw {
+		if err := s.writer.AppendRaw(raw); err != nil {
+			return err
+		}
 	}
-	return s.writer.AppendRaw(raw)
+	s.rawBatches.Add(1)
+	return nil
 }
 
 func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
-	return s.writer.AppendEvent(wire, event)
+	if err := s.writer.AppendEvent(wire, event); err != nil {
+		return err
+	}
+	s.events.Add(1)
+	return nil
 }

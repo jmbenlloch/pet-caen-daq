@@ -31,6 +31,10 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 	if err := session.Finalize("2026-07-21T16:00:00Z", "operator_stop"); err != nil {
 		t.Fatal(err)
 	}
+	stats := session.Stats()
+	if stats.Directory != session.Directory() || stats.BytesWritten == 0 || stats.EventCount != 1 || stats.RawBatches != 1 || !stats.Finalized || stats.LastError != "" {
+		t.Fatalf("storage stats = %+v", stats)
+	}
 	for _, name := range []string{"manifest.json", "events.jsonl", "wire.raw"} {
 		if _, err := os.Stat(filepath.Join(session.Directory(), name)); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
@@ -60,5 +64,9 @@ func TestSessionAbortRetainsIncompleteMarker(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(session.Directory(), "incomplete")); err != nil {
 		t.Fatalf("incomplete marker missing: %v", err)
+	}
+	stats := session.Stats()
+	if stats.Finalized || stats.LastError == "" || stats.EventCount != 0 {
+		t.Fatalf("failed storage stats = %+v", stats)
 	}
 }

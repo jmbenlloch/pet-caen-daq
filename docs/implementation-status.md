@@ -28,6 +28,8 @@ Restart inspection now scans run storage read-only for `incomplete` markers, rea
 
 The bounded pipeline now exposes race-safe operational counters for capacity/depth, accepted and rejected batches, decoded events, decode failures, and raw/event sink failures. Backpressure rejection counts only actual full-queue rejection, while cancellation and closure remain distinct outcomes. A service adapter copies these values into complete telemetry snapshots and promotes sink failure to storage fault without introducing protobuf dependencies into acquisition.
 
+Storage-backed run sessions now expose race-safe decoded-event and raw-batch counts, artifact bytes currently present on disk, run-directory identity, finalization state, and the last observed pipeline/storage error. A service adapter publishes storage health and updates the current run's persisted counters and incomplete state. File inspection ignores symlinks and remains observational; it does not alter durability or finalization behavior.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:
