@@ -22,6 +22,8 @@ ConnectRPC run-control handlers now validate required identity and the static JA
 
 The development run writer now directly implements the bounded pipeline's typed event sink for spectroscopy, timing, counting, waveform, service, and test events. Each JSON Lines envelope retains chain/node, qualifier, trigger ID, timestamp, and the complete project-owned decoded event, with 64-bit values encoded as decimal strings. The original Phase 1 spectroscopy append method and envelope kind remain available for replay compatibility.
 
+A storage-backed run-session factory now creates one development run directory and bounded pipeline per coordinator run. It records the start time, optionally captures complete raw batches, persists every typed event, drains accepted work before closing, and exposes an explicit finalize/abort choice. The coordinator finalizes and removes `incomplete` only after successful stop/drain and pipeline closure; start, stream, decode, storage, or finalization failures abort while retaining the marker and primary error.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:

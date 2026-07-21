@@ -24,6 +24,14 @@ type RunPipeline interface {
 
 type PipelineFactory func(runID string) (RunPipeline, error)
 
+type RunPipelineFinalizer interface {
+	Finalize(completedAt, reason string) error
+}
+
+type RunPipelineAborter interface {
+	Abort() error
+}
+
 type activeRun struct {
 	id       string
 	ctx      context.Context
@@ -130,7 +138,13 @@ func (c *Coordinator) Stop(ctx context.Context, actor string) error {
 	cancel()
 	result := JoinStopError(run.readErr, drainErr)
 	result = JoinStopError(result, run.pipeline.Close())
+	if result == nil {
+		if finalizer, ok := run.pipeline.(RunPipelineFinalizer); ok {
+			result = finalizer.Finalize(time.Now().UTC().Format(time.RFC3339Nano), "operator_stop")
+		}
+	}
 	if result != nil {
+		result = JoinStopError(result, abortPipeline(run.pipeline))
 		return c.finishFault(run, result, actor)
 	}
 	c.clearActive(run, nil)
@@ -197,14 +211,23 @@ func (c *Coordinator) watch(run *activeRun) {
 	cancel()
 	err := JoinStopError(run.readErr, cleanupErr)
 	err = JoinStopError(err, run.pipeline.Close())
+	err = JoinStopError(err, abortPipeline(run.pipeline))
 	c.clearActive(run, err)
 }
 
 func (c *Coordinator) failStart(primary error, actor string, pipeline RunPipeline) error {
 	if pipeline != nil {
 		primary = JoinStopError(primary, pipeline.Close())
+		primary = JoinStopError(primary, abortPipeline(pipeline))
 	}
 	return c.recordFault(primary, actor)
+}
+
+func abortPipeline(pipeline RunPipeline) error {
+	if aborter, ok := pipeline.(RunPipelineAborter); ok {
+		return aborter.Abort()
+	}
+	return nil
 }
 
 func (c *Coordinator) finishFault(run *activeRun, err error, actor string) error {

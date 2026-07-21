@@ -49,9 +49,11 @@ func (h *coordinatorHardware) ReadRawStreamBatch(ctx context.Context) ([]byte, [
 }
 
 type coordinatorPipeline struct {
-	mu      sync.Mutex
-	batches []PipelineBatch
-	closed  bool
+	mu        sync.Mutex
+	batches   []PipelineBatch
+	closed    bool
+	finalized bool
+	aborted   bool
 }
 
 func (p *coordinatorPipeline) Submit(_ context.Context, batch PipelineBatch) error {
@@ -64,6 +66,18 @@ func (p *coordinatorPipeline) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.closed = true
+	return nil
+}
+func (p *coordinatorPipeline) Finalize(string, string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.finalized = true
+	return nil
+}
+func (p *coordinatorPipeline) Abort() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.aborted = true
 	return nil
 }
 
@@ -95,7 +109,7 @@ func TestCoordinatorStartsReadsAndDrainsToReady(t *testing.T) {
 	}
 	pipeline.mu.Lock()
 	defer pipeline.mu.Unlock()
-	if !pipeline.closed || len(pipeline.batches) != 1 || string(pipeline.batches[0].Raw) != "complete" {
+	if !pipeline.closed || !pipeline.finalized || pipeline.aborted || len(pipeline.batches) != 1 || string(pipeline.batches[0].Raw) != "complete" {
 		t.Fatalf("pipeline=%+v", pipeline)
 	}
 }
@@ -105,8 +119,8 @@ func TestCoordinatorStartFailureMovesToFaultAndClosesPipeline(t *testing.T) {
 	hardware := &coordinatorHardware{startErr: sentinel}
 	coordinator, states, pipeline := readyCoordinator(t, hardware)
 	err := coordinator.Start(context.Background(), "run-1", "operator")
-	if !errors.Is(err, sentinel) || states.Snapshot().State != StateFault || !pipeline.closed {
-		t.Fatalf("error=%v state=%s closed=%v", err, states.Snapshot().State, pipeline.closed)
+	if !errors.Is(err, sentinel) || states.Snapshot().State != StateFault || !pipeline.closed || !pipeline.aborted || pipeline.finalized {
+		t.Fatalf("error=%v state=%s pipeline=%+v", err, states.Snapshot().State, pipeline)
 	}
 }
 
