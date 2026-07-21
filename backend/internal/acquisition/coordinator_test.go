@@ -138,6 +138,8 @@ func TestCoordinatorStreamFailureStopsAndRecordsPrimaryError(t *testing.T) {
 	sentinel := errors.New("stream disconnected")
 	hardware := &coordinatorHardware{readErr: sentinel}
 	coordinator, states, _ := readyCoordinator(t, hardware)
+	faults := make(chan error, 1)
+	coordinator.SetFaultObserver(func(err error) { faults <- err })
 	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -150,6 +152,14 @@ func TestCoordinatorStreamFailureStopsAndRecordsPrimaryError(t *testing.T) {
 	}
 	if !errors.Is(coordinator.LastError(), sentinel) {
 		t.Fatalf("last error = %v", coordinator.LastError())
+	}
+	select {
+	case observed := <-faults:
+		if !errors.Is(observed, sentinel) {
+			t.Fatalf("observed fault = %v", observed)
+		}
+	default:
+		t.Fatal("coordinator fault was not published")
 	}
 }
 

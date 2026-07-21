@@ -15,6 +15,10 @@ type RunHealthSource interface {
 	StorageStats() runpipeline.StorageStats
 }
 
+type BoardHealthSource interface {
+	BoardStats() []runpipeline.BoardStats
+}
+
 // HealthMonitor publishes one complete, coalesced snapshot per sample. Tick is
 // injectable for deterministic tests; production callers normally use Interval.
 type HealthMonitor struct {
@@ -72,6 +76,41 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 		snapshot.CurrentRun.EventCount = storage.EventCount
 		snapshot.CurrentRun.RawBatchCount = storage.RawBatches
 		snapshot.CurrentRun.Incomplete = !storage.Finalized
+	}
+	if boards, ok := m.Source.(BoardHealthSource); ok {
+		for _, observation := range boards.BoardStats() {
+			for _, chain := range snapshot.Chains {
+				if chain.Index != uint32(observation.Chain) {
+					continue
+				}
+				for _, board := range chain.Boards {
+					if board.Node != uint32(observation.Node) {
+						continue
+					}
+					board.EventCount = observation.EventCount
+					board.Health = daqv1.HealthStatus_HEALTH_STATUS_OK
+					if observation.FPGATemperature != nil {
+						board.FpgaTemperatureC = *observation.FPGATemperature
+					}
+					if observation.BoardTemperature != nil {
+						board.BoardTemperatureC = *observation.BoardTemperature
+					}
+					if observation.DetectorTemperature != nil {
+						board.DetectorTemperatureC = *observation.DetectorTemperature
+					}
+					if observation.HVVoltage != nil {
+						board.HvVoltageV = *observation.HVVoltage
+					}
+					if observation.HVCurrent != nil {
+						board.HvCurrentA = *observation.HVCurrent
+					}
+					board.HvOn = observation.HVOn
+					if observation.HVOverCurrent || observation.HVOverVoltage {
+						board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
+					}
+				}
+			}
+		}
 	}
 	return m.Publisher.Publish(snapshot)
 }

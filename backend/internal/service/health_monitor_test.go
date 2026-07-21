@@ -14,16 +14,20 @@ import (
 type mutableRunHealth struct {
 	pipeline acquisition.PipelineStats
 	storage  runpipeline.StorageStats
+	boards   []runpipeline.BoardStats
 }
 
 func (s *mutableRunHealth) PipelineStats() acquisition.PipelineStats { return s.pipeline }
 func (s *mutableRunHealth) StorageStats() runpipeline.StorageStats   { return s.storage }
+func (s *mutableRunHealth) BoardStats() []runpipeline.BoardStats     { return s.boards }
 
 func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
-	publisher, _ := telemetry.NewPublisher("instance-a", &daqv1.TelemetrySnapshot{CurrentRun: &daqv1.RunSummary{RunId: "42"}}, nil)
+	publisher, _ := telemetry.NewPublisher("instance-a", &daqv1.TelemetrySnapshot{CurrentRun: &daqv1.RunSummary{RunId: "42"}, Chains: []*daqv1.Chain{{Index: 0, Boards: []*daqv1.Board{{Node: 0}}}}}, nil)
+	temperature, voltage, current := 41.5, 52.1, 0.02
 	source := &mutableRunHealth{
 		pipeline: acquisition.PipelineStats{Capacity: 8, QueueDepth: 2, AcceptedBatches: 3},
 		storage:  runpipeline.StorageStats{Directory: "/runs/run-42", BytesWritten: 100, EventCount: 2, RawBatches: 1},
+		boards:   []runpipeline.BoardStats{{Chain: 0, Node: 0, EventCount: 2, FPGATemperature: &temperature, HVVoltage: &voltage, HVCurrent: &current, HVOn: true}},
 	}
 	ticks := make(chan time.Time)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,15 +42,17 @@ func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 		// Subscription can race the monitor's immediate sample; consume it.
 		first = <-updates
 	}
-	if first.Pipeline.GetQueueDepth() != 2 || first.Storage.GetBytesWritten() != 100 || first.CurrentRun.GetEventCount() != 2 {
+	if first.Pipeline.GetQueueDepth() != 2 || first.Storage.GetBytesWritten() != 100 || first.CurrentRun.GetEventCount() != 2 || first.Chains[0].Boards[0].GetFpgaTemperatureC() != temperature || !first.Chains[0].Boards[0].GetHvOn() {
 		t.Fatalf("immediate snapshot = %+v", first)
 	}
 	source.pipeline.QueueDepth = 0
 	source.pipeline.DecodedEvents = 9
 	source.storage.EventCount = 9
+	source.boards[0].EventCount = 9
+	source.boards[0].HVOverCurrent = true
 	ticks <- time.Unix(1, 0)
 	second := <-updates
-	if second.Sequence != first.Sequence+1 || second.Pipeline.GetDecodedEvents() != 9 || second.CurrentRun.GetEventCount() != 9 {
+	if second.Sequence != first.Sequence+1 || second.Pipeline.GetDecodedEvents() != 9 || second.CurrentRun.GetEventCount() != 9 || second.Chains[0].Boards[0].GetEventCount() != 9 || second.Chains[0].Boards[0].GetHealth() != daqv1.HealthStatus_HEALTH_STATUS_FAULT {
 		t.Fatalf("tick snapshot = %+v", second)
 	}
 	cancel()

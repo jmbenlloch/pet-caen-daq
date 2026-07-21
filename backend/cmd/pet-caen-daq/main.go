@@ -103,6 +103,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	if err != nil {
 		return err
 	}
+	coordinator.SetFaultObserver(func(fault error) { service.PublishCoordinatorFault(publisher, fault, nil) })
 	incomplete, err := runstore.FindIncomplete(*runParent)
 	if err != nil {
 		return err

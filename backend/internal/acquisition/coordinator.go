@@ -65,6 +65,7 @@ type Coordinator struct {
 	drainTimeout   time.Duration
 	active         *activeRun
 	lastErr        error
+	faultObserver  func(error)
 }
 
 func NewCoordinator(states *StateMachine, hardware CoordinatorHardware, newPipeline PipelineFactory, expectedChains int, drainTimeout time.Duration) (*Coordinator, error) {
@@ -180,6 +181,21 @@ func (c *Coordinator) LastError() error {
 	return c.lastErr
 }
 
+func (c *Coordinator) ActivePipeline() RunPipeline {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.active == nil {
+		return nil
+	}
+	return c.active.pipeline
+}
+
+func (c *Coordinator) SetFaultObserver(observer func(error)) {
+	c.mu.Lock()
+	c.faultObserver = observer
+	c.mu.Unlock()
+}
+
 func (c *Coordinator) readLoop(run *activeRun) {
 	defer close(run.done)
 	for {
@@ -253,7 +269,11 @@ func (c *Coordinator) recordFault(err error, actor string) error {
 	}
 	c.mu.Lock()
 	c.lastErr = err
+	observer := c.faultObserver
 	c.mu.Unlock()
+	if observer != nil {
+		observer(err)
+	}
 	return err
 }
 

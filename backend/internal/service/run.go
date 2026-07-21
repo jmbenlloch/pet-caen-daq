@@ -21,6 +21,7 @@ type RunController interface {
 	Start(context.Context, string, string, acquisition.RunOptions) error
 	Stop(context.Context, string) error
 	ActiveRunID() string
+	ActivePipeline() acquisition.RunPipeline
 	StateSnapshot() acquisition.StateSnapshot
 }
 
@@ -33,14 +34,17 @@ type SnapshotPublisher interface {
 
 type RunService struct {
 	daqv1connect.UnimplementedRunServiceHandler
-	Controller RunController
-	Telemetry  SnapshotPublisher
-	Now        func() time.Time
-	Configure  ConfigurationApplier
-	Boards     []configaudit.BoardEvidence
+	Controller     RunController
+	Telemetry      SnapshotPublisher
+	Now            func() time.Time
+	Configure      ConfigurationApplier
+	Boards         []configaudit.BoardEvidence
+	HealthInterval time.Duration
 
-	mu      sync.Mutex
-	current *daqv1.RunSummary
+	mu            sync.Mutex
+	current       *daqv1.RunSummary
+	monitorCancel context.CancelFunc
+	monitorDone   chan error
 }
 
 func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest]) (*connect.Response[daqv1.StartRunResponse], error) {
@@ -84,6 +88,7 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	s.current = run
 	s.mu.Unlock()
 	snapshot := s.publish(run)
+	s.startMonitor()
 	return connect.NewResponse(&daqv1.StartRunResponse{Run: run, Snapshot: snapshot}), nil
 }
 
@@ -97,9 +102,11 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("run %q is not active", message.GetRunId()))
 	}
 	if err := s.Controller.Stop(ctx, message.GetRequestedBy()); err != nil {
+		s.stopMonitor()
 		s.publish(s.currentRun())
 		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 	}
+	s.stopMonitor()
 	run := s.currentRun()
 	if run == nil {
 		run = &daqv1.RunSummary{RunId: message.GetRunId()}
@@ -112,6 +119,35 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 	s.mu.Unlock()
 	snapshot := s.publish(nil)
 	return connect.NewResponse(&daqv1.StopRunResponse{Run: run, Snapshot: snapshot}), nil
+}
+
+func (s *RunService) startMonitor() {
+	source, ok := s.Controller.ActivePipeline().(RunHealthSource)
+	if !ok {
+		return
+	}
+	interval := s.HealthInterval
+	if interval <= 0 {
+		interval = time.Second
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	s.mu.Lock()
+	s.monitorCancel, s.monitorDone = cancel, done
+	s.mu.Unlock()
+	go func() { done <- (&HealthMonitor{Publisher: s.Telemetry, Source: source, Interval: interval}).Run(ctx) }()
+}
+
+func (s *RunService) stopMonitor() {
+	s.mu.Lock()
+	cancel, done := s.monitorCancel, s.monitorDone
+	s.monitorCancel, s.monitorDone = nil, nil
+	s.mu.Unlock()
+	if cancel == nil {
+		return
+	}
+	cancel()
+	<-done
 }
 
 func (s *RunService) publish(run *daqv1.RunSummary) *daqv1.TelemetrySnapshot {

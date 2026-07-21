@@ -94,3 +94,30 @@ func TestSessionAbortRetainsIncompleteMarker(t *testing.T) {
 		t.Fatalf("failed storage stats = %+v", stats)
 	}
 }
+
+func TestSessionRetainsLatestBoardServiceTelemetry(t *testing.T) {
+	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock}}
+	created, err := factory.New("service", acquisition.RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := created.(*Session)
+	temperature, voltage := 38.25, 49.5
+	status := uint16(7)
+	event := dt5202.Event{Kind: dt5202.EventService, Service: &dt5202.ServiceEvent{
+		FPGATemperature: &temperature, HVVoltage: &voltage, HVOn: true, HVOverVoltage: true, Status: &status,
+	}}
+	if err := session.sink.AppendEvent(dt5215.StreamEvent{Chain: 2, Descriptor: dt5215.Descriptor{Node: 3}}, event); err != nil {
+		t.Fatal(err)
+	}
+	boards := session.BoardStats()
+	if len(boards) != 1 || boards[0].Chain != 2 || boards[0].Node != 3 || boards[0].EventCount != 1 || boards[0].FPGATemperature == nil || *boards[0].FPGATemperature != temperature || boards[0].HVVoltage == nil || *boards[0].HVVoltage != voltage || !boards[0].HVOverVoltage || boards[0].AcquisitionStatus == nil || *boards[0].AcquisitionStatus != status {
+		t.Fatalf("boards = %+v", boards)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Abort(); err != nil {
+		t.Fatal(err)
+	}
+}

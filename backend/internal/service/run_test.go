@@ -11,6 +11,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
 )
 
@@ -20,6 +21,18 @@ type fakeRunController struct {
 	startErr error
 	stopErr  error
 	options  acquisition.RunOptions
+	pipeline acquisition.RunPipeline
+}
+
+type serviceHealthPipeline struct{}
+
+func (*serviceHealthPipeline) Submit(context.Context, acquisition.PipelineBatch) error { return nil }
+func (*serviceHealthPipeline) Close() error                                            { return nil }
+func (*serviceHealthPipeline) PipelineStats() acquisition.PipelineStats {
+	return acquisition.PipelineStats{Capacity: 4}
+}
+func (*serviceHealthPipeline) StorageStats() runpipeline.StorageStats {
+	return runpipeline.StorageStats{Directory: "/runs/run-42"}
 }
 
 func (c *fakeRunController) Start(_ context.Context, runID, _ string, options acquisition.RunOptions) error {
@@ -37,7 +50,8 @@ func (c *fakeRunController) Stop(context.Context, string) error {
 	c.active, c.state = "", acquisition.StateReady
 	return nil
 }
-func (c *fakeRunController) ActiveRunID() string { return c.active }
+func (c *fakeRunController) ActiveRunID() string                     { return c.active }
+func (c *fakeRunController) ActivePipeline() acquisition.RunPipeline { return c.pipeline }
 func (c *fakeRunController) StateSnapshot() acquisition.StateSnapshot {
 	return acquisition.StateSnapshot{State: c.state}
 }
@@ -105,5 +119,30 @@ func TestRunServiceRejectsStartWhenConfigurationDoesNotReachReady(t *testing.T) 
 	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || controller.active != "" {
 		t.Fatalf("code=%v error=%v controller=%+v", connect.CodeOf(err), err, controller)
+	}
+}
+
+func TestRunServiceOwnsHealthMonitorThroughStop(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
+	service := newRunService(t, controller)
+	service.HealthInterval = time.Hour
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.mu.Lock()
+	running := service.monitorCancel != nil && service.monitorDone != nil
+	service.mu.Unlock()
+	if !running {
+		t.Fatal("health monitor did not start")
+	}
+	if _, err := service.StopRun(context.Background(), connect.NewRequest(&daqv1.StopRunRequest{RunId: "42", RequestedBy: "operator"})); err != nil {
+		t.Fatal(err)
+	}
+	service.mu.Lock()
+	stopped := service.monitorCancel == nil && service.monitorDone == nil
+	service.mu.Unlock()
+	if !stopped {
+		t.Fatal("health monitor did not stop")
 	}
 }

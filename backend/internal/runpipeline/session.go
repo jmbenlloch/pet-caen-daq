@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,7 +59,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 			return nil, err
 		}
 	}
-	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw}
+	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, boards: make(map[boardKey]BoardStats)}
 	pipeline, err := acquisition.NewPipeline(options.Capacity, options.Backpressure, sink)
 	if err != nil {
 		_ = writer.Abort()
@@ -142,6 +143,7 @@ func (s *Session) Stats() StorageStats {
 
 func (s *Session) PipelineStats() acquisition.PipelineStats { return s.pipeline.Stats() }
 func (s *Session) StorageStats() StorageStats               { return s.Stats() }
+func (s *Session) BoardStats() []BoardStats                 { return s.sink.BoardStats() }
 
 func (s *Session) recordError(err error) {
 	if err == nil {
@@ -157,6 +159,26 @@ type sink struct {
 	captureRaw bool
 	events     atomic.Uint64
 	rawBatches atomic.Uint64
+	mu         sync.Mutex
+	boards     map[boardKey]BoardStats
+}
+
+type boardKey struct{ chain, node uint8 }
+
+type BoardStats struct {
+	Chain               uint8
+	Node                uint8
+	EventCount          uint64
+	FPGATemperature     *float64
+	BoardTemperature    *float64
+	DetectorTemperature *float64
+	HVVoltage           *float64
+	HVCurrent           *float64
+	HVOn                bool
+	HVRamping           bool
+	HVOverCurrent       bool
+	HVOverVoltage       bool
+	AcquisitionStatus   *uint16
 }
 
 func (s *sink) AppendRaw(raw []byte) error {
@@ -174,5 +196,53 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 		return err
 	}
 	s.events.Add(1)
+	s.mu.Lock()
+	key := boardKey{chain: wire.Chain, node: wire.Descriptor.Node}
+	board := s.boards[key]
+	board.Chain, board.Node, board.EventCount = key.chain, key.node, board.EventCount+1
+	if service := event.Service; service != nil {
+		board.FPGATemperature = cloneFloat(service.FPGATemperature)
+		board.BoardTemperature = cloneFloat(service.BoardTemperature)
+		board.DetectorTemperature = cloneFloat(service.DetectorTemperature)
+		board.HVVoltage = cloneFloat(service.HVVoltage)
+		board.HVCurrent = cloneFloat(service.HVCurrent)
+		board.HVOn, board.HVRamping = service.HVOn, service.HVRamping
+		board.HVOverCurrent, board.HVOverVoltage = service.HVOverCurrent, service.HVOverVoltage
+		if service.Status != nil {
+			status := *service.Status
+			board.AcquisitionStatus = &status
+		}
+	}
+	s.boards[key] = board
+	s.mu.Unlock()
 	return nil
+}
+
+func (s *sink) BoardStats() []BoardStats {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]BoardStats, 0, len(s.boards))
+	for _, board := range s.boards {
+		board.FPGATemperature = cloneFloat(board.FPGATemperature)
+		board.BoardTemperature = cloneFloat(board.BoardTemperature)
+		board.DetectorTemperature = cloneFloat(board.DetectorTemperature)
+		board.HVVoltage = cloneFloat(board.HVVoltage)
+		board.HVCurrent = cloneFloat(board.HVCurrent)
+		result = append(result, board)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Chain == result[j].Chain {
+			return result[i].Node < result[j].Node
+		}
+		return result[i].Chain < result[j].Chain
+	})
+	return result
+}
+
+func cloneFloat(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
