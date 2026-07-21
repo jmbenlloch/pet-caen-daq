@@ -2,38 +2,33 @@ syntax = "proto3";
 
 package pet.caen.daq.v1;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package = "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1;daqv1";
 
+// SystemService exposes point-in-time health/configuration queries and a
+// reconnect-safe stream of complete telemetry snapshots.
 service SystemService {
   rpc GetSystemSnapshot(GetSystemSnapshotRequest) returns (GetSystemSnapshotResponse) {}
   rpc ValidateConfiguration(ValidateConfigurationRequest) returns (ValidateConfigurationResponse) {}
+  rpc StreamTelemetry(StreamTelemetryRequest) returns (stream StreamTelemetryResponse) {}
+}
+
+// RunService owns coarse run-control operations. Register-level access is
+// deliberately excluded from the normal operator contract.
+service RunService {
+  rpc StartRun(StartRunRequest) returns (StartRunResponse) {}
+  rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
 }
 
 message GetSystemSnapshotRequest {}
 
 message GetSystemSnapshotResponse {
-  string instance_id = 1;
-  SystemState state = 2;
-  repeated Chain chains = 3;
-}
-
-enum SystemState {
-  SYSTEM_STATE_UNSPECIFIED = 0;
-  SYSTEM_STATE_DISCONNECTED = 1;
-  SYSTEM_STATE_IDLE = 2;
-  SYSTEM_STATE_FAULT = 3;
-}
-
-message Chain {
-  uint32 index = 1;
-  bool enabled = 2;
-  repeated Board boards = 3;
-}
-
-message Board {
-  uint32 node = 1;
-  uint32 product_id = 2;
-  uint32 fpga_firmware = 3;
+  // Deprecated discovery-slice fields retained for wire compatibility.
+  string instance_id = 1 [deprecated = true];
+  SystemState state = 2 [deprecated = true];
+  repeated Chain chains = 3 [deprecated = true];
+  TelemetrySnapshot snapshot = 4;
 }
 
 message ValidateConfigurationRequest {
@@ -42,5 +37,158 @@ message ValidateConfigurationRequest {
 
 message ValidateConfigurationResponse {
   bool valid = 1;
-  repeated string errors = 2;
+  // Deprecated in favor of structured issues.
+  repeated string errors = 2 [deprecated = true];
+  repeated ValidationIssue issues = 3;
+}
+
+message ValidationIssue {
+  ValidationSeverity severity = 1;
+  string field = 2;
+  uint32 source_line = 3;
+  string message = 4;
+}
+
+enum ValidationSeverity {
+  VALIDATION_SEVERITY_UNSPECIFIED = 0;
+  VALIDATION_SEVERITY_WARNING = 1;
+  VALIDATION_SEVERITY_ERROR = 2;
+}
+
+message StreamTelemetryRequest {}
+
+message StreamTelemetryResponse {
+  // Every response is independently usable. The first response on each new
+  // stream is a full snapshot and replaces all client-side telemetry state.
+  TelemetrySnapshot snapshot = 1;
+}
+
+message StartRunRequest {
+  string run_id = 1;
+  string janus_configuration = 2;
+  bool capture_raw = 3;
+  bool journal_transport = 4;
+  string requested_by = 5;
+}
+
+message StartRunResponse {
+  RunSummary run = 1;
+  TelemetrySnapshot snapshot = 2;
+}
+
+message StopRunRequest {
+  string run_id = 1;
+  string requested_by = 2;
+}
+
+message StopRunResponse {
+  RunSummary run = 1;
+  TelemetrySnapshot snapshot = 2;
+}
+
+message TelemetrySnapshot {
+  string instance_id = 1;
+  uint64 sequence = 2;
+  google.protobuf.Timestamp observed_at = 3;
+  SystemState state = 4;
+  RunSummary current_run = 5;
+  repeated Chain chains = 6;
+  PipelineTelemetry pipeline = 7;
+  StorageTelemetry storage = 8;
+  repeated Diagnostic diagnostics = 9;
+}
+
+enum SystemState {
+  SYSTEM_STATE_UNSPECIFIED = 0;
+  SYSTEM_STATE_DISCONNECTED = 1;
+  SYSTEM_STATE_IDLE = 2;
+  SYSTEM_STATE_FAULT = 3;
+  SYSTEM_STATE_CONNECTING = 4;
+  SYSTEM_STATE_CONFIGURING = 5;
+  SYSTEM_STATE_READY = 6;
+  SYSTEM_STATE_STARTING = 7;
+  SYSTEM_STATE_RUNNING = 8;
+  SYSTEM_STATE_STOPPING = 9;
+  SYSTEM_STATE_DRAINING = 10;
+  SYSTEM_STATE_RECOVERING = 11;
+}
+
+message RunSummary {
+  string run_id = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Timestamp completed_at = 3;
+  string termination_reason = 4;
+  uint64 event_count = 5;
+  uint64 raw_batch_count = 6;
+  bool incomplete = 7;
+  repeated Artifact artifacts = 8;
+}
+
+message Artifact {
+  string kind = 1;
+  string name = 2;
+  uint64 size_bytes = 3;
+  string sha256 = 4;
+}
+
+message Chain {
+  uint32 index = 1;
+  bool enabled = 2;
+  HealthStatus health = 3;
+  repeated Board boards = 4;
+}
+
+message Board {
+  uint32 node = 1;
+  uint32 product_id = 2;
+  uint32 fpga_firmware = 3;
+  HealthStatus health = 4;
+  double fpga_temperature_c = 5;
+  double board_temperature_c = 6;
+  double detector_temperature_c = 7;
+  double hv_voltage_v = 8;
+  double hv_current_a = 9;
+  bool hv_on = 10;
+  uint64 event_count = 11;
+}
+
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTH_STATUS_UNKNOWN = 1;
+  HEALTH_STATUS_OK = 2;
+  HEALTH_STATUS_DEGRADED = 3;
+  HEALTH_STATUS_FAULT = 4;
+}
+
+message PipelineTelemetry {
+  uint64 queue_capacity = 1;
+  uint64 queue_depth = 2;
+  uint64 accepted_batches = 3;
+  uint64 rejected_batches = 4;
+  uint64 decoded_events = 5;
+  uint64 decode_failures = 6;
+}
+
+message StorageTelemetry {
+  HealthStatus health = 1;
+  string run_directory = 2;
+  uint64 bytes_written = 3;
+  uint64 pending_bytes = 4;
+  string last_error = 5;
+}
+
+message Diagnostic {
+  DiagnosticSeverity severity = 1;
+  string code = 2;
+  string message = 3;
+  string chain = 4;
+  string node = 5;
+  google.protobuf.Timestamp observed_at = 6;
+}
+
+enum DiagnosticSeverity {
+  DIAGNOSTIC_SEVERITY_UNSPECIFIED = 0;
+  DIAGNOSTIC_SEVERITY_INFO = 1;
+  DIAGNOSTIC_SEVERITY_WARNING = 2;
+  DIAGNOSTIC_SEVERITY_ERROR = 3;
 }

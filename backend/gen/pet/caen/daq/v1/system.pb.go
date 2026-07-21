@@ -9,6 +9,7 @@ package daqv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -21,6 +22,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ValidationSeverity int32
+
+const (
+	ValidationSeverity_VALIDATION_SEVERITY_UNSPECIFIED ValidationSeverity = 0
+	ValidationSeverity_VALIDATION_SEVERITY_WARNING     ValidationSeverity = 1
+	ValidationSeverity_VALIDATION_SEVERITY_ERROR       ValidationSeverity = 2
+)
+
+// Enum value maps for ValidationSeverity.
+var (
+	ValidationSeverity_name = map[int32]string{
+		0: "VALIDATION_SEVERITY_UNSPECIFIED",
+		1: "VALIDATION_SEVERITY_WARNING",
+		2: "VALIDATION_SEVERITY_ERROR",
+	}
+	ValidationSeverity_value = map[string]int32{
+		"VALIDATION_SEVERITY_UNSPECIFIED": 0,
+		"VALIDATION_SEVERITY_WARNING":     1,
+		"VALIDATION_SEVERITY_ERROR":       2,
+	}
+)
+
+func (x ValidationSeverity) Enum() *ValidationSeverity {
+	p := new(ValidationSeverity)
+	*p = x
+	return p
+}
+
+func (x ValidationSeverity) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ValidationSeverity) Descriptor() protoreflect.EnumDescriptor {
+	return file_pet_caen_daq_v1_system_proto_enumTypes[0].Descriptor()
+}
+
+func (ValidationSeverity) Type() protoreflect.EnumType {
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[0]
+}
+
+func (x ValidationSeverity) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ValidationSeverity.Descriptor instead.
+func (ValidationSeverity) EnumDescriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{0}
+}
+
 type SystemState int32
 
 const (
@@ -28,21 +78,45 @@ const (
 	SystemState_SYSTEM_STATE_DISCONNECTED SystemState = 1
 	SystemState_SYSTEM_STATE_IDLE         SystemState = 2
 	SystemState_SYSTEM_STATE_FAULT        SystemState = 3
+	SystemState_SYSTEM_STATE_CONNECTING   SystemState = 4
+	SystemState_SYSTEM_STATE_CONFIGURING  SystemState = 5
+	SystemState_SYSTEM_STATE_READY        SystemState = 6
+	SystemState_SYSTEM_STATE_STARTING     SystemState = 7
+	SystemState_SYSTEM_STATE_RUNNING      SystemState = 8
+	SystemState_SYSTEM_STATE_STOPPING     SystemState = 9
+	SystemState_SYSTEM_STATE_DRAINING     SystemState = 10
+	SystemState_SYSTEM_STATE_RECOVERING   SystemState = 11
 )
 
 // Enum value maps for SystemState.
 var (
 	SystemState_name = map[int32]string{
-		0: "SYSTEM_STATE_UNSPECIFIED",
-		1: "SYSTEM_STATE_DISCONNECTED",
-		2: "SYSTEM_STATE_IDLE",
-		3: "SYSTEM_STATE_FAULT",
+		0:  "SYSTEM_STATE_UNSPECIFIED",
+		1:  "SYSTEM_STATE_DISCONNECTED",
+		2:  "SYSTEM_STATE_IDLE",
+		3:  "SYSTEM_STATE_FAULT",
+		4:  "SYSTEM_STATE_CONNECTING",
+		5:  "SYSTEM_STATE_CONFIGURING",
+		6:  "SYSTEM_STATE_READY",
+		7:  "SYSTEM_STATE_STARTING",
+		8:  "SYSTEM_STATE_RUNNING",
+		9:  "SYSTEM_STATE_STOPPING",
+		10: "SYSTEM_STATE_DRAINING",
+		11: "SYSTEM_STATE_RECOVERING",
 	}
 	SystemState_value = map[string]int32{
 		"SYSTEM_STATE_UNSPECIFIED":  0,
 		"SYSTEM_STATE_DISCONNECTED": 1,
 		"SYSTEM_STATE_IDLE":         2,
 		"SYSTEM_STATE_FAULT":        3,
+		"SYSTEM_STATE_CONNECTING":   4,
+		"SYSTEM_STATE_CONFIGURING":  5,
+		"SYSTEM_STATE_READY":        6,
+		"SYSTEM_STATE_STARTING":     7,
+		"SYSTEM_STATE_RUNNING":      8,
+		"SYSTEM_STATE_STOPPING":     9,
+		"SYSTEM_STATE_DRAINING":     10,
+		"SYSTEM_STATE_RECOVERING":   11,
 	}
 )
 
@@ -57,11 +131,11 @@ func (x SystemState) String() string {
 }
 
 func (SystemState) Descriptor() protoreflect.EnumDescriptor {
-	return file_pet_caen_daq_v1_system_proto_enumTypes[0].Descriptor()
+	return file_pet_caen_daq_v1_system_proto_enumTypes[1].Descriptor()
 }
 
 func (SystemState) Type() protoreflect.EnumType {
-	return &file_pet_caen_daq_v1_system_proto_enumTypes[0]
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[1]
 }
 
 func (x SystemState) Number() protoreflect.EnumNumber {
@@ -70,7 +144,114 @@ func (x SystemState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SystemState.Descriptor instead.
 func (SystemState) EnumDescriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{0}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{1}
+}
+
+type HealthStatus int32
+
+const (
+	HealthStatus_HEALTH_STATUS_UNSPECIFIED HealthStatus = 0
+	HealthStatus_HEALTH_STATUS_UNKNOWN     HealthStatus = 1
+	HealthStatus_HEALTH_STATUS_OK          HealthStatus = 2
+	HealthStatus_HEALTH_STATUS_DEGRADED    HealthStatus = 3
+	HealthStatus_HEALTH_STATUS_FAULT       HealthStatus = 4
+)
+
+// Enum value maps for HealthStatus.
+var (
+	HealthStatus_name = map[int32]string{
+		0: "HEALTH_STATUS_UNSPECIFIED",
+		1: "HEALTH_STATUS_UNKNOWN",
+		2: "HEALTH_STATUS_OK",
+		3: "HEALTH_STATUS_DEGRADED",
+		4: "HEALTH_STATUS_FAULT",
+	}
+	HealthStatus_value = map[string]int32{
+		"HEALTH_STATUS_UNSPECIFIED": 0,
+		"HEALTH_STATUS_UNKNOWN":     1,
+		"HEALTH_STATUS_OK":          2,
+		"HEALTH_STATUS_DEGRADED":    3,
+		"HEALTH_STATUS_FAULT":       4,
+	}
+)
+
+func (x HealthStatus) Enum() *HealthStatus {
+	p := new(HealthStatus)
+	*p = x
+	return p
+}
+
+func (x HealthStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (HealthStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_pet_caen_daq_v1_system_proto_enumTypes[2].Descriptor()
+}
+
+func (HealthStatus) Type() protoreflect.EnumType {
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[2]
+}
+
+func (x HealthStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use HealthStatus.Descriptor instead.
+func (HealthStatus) EnumDescriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{2}
+}
+
+type DiagnosticSeverity int32
+
+const (
+	DiagnosticSeverity_DIAGNOSTIC_SEVERITY_UNSPECIFIED DiagnosticSeverity = 0
+	DiagnosticSeverity_DIAGNOSTIC_SEVERITY_INFO        DiagnosticSeverity = 1
+	DiagnosticSeverity_DIAGNOSTIC_SEVERITY_WARNING     DiagnosticSeverity = 2
+	DiagnosticSeverity_DIAGNOSTIC_SEVERITY_ERROR       DiagnosticSeverity = 3
+)
+
+// Enum value maps for DiagnosticSeverity.
+var (
+	DiagnosticSeverity_name = map[int32]string{
+		0: "DIAGNOSTIC_SEVERITY_UNSPECIFIED",
+		1: "DIAGNOSTIC_SEVERITY_INFO",
+		2: "DIAGNOSTIC_SEVERITY_WARNING",
+		3: "DIAGNOSTIC_SEVERITY_ERROR",
+	}
+	DiagnosticSeverity_value = map[string]int32{
+		"DIAGNOSTIC_SEVERITY_UNSPECIFIED": 0,
+		"DIAGNOSTIC_SEVERITY_INFO":        1,
+		"DIAGNOSTIC_SEVERITY_WARNING":     2,
+		"DIAGNOSTIC_SEVERITY_ERROR":       3,
+	}
+)
+
+func (x DiagnosticSeverity) Enum() *DiagnosticSeverity {
+	p := new(DiagnosticSeverity)
+	*p = x
+	return p
+}
+
+func (x DiagnosticSeverity) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DiagnosticSeverity) Descriptor() protoreflect.EnumDescriptor {
+	return file_pet_caen_daq_v1_system_proto_enumTypes[3].Descriptor()
+}
+
+func (DiagnosticSeverity) Type() protoreflect.EnumType {
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[3]
+}
+
+func (x DiagnosticSeverity) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DiagnosticSeverity.Descriptor instead.
+func (DiagnosticSeverity) EnumDescriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{3}
 }
 
 type GetSystemSnapshotRequest struct {
@@ -110,10 +291,16 @@ func (*GetSystemSnapshotRequest) Descriptor() ([]byte, []int) {
 }
 
 type GetSystemSnapshotResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	InstanceId    string                 `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
-	State         SystemState            `protobuf:"varint,2,opt,name=state,proto3,enum=pet.caen.daq.v1.SystemState" json:"state,omitempty"`
-	Chains        []*Chain               `protobuf:"bytes,3,rep,name=chains,proto3" json:"chains,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Deprecated discovery-slice fields retained for wire compatibility.
+	//
+	// Deprecated: Marked as deprecated in pet/caen/daq/v1/system.proto.
+	InstanceId string `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
+	// Deprecated: Marked as deprecated in pet/caen/daq/v1/system.proto.
+	State SystemState `protobuf:"varint,2,opt,name=state,proto3,enum=pet.caen.daq.v1.SystemState" json:"state,omitempty"`
+	// Deprecated: Marked as deprecated in pet/caen/daq/v1/system.proto.
+	Chains        []*Chain           `protobuf:"bytes,3,rep,name=chains,proto3" json:"chains,omitempty"`
+	Snapshot      *TelemetrySnapshot `protobuf:"bytes,4,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -148,6 +335,7 @@ func (*GetSystemSnapshotResponse) Descriptor() ([]byte, []int) {
 	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{1}
 }
 
+// Deprecated: Marked as deprecated in pet/caen/daq/v1/system.proto.
 func (x *GetSystemSnapshotResponse) GetInstanceId() string {
 	if x != nil {
 		return x.InstanceId
@@ -155,6 +343,7 @@ func (x *GetSystemSnapshotResponse) GetInstanceId() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in pet/caen/daq/v1/system.proto.
 func (x *GetSystemSnapshotResponse) GetState() SystemState {
 	if x != nil {
 		return x.State
@@ -162,6 +351,7 @@ func (x *GetSystemSnapshotResponse) GetState() SystemState {
 	return SystemState_SYSTEM_STATE_UNSPECIFIED
 }
 
+// Deprecated: Marked as deprecated in pet/caen/daq/v1/system.proto.
 func (x *GetSystemSnapshotResponse) GetChains() []*Chain {
 	if x != nil {
 		return x.Chains
@@ -169,18 +359,792 @@ func (x *GetSystemSnapshotResponse) GetChains() []*Chain {
 	return nil
 }
 
+func (x *GetSystemSnapshotResponse) GetSnapshot() *TelemetrySnapshot {
+	if x != nil {
+		return x.Snapshot
+	}
+	return nil
+}
+
+type ValidateConfigurationRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	JanusConfiguration string                 `protobuf:"bytes,1,opt,name=janus_configuration,json=janusConfiguration,proto3" json:"janus_configuration,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *ValidateConfigurationRequest) Reset() {
+	*x = ValidateConfigurationRequest{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateConfigurationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateConfigurationRequest) ProtoMessage() {}
+
+func (x *ValidateConfigurationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateConfigurationRequest.ProtoReflect.Descriptor instead.
+func (*ValidateConfigurationRequest) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ValidateConfigurationRequest) GetJanusConfiguration() string {
+	if x != nil {
+		return x.JanusConfiguration
+	}
+	return ""
+}
+
+type ValidateConfigurationResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Valid bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
+	// Deprecated in favor of structured issues.
+	//
+	// Deprecated: Marked as deprecated in pet/caen/daq/v1/system.proto.
+	Errors        []string           `protobuf:"bytes,2,rep,name=errors,proto3" json:"errors,omitempty"`
+	Issues        []*ValidationIssue `protobuf:"bytes,3,rep,name=issues,proto3" json:"issues,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateConfigurationResponse) Reset() {
+	*x = ValidateConfigurationResponse{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateConfigurationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateConfigurationResponse) ProtoMessage() {}
+
+func (x *ValidateConfigurationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateConfigurationResponse.ProtoReflect.Descriptor instead.
+func (*ValidateConfigurationResponse) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ValidateConfigurationResponse) GetValid() bool {
+	if x != nil {
+		return x.Valid
+	}
+	return false
+}
+
+// Deprecated: Marked as deprecated in pet/caen/daq/v1/system.proto.
+func (x *ValidateConfigurationResponse) GetErrors() []string {
+	if x != nil {
+		return x.Errors
+	}
+	return nil
+}
+
+func (x *ValidateConfigurationResponse) GetIssues() []*ValidationIssue {
+	if x != nil {
+		return x.Issues
+	}
+	return nil
+}
+
+type ValidationIssue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Severity      ValidationSeverity     `protobuf:"varint,1,opt,name=severity,proto3,enum=pet.caen.daq.v1.ValidationSeverity" json:"severity,omitempty"`
+	Field         string                 `protobuf:"bytes,2,opt,name=field,proto3" json:"field,omitempty"`
+	SourceLine    uint32                 `protobuf:"varint,3,opt,name=source_line,json=sourceLine,proto3" json:"source_line,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidationIssue) Reset() {
+	*x = ValidationIssue{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidationIssue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidationIssue) ProtoMessage() {}
+
+func (x *ValidationIssue) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidationIssue.ProtoReflect.Descriptor instead.
+func (*ValidationIssue) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ValidationIssue) GetSeverity() ValidationSeverity {
+	if x != nil {
+		return x.Severity
+	}
+	return ValidationSeverity_VALIDATION_SEVERITY_UNSPECIFIED
+}
+
+func (x *ValidationIssue) GetField() string {
+	if x != nil {
+		return x.Field
+	}
+	return ""
+}
+
+func (x *ValidationIssue) GetSourceLine() uint32 {
+	if x != nil {
+		return x.SourceLine
+	}
+	return 0
+}
+
+func (x *ValidationIssue) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type StreamTelemetryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamTelemetryRequest) Reset() {
+	*x = StreamTelemetryRequest{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamTelemetryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamTelemetryRequest) ProtoMessage() {}
+
+func (x *StreamTelemetryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamTelemetryRequest.ProtoReflect.Descriptor instead.
+func (*StreamTelemetryRequest) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{5}
+}
+
+type StreamTelemetryResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Every response is independently usable. The first response on each new
+	// stream is a full snapshot and replaces all client-side telemetry state.
+	Snapshot      *TelemetrySnapshot `protobuf:"bytes,1,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamTelemetryResponse) Reset() {
+	*x = StreamTelemetryResponse{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamTelemetryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamTelemetryResponse) ProtoMessage() {}
+
+func (x *StreamTelemetryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamTelemetryResponse.ProtoReflect.Descriptor instead.
+func (*StreamTelemetryResponse) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *StreamTelemetryResponse) GetSnapshot() *TelemetrySnapshot {
+	if x != nil {
+		return x.Snapshot
+	}
+	return nil
+}
+
+type StartRunRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	RunId              string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	JanusConfiguration string                 `protobuf:"bytes,2,opt,name=janus_configuration,json=janusConfiguration,proto3" json:"janus_configuration,omitempty"`
+	CaptureRaw         bool                   `protobuf:"varint,3,opt,name=capture_raw,json=captureRaw,proto3" json:"capture_raw,omitempty"`
+	JournalTransport   bool                   `protobuf:"varint,4,opt,name=journal_transport,json=journalTransport,proto3" json:"journal_transport,omitempty"`
+	RequestedBy        string                 `protobuf:"bytes,5,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *StartRunRequest) Reset() {
+	*x = StartRunRequest{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartRunRequest) ProtoMessage() {}
+
+func (x *StartRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartRunRequest.ProtoReflect.Descriptor instead.
+func (*StartRunRequest) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *StartRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *StartRunRequest) GetJanusConfiguration() string {
+	if x != nil {
+		return x.JanusConfiguration
+	}
+	return ""
+}
+
+func (x *StartRunRequest) GetCaptureRaw() bool {
+	if x != nil {
+		return x.CaptureRaw
+	}
+	return false
+}
+
+func (x *StartRunRequest) GetJournalTransport() bool {
+	if x != nil {
+		return x.JournalTransport
+	}
+	return false
+}
+
+func (x *StartRunRequest) GetRequestedBy() string {
+	if x != nil {
+		return x.RequestedBy
+	}
+	return ""
+}
+
+type StartRunResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Run           *RunSummary            `protobuf:"bytes,1,opt,name=run,proto3" json:"run,omitempty"`
+	Snapshot      *TelemetrySnapshot     `protobuf:"bytes,2,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartRunResponse) Reset() {
+	*x = StartRunResponse{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartRunResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartRunResponse) ProtoMessage() {}
+
+func (x *StartRunResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartRunResponse.ProtoReflect.Descriptor instead.
+func (*StartRunResponse) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *StartRunResponse) GetRun() *RunSummary {
+	if x != nil {
+		return x.Run
+	}
+	return nil
+}
+
+func (x *StartRunResponse) GetSnapshot() *TelemetrySnapshot {
+	if x != nil {
+		return x.Snapshot
+	}
+	return nil
+}
+
+type StopRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	RequestedBy   string                 `protobuf:"bytes,2,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopRunRequest) Reset() {
+	*x = StopRunRequest{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopRunRequest) ProtoMessage() {}
+
+func (x *StopRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopRunRequest.ProtoReflect.Descriptor instead.
+func (*StopRunRequest) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *StopRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *StopRunRequest) GetRequestedBy() string {
+	if x != nil {
+		return x.RequestedBy
+	}
+	return ""
+}
+
+type StopRunResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Run           *RunSummary            `protobuf:"bytes,1,opt,name=run,proto3" json:"run,omitempty"`
+	Snapshot      *TelemetrySnapshot     `protobuf:"bytes,2,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopRunResponse) Reset() {
+	*x = StopRunResponse{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopRunResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopRunResponse) ProtoMessage() {}
+
+func (x *StopRunResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopRunResponse.ProtoReflect.Descriptor instead.
+func (*StopRunResponse) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *StopRunResponse) GetRun() *RunSummary {
+	if x != nil {
+		return x.Run
+	}
+	return nil
+}
+
+func (x *StopRunResponse) GetSnapshot() *TelemetrySnapshot {
+	if x != nil {
+		return x.Snapshot
+	}
+	return nil
+}
+
+type TelemetrySnapshot struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	InstanceId    string                 `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
+	Sequence      uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	ObservedAt    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	State         SystemState            `protobuf:"varint,4,opt,name=state,proto3,enum=pet.caen.daq.v1.SystemState" json:"state,omitempty"`
+	CurrentRun    *RunSummary            `protobuf:"bytes,5,opt,name=current_run,json=currentRun,proto3" json:"current_run,omitempty"`
+	Chains        []*Chain               `protobuf:"bytes,6,rep,name=chains,proto3" json:"chains,omitempty"`
+	Pipeline      *PipelineTelemetry     `protobuf:"bytes,7,opt,name=pipeline,proto3" json:"pipeline,omitempty"`
+	Storage       *StorageTelemetry      `protobuf:"bytes,8,opt,name=storage,proto3" json:"storage,omitempty"`
+	Diagnostics   []*Diagnostic          `protobuf:"bytes,9,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TelemetrySnapshot) Reset() {
+	*x = TelemetrySnapshot{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TelemetrySnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TelemetrySnapshot) ProtoMessage() {}
+
+func (x *TelemetrySnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TelemetrySnapshot.ProtoReflect.Descriptor instead.
+func (*TelemetrySnapshot) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *TelemetrySnapshot) GetInstanceId() string {
+	if x != nil {
+		return x.InstanceId
+	}
+	return ""
+}
+
+func (x *TelemetrySnapshot) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *TelemetrySnapshot) GetObservedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ObservedAt
+	}
+	return nil
+}
+
+func (x *TelemetrySnapshot) GetState() SystemState {
+	if x != nil {
+		return x.State
+	}
+	return SystemState_SYSTEM_STATE_UNSPECIFIED
+}
+
+func (x *TelemetrySnapshot) GetCurrentRun() *RunSummary {
+	if x != nil {
+		return x.CurrentRun
+	}
+	return nil
+}
+
+func (x *TelemetrySnapshot) GetChains() []*Chain {
+	if x != nil {
+		return x.Chains
+	}
+	return nil
+}
+
+func (x *TelemetrySnapshot) GetPipeline() *PipelineTelemetry {
+	if x != nil {
+		return x.Pipeline
+	}
+	return nil
+}
+
+func (x *TelemetrySnapshot) GetStorage() *StorageTelemetry {
+	if x != nil {
+		return x.Storage
+	}
+	return nil
+}
+
+func (x *TelemetrySnapshot) GetDiagnostics() []*Diagnostic {
+	if x != nil {
+		return x.Diagnostics
+	}
+	return nil
+}
+
+type RunSummary struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	RunId             string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	StartedAt         *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	CompletedAt       *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	TerminationReason string                 `protobuf:"bytes,4,opt,name=termination_reason,json=terminationReason,proto3" json:"termination_reason,omitempty"`
+	EventCount        uint64                 `protobuf:"varint,5,opt,name=event_count,json=eventCount,proto3" json:"event_count,omitempty"`
+	RawBatchCount     uint64                 `protobuf:"varint,6,opt,name=raw_batch_count,json=rawBatchCount,proto3" json:"raw_batch_count,omitempty"`
+	Incomplete        bool                   `protobuf:"varint,7,opt,name=incomplete,proto3" json:"incomplete,omitempty"`
+	Artifacts         []*Artifact            `protobuf:"bytes,8,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RunSummary) Reset() {
+	*x = RunSummary{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunSummary) ProtoMessage() {}
+
+func (x *RunSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunSummary.ProtoReflect.Descriptor instead.
+func (*RunSummary) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RunSummary) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *RunSummary) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *RunSummary) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
+func (x *RunSummary) GetTerminationReason() string {
+	if x != nil {
+		return x.TerminationReason
+	}
+	return ""
+}
+
+func (x *RunSummary) GetEventCount() uint64 {
+	if x != nil {
+		return x.EventCount
+	}
+	return 0
+}
+
+func (x *RunSummary) GetRawBatchCount() uint64 {
+	if x != nil {
+		return x.RawBatchCount
+	}
+	return 0
+}
+
+func (x *RunSummary) GetIncomplete() bool {
+	if x != nil {
+		return x.Incomplete
+	}
+	return false
+}
+
+func (x *RunSummary) GetArtifacts() []*Artifact {
+	if x != nil {
+		return x.Artifacts
+	}
+	return nil
+}
+
+type Artifact struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	SizeBytes     uint64                 `protobuf:"varint,3,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	Sha256        string                 `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Artifact) Reset() {
+	*x = Artifact{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Artifact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Artifact) ProtoMessage() {}
+
+func (x *Artifact) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Artifact.ProtoReflect.Descriptor instead.
+func (*Artifact) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *Artifact) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *Artifact) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Artifact) GetSizeBytes() uint64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *Artifact) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
 type Chain struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Index         uint32                 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
 	Enabled       bool                   `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	Boards        []*Board               `protobuf:"bytes,3,rep,name=boards,proto3" json:"boards,omitempty"`
+	Health        HealthStatus           `protobuf:"varint,3,opt,name=health,proto3,enum=pet.caen.daq.v1.HealthStatus" json:"health,omitempty"`
+	Boards        []*Board               `protobuf:"bytes,4,rep,name=boards,proto3" json:"boards,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Chain) Reset() {
 	*x = Chain{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[2]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -192,7 +1156,7 @@ func (x *Chain) String() string {
 func (*Chain) ProtoMessage() {}
 
 func (x *Chain) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[2]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -205,7 +1169,7 @@ func (x *Chain) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Chain.ProtoReflect.Descriptor instead.
 func (*Chain) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{2}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Chain) GetIndex() uint32 {
@@ -222,6 +1186,13 @@ func (x *Chain) GetEnabled() bool {
 	return false
 }
 
+func (x *Chain) GetHealth() HealthStatus {
+	if x != nil {
+		return x.Health
+	}
+	return HealthStatus_HEALTH_STATUS_UNSPECIFIED
+}
+
 func (x *Chain) GetBoards() []*Board {
 	if x != nil {
 		return x.Boards
@@ -230,17 +1201,25 @@ func (x *Chain) GetBoards() []*Board {
 }
 
 type Board struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Node          uint32                 `protobuf:"varint,1,opt,name=node,proto3" json:"node,omitempty"`
-	ProductId     uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	FpgaFirmware  uint32                 `protobuf:"varint,3,opt,name=fpga_firmware,json=fpgaFirmware,proto3" json:"fpga_firmware,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Node                 uint32                 `protobuf:"varint,1,opt,name=node,proto3" json:"node,omitempty"`
+	ProductId            uint32                 `protobuf:"varint,2,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
+	FpgaFirmware         uint32                 `protobuf:"varint,3,opt,name=fpga_firmware,json=fpgaFirmware,proto3" json:"fpga_firmware,omitempty"`
+	Health               HealthStatus           `protobuf:"varint,4,opt,name=health,proto3,enum=pet.caen.daq.v1.HealthStatus" json:"health,omitempty"`
+	FpgaTemperatureC     float64                `protobuf:"fixed64,5,opt,name=fpga_temperature_c,json=fpgaTemperatureC,proto3" json:"fpga_temperature_c,omitempty"`
+	BoardTemperatureC    float64                `protobuf:"fixed64,6,opt,name=board_temperature_c,json=boardTemperatureC,proto3" json:"board_temperature_c,omitempty"`
+	DetectorTemperatureC float64                `protobuf:"fixed64,7,opt,name=detector_temperature_c,json=detectorTemperatureC,proto3" json:"detector_temperature_c,omitempty"`
+	HvVoltageV           float64                `protobuf:"fixed64,8,opt,name=hv_voltage_v,json=hvVoltageV,proto3" json:"hv_voltage_v,omitempty"`
+	HvCurrentA           float64                `protobuf:"fixed64,9,opt,name=hv_current_a,json=hvCurrentA,proto3" json:"hv_current_a,omitempty"`
+	HvOn                 bool                   `protobuf:"varint,10,opt,name=hv_on,json=hvOn,proto3" json:"hv_on,omitempty"`
+	EventCount           uint64                 `protobuf:"varint,11,opt,name=event_count,json=eventCount,proto3" json:"event_count,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *Board) Reset() {
 	*x = Board{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[3]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -252,7 +1231,7 @@ func (x *Board) String() string {
 func (*Board) ProtoMessage() {}
 
 func (x *Board) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[3]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -265,7 +1244,7 @@ func (x *Board) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Board.ProtoReflect.Descriptor instead.
 func (*Board) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{3}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *Board) GetNode() uint32 {
@@ -289,98 +1268,302 @@ func (x *Board) GetFpgaFirmware() uint32 {
 	return 0
 }
 
-type ValidateConfigurationRequest struct {
-	state              protoimpl.MessageState `protogen:"open.v1"`
-	JanusConfiguration string                 `protobuf:"bytes,1,opt,name=janus_configuration,json=janusConfiguration,proto3" json:"janus_configuration,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
-}
-
-func (x *ValidateConfigurationRequest) Reset() {
-	*x = ValidateConfigurationRequest{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ValidateConfigurationRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ValidateConfigurationRequest) ProtoMessage() {}
-
-func (x *ValidateConfigurationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[4]
+func (x *Board) GetHealth() HealthStatus {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+		return x.Health
 	}
-	return mi.MessageOf(x)
+	return HealthStatus_HEALTH_STATUS_UNSPECIFIED
 }
 
-// Deprecated: Use ValidateConfigurationRequest.ProtoReflect.Descriptor instead.
-func (*ValidateConfigurationRequest) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ValidateConfigurationRequest) GetJanusConfiguration() string {
+func (x *Board) GetFpgaTemperatureC() float64 {
 	if x != nil {
-		return x.JanusConfiguration
+		return x.FpgaTemperatureC
 	}
-	return ""
+	return 0
 }
 
-type ValidateConfigurationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
-	Errors        []string               `protobuf:"bytes,2,rep,name=errors,proto3" json:"errors,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ValidateConfigurationResponse) Reset() {
-	*x = ValidateConfigurationResponse{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ValidateConfigurationResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ValidateConfigurationResponse) ProtoMessage() {}
-
-func (x *ValidateConfigurationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[5]
+func (x *Board) GetBoardTemperatureC() float64 {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+		return x.BoardTemperatureC
 	}
-	return mi.MessageOf(x)
+	return 0
 }
 
-// Deprecated: Use ValidateConfigurationResponse.ProtoReflect.Descriptor instead.
-func (*ValidateConfigurationResponse) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *ValidateConfigurationResponse) GetValid() bool {
+func (x *Board) GetDetectorTemperatureC() float64 {
 	if x != nil {
-		return x.Valid
+		return x.DetectorTemperatureC
+	}
+	return 0
+}
+
+func (x *Board) GetHvVoltageV() float64 {
+	if x != nil {
+		return x.HvVoltageV
+	}
+	return 0
+}
+
+func (x *Board) GetHvCurrentA() float64 {
+	if x != nil {
+		return x.HvCurrentA
+	}
+	return 0
+}
+
+func (x *Board) GetHvOn() bool {
+	if x != nil {
+		return x.HvOn
 	}
 	return false
 }
 
-func (x *ValidateConfigurationResponse) GetErrors() []string {
+func (x *Board) GetEventCount() uint64 {
 	if x != nil {
-		return x.Errors
+		return x.EventCount
+	}
+	return 0
+}
+
+type PipelineTelemetry struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	QueueCapacity   uint64                 `protobuf:"varint,1,opt,name=queue_capacity,json=queueCapacity,proto3" json:"queue_capacity,omitempty"`
+	QueueDepth      uint64                 `protobuf:"varint,2,opt,name=queue_depth,json=queueDepth,proto3" json:"queue_depth,omitempty"`
+	AcceptedBatches uint64                 `protobuf:"varint,3,opt,name=accepted_batches,json=acceptedBatches,proto3" json:"accepted_batches,omitempty"`
+	RejectedBatches uint64                 `protobuf:"varint,4,opt,name=rejected_batches,json=rejectedBatches,proto3" json:"rejected_batches,omitempty"`
+	DecodedEvents   uint64                 `protobuf:"varint,5,opt,name=decoded_events,json=decodedEvents,proto3" json:"decoded_events,omitempty"`
+	DecodeFailures  uint64                 `protobuf:"varint,6,opt,name=decode_failures,json=decodeFailures,proto3" json:"decode_failures,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *PipelineTelemetry) Reset() {
+	*x = PipelineTelemetry{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PipelineTelemetry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PipelineTelemetry) ProtoMessage() {}
+
+func (x *PipelineTelemetry) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PipelineTelemetry.ProtoReflect.Descriptor instead.
+func (*PipelineTelemetry) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *PipelineTelemetry) GetQueueCapacity() uint64 {
+	if x != nil {
+		return x.QueueCapacity
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetQueueDepth() uint64 {
+	if x != nil {
+		return x.QueueDepth
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetAcceptedBatches() uint64 {
+	if x != nil {
+		return x.AcceptedBatches
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetRejectedBatches() uint64 {
+	if x != nil {
+		return x.RejectedBatches
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetDecodedEvents() uint64 {
+	if x != nil {
+		return x.DecodedEvents
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetDecodeFailures() uint64 {
+	if x != nil {
+		return x.DecodeFailures
+	}
+	return 0
+}
+
+type StorageTelemetry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Health        HealthStatus           `protobuf:"varint,1,opt,name=health,proto3,enum=pet.caen.daq.v1.HealthStatus" json:"health,omitempty"`
+	RunDirectory  string                 `protobuf:"bytes,2,opt,name=run_directory,json=runDirectory,proto3" json:"run_directory,omitempty"`
+	BytesWritten  uint64                 `protobuf:"varint,3,opt,name=bytes_written,json=bytesWritten,proto3" json:"bytes_written,omitempty"`
+	PendingBytes  uint64                 `protobuf:"varint,4,opt,name=pending_bytes,json=pendingBytes,proto3" json:"pending_bytes,omitempty"`
+	LastError     string                 `protobuf:"bytes,5,opt,name=last_error,json=lastError,proto3" json:"last_error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StorageTelemetry) Reset() {
+	*x = StorageTelemetry{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StorageTelemetry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StorageTelemetry) ProtoMessage() {}
+
+func (x *StorageTelemetry) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StorageTelemetry.ProtoReflect.Descriptor instead.
+func (*StorageTelemetry) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *StorageTelemetry) GetHealth() HealthStatus {
+	if x != nil {
+		return x.Health
+	}
+	return HealthStatus_HEALTH_STATUS_UNSPECIFIED
+}
+
+func (x *StorageTelemetry) GetRunDirectory() string {
+	if x != nil {
+		return x.RunDirectory
+	}
+	return ""
+}
+
+func (x *StorageTelemetry) GetBytesWritten() uint64 {
+	if x != nil {
+		return x.BytesWritten
+	}
+	return 0
+}
+
+func (x *StorageTelemetry) GetPendingBytes() uint64 {
+	if x != nil {
+		return x.PendingBytes
+	}
+	return 0
+}
+
+func (x *StorageTelemetry) GetLastError() string {
+	if x != nil {
+		return x.LastError
+	}
+	return ""
+}
+
+type Diagnostic struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Severity      DiagnosticSeverity     `protobuf:"varint,1,opt,name=severity,proto3,enum=pet.caen.daq.v1.DiagnosticSeverity" json:"severity,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	Chain         string                 `protobuf:"bytes,4,opt,name=chain,proto3" json:"chain,omitempty"`
+	Node          string                 `protobuf:"bytes,5,opt,name=node,proto3" json:"node,omitempty"`
+	ObservedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Diagnostic) Reset() {
+	*x = Diagnostic{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Diagnostic) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Diagnostic) ProtoMessage() {}
+
+func (x *Diagnostic) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Diagnostic.ProtoReflect.Descriptor instead.
+func (*Diagnostic) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *Diagnostic) GetSeverity() DiagnosticSeverity {
+	if x != nil {
+		return x.Severity
+	}
+	return DiagnosticSeverity_DIAGNOSTIC_SEVERITY_UNSPECIFIED
+}
+
+func (x *Diagnostic) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *Diagnostic) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *Diagnostic) GetChain() string {
+	if x != nil {
+		return x.Chain
+	}
+	return ""
+}
+
+func (x *Diagnostic) GetNode() string {
+	if x != nil {
+		return x.Node
+	}
+	return ""
+}
+
+func (x *Diagnostic) GetObservedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ObservedAt
 	}
 	return nil
 }
@@ -389,35 +1572,161 @@ var File_pet_caen_daq_v1_system_proto protoreflect.FileDescriptor
 
 const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\n" +
-	"\x1cpet/caen/daq/v1/system.proto\x12\x0fpet.caen.daq.v1\"\x1a\n" +
-	"\x18GetSystemSnapshotRequest\"\xa0\x01\n" +
-	"\x19GetSystemSnapshotResponse\x12\x1f\n" +
+	"\x1cpet/caen/daq/v1/system.proto\x12\x0fpet.caen.daq.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x1a\n" +
+	"\x18GetSystemSnapshotRequest\"\xec\x01\n" +
+	"\x19GetSystemSnapshotResponse\x12#\n" +
+	"\vinstance_id\x18\x01 \x01(\tB\x02\x18\x01R\n" +
+	"instanceId\x126\n" +
+	"\x05state\x18\x02 \x01(\x0e2\x1c.pet.caen.daq.v1.SystemStateB\x02\x18\x01R\x05state\x122\n" +
+	"\x06chains\x18\x03 \x03(\v2\x16.pet.caen.daq.v1.ChainB\x02\x18\x01R\x06chains\x12>\n" +
+	"\bsnapshot\x18\x04 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"O\n" +
+	"\x1cValidateConfigurationRequest\x12/\n" +
+	"\x13janus_configuration\x18\x01 \x01(\tR\x12janusConfiguration\"\x8b\x01\n" +
+	"\x1dValidateConfigurationResponse\x12\x14\n" +
+	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x1a\n" +
+	"\x06errors\x18\x02 \x03(\tB\x02\x18\x01R\x06errors\x128\n" +
+	"\x06issues\x18\x03 \x03(\v2 .pet.caen.daq.v1.ValidationIssueR\x06issues\"\xa3\x01\n" +
+	"\x0fValidationIssue\x12?\n" +
+	"\bseverity\x18\x01 \x01(\x0e2#.pet.caen.daq.v1.ValidationSeverityR\bseverity\x12\x14\n" +
+	"\x05field\x18\x02 \x01(\tR\x05field\x12\x1f\n" +
+	"\vsource_line\x18\x03 \x01(\rR\n" +
+	"sourceLine\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\"\x18\n" +
+	"\x16StreamTelemetryRequest\"Y\n" +
+	"\x17StreamTelemetryResponse\x12>\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xca\x01\n" +
+	"\x0fStartRunRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12/\n" +
+	"\x13janus_configuration\x18\x02 \x01(\tR\x12janusConfiguration\x12\x1f\n" +
+	"\vcapture_raw\x18\x03 \x01(\bR\n" +
+	"captureRaw\x12+\n" +
+	"\x11journal_transport\x18\x04 \x01(\bR\x10journalTransport\x12!\n" +
+	"\frequested_by\x18\x05 \x01(\tR\vrequestedBy\"\x81\x01\n" +
+	"\x10StartRunResponse\x12-\n" +
+	"\x03run\x18\x01 \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x03run\x12>\n" +
+	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"J\n" +
+	"\x0eStopRunRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12!\n" +
+	"\frequested_by\x18\x02 \x01(\tR\vrequestedBy\"\x80\x01\n" +
+	"\x0fStopRunResponse\x12-\n" +
+	"\x03run\x18\x01 \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x03run\x12>\n" +
+	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xeb\x03\n" +
+	"\x11TelemetrySnapshot\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
-	"instanceId\x122\n" +
-	"\x05state\x18\x02 \x01(\x0e2\x1c.pet.caen.daq.v1.SystemStateR\x05state\x12.\n" +
-	"\x06chains\x18\x03 \x03(\v2\x16.pet.caen.daq.v1.ChainR\x06chains\"g\n" +
+	"instanceId\x12\x1a\n" +
+	"\bsequence\x18\x02 \x01(\x04R\bsequence\x12;\n" +
+	"\vobserved_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"observedAt\x122\n" +
+	"\x05state\x18\x04 \x01(\x0e2\x1c.pet.caen.daq.v1.SystemStateR\x05state\x12<\n" +
+	"\vcurrent_run\x18\x05 \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\n" +
+	"currentRun\x12.\n" +
+	"\x06chains\x18\x06 \x03(\v2\x16.pet.caen.daq.v1.ChainR\x06chains\x12>\n" +
+	"\bpipeline\x18\a \x01(\v2\".pet.caen.daq.v1.PipelineTelemetryR\bpipeline\x12;\n" +
+	"\astorage\x18\b \x01(\v2!.pet.caen.daq.v1.StorageTelemetryR\astorage\x12=\n" +
+	"\vdiagnostics\x18\t \x03(\v2\x1b.pet.caen.daq.v1.DiagnosticR\vdiagnostics\"\xee\x02\n" +
+	"\n" +
+	"RunSummary\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x129\n" +
+	"\n" +
+	"started_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12=\n" +
+	"\fcompleted_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12-\n" +
+	"\x12termination_reason\x18\x04 \x01(\tR\x11terminationReason\x12\x1f\n" +
+	"\vevent_count\x18\x05 \x01(\x04R\n" +
+	"eventCount\x12&\n" +
+	"\x0fraw_batch_count\x18\x06 \x01(\x04R\rrawBatchCount\x12\x1e\n" +
+	"\n" +
+	"incomplete\x18\a \x01(\bR\n" +
+	"incomplete\x127\n" +
+	"\tartifacts\x18\b \x03(\v2\x19.pet.caen.daq.v1.ArtifactR\tartifacts\"i\n" +
+	"\bArtifact\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x03 \x01(\x04R\tsizeBytes\x12\x16\n" +
+	"\x06sha256\x18\x04 \x01(\tR\x06sha256\"\x9e\x01\n" +
 	"\x05Chain\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\rR\x05index\x12\x18\n" +
-	"\aenabled\x18\x02 \x01(\bR\aenabled\x12.\n" +
-	"\x06boards\x18\x03 \x03(\v2\x16.pet.caen.daq.v1.BoardR\x06boards\"_\n" +
+	"\aenabled\x18\x02 \x01(\bR\aenabled\x125\n" +
+	"\x06health\x18\x03 \x01(\x0e2\x1d.pet.caen.daq.v1.HealthStatusR\x06health\x12.\n" +
+	"\x06boards\x18\x04 \x03(\v2\x16.pet.caen.daq.v1.BoardR\x06boards\"\xa4\x03\n" +
 	"\x05Board\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\rR\x04node\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x02 \x01(\rR\tproductId\x12#\n" +
-	"\rfpga_firmware\x18\x03 \x01(\rR\ffpgaFirmware\"O\n" +
-	"\x1cValidateConfigurationRequest\x12/\n" +
-	"\x13janus_configuration\x18\x01 \x01(\tR\x12janusConfiguration\"M\n" +
-	"\x1dValidateConfigurationResponse\x12\x14\n" +
-	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x16\n" +
-	"\x06errors\x18\x02 \x03(\tR\x06errors*y\n" +
+	"\rfpga_firmware\x18\x03 \x01(\rR\ffpgaFirmware\x125\n" +
+	"\x06health\x18\x04 \x01(\x0e2\x1d.pet.caen.daq.v1.HealthStatusR\x06health\x12,\n" +
+	"\x12fpga_temperature_c\x18\x05 \x01(\x01R\x10fpgaTemperatureC\x12.\n" +
+	"\x13board_temperature_c\x18\x06 \x01(\x01R\x11boardTemperatureC\x124\n" +
+	"\x16detector_temperature_c\x18\a \x01(\x01R\x14detectorTemperatureC\x12 \n" +
+	"\fhv_voltage_v\x18\b \x01(\x01R\n" +
+	"hvVoltageV\x12 \n" +
+	"\fhv_current_a\x18\t \x01(\x01R\n" +
+	"hvCurrentA\x12\x13\n" +
+	"\x05hv_on\x18\n" +
+	" \x01(\bR\x04hvOn\x12\x1f\n" +
+	"\vevent_count\x18\v \x01(\x04R\n" +
+	"eventCount\"\x81\x02\n" +
+	"\x11PipelineTelemetry\x12%\n" +
+	"\x0equeue_capacity\x18\x01 \x01(\x04R\rqueueCapacity\x12\x1f\n" +
+	"\vqueue_depth\x18\x02 \x01(\x04R\n" +
+	"queueDepth\x12)\n" +
+	"\x10accepted_batches\x18\x03 \x01(\x04R\x0facceptedBatches\x12)\n" +
+	"\x10rejected_batches\x18\x04 \x01(\x04R\x0frejectedBatches\x12%\n" +
+	"\x0edecoded_events\x18\x05 \x01(\x04R\rdecodedEvents\x12'\n" +
+	"\x0fdecode_failures\x18\x06 \x01(\x04R\x0edecodeFailures\"\xd7\x01\n" +
+	"\x10StorageTelemetry\x125\n" +
+	"\x06health\x18\x01 \x01(\x0e2\x1d.pet.caen.daq.v1.HealthStatusR\x06health\x12#\n" +
+	"\rrun_directory\x18\x02 \x01(\tR\frunDirectory\x12#\n" +
+	"\rbytes_written\x18\x03 \x01(\x04R\fbytesWritten\x12#\n" +
+	"\rpending_bytes\x18\x04 \x01(\x04R\fpendingBytes\x12\x1d\n" +
+	"\n" +
+	"last_error\x18\x05 \x01(\tR\tlastError\"\xe2\x01\n" +
+	"\n" +
+	"Diagnostic\x12?\n" +
+	"\bseverity\x18\x01 \x01(\x0e2#.pet.caen.daq.v1.DiagnosticSeverityR\bseverity\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12\x14\n" +
+	"\x05chain\x18\x04 \x01(\tR\x05chain\x12\x12\n" +
+	"\x04node\x18\x05 \x01(\tR\x04node\x12;\n" +
+	"\vobserved_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"observedAt*y\n" +
+	"\x12ValidationSeverity\x12#\n" +
+	"\x1fVALIDATION_SEVERITY_UNSPECIFIED\x10\x00\x12\x1f\n" +
+	"\x1bVALIDATION_SEVERITY_WARNING\x10\x01\x12\x1d\n" +
+	"\x19VALIDATION_SEVERITY_ERROR\x10\x02*\xd4\x02\n" +
 	"\vSystemState\x12\x1c\n" +
 	"\x18SYSTEM_STATE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19SYSTEM_STATE_DISCONNECTED\x10\x01\x12\x15\n" +
 	"\x11SYSTEM_STATE_IDLE\x10\x02\x12\x16\n" +
-	"\x12SYSTEM_STATE_FAULT\x10\x032\xf7\x01\n" +
+	"\x12SYSTEM_STATE_FAULT\x10\x03\x12\x1b\n" +
+	"\x17SYSTEM_STATE_CONNECTING\x10\x04\x12\x1c\n" +
+	"\x18SYSTEM_STATE_CONFIGURING\x10\x05\x12\x16\n" +
+	"\x12SYSTEM_STATE_READY\x10\x06\x12\x19\n" +
+	"\x15SYSTEM_STATE_STARTING\x10\a\x12\x18\n" +
+	"\x14SYSTEM_STATE_RUNNING\x10\b\x12\x19\n" +
+	"\x15SYSTEM_STATE_STOPPING\x10\t\x12\x19\n" +
+	"\x15SYSTEM_STATE_DRAINING\x10\n" +
+	"\x12\x1b\n" +
+	"\x17SYSTEM_STATE_RECOVERING\x10\v*\x93\x01\n" +
+	"\fHealthStatus\x12\x1d\n" +
+	"\x19HEALTH_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15HEALTH_STATUS_UNKNOWN\x10\x01\x12\x14\n" +
+	"\x10HEALTH_STATUS_OK\x10\x02\x12\x1a\n" +
+	"\x16HEALTH_STATUS_DEGRADED\x10\x03\x12\x17\n" +
+	"\x13HEALTH_STATUS_FAULT\x10\x04*\x97\x01\n" +
+	"\x12DiagnosticSeverity\x12#\n" +
+	"\x1fDIAGNOSTIC_SEVERITY_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18DIAGNOSTIC_SEVERITY_INFO\x10\x01\x12\x1f\n" +
+	"\x1bDIAGNOSTIC_SEVERITY_WARNING\x10\x02\x12\x1d\n" +
+	"\x19DIAGNOSTIC_SEVERITY_ERROR\x10\x032\xe1\x02\n" +
 	"\rSystemService\x12l\n" +
 	"\x11GetSystemSnapshot\x12).pet.caen.daq.v1.GetSystemSnapshotRequest\x1a*.pet.caen.daq.v1.GetSystemSnapshotResponse\"\x00\x12x\n" +
-	"\x15ValidateConfiguration\x12-.pet.caen.daq.v1.ValidateConfigurationRequest\x1a..pet.caen.daq.v1.ValidateConfigurationResponse\"\x00BFZDgithub.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1;daqv1b\x06proto3"
+	"\x15ValidateConfiguration\x12-.pet.caen.daq.v1.ValidateConfigurationRequest\x1a..pet.caen.daq.v1.ValidateConfigurationResponse\"\x00\x12h\n" +
+	"\x0fStreamTelemetry\x12'.pet.caen.daq.v1.StreamTelemetryRequest\x1a(.pet.caen.daq.v1.StreamTelemetryResponse\"\x000\x012\xaf\x01\n" +
+	"\n" +
+	"RunService\x12Q\n" +
+	"\bStartRun\x12 .pet.caen.daq.v1.StartRunRequest\x1a!.pet.caen.daq.v1.StartRunResponse\"\x00\x12N\n" +
+	"\aStopRun\x12\x1f.pet.caen.daq.v1.StopRunRequest\x1a .pet.caen.daq.v1.StopRunResponse\"\x00BFZDgithub.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1;daqv1b\x06proto3"
 
 var (
 	file_pet_caen_daq_v1_system_proto_rawDescOnce sync.Once
@@ -431,30 +1740,76 @@ func file_pet_caen_daq_v1_system_proto_rawDescGZIP() []byte {
 	return file_pet_caen_daq_v1_system_proto_rawDescData
 }
 
-var file_pet_caen_daq_v1_system_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_pet_caen_daq_v1_system_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_pet_caen_daq_v1_system_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_pet_caen_daq_v1_system_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_pet_caen_daq_v1_system_proto_goTypes = []any{
-	(SystemState)(0),                      // 0: pet.caen.daq.v1.SystemState
-	(*GetSystemSnapshotRequest)(nil),      // 1: pet.caen.daq.v1.GetSystemSnapshotRequest
-	(*GetSystemSnapshotResponse)(nil),     // 2: pet.caen.daq.v1.GetSystemSnapshotResponse
-	(*Chain)(nil),                         // 3: pet.caen.daq.v1.Chain
-	(*Board)(nil),                         // 4: pet.caen.daq.v1.Board
-	(*ValidateConfigurationRequest)(nil),  // 5: pet.caen.daq.v1.ValidateConfigurationRequest
-	(*ValidateConfigurationResponse)(nil), // 6: pet.caen.daq.v1.ValidateConfigurationResponse
+	(ValidationSeverity)(0),               // 0: pet.caen.daq.v1.ValidationSeverity
+	(SystemState)(0),                      // 1: pet.caen.daq.v1.SystemState
+	(HealthStatus)(0),                     // 2: pet.caen.daq.v1.HealthStatus
+	(DiagnosticSeverity)(0),               // 3: pet.caen.daq.v1.DiagnosticSeverity
+	(*GetSystemSnapshotRequest)(nil),      // 4: pet.caen.daq.v1.GetSystemSnapshotRequest
+	(*GetSystemSnapshotResponse)(nil),     // 5: pet.caen.daq.v1.GetSystemSnapshotResponse
+	(*ValidateConfigurationRequest)(nil),  // 6: pet.caen.daq.v1.ValidateConfigurationRequest
+	(*ValidateConfigurationResponse)(nil), // 7: pet.caen.daq.v1.ValidateConfigurationResponse
+	(*ValidationIssue)(nil),               // 8: pet.caen.daq.v1.ValidationIssue
+	(*StreamTelemetryRequest)(nil),        // 9: pet.caen.daq.v1.StreamTelemetryRequest
+	(*StreamTelemetryResponse)(nil),       // 10: pet.caen.daq.v1.StreamTelemetryResponse
+	(*StartRunRequest)(nil),               // 11: pet.caen.daq.v1.StartRunRequest
+	(*StartRunResponse)(nil),              // 12: pet.caen.daq.v1.StartRunResponse
+	(*StopRunRequest)(nil),                // 13: pet.caen.daq.v1.StopRunRequest
+	(*StopRunResponse)(nil),               // 14: pet.caen.daq.v1.StopRunResponse
+	(*TelemetrySnapshot)(nil),             // 15: pet.caen.daq.v1.TelemetrySnapshot
+	(*RunSummary)(nil),                    // 16: pet.caen.daq.v1.RunSummary
+	(*Artifact)(nil),                      // 17: pet.caen.daq.v1.Artifact
+	(*Chain)(nil),                         // 18: pet.caen.daq.v1.Chain
+	(*Board)(nil),                         // 19: pet.caen.daq.v1.Board
+	(*PipelineTelemetry)(nil),             // 20: pet.caen.daq.v1.PipelineTelemetry
+	(*StorageTelemetry)(nil),              // 21: pet.caen.daq.v1.StorageTelemetry
+	(*Diagnostic)(nil),                    // 22: pet.caen.daq.v1.Diagnostic
+	(*timestamppb.Timestamp)(nil),         // 23: google.protobuf.Timestamp
 }
 var file_pet_caen_daq_v1_system_proto_depIdxs = []int32{
-	0, // 0: pet.caen.daq.v1.GetSystemSnapshotResponse.state:type_name -> pet.caen.daq.v1.SystemState
-	3, // 1: pet.caen.daq.v1.GetSystemSnapshotResponse.chains:type_name -> pet.caen.daq.v1.Chain
-	4, // 2: pet.caen.daq.v1.Chain.boards:type_name -> pet.caen.daq.v1.Board
-	1, // 3: pet.caen.daq.v1.SystemService.GetSystemSnapshot:input_type -> pet.caen.daq.v1.GetSystemSnapshotRequest
-	5, // 4: pet.caen.daq.v1.SystemService.ValidateConfiguration:input_type -> pet.caen.daq.v1.ValidateConfigurationRequest
-	2, // 5: pet.caen.daq.v1.SystemService.GetSystemSnapshot:output_type -> pet.caen.daq.v1.GetSystemSnapshotResponse
-	6, // 6: pet.caen.daq.v1.SystemService.ValidateConfiguration:output_type -> pet.caen.daq.v1.ValidateConfigurationResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	1,  // 0: pet.caen.daq.v1.GetSystemSnapshotResponse.state:type_name -> pet.caen.daq.v1.SystemState
+	18, // 1: pet.caen.daq.v1.GetSystemSnapshotResponse.chains:type_name -> pet.caen.daq.v1.Chain
+	15, // 2: pet.caen.daq.v1.GetSystemSnapshotResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	8,  // 3: pet.caen.daq.v1.ValidateConfigurationResponse.issues:type_name -> pet.caen.daq.v1.ValidationIssue
+	0,  // 4: pet.caen.daq.v1.ValidationIssue.severity:type_name -> pet.caen.daq.v1.ValidationSeverity
+	15, // 5: pet.caen.daq.v1.StreamTelemetryResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	16, // 6: pet.caen.daq.v1.StartRunResponse.run:type_name -> pet.caen.daq.v1.RunSummary
+	15, // 7: pet.caen.daq.v1.StartRunResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	16, // 8: pet.caen.daq.v1.StopRunResponse.run:type_name -> pet.caen.daq.v1.RunSummary
+	15, // 9: pet.caen.daq.v1.StopRunResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	23, // 10: pet.caen.daq.v1.TelemetrySnapshot.observed_at:type_name -> google.protobuf.Timestamp
+	1,  // 11: pet.caen.daq.v1.TelemetrySnapshot.state:type_name -> pet.caen.daq.v1.SystemState
+	16, // 12: pet.caen.daq.v1.TelemetrySnapshot.current_run:type_name -> pet.caen.daq.v1.RunSummary
+	18, // 13: pet.caen.daq.v1.TelemetrySnapshot.chains:type_name -> pet.caen.daq.v1.Chain
+	20, // 14: pet.caen.daq.v1.TelemetrySnapshot.pipeline:type_name -> pet.caen.daq.v1.PipelineTelemetry
+	21, // 15: pet.caen.daq.v1.TelemetrySnapshot.storage:type_name -> pet.caen.daq.v1.StorageTelemetry
+	22, // 16: pet.caen.daq.v1.TelemetrySnapshot.diagnostics:type_name -> pet.caen.daq.v1.Diagnostic
+	23, // 17: pet.caen.daq.v1.RunSummary.started_at:type_name -> google.protobuf.Timestamp
+	23, // 18: pet.caen.daq.v1.RunSummary.completed_at:type_name -> google.protobuf.Timestamp
+	17, // 19: pet.caen.daq.v1.RunSummary.artifacts:type_name -> pet.caen.daq.v1.Artifact
+	2,  // 20: pet.caen.daq.v1.Chain.health:type_name -> pet.caen.daq.v1.HealthStatus
+	19, // 21: pet.caen.daq.v1.Chain.boards:type_name -> pet.caen.daq.v1.Board
+	2,  // 22: pet.caen.daq.v1.Board.health:type_name -> pet.caen.daq.v1.HealthStatus
+	2,  // 23: pet.caen.daq.v1.StorageTelemetry.health:type_name -> pet.caen.daq.v1.HealthStatus
+	3,  // 24: pet.caen.daq.v1.Diagnostic.severity:type_name -> pet.caen.daq.v1.DiagnosticSeverity
+	23, // 25: pet.caen.daq.v1.Diagnostic.observed_at:type_name -> google.protobuf.Timestamp
+	4,  // 26: pet.caen.daq.v1.SystemService.GetSystemSnapshot:input_type -> pet.caen.daq.v1.GetSystemSnapshotRequest
+	6,  // 27: pet.caen.daq.v1.SystemService.ValidateConfiguration:input_type -> pet.caen.daq.v1.ValidateConfigurationRequest
+	9,  // 28: pet.caen.daq.v1.SystemService.StreamTelemetry:input_type -> pet.caen.daq.v1.StreamTelemetryRequest
+	11, // 29: pet.caen.daq.v1.RunService.StartRun:input_type -> pet.caen.daq.v1.StartRunRequest
+	13, // 30: pet.caen.daq.v1.RunService.StopRun:input_type -> pet.caen.daq.v1.StopRunRequest
+	5,  // 31: pet.caen.daq.v1.SystemService.GetSystemSnapshot:output_type -> pet.caen.daq.v1.GetSystemSnapshotResponse
+	7,  // 32: pet.caen.daq.v1.SystemService.ValidateConfiguration:output_type -> pet.caen.daq.v1.ValidateConfigurationResponse
+	10, // 33: pet.caen.daq.v1.SystemService.StreamTelemetry:output_type -> pet.caen.daq.v1.StreamTelemetryResponse
+	12, // 34: pet.caen.daq.v1.RunService.StartRun:output_type -> pet.caen.daq.v1.StartRunResponse
+	14, // 35: pet.caen.daq.v1.RunService.StopRun:output_type -> pet.caen.daq.v1.StopRunResponse
+	31, // [31:36] is the sub-list for method output_type
+	26, // [26:31] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_pet_caen_daq_v1_system_proto_init() }
@@ -467,10 +1822,10 @@ func file_pet_caen_daq_v1_system_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pet_caen_daq_v1_system_proto_rawDesc), len(file_pet_caen_daq_v1_system_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   6,
+			NumEnums:      4,
+			NumMessages:   19,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_pet_caen_daq_v1_system_proto_goTypes,
 		DependencyIndexes: file_pet_caen_daq_v1_system_proto_depIdxs,

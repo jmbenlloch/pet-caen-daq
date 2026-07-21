@@ -23,6 +23,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// SystemServiceName is the fully-qualified name of the SystemService service.
 	SystemServiceName = "pet.caen.daq.v1.SystemService"
+	// RunServiceName is the fully-qualified name of the RunService service.
+	RunServiceName = "pet.caen.daq.v1.RunService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -39,12 +41,20 @@ const (
 	// SystemServiceValidateConfigurationProcedure is the fully-qualified name of the SystemService's
 	// ValidateConfiguration RPC.
 	SystemServiceValidateConfigurationProcedure = "/pet.caen.daq.v1.SystemService/ValidateConfiguration"
+	// SystemServiceStreamTelemetryProcedure is the fully-qualified name of the SystemService's
+	// StreamTelemetry RPC.
+	SystemServiceStreamTelemetryProcedure = "/pet.caen.daq.v1.SystemService/StreamTelemetry"
+	// RunServiceStartRunProcedure is the fully-qualified name of the RunService's StartRun RPC.
+	RunServiceStartRunProcedure = "/pet.caen.daq.v1.RunService/StartRun"
+	// RunServiceStopRunProcedure is the fully-qualified name of the RunService's StopRun RPC.
+	RunServiceStopRunProcedure = "/pet.caen.daq.v1.RunService/StopRun"
 )
 
 // SystemServiceClient is a client for the pet.caen.daq.v1.SystemService service.
 type SystemServiceClient interface {
 	GetSystemSnapshot(context.Context, *connect.Request[v1.GetSystemSnapshotRequest]) (*connect.Response[v1.GetSystemSnapshotResponse], error)
 	ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error)
+	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest]) (*connect.ServerStreamForClient[v1.StreamTelemetryResponse], error)
 }
 
 // NewSystemServiceClient constructs a client for the pet.caen.daq.v1.SystemService service. By
@@ -70,6 +80,12 @@ func NewSystemServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(systemServiceMethods.ByName("ValidateConfiguration")),
 			connect.WithClientOptions(opts...),
 		),
+		streamTelemetry: connect.NewClient[v1.StreamTelemetryRequest, v1.StreamTelemetryResponse](
+			httpClient,
+			baseURL+SystemServiceStreamTelemetryProcedure,
+			connect.WithSchema(systemServiceMethods.ByName("StreamTelemetry")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -77,6 +93,7 @@ func NewSystemServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 type systemServiceClient struct {
 	getSystemSnapshot     *connect.Client[v1.GetSystemSnapshotRequest, v1.GetSystemSnapshotResponse]
 	validateConfiguration *connect.Client[v1.ValidateConfigurationRequest, v1.ValidateConfigurationResponse]
+	streamTelemetry       *connect.Client[v1.StreamTelemetryRequest, v1.StreamTelemetryResponse]
 }
 
 // GetSystemSnapshot calls pet.caen.daq.v1.SystemService.GetSystemSnapshot.
@@ -89,10 +106,16 @@ func (c *systemServiceClient) ValidateConfiguration(ctx context.Context, req *co
 	return c.validateConfiguration.CallUnary(ctx, req)
 }
 
+// StreamTelemetry calls pet.caen.daq.v1.SystemService.StreamTelemetry.
+func (c *systemServiceClient) StreamTelemetry(ctx context.Context, req *connect.Request[v1.StreamTelemetryRequest]) (*connect.ServerStreamForClient[v1.StreamTelemetryResponse], error) {
+	return c.streamTelemetry.CallServerStream(ctx, req)
+}
+
 // SystemServiceHandler is an implementation of the pet.caen.daq.v1.SystemService service.
 type SystemServiceHandler interface {
 	GetSystemSnapshot(context.Context, *connect.Request[v1.GetSystemSnapshotRequest]) (*connect.Response[v1.GetSystemSnapshotResponse], error)
 	ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error)
+	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest], *connect.ServerStream[v1.StreamTelemetryResponse]) error
 }
 
 // NewSystemServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -114,12 +137,20 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(systemServiceMethods.ByName("ValidateConfiguration")),
 		connect.WithHandlerOptions(opts...),
 	)
+	systemServiceStreamTelemetryHandler := connect.NewServerStreamHandler(
+		SystemServiceStreamTelemetryProcedure,
+		svc.StreamTelemetry,
+		connect.WithSchema(systemServiceMethods.ByName("StreamTelemetry")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/pet.caen.daq.v1.SystemService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SystemServiceGetSystemSnapshotProcedure:
 			systemServiceGetSystemSnapshotHandler.ServeHTTP(w, r)
 		case SystemServiceValidateConfigurationProcedure:
 			systemServiceValidateConfigurationHandler.ServeHTTP(w, r)
+		case SystemServiceStreamTelemetryProcedure:
+			systemServiceStreamTelemetryHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -135,4 +166,104 @@ func (UnimplementedSystemServiceHandler) GetSystemSnapshot(context.Context, *con
 
 func (UnimplementedSystemServiceHandler) ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.ValidateConfiguration is not implemented"))
+}
+
+func (UnimplementedSystemServiceHandler) StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest], *connect.ServerStream[v1.StreamTelemetryResponse]) error {
+	return connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.StreamTelemetry is not implemented"))
+}
+
+// RunServiceClient is a client for the pet.caen.daq.v1.RunService service.
+type RunServiceClient interface {
+	StartRun(context.Context, *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error)
+	StopRun(context.Context, *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error)
+}
+
+// NewRunServiceClient constructs a client for the pet.caen.daq.v1.RunService service. By default,
+// it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and
+// sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC()
+// or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) RunServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	runServiceMethods := v1.File_pet_caen_daq_v1_system_proto.Services().ByName("RunService").Methods()
+	return &runServiceClient{
+		startRun: connect.NewClient[v1.StartRunRequest, v1.StartRunResponse](
+			httpClient,
+			baseURL+RunServiceStartRunProcedure,
+			connect.WithSchema(runServiceMethods.ByName("StartRun")),
+			connect.WithClientOptions(opts...),
+		),
+		stopRun: connect.NewClient[v1.StopRunRequest, v1.StopRunResponse](
+			httpClient,
+			baseURL+RunServiceStopRunProcedure,
+			connect.WithSchema(runServiceMethods.ByName("StopRun")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// runServiceClient implements RunServiceClient.
+type runServiceClient struct {
+	startRun *connect.Client[v1.StartRunRequest, v1.StartRunResponse]
+	stopRun  *connect.Client[v1.StopRunRequest, v1.StopRunResponse]
+}
+
+// StartRun calls pet.caen.daq.v1.RunService.StartRun.
+func (c *runServiceClient) StartRun(ctx context.Context, req *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error) {
+	return c.startRun.CallUnary(ctx, req)
+}
+
+// StopRun calls pet.caen.daq.v1.RunService.StopRun.
+func (c *runServiceClient) StopRun(ctx context.Context, req *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error) {
+	return c.stopRun.CallUnary(ctx, req)
+}
+
+// RunServiceHandler is an implementation of the pet.caen.daq.v1.RunService service.
+type RunServiceHandler interface {
+	StartRun(context.Context, *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error)
+	StopRun(context.Context, *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error)
+}
+
+// NewRunServiceHandler builds an HTTP handler from the service implementation. It returns the path
+// on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	runServiceMethods := v1.File_pet_caen_daq_v1_system_proto.Services().ByName("RunService").Methods()
+	runServiceStartRunHandler := connect.NewUnaryHandler(
+		RunServiceStartRunProcedure,
+		svc.StartRun,
+		connect.WithSchema(runServiceMethods.ByName("StartRun")),
+		connect.WithHandlerOptions(opts...),
+	)
+	runServiceStopRunHandler := connect.NewUnaryHandler(
+		RunServiceStopRunProcedure,
+		svc.StopRun,
+		connect.WithSchema(runServiceMethods.ByName("StopRun")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/pet.caen.daq.v1.RunService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case RunServiceStartRunProcedure:
+			runServiceStartRunHandler.ServeHTTP(w, r)
+		case RunServiceStopRunProcedure:
+			runServiceStopRunHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedRunServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedRunServiceHandler struct{}
+
+func (UnimplementedRunServiceHandler) StartRun(context.Context, *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.StartRun is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) StopRun(context.Context, *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.StopRun is not implemented"))
 }

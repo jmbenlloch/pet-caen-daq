@@ -10,6 +10,8 @@ Started on 2026-07-21:
 
 These are internal orchestration primitives. They are not yet wired to a long-running coordinator or ConnectRPC service; the next Phase 2 slice will build run control and snapshot telemetry on these boundaries.
 
+The Phase 2 protobuf contract now defines coarse start/stop operations, structured configuration diagnostics, complete system/run/board/pipeline/storage telemetry snapshots, health and diagnostic vocabulary, and ConnectRPC server streaming. Every streamed message carries a complete independently usable snapshot with instance/run identity, sequence, and observation time. The original discovery-slice fields and enum numbers remain wire-compatible and are deprecated in favor of the complete snapshot representation.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:
