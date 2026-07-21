@@ -124,11 +124,20 @@ test('operator configures bounded values and channel masks without editing text'
   await page.getByRole('button', { name: 'Per-channel overrides' }).click()
   const hvChannels = page.getByRole('dialog', { name: 'HV_IndivAdj' })
   await hvChannels.getByRole('combobox').selectOption('1')
+  await expect(
+    hvChannels.getByLabel('HV_IndivAdj board 1 channel 4', { exact: true }).locator('..'),
+  ).toContainText('Vnom 41.20 V')
   await hvChannels.getByLabel('HV_IndivAdj board 1 channel 4', { exact: true }).fill('12')
+  await expect(
+    hvChannels.getByLabel('HV_IndivAdj board 1 channel 4', { exact: true }).locator('..'),
+  ).toContainText('Vnom 41.40 V')
   await hvChannels.getByRole('button', { name: 'Apply overrides' }).click()
   await expect(page.getByLabel('HV_IndivAdj non-zero individual values')).toContainText(
     'B1: 1 non-zero',
   )
+
+  await page.getByLabel('Find a parameter').fill('TempSensType')
+  await page.getByLabel('TempSensType', { exact: true }).fill('1 2 3')
 
   await page.getByRole('button', { name: 'Edit source' }).click()
   await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
@@ -143,4 +152,22 @@ test('operator configures bounded values and channel masks without editing text'
   await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
     /HV_IndivAdj\[1\]\[4\]\s+12/,
   )
+  await expect(page.getByLabel('JANUS configuration source')).toHaveValue(/TempSensType\s+1 2 3/)
+})
+
+test('operator monitors and safely switches high voltage while ready', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
+
+  const board0 = page.locator('.board-card').filter({ hasText: 'Chain 0' })
+  await expect(board0.getByText('HV off')).toBeVisible()
+  await expect(board0).toContainText('Vmon0.00 V')
+  await expect(board0).toContainText('Imon0.000 mA')
+  await expect(board0).toContainText('HV temp.30.7 °C')
+  await board0.getByRole('button', { name: 'Turn board 0 HV on' }).click()
+  await expect(board0.getByText('HV on')).toBeVisible()
+  await expect(board0).toContainText('Vmon45.40 V')
+
+  await page.getByRole('button', { name: 'All HV off' }).click()
+  await expect(board0.getByText('HV off')).toBeVisible()
 })

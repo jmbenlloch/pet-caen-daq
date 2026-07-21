@@ -218,6 +218,25 @@ function boardOverrides(field: ConfigurationField) {
   return result
 }
 
+function globalValue(name: string) {
+  return configurationDocument.value.fields.find(
+    (field) => field.name === name && field.index === undefined && field.channel === undefined,
+  )?.value
+}
+
+function effectiveBoardNumericValues(name: string) {
+  const general = Number.parseFloat(globalValue(name) ?? '0')
+  const result: Record<number, number> = {}
+  for (let board = 0; board < 4; board++) {
+    const override = configurationDocument.value.fields.find(
+      (field) =>
+        field.name === name && field.index === String(board) && field.channel === undefined,
+    )
+    result[board] = Number.parseFloat(override?.value ?? String(general))
+  }
+  return result
+}
+
 function applyBoardOverrides(values: Record<number, string>) {
   if (!activeBoardField.value) return
   for (let board = 0; board < 4; board++) {
@@ -437,7 +456,7 @@ onMounted(() => daq.connect())
                   </button>
                 </div>
                 <select
-                  v-else-if="field.options.length"
+                  v-else-if="field.options.length && field.name !== 'TempSensType'"
                   :id="field.id"
                   :value="field.value"
                   @change="setField(field, ($event.target as HTMLSelectElement).value)"
@@ -449,6 +468,19 @@ onMounted(() => daq.connect())
                     {{ option }}
                   </option>
                 </select>
+                <div v-else-if="field.name === 'TempSensType'" class="sensor-input">
+                  <input
+                    :id="field.id"
+                    :value="field.value"
+                    list="temperature-sensor-types"
+                    placeholder="Sensor name or c0 c1 c2"
+                    @change="setField(field, ($event.target as HTMLInputElement).value)"
+                  />
+                  <datalist id="temperature-sensor-types">
+                    <option v-for="option in field.options" :key="option" :value="option" />
+                  </datalist>
+                  <small>Choose a known sensor or enter coefficients: c0 c1 c2</small>
+                </div>
                 <NumericField
                   v-else-if="numericConstraint(field)"
                   :field="field"
@@ -736,6 +768,24 @@ onMounted(() => daq.connect())
             <p class="eyebrow">Four-link topology</p>
             <h2 id="boards-heading">Detector boards</h2>
           </div>
+          <div class="hv-global-actions">
+            <button
+              type="button"
+              class="secondary"
+              :disabled="!daq.canSwitchHV.value || !requestedBy"
+              @click="daq.setHighVoltage([], true, requestedBy)"
+            >
+              All HV on
+            </button>
+            <button
+              type="button"
+              class="danger"
+              :disabled="!daq.canSwitchHV.value || !requestedBy"
+              @click="daq.setHighVoltage([], false, requestedBy)"
+            >
+              All HV off
+            </button>
+          </div>
         </div>
         <div class="board-grid">
           <article v-for="board in boards" :key="`${board.chain}-${board.node}`" class="board-card">
@@ -747,6 +797,25 @@ onMounted(() => daq.connect())
               <span class="health-pill" :class="healthLabel[board.health].toLowerCase()">{{
                 healthLabel[board.health]
               }}</span>
+            </div>
+            <div
+              class="hv-state"
+              :class="{
+                on: board.hvOn,
+                ramping: board.hvRamping,
+                fault: board.hvOverCurrent || board.hvOverVoltage,
+              }"
+            >
+              <span class="status-dot" />
+              {{
+                board.hvOverCurrent || board.hvOverVoltage
+                  ? 'HV fault'
+                  : board.hvRamping
+                    ? 'Ramping'
+                    : board.hvOn
+                      ? 'HV on'
+                      : 'HV off'
+              }}
             </div>
             <dl class="metrics board-metrics">
               <div>
@@ -762,14 +831,34 @@ onMounted(() => daq.connect())
                 <dd>{{ board.detectorTemperatureC.toFixed(1) }} °C</dd>
               </div>
               <div>
-                <dt>HV</dt>
-                <dd>{{ board.hvOn ? `${board.hvVoltageV.toFixed(1)} V` : 'Off' }}</dd>
+                <dt>FPGA temp.</dt>
+                <dd>{{ board.fpgaTemperatureC.toFixed(1) }} °C</dd>
+              </div>
+              <div>
+                <dt>HV temp.</dt>
+                <dd>{{ board.hvTemperatureC.toFixed(1) }} °C</dd>
+              </div>
+              <div>
+                <dt>Vmon</dt>
+                <dd>{{ board.hvVoltageV.toFixed(2) }} V</dd>
+              </div>
+              <div>
+                <dt>Imon</dt>
+                <dd>{{ (board.hvCurrentA * 1000).toFixed(3) }} mA</dd>
               </div>
               <div>
                 <dt>Events</dt>
                 <dd>{{ compact(board.eventCount) }}</dd>
               </div>
             </dl>
+            <button
+              type="button"
+              :class="board.hvOn ? 'danger' : 'secondary'"
+              :disabled="!daq.canSwitchHV.value || !requestedBy"
+              @click="daq.setHighVoltage([board.chain], !board.hvOn, requestedBy)"
+            >
+              Turn board {{ board.chain }} HV {{ board.hvOn ? 'off' : 'on' }}
+            </button>
           </article>
           <p v-if="!boards.length" class="empty">Waiting for discovered boards…</p>
         </div>
@@ -795,6 +884,14 @@ onMounted(() => daq.connect())
       :field="activeChannelField"
       :constraint="numericConstraint(activeChannelField)!"
       :overrides="channelOverrides(activeChannelField)"
+      :nominal-bias="
+        activeChannelField.name === 'HV_IndivAdj'
+          ? effectiveBoardNumericValues('HV_Vbias')
+          : undefined
+      "
+      :adjustment-range="
+        activeChannelField.name === 'HV_IndivAdj' ? globalValue('HV_Adjust_Range') : undefined
+      "
       @apply="applyChannelOverrides"
       @close="activeChannelField = undefined"
     />

@@ -21,6 +21,19 @@ type HVPlan struct {
 	Transactions            []HVTransaction
 }
 
+type HVTelemetry struct {
+	FPGATemperatureC     float64
+	BoardTemperatureC    float64
+	DetectorTemperatureC float64
+	HVTemperatureC       float64
+	VoltageV             float64
+	CurrentA             float64
+	On                   bool
+	Ramping              bool
+	OverCurrent          bool
+	OverVoltage          bool
+}
+
 type HVHardware interface {
 	WriteRegister(context.Context, uint16, uint16, uint32, uint32) error
 	ReadRegister(context.Context, uint16, uint16, uint32) (uint32, error)
@@ -65,6 +78,70 @@ func ApplyHVConfiguration(ctx context.Context, hardware HVHardware, chain, node 
 		}
 	}
 	return nil
+}
+
+// SetHVOn switches the output using the same HV peripheral transaction as
+// FERS_HV_Set_OnOff. Callers own lifecycle and authorization checks.
+func SetHVOn(ctx context.Context, hardware HVHardware, chain, node uint16, enabled bool) error {
+	if err := writeHVBusPair(ctx, hardware, chain, node, 0x2001, 0); err != nil {
+		return fmt.Errorf("initialize HV bus: %w", err)
+	}
+	value := uint32(0)
+	if enabled {
+		value = 1
+	}
+	if err := writeHVBusPair(ctx, hardware, chain, node, 2<<8, value); err != nil {
+		return fmt.Errorf("set HV on=%t: %w", enabled, err)
+	}
+	return nil
+}
+
+// ReadHVTelemetry uses the firmware-4+ direct monitor registers. These reads
+// are non-mutating and remain available while acquisition is idle.
+func ReadHVTelemetry(ctx context.Context, hardware HVHardware, chain, node uint16) (HVTelemetry, error) {
+	read := func(register Register) (uint32, error) {
+		value, err := hardware.ReadRegister(ctx, chain, node, uint32(register))
+		if err != nil {
+			return 0, fmt.Errorf("read register %#08x: %w", register, err)
+		}
+		return value, nil
+	}
+	fpga, err := read(FPGATemperature)
+	if err != nil {
+		return HVTelemetry{}, err
+	}
+	board, err := read(BoardTemperature)
+	if err != nil {
+		return HVTelemetry{}, err
+	}
+	voltage, err := read(HVVoltageMonitor)
+	if err != nil {
+		return HVTelemetry{}, err
+	}
+	current, err := read(HVCurrentMonitor)
+	if err != nil {
+		return HVTelemetry{}, err
+	}
+	status, err := read(HVStatus)
+	if err != nil {
+		return HVTelemetry{}, err
+	}
+	currentA := float64(current) / 10_000_000
+	if current>>31 != 0 {
+		currentA = 0
+	}
+	return HVTelemetry{
+		FPGATemperatureC:     float64(fpga)*503.975/4096 - 273.15,
+		BoardTemperatureC:    float64(int32(board)) / 4,
+		DetectorTemperatureC: float64(status&0x1fff) * 256 / 10000,
+		HVTemperatureC:       float64((status>>13)&0x1fff) * 256 / 10000,
+		VoltageV:             float64(voltage) / 10000,
+		CurrentA:             currentA,
+		On:                   status&(1<<26) != 0,
+		Ramping:              status&(1<<27) != 0,
+		OverCurrent:          status&(1<<28) != 0,
+		OverVoltage:          status&(1<<29) != 0,
+	}, nil
 }
 
 func writeHVBusPair(ctx context.Context, hardware HVHardware, chain, node uint16, selector, data uint32) error {

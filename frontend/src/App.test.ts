@@ -56,6 +56,9 @@ function dashboardApi(): DaqApi {
       }),
     }),
     stop: vi.fn().mockResolvedValue({}),
+    setHighVoltage: vi
+      .fn()
+      .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.READY })),
     listRuns: vi.fn().mockResolvedValue([
       create(RunSummarySchema, {
         runId: 'run-54',

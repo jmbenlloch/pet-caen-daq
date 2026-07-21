@@ -160,7 +160,21 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return fmt.Errorf("apply startup configuration: %w", err)
 	}
 
-	systemService := &service.SystemService{Source: publisher, ConfigurationTemplate: string(configuration)}
+	hvTargets := make([]service.HVTarget, 0, len(targets))
+	for _, target := range targets {
+		hvTargets = append(hvTargets, service.HVTarget{Board: target.Board, Chain: target.Chain, Node: target.Node})
+	}
+	hvController := &service.NativeHVController{
+		Hardware: client, States: states, Publisher: publisher, Targets: hvTargets, Authorized: *authorizeHV,
+	}
+	systemService := &service.SystemService{Source: publisher, ConfigurationTemplate: string(configuration), HV: hvController}
+	hvMonitorCtx, stopHVMonitor := context.WithCancel(ctx)
+	defer stopHVMonitor()
+	go func() {
+		if monitorErr := hvController.Run(hvMonitorCtx, time.Second); monitorErr != nil {
+			fmt.Fprintf(output, "HV monitor stopped: %v\n", monitorErr)
+		}
+	}()
 	boards := make([]configaudit.BoardEvidence, 0, len(topology.Boards))
 	for _, board := range topology.Boards {
 		boards = append(boards, configaudit.BoardEvidence{Board: int(board.Chain), FirmwareRevision: board.FirmwareRevision})

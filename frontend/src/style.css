@@ -556,6 +556,44 @@ select:focus {
 .board-values input:not([type='checkbox']) {
   margin-top: 5px;
 }
+.sensor-input small,
+.channel-values small {
+  display: block;
+  margin-top: 3px;
+  color: #71859d;
+  font-size: 0.58rem;
+}
+.hv-global-actions {
+  display: flex;
+  gap: 8px;
+}
+.hv-state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0;
+  color: #8498af;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.hv-state.on {
+  color: #72dcb9;
+}
+.hv-state.ramping {
+  color: #f7cb83;
+}
+.hv-state.fault {
+  color: #ff9a9a;
+}
+.hv-state.on .status-dot {
+  background: #42d5a5;
+}
+.hv-state.ramping .status-dot {
+  background: #efb85b;
+}
+.hv-state.fault .status-dot {
+  background: #ff6b75;
+}
 .board-value-summary span {
   padding: 4px 6px;
   border-radius: 5px;

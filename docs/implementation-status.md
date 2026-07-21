@@ -40,7 +40,7 @@ The text-only configuration box has been replaced by a searchable, categorized
 parameter editor initialized immediately from the checked-in production sample,
 without requiring a file load or backend round trip. Operators can reset to the
 sample or explicitly replace it with the backend's exact startup JANUS document.
-It renders comment-documented choices as selects, binary settings as switches,
+It renders JANUS-catalog choices as selects, binary settings as switches,
 free-form values with their units/ranges, and indexed assignments as explicit
 board/channel overrides. File import and an advanced source editor remain
 available, and every edit still passes through the same backend validation and
@@ -63,6 +63,19 @@ high/low gains, and zero-suppression thresholds expose a board-specific
 the DT5202 planner applies those values to the exact channel register, Citiroc
 stream field, or pedestal-dependent zero-suppression write while other channels
 retain the general value.
+
+The complete bundled JANUS 5202 5.0.0 parameter definition is now checked in
+and parsed into a typed 96-entry frontend catalog. Sections, global/board/channel
+scope, widget types, choices, ranges, units, and activation dependencies no
+longer depend on comments in the selected sample configuration.
+
+The HV_bias surface now includes continuously polled firmware-4+ Vmon, Imon,
+detector/HV/FPGA/board temperatures, and off/ramping/on/over-current/over-voltage
+state for all four boards. Explicit per-board and all-board switches are exposed
+only while Ready; HV-on requires the backend authorization flag and a failed
+multi-board enable rolls already-enabled targets back off. The channel adjustment
+dialog calculates live `Vnom`, and `TempSensType` accepts either a named sensor
+or custom `c0 c1 c2` coefficients.
 
 The run-control client now retains the authoritative completed `RunSummary`
 returned by `StopRun` rather than trying to reconstruct completion from the next

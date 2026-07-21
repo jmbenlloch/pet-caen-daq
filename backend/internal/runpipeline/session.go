@@ -177,6 +177,7 @@ type BoardStats struct {
 	FPGATemperature     *float64
 	BoardTemperature    *float64
 	DetectorTemperature *float64
+	HVTemperature       *float64
 	HVVoltage           *float64
 	HVCurrent           *float64
 	HVOn                bool
@@ -209,6 +210,7 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 		board.FPGATemperature = cloneFloat(service.FPGATemperature)
 		board.BoardTemperature = cloneFloat(service.BoardTemperature)
 		board.DetectorTemperature = cloneFloat(service.DetectorTemperature)
+		board.HVTemperature = cloneFloat(service.HVTemperature)
 		board.HVVoltage = cloneFloat(service.HVVoltage)
 		board.HVCurrent = cloneFloat(service.HVCurrent)
 		board.HVOn, board.HVRamping = service.HVOn, service.HVRamping
@@ -231,6 +233,7 @@ func (s *sink) BoardStats() []BoardStats {
 		board.FPGATemperature = cloneFloat(board.FPGATemperature)
 		board.BoardTemperature = cloneFloat(board.BoardTemperature)
 		board.DetectorTemperature = cloneFloat(board.DetectorTemperature)
+		board.HVTemperature = cloneFloat(board.HVTemperature)
 		board.HVVoltage = cloneFloat(board.HVVoltage)
 		board.HVCurrent = cloneFloat(board.HVCurrent)
 		result = append(result, board)

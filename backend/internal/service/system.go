@@ -3,6 +3,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"connectrpc.com/connect"
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
@@ -18,6 +20,21 @@ type SystemService struct {
 	daqv1connect.UnimplementedSystemServiceHandler
 	Source                SnapshotSource
 	ConfigurationTemplate string
+	HV                    HVController
+}
+
+func (s *SystemService) SetHighVoltage(ctx context.Context, request *connect.Request[daqv1.SetHighVoltageRequest]) (*connect.Response[daqv1.SetHighVoltageResponse], error) {
+	if s.HV == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, nil)
+	}
+	actor := strings.TrimSpace(request.Msg.GetRequestedBy())
+	if actor == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requested_by is required"))
+	}
+	if err := s.HV.Set(ctx, request.Msg.GetBoards(), request.Msg.GetEnabled(), actor); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	return connect.NewResponse(&daqv1.SetHighVoltageResponse{Snapshot: s.Source.Snapshot()}), nil
 }
 
 func (s *SystemService) GetSystemSnapshot(_ context.Context, _ *connect.Request[daqv1.GetSystemSnapshotRequest]) (*connect.Response[daqv1.GetSystemSnapshotResponse], error) {

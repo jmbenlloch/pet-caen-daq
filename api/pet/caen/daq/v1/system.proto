@@ -13,6 +13,7 @@ service SystemService {
   rpc GetConfigurationTemplate(GetConfigurationTemplateRequest) returns (GetConfigurationTemplateResponse) {}
   rpc ValidateConfiguration(ValidateConfigurationRequest) returns (ValidateConfigurationResponse) {}
   rpc StreamTelemetry(StreamTelemetryRequest) returns (stream StreamTelemetryResponse) {}
+  rpc SetHighVoltage(SetHighVoltageRequest) returns (SetHighVoltageResponse) {}
 }
 
 // RunService owns coarse run-control operations. Register-level access is
@@ -71,6 +72,17 @@ message StreamTelemetryRequest {}
 message StreamTelemetryResponse {
   // Every response is independently usable. The first response on each new
   // stream is a full snapshot and replaces all client-side telemetry state.
+  TelemetrySnapshot snapshot = 1;
+}
+
+message SetHighVoltageRequest {
+  // Empty applies to all configured boards; otherwise these are chain/board indices.
+  repeated uint32 boards = 1;
+  bool enabled = 2;
+  string requested_by = 3;
+}
+
+message SetHighVoltageResponse {
   TelemetrySnapshot snapshot = 1;
 }
 
@@ -180,6 +192,10 @@ message Board {
   double hv_current_a = 9;
   bool hv_on = 10;
   uint64 event_count = 11;
+  double hv_temperature_c = 12;
+  bool hv_ramping = 13;
+  bool hv_over_current = 14;
+  bool hv_over_voltage = 15;
 }
 
 enum HealthStatus {

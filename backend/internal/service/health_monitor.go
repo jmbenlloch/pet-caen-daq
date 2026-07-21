@@ -98,6 +98,9 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 					if observation.DetectorTemperature != nil {
 						board.DetectorTemperatureC = *observation.DetectorTemperature
 					}
+					if observation.HVTemperature != nil {
+						board.HvTemperatureC = *observation.HVTemperature
+					}
 					if observation.HVVoltage != nil {
 						board.HvVoltageV = *observation.HVVoltage
 					}
@@ -105,6 +108,9 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 						board.HvCurrentA = *observation.HVCurrent
 					}
 					board.HvOn = observation.HVOn
+					board.HvRamping = observation.HVRamping
+					board.HvOverCurrent = observation.HVOverCurrent
+					board.HvOverVoltage = observation.HVOverVoltage
 					if observation.HVOverCurrent || observation.HVOverVoltage {
 						board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
 					}

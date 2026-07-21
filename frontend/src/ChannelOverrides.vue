@@ -6,6 +6,8 @@ const props = defineProps<{
   field: ConfigurationField
   constraint: NumericConstraint
   overrides: Record<number, Record<number, string>>
+  nominalBias?: Record<number, number>
+  adjustmentRange?: string
 }>()
 defineEmits<{ apply: [board: number, values: Record<number, string>]; close: [] }>()
 const board = ref(0)
@@ -22,6 +24,14 @@ function update(channel: number, value: string) {
   if (value === '') delete next[channel]
   else next[channel] = value
   values.value = next
+}
+
+function nominalVoltage(channel: number) {
+  if (!props.nominalBias || !props.adjustmentRange) return undefined
+  const fullScale =
+    props.adjustmentRange === '4.5' ? 4.2 : props.adjustmentRange === '2.5' ? 2.5 : 0
+  const adjustment = Number(values.value[channel] ?? general.value)
+  return props.nominalBias[board.value] - (fullScale * (255 - adjustment)) / 255
 }
 </script>
 
@@ -62,6 +72,9 @@ function update(channel: number, value: string) {
             :step="constraint.step"
             @input="update(channel - 1, ($event.target as HTMLInputElement).value)"
           />
+          <small v-if="nominalVoltage(channel - 1) !== undefined">
+            Vnom {{ nominalVoltage(channel - 1)?.toFixed(2) }} V
+          </small>
         </label>
       </div>
       <div class="mask-footer">

@@ -28,6 +28,7 @@ type hvHardware struct {
 	writes    []RegisterWrite
 	status    uint32
 	failWrite int
+	reads     map[uint32]uint32
 }
 
 func (h *hvHardware) WriteRegister(_ context.Context, _, _ uint16, address, value uint32) error {
@@ -37,7 +38,11 @@ func (h *hvHardware) WriteRegister(_ context.Context, _, _ uint16, address, valu
 	}
 	return nil
 }
-func (h *hvHardware) ReadRegister(_ context.Context, _, _ uint16, _ uint32) (uint32, error) {
+
+func (h *hvHardware) ReadRegister(_ context.Context, _, _ uint16, address uint32) (uint32, error) {
+	if value, ok := h.reads[address]; ok {
+		return value, nil
+	}
 	return h.status, nil
 }
 func (h *hvHardware) SendCommand(context.Context, uint16, uint16, uint32, uint32) error { return nil }
@@ -84,5 +89,43 @@ func TestBuildHVPlanClampsUnsupportedTenMilliampLimit(t *testing.T) {
 	plan := buildHVPlan(45, 10, [3]float64{}, false, 0)
 	if plan.CurrentLimitMA != 9.999 || plan.Transactions[3].Data != 99990 {
 		t.Fatalf("effective current = %v, transaction = %#v", plan.CurrentLimitMA, plan.Transactions[3])
+	}
+}
+
+func TestSetHVOnUsesPeripheralOnOffRegister(t *testing.T) {
+	hardware := &hvHardware{}
+	if err := SetHVOn(context.Background(), hardware, 1, 0, true); err != nil {
+		t.Fatal(err)
+	}
+	want := []RegisterWrite{
+		{HVRegisterAddress, 0x2001}, {HVRegisterData, 0},
+		{HVRegisterAddress, 0x200}, {HVRegisterData, 1},
+	}
+	if len(hardware.writes) != len(want) {
+		t.Fatalf("writes = %#v", hardware.writes)
+	}
+	for index := range want {
+		if hardware.writes[index] != want[index] {
+			t.Errorf("write %d = %#v, want %#v", index, hardware.writes[index], want[index])
+		}
+	}
+}
+
+func TestReadHVTelemetryDecodesDirectMonitorRegisters(t *testing.T) {
+	hardware := &hvHardware{reads: map[uint32]uint32{
+		uint32(FPGATemperature):  2500,
+		uint32(BoardTemperature): 100,
+		uint32(HVVoltageMonitor): 454000,
+		uint32(HVCurrentMonitor): 10000,
+		uint32(HVStatus):         1000 | 1200<<13 | 1<<26 | 1<<27 | 1<<28,
+	}}
+	got, err := ReadHVTelemetry(context.Background(), hardware, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.BoardTemperatureC != 25 || got.VoltageV != 45.4 || got.CurrentA != 0.001 ||
+		got.DetectorTemperatureC != 25.6 || got.HVTemperatureC != 30.72 ||
+		!got.On || !got.Ramping || !got.OverCurrent || got.OverVoltage {
+		t.Fatalf("telemetry = %#v", got)
 	}
 }

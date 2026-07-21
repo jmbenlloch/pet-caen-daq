@@ -47,6 +47,9 @@ const (
 	// SystemServiceStreamTelemetryProcedure is the fully-qualified name of the SystemService's
 	// StreamTelemetry RPC.
 	SystemServiceStreamTelemetryProcedure = "/pet.caen.daq.v1.SystemService/StreamTelemetry"
+	// SystemServiceSetHighVoltageProcedure is the fully-qualified name of the SystemService's
+	// SetHighVoltage RPC.
+	SystemServiceSetHighVoltageProcedure = "/pet.caen.daq.v1.SystemService/SetHighVoltage"
 	// RunServiceStartRunProcedure is the fully-qualified name of the RunService's StartRun RPC.
 	RunServiceStartRunProcedure = "/pet.caen.daq.v1.RunService/StartRun"
 	// RunServiceStopRunProcedure is the fully-qualified name of the RunService's StopRun RPC.
@@ -64,6 +67,7 @@ type SystemServiceClient interface {
 	GetConfigurationTemplate(context.Context, *connect.Request[v1.GetConfigurationTemplateRequest]) (*connect.Response[v1.GetConfigurationTemplateResponse], error)
 	ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error)
 	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest]) (*connect.ServerStreamForClient[v1.StreamTelemetryResponse], error)
+	SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error)
 }
 
 // NewSystemServiceClient constructs a client for the pet.caen.daq.v1.SystemService service. By
@@ -101,6 +105,12 @@ func NewSystemServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(systemServiceMethods.ByName("StreamTelemetry")),
 			connect.WithClientOptions(opts...),
 		),
+		setHighVoltage: connect.NewClient[v1.SetHighVoltageRequest, v1.SetHighVoltageResponse](
+			httpClient,
+			baseURL+SystemServiceSetHighVoltageProcedure,
+			connect.WithSchema(systemServiceMethods.ByName("SetHighVoltage")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -110,6 +120,7 @@ type systemServiceClient struct {
 	getConfigurationTemplate *connect.Client[v1.GetConfigurationTemplateRequest, v1.GetConfigurationTemplateResponse]
 	validateConfiguration    *connect.Client[v1.ValidateConfigurationRequest, v1.ValidateConfigurationResponse]
 	streamTelemetry          *connect.Client[v1.StreamTelemetryRequest, v1.StreamTelemetryResponse]
+	setHighVoltage           *connect.Client[v1.SetHighVoltageRequest, v1.SetHighVoltageResponse]
 }
 
 // GetSystemSnapshot calls pet.caen.daq.v1.SystemService.GetSystemSnapshot.
@@ -132,12 +143,18 @@ func (c *systemServiceClient) StreamTelemetry(ctx context.Context, req *connect.
 	return c.streamTelemetry.CallServerStream(ctx, req)
 }
 
+// SetHighVoltage calls pet.caen.daq.v1.SystemService.SetHighVoltage.
+func (c *systemServiceClient) SetHighVoltage(ctx context.Context, req *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error) {
+	return c.setHighVoltage.CallUnary(ctx, req)
+}
+
 // SystemServiceHandler is an implementation of the pet.caen.daq.v1.SystemService service.
 type SystemServiceHandler interface {
 	GetSystemSnapshot(context.Context, *connect.Request[v1.GetSystemSnapshotRequest]) (*connect.Response[v1.GetSystemSnapshotResponse], error)
 	GetConfigurationTemplate(context.Context, *connect.Request[v1.GetConfigurationTemplateRequest]) (*connect.Response[v1.GetConfigurationTemplateResponse], error)
 	ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error)
 	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest], *connect.ServerStream[v1.StreamTelemetryResponse]) error
+	SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error)
 }
 
 // NewSystemServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -171,6 +188,12 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(systemServiceMethods.ByName("StreamTelemetry")),
 		connect.WithHandlerOptions(opts...),
 	)
+	systemServiceSetHighVoltageHandler := connect.NewUnaryHandler(
+		SystemServiceSetHighVoltageProcedure,
+		svc.SetHighVoltage,
+		connect.WithSchema(systemServiceMethods.ByName("SetHighVoltage")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/pet.caen.daq.v1.SystemService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SystemServiceGetSystemSnapshotProcedure:
@@ -181,6 +204,8 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 			systemServiceValidateConfigurationHandler.ServeHTTP(w, r)
 		case SystemServiceStreamTelemetryProcedure:
 			systemServiceStreamTelemetryHandler.ServeHTTP(w, r)
+		case SystemServiceSetHighVoltageProcedure:
+			systemServiceSetHighVoltageHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -204,6 +229,10 @@ func (UnimplementedSystemServiceHandler) ValidateConfiguration(context.Context, 
 
 func (UnimplementedSystemServiceHandler) StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest], *connect.ServerStream[v1.StreamTelemetryResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.StreamTelemetry is not implemented"))
+}
+
+func (UnimplementedSystemServiceHandler) SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.SetHighVoltage is not implemented"))
 }
 
 // RunServiceClient is a client for the pet.caen.daq.v1.RunService service.

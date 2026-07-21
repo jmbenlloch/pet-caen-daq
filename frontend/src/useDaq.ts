@@ -146,6 +146,18 @@ export function useDaq(api: DaqApi) {
     }
   }
 
+  async function setHighVoltage(boards: number[], enabled: boolean, requestedBy: string) {
+    busy.value = true
+    error.value = ''
+    try {
+      accept(await api.setHighVoltage(boards, enabled, requestedBy))
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      busy.value = false
+    }
+  }
+
   function disconnect() {
     stopped = true
     streamController?.abort()
@@ -167,11 +179,13 @@ export function useDaq(api: DaqApi) {
     configurationTemplate: readonly(configurationTemplate),
     canStart: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     canStop: computed(() => snapshot.value?.state === SystemState.RUNNING && !busy.value),
+    canSwitchHV: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     connect,
     disconnect,
     validate,
     startRun,
     stopRun,
+    setHighVoltage,
     refreshHistory,
     downloadArtifact,
   }

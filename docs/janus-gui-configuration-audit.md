@@ -66,12 +66,12 @@ High-priority frontend gaps after the current milestones are:
 | `HV_Imax` | HV current trip limit. | Board, current with units. | **Complete for configuration.** Four-board editor and native HV plan; frontend has a lower bound but JANUS provides no explicit upper bound. |
 | `HV_Adjust_Range` | Selects the per-channel DAC full scale. | Global combo: 4.5, 2.5, DISABLED. | **Complete.** Select and Citiroc/HV translation. |
 | `HV_IndivAdj` | Per-channel DAC trim. | Channel, integer 0–255. | **Complete for configuration.** 4 x 64 editor and exact Citiroc channel setting; main row reports non-zero exception counts. |
-| `Vnom` | Read-only estimated channel voltage, calculated from board bias, trim range, and `HV_IndivAdj`. | Channel monitor. | **Missing.** The effective estimated voltage is not calculated or displayed. |
-| `TempSensType` | Chooses detector temperature conversion. | Global combo: TMP37, LM94021_G11, LM94021_G00 (JANUS also describes generic coefficients). | **Complete for the three enumerated sensors.** Custom coefficient strings are not supported by the backend choice parser. |
+| `Vnom` | Read-only estimated channel voltage, calculated from board bias, trim range, and `HV_IndivAdj`. | Channel monitor. | **Complete.** The 4 x 64 adjustment editor shows each effective nominal voltage and updates it immediately as bias/range/trim values change. |
+| `TempSensType` | Chooses detector temperature conversion. | Global combo: TMP37, LM94021_G11, LM94021_G00 (JANUS also describes generic coefficients). | **Complete.** Known sensors are suggested and a custom `c0 c1 c2` polynomial is accepted and translated to the HV plan. |
 | `TempFeedbackCoeff` | Temperature compensation coefficient for bias. | Global float, mV/°C. | **Complete.** Native HV plan applies it. |
 | `EnableTempFeedback` | Enables temperature feedback. | Global boolean. | **Complete.** |
-| Global/board HV switches and LEDs | Commands all boards or one board on/off; grey/yellow/green/red represents off/ramping/on/fault. Disabled while acquiring. | Live action, board/global. | **Partial.** Backend has explicit HV authorization and HV configuration, and telemetry exposes health/temperature, but there is no JANUS-equivalent per-board live on/off panel, ramp state, or HV fault LED. |
-| `Vmon`, `Imon`, detector/HV/FPGA/board temperatures | Live per-board service values. | Read-only monitors. | **Partial.** Board temperature/health telemetry exists, but the web UI does not reproduce all six JANUS monitors or Vmon/Imon/ramp comparison. |
+| Global/board HV switches and LEDs | Commands all boards or one board on/off; grey/yellow/green/red represents off/ramping/on/fault. Disabled while acquiring. | Live action, board/global. | **Complete.** Guarded native controls support each board or all boards, require backend HV authorization for ON, roll back a partial all-board enable, and are locked outside Ready. Off/ramping/on/fault state is continuously displayed. |
+| `Vmon`, `Imon`, detector/HV/FPGA/board temperatures | Live per-board service values. | Read-only monitors. | **Complete for firmware 4+.** Direct monitor registers are polled while idle or running and all six values are streamed in complete telemetry snapshots. |
 
 ## RunCtrl tab
 

@@ -45,6 +45,7 @@ func ProductionTopology() Topology {
 			ProductID:        pid,
 			FirmwareRevision: 0x07080000 | uint32(chain),
 			Status:           1,
+			Registers:        monitorRegisters(),
 			CommonPedestal:   50,
 		}}
 		for channel := range topology.Chains[chain][0].Pedestal.LowGain {
@@ -416,6 +417,16 @@ func (s *Server) handleWriteRegister(connection net.Conn) error {
 			board.HVRegisters = make(map[uint32]uint32)
 		}
 		board.HVRegisters[board.hvSelector] = value
+		if board.hvSelector == 0x200 {
+			status := board.Registers[uint32(dt5202.HVStatus)] &^ (uint32(1) << 26)
+			if value != 0 {
+				status |= 1 << 26
+				board.Registers[uint32(dt5202.HVVoltageMonitor)] = board.HVRegisters[0x102]
+			} else {
+				board.Registers[uint32(dt5202.HVVoltageMonitor)] = 0
+			}
+			board.Registers[uint32(dt5202.HVStatus)] = status
+		}
 	}
 	return writeStatus(connection, 0)
 }
@@ -491,7 +502,7 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 			}
 		case dt5215.CommandGlobalReset:
 			board.Status = 1
-			board.Registers = make(map[uint32]uint32)
+			board.Registers = monitorRegisters()
 			board.CitirocLoads = [2]uint32{}
 			board.HVRegisters = make(map[uint32]uint32)
 			board.hvSelector = 0
@@ -535,6 +546,15 @@ func eventBatch(chain, node, qualifier uint8, sequence uint64, payload []byte) [
 	copy(batch[44:], payload)
 	return batch
 }
+
+func monitorRegisters() map[uint32]uint32 {
+	return map[uint32]uint32{
+		uint32(dt5202.FPGATemperature):  2500,
+		uint32(dt5202.BoardTemperature): 100,
+		uint32(dt5202.HVStatus):         1000 | 1200<<13,
+	}
+}
+
 func writeStatus(w io.Writer, status uint32) error {
 	response := make([]byte, 4)
 	binary.LittleEndian.PutUint32(response, status)

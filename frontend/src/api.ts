@@ -17,6 +17,11 @@ export interface DaqApi {
   validate(configuration: string): Promise<{ valid: boolean; issues: ValidationIssue[] }>
   start(request: StartRunRequest): Promise<RunCommandResult>
   stop(request: StopRunRequest): Promise<RunCommandResult>
+  setHighVoltage(
+    boards: number[],
+    enabled: boolean,
+    requestedBy: string,
+  ): Promise<TelemetrySnapshot>
   listRuns(limit?: number): Promise<RunSummary[]>
   downloadArtifact(runId: string, artifactName: string): Promise<Blob>
 }
@@ -54,6 +59,11 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     async stop(request) {
       const response = await runs.stopRun(request)
       return { run: response.run, snapshot: response.snapshot }
+    },
+    async setHighVoltage(boards, enabled, requestedBy) {
+      const response = await system.setHighVoltage({ boards, enabled, requestedBy })
+      if (!response.snapshot) throw new Error('HV command returned no telemetry snapshot')
+      return response.snapshot
     },
     async listRuns(limit = 50) {
       return (await runs.listRuns({ limit })).runs
