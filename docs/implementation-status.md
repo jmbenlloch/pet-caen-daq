@@ -42,6 +42,8 @@ When transport journaling is requested, the coordinator attaches the run writer 
 
 Finalization now calculates exact sizes and SHA-256 digests after closing each stable payload artifact: decoded JSON Lines, optional complete-batch raw capture, and optional transport journal. The manifest persists those records and a successful `StopRun` returns the same artifact metadata in `RunSummary`; the manifest deliberately does not self-hash because embedding its own digest would be circular.
 
+Startup discovery now treats any board carrying the acquisition-running status as interrupted hardware state. Before configuration writes, recovery records `idle -> fault -> recovering`, performs a bounded broadcast stop and drain, attempts a broadcast global reset even when an earlier cleanup step fails, and verifies every discovered board is ready and not running. Success returns to `idle` with a warning diagnostic; failure moves to `disconnected` and joins the original already-running evidence with every stop, drain, reset, verification, and transition error.
+
 An HTTP integration test now uses the checked-in generated ConnectRPC client against the mounted system handler. It verifies the unary complete snapshot, the stream's immediate initial snapshot, a live sequence/state/run update, cancellation, and a new connection receiving the latest complete snapshot rather than replaying deltas.
 
 ## Vertical slice 1: read-only topology discovery

@@ -142,7 +142,7 @@ func TestControlAndPartialStreamWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	status, err := client.ReadRegister(ctx, 3, 0, dt5215.RegisterAcquisitionStatus)
-	if err != nil || status != 2 {
+	if err != nil || !dt5202.Status(status).Has(dt5202.StatusRunning) {
 		t.Fatalf("running status %d: %v", status, err)
 	}
 	batch := testBatch()
@@ -539,6 +539,50 @@ func TestConfigurationOrchestratorReachesReadyWithExplicitHVAuthorization(t *tes
 		}
 		if snapshot.CitirocLoads != [2]uint32{1, 1} || snapshot.HVRegisters[0x102] != 454000 {
 			t.Fatalf("board %d loads=%v HV=%#x", board, snapshot.CitirocLoads, snapshot.HVRegisters[0x102])
+		}
+	}
+}
+
+func TestStartupRecoveryStopsAndResetsAlreadyRunningHardware(t *testing.T) {
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	first, err := dt5215.Dial(context.Background(), server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Synchronize(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := first.SendCommand(context.Background(), 0xff, 0xff, dt5215.CommandAcquisitionStart, 0); err != nil {
+		t.Fatal(err)
+	}
+	_ = first.Close()
+
+	restarted, err := dt5215.Dial(context.Background(), server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restarted.Close()
+	boards := make([]acquisition.RecoveryBoard, 4)
+	for chain := range 4 {
+		status, err := restarted.ReadRegister(context.Background(), uint16(chain), 0, dt5215.RegisterAcquisitionStatus)
+		if err != nil {
+			t.Fatal(err)
+		}
+		boards[chain] = acquisition.RecoveryBoard{Chain: uint16(chain), Status: status}
+	}
+	states, _ := acquisition.NewStateMachine(acquisition.StateIdle, nil)
+	result, err := acquisition.RecoverStartup(context.Background(), states, restarted, boards, 4, 100*time.Millisecond, "integration_restart")
+	if err != nil || !result.Detected || states.Snapshot().State != acquisition.StateIdle {
+		t.Fatalf("result=%+v error=%v state=%s", result, err, states.Snapshot().State)
+	}
+	for chain := range 4 {
+		status, err := restarted.ReadRegister(context.Background(), uint16(chain), 0, dt5215.RegisterAcquisitionStatus)
+		if err != nil || dt5202.Status(status).Has(dt5202.StatusRunning) || !dt5202.Status(status).Has(dt5202.StatusReady) {
+			t.Fatalf("chain %d status=%#x error=%v", chain, status, err)
 		}
 	}
 }

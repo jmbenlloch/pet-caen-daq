@@ -8,7 +8,7 @@ import (
 )
 
 func configuredBoard(mode uint32, mask uint64) Board {
-	board := Board{Status: 2, Registers: map[uint32]uint32{
+	board := Board{Status: uint32(dt5202.StatusRunning), Registers: map[uint32]uint32{
 		uint32(dt5202.AcquisitionControl): mode,
 		uint32(dt5202.ChannelMaskLow):     uint32(mask),
 		uint32(dt5202.ChannelMaskHigh):    uint32(mask >> 32),

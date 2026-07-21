@@ -104,6 +104,15 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return err
 	}
 	coordinator.SetFaultObserver(func(fault error) { service.PublishCoordinatorFault(publisher, fault, nil) })
+	recoveryBoards := make([]acquisition.RecoveryBoard, 0, len(topology.Boards))
+	for _, board := range topology.Boards {
+		recoveryBoards = append(recoveryBoards, acquisition.RecoveryBoard{Chain: board.Chain, Node: board.Node, Status: board.AcquisitionState})
+	}
+	recoveryResult, recoveryErr := acquisition.RecoverStartup(ctx, states, client, recoveryBoards, 4, *drainTimeout, "backend_restart")
+	service.PublishStartupRecovery(publisher, recoveryResult, recoveryErr, time.Now())
+	if recoveryErr != nil {
+		return fmt.Errorf("recover hardware after restart: %w", recoveryErr)
+	}
 	incomplete, err := runstore.FindIncomplete(*runParent)
 	if err != nil {
 		return err

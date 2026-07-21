@@ -432,7 +432,7 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 		board := target.board
 		switch command {
 		case dt5215.CommandAcquisitionStart:
-			board.Status = 2
+			board.Status = uint32(dt5202.StatusRunning)
 			if board.Registers[uint32(dt5202.AcquisitionControl)]&(3<<18) != 0 {
 				s.eventSequence++
 				batch, err := generatedBatch(uint8(target.chain), uint8(target.node), s.eventSequence, dt5202.QualifierService, board)
@@ -449,7 +449,7 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 				}
 			}
 		case dt5215.CommandAcquisitionStop:
-			if board.Status == 2 {
+			if dt5202.Status(board.Status).Has(dt5202.StatusRunning) {
 				board.Status = 1
 				s.eventSequence++
 				batch, err := generatedBatch(uint8(target.chain), uint8(target.node), s.eventSequence, dt5202.QualifierService, board)
@@ -474,7 +474,7 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 			board.hvSelector = 0
 			board.spi = flashReadState{}
 		case dt5215.CommandTestPulse:
-			if board.Status != 2 {
+			if !dt5202.Status(board.Status).Has(dt5202.StatusRunning) {
 				return writeStatus(connection, 10)
 			}
 			s.eventSequence++
