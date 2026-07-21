@@ -116,7 +116,9 @@ Implemented on 2026-07-20:
 - explicit mapping of board channels 0--31 to Citiroc 0 and 32--63 to Citiroc 1; and
 - the source-confirmed normal FPGA-assisted ASIC configuration sequence for both chips, including fail-fast error propagation.
 
-The production planner populates both chip representations with its effective 64-channel gains, fine thresholds, HV adjustments, shaping selections, discriminator thresholds/mask, fast-shaper source, and source-hardcoded common modes. The bundled host implementation delegates automatic stream synthesis to FPGA firmware, so it cannot provide a host-generated 36-word golden image. Layout comparisons use its `WriteCStoFileFormatted` field boundaries and the official Citiroc 1A slow-control table. Manual stream loading remains intentionally unavailable until all power-control values have explicit requested/default provenance; normal hardware configuration continues using FPGA-assisted loading.
+The production planner populates both chip representations with its effective 64-channel gains, fine thresholds, HV adjustments, shaping selections, discriminator thresholds/mask, fast-shaper source, and source-hardcoded common modes. Layout comparisons use the JANUS `WriteCStoFileFormatted` field boundaries and the official Citiroc 1A slow-control table.
+
+The verification path now reproduces JANUS `ReadSCbsFromChip`, captures both complete FPGA-generated 36-word streams without enabling manual loading, restores the slow-control selector, and compares all 1,144 bits with exact word/bit diagnostics. An exhaustive 52-entry provenance catalog covers every ASIC enable and power-mode bit. The Citiroc 1A V2.53 datasheet establishes their position and semantics; JANUS establishes the forced-on OTA policy, while all other automatic-load power values are explicitly FPGA-owned and require real-board readback evidence. Manual stream loading remains unavailable until those authoritative captures are committed; normal hardware configuration continues using FPGA-assisted loading.
 
 ## Phase 1 configuration application and readback
 
