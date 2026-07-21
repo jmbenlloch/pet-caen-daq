@@ -16,6 +16,8 @@ The internal telemetry publisher and ConnectRPC system adapter now implement the
 
 The ConnectRPC configuration-validation method now uses the same lossless JANUS parser, semantic-owner catalog, and four-link production-topology rules as backend startup. It reports structured severity, field, source-line, and message diagnostics while retaining the deprecated string error list for existing clients. This endpoint performs static validation only; firmware-, readback-, and pedestal-dependent effective-configuration validation remains part of configuration application against discovered boards.
 
+A long-running acquisition coordinator now serializes start and stop operations over the explicit state machine. It synchronizes and clears the stream before start, continuously routes immutable raw/event batches through the bounded pipeline, cancels the reader before an orderly bounded stop-and-drain, and returns to ready only after pipeline finalization. Start, stream, drain, and pipeline failures retain their primary cause, attempt safe cleanup where possible, and leave the system in fault with a queryable diagnostic.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:
