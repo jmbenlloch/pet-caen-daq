@@ -19,6 +19,8 @@
   },
   "devDependencies": {
     "@bufbuild/protoc-gen-es": "2.12.1",
+    "@emnapi/core": "1.11.1",
+    "@emnapi/runtime": "1.11.1",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.61.1",
     "@tailwindcss/vite": "4.3.3",
