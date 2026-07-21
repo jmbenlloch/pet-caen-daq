@@ -44,6 +44,8 @@ Finalization now calculates exact sizes and SHA-256 digests after closing each s
 
 Startup discovery now treats any board carrying the acquisition-running status as interrupted hardware state. Before configuration writes, recovery records `idle -> fault -> recovering`, performs a bounded broadcast stop and drain, attempts a broadcast global reset even when an earlier cleanup step fails, and verifies every discovered board is ready and not running. Success returns to `idle` with a warning diagnostic; failure moves to `disconnected` and joins the original already-running evidence with every stop, drain, reset, verification, and transition error.
 
+A generated ConnectRPC client integration test now exercises the complete simulator-backed service workflow: static validation of the production JANUS document, configuration application on all four boards, run start with raw and journal evidence, live test-pulse telemetry, operator stop/drain, and finalized artifact inspection. It verifies the manifest's requested/effective configuration and audit, JSON Lines event count, raw replay, journal presence, and every returned size/SHA-256 digest against the on-disk bytes.
+
 An HTTP integration test now uses the checked-in generated ConnectRPC client against the mounted system handler. It verifies the unary complete snapshot, the stream's immediate initial snapshot, a live sequence/state/run update, cancellation, and a new connection receiving the latest complete snapshot rather than replaying deltas.
 
 ## Vertical slice 1: read-only topology discovery
