@@ -1,12 +1,15 @@
 package dt5215
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 func TestDecodeStreamBatch(t *testing.T) {
@@ -33,6 +36,52 @@ func TestDecodeStreamBatch(t *testing.T) {
 	e := events[0]
 	if e.Chain != 1 || e.Descriptor.Node != 2 || e.Descriptor.Qualifier != 3 || !e.Descriptor.CRCError || e.Descriptor.PayloadSizeWords != 3 || len(e.Payload) != 12 {
 		t.Fatalf("event = %#v", e)
+	}
+}
+func TestStreamJournalPreservesConnectionTruncation(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	var capture bytes.Buffer
+	journal, _ := transportjournal.NewWriter(&capture)
+	client := &Client{stream: clientConn}
+	client.SetStreamJournal(journal, "connection-7", func() time.Time { return time.Unix(0, 123) })
+	go func() { _, _ = serverConn.Write([]byte{0xff, 0xff, 0xff, 0xff, 0xff}); _ = serverConn.Close() }()
+	_, _, err := client.ReadRawStreamBatch(context.Background())
+	if err == nil {
+		t.Fatal("accepted truncated header")
+	}
+	_ = journal.Close()
+	reader, err := transportjournal.NewReader(bytes.NewReader(capture.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, failures, err := transportjournal.Replay(reader, "connection-7")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(data, []byte{0xff, 0xff, 0xff, 0xff, 0xff}) || len(failures) != 1 || failures[0].Kind != transportjournal.Termination || failures[0].Stage != "header" || failures[0].TimestampUnixNano != 123 {
+		t.Fatalf("data=%x failures=%#v", data, failures)
+	}
+}
+func TestStreamJournalPreservesMalformedHeader(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	var capture bytes.Buffer
+	journal, _ := transportjournal.NewWriter(&capture)
+	client := &Client{stream: clientConn}
+	client.SetStreamJournal(journal, "connection-8", nil)
+	go func() { _, _ = serverConn.Write(make([]byte, 12)) }()
+	_, _, err := client.ReadRawStreamBatch(context.Background())
+	if err == nil {
+		t.Fatal("accepted malformed header")
+	}
+	reader, _ := transportjournal.NewReader(bytes.NewReader(capture.Bytes()))
+	data, failures, err := transportjournal.Replay(reader, "connection-8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data) != 12 || len(failures) != 1 || failures[0].Kind != transportjournal.FramingFailure || failures[0].Reason != "invalid stream batch sentinel" {
+		t.Fatalf("data=%x failures=%#v", data, failures)
 	}
 }
 func TestReadRawStreamBatchCancellationInterruptsStalledRead(t *testing.T) {

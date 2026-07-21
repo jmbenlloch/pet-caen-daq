@@ -3,6 +3,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/simulator"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 func faultClient(t *testing.T) (*simulator.Server, *dt5215.Client) {
@@ -155,5 +157,69 @@ func TestDeterministicMissingStartService(t *testing.T) {
 	_, err := client.ReadStreamBatch(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("error=%v", err)
+	}
+}
+
+func TestTransportJournalReplaysTruncatedFramingFailure(t *testing.T) {
+	server, client := runningFaultClient(t)
+	var capture bytes.Buffer
+	journal, err := transportjournal.NewWriter(&capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetStreamJournal(journal, "truncated-stream", func() time.Time { return time.Unix(0, 77) })
+	if err = server.QueueFault(simulator.Fault{Kind: simulator.FaultStreamTruncation, AfterBytes: 20}); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.SendCommand(context.Background(), 0, 0, dt5215.CommandTestPulse, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = client.ReadStreamBatch(context.Background()); err == nil {
+		t.Fatal("truncated stream succeeded")
+	}
+	if err = journal.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := transportjournal.NewReader(bytes.NewReader(capture.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wire, failures, err := transportjournal.Replay(reader, "truncated-stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wire) != 20 || len(failures) != 1 || failures[0].Kind != transportjournal.Termination || failures[0].Offset != 20 || failures[0].TimestampUnixNano != 77 {
+		t.Fatalf("wire=%x failures=%#v", wire, failures)
+	}
+	if _, err = dt5215.DecodeStreamBatch(wire); err == nil {
+		t.Fatal("replayed truncation decoded successfully")
+	}
+}
+
+func TestTransportJournalReplaysMalformedDescriptor(t *testing.T) {
+	server, client := runningFaultClient(t)
+	var capture bytes.Buffer
+	journal, _ := transportjournal.NewWriter(&capture)
+	client.SetStreamJournal(journal, "malformed-stream", func() time.Time { return time.Unix(0, 88) })
+	if err := server.QueueFault(simulator.Fault{Kind: simulator.FaultMalformedDescriptor}); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.SendCommand(context.Background(), 0, 0, dt5215.CommandTestPulse, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.ReadStreamBatch(context.Background()); err == nil {
+		t.Fatal("malformed descriptor succeeded")
+	}
+	_ = journal.Close()
+	reader, _ := transportjournal.NewReader(bytes.NewReader(capture.Bytes()))
+	wire, failures, err := transportjournal.Replay(reader, "malformed-stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(wire) == 0 || len(failures) != 1 || failures[0].Kind != transportjournal.FramingFailure || failures[0].Stage != "decode" || failures[0].TimestampUnixNano != 88 {
+		t.Fatalf("wire=%x failures=%#v", wire, failures)
+	}
+	if _, err = dt5215.DecodeStreamBatch(wire); err == nil {
+		t.Fatal("replayed malformed descriptor decoded")
 	}
 }

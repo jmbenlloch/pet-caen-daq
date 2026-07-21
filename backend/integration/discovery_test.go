@@ -19,6 +19,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/simulator"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 func TestPersistedTestPulseRun(t *testing.T) {
@@ -41,6 +42,10 @@ func TestPersistedTestPulseRun(t *testing.T) {
 	if err = run.EnableRawCapture(); err != nil {
 		t.Fatal(err)
 	}
+	if err = run.EnableTransportJournal(); err != nil {
+		t.Fatal(err)
+	}
+	client.SetStreamJournal(run.TransportJournal(), "simulated-stream", func() time.Time { return time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC) })
 	if err = acquisition.RunTestPulse(ctx, client, run, 4); err != nil {
 		run.Abort()
 		t.Fatal(err)
@@ -87,6 +92,22 @@ func TestPersistedTestPulseRun(t *testing.T) {
 	}
 	if _, err = os.Stat(filepath.Join(run.Directory(), "incomplete")); !os.IsNotExist(err) {
 		t.Fatalf("incomplete marker: %v", err)
+	}
+	journalFile, err := os.Open(filepath.Join(run.Directory(), "transport.journal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer journalFile.Close()
+	journalReader, err := transportjournal.NewReader(journalFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	journalBytes, failures, err := transportjournal.Replay(journalReader, "simulated-stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(journalBytes) == 0 || len(failures) != 0 {
+		t.Fatalf("journal bytes=%d failures=%#v", len(journalBytes), failures)
 	}
 }
 

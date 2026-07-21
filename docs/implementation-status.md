@@ -220,3 +220,14 @@ Implemented on 2026-07-21:
 - a byte-exact synthetic source-confirmed fixture with metadata, malformed-page and I/O tests, parser fuzz coverage, and a four-board real-socket simulator integration test.
 
 The simulator models the read transaction and rejects the page-program opcode. Protected flash is never modified. Fixture contents are synthetic from the bundled source layout rather than hardware-captured evidence; authoritative page captures remain scheduled for Phase 4.
+
+## Phase 1 raw transport evidence journal
+
+Implemented on 2026-07-21:
+
+- a versioned, length-delimited, CRC32-protected `transport.journal` alongside the existing complete-batch `wire.raw` format;
+- journaling of every successful socket-read fragment before DT5215 header, descriptor, extent, CRC, or payload validation, with connection identity, continuous byte offset, timestamp, and framing stage;
+- explicit framing-failure and connection-termination records carrying the observed offset and reason, including cancellation/deadline classification; and
+- deterministic per-connection replay that reconstructs the exact observed byte stream and ordered failures, rejects offset gaps/corruption, and reproduces truncated-header and malformed-descriptor failures offline.
+
+The development run writer can create, synchronize, and close the transport journal with the other run artifacts. Complete validated batches continue to be stored in `wire.raw`; the two formats intentionally preserve different evidence boundaries. Real DT5215 capture fixtures remain scheduled for Phase 4.

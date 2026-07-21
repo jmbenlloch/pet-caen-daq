@@ -106,6 +106,7 @@ run-<id>/
   manifest.json
   events.jsonl
   wire.raw          # optional byte-exact capture
+  transport.journal # optional pre-framing byte/failure evidence
   incomplete        # present until successful finalization
 ```
 

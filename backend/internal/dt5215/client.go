@@ -10,16 +10,38 @@ import (
 	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 const defaultOperationTimeout = 3 * time.Second
 
 // Client owns one DT5215 control connection and one stream connection.
 type Client struct {
-	control  net.Conn
-	stream   net.Conn
-	mu       sync.Mutex
-	streamMu sync.Mutex
+	control            net.Conn
+	stream             net.Conn
+	mu                 sync.Mutex
+	streamMu           sync.Mutex
+	journal            transportjournal.Sink
+	streamConnectionID string
+	streamOffset       uint64
+	journalNow         func() time.Time
+}
+
+// SetStreamJournal installs evidence capture below DT5215 framing. Call it
+// before starting stream reads. Passing nil disables journaling.
+func (c *Client) SetStreamJournal(journal transportjournal.Sink, connectionID string, now func() time.Time) {
+	c.streamMu.Lock()
+	defer c.streamMu.Unlock()
+	c.journal = journal
+	c.streamOffset = 0
+	c.streamConnectionID = connectionID
+	if c.streamConnectionID == "" && c.stream != nil {
+		c.streamConnectionID = c.stream.LocalAddr().String() + "->" + c.stream.RemoteAddr().String()
+	}
+	c.journalNow = now
+	if c.journalNow == nil {
+		c.journalNow = time.Now
+	}
 }
 
 func (c *Client) WriteRegister(ctx context.Context, chain, node uint16, address, value uint32) error {

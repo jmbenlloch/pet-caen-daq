@@ -19,7 +19,8 @@ Each development run uses:
 
 - `manifest.json`: bounded run metadata, configuration snapshot, topology, firmware/software identity, lifecycle timestamps, termination state, counters, warnings, artifact hashes, and format versions;
 - `events.jsonl`: one independently parseable, versioned JSON event envelope per line;
-- `wire.raw`: optional byte-exact DT5215 stream/control evidence with sufficient side metadata for replay;
+- `wire.raw`: optional byte-exact complete DT5215 batches for ordinary replay;
+- `transport.journal`: optional pre-framing socket fragments and failure metadata for deterministic reconstruction of malformed or truncated input;
 - an incomplete marker or equivalent atomic-finalization mechanism.
 
 The exact envelope schema, 64-bit integer representation, flush/finalization, and durability rules will be specified and golden-tested during implementation. Readers must stream, enforce line-size bounds, detect a truncated final record, identify malformed records precisely, and reject unsupported versions clearly.

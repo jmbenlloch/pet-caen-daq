@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 func TestRunLifecycleAndReplay(t *testing.T) {
@@ -19,6 +20,12 @@ func TestRunLifecycleAndReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = w.EnableRawCapture(); err != nil {
+		t.Fatal(err)
+	}
+	if err = w.EnableTransportJournal(); err != nil {
+		t.Fatal(err)
+	}
+	if err = w.TransportJournal().AppendRecord(transportjournal.Record{Kind: transportjournal.Data, ConnectionID: "stream", Stage: "header", Data: []byte{9, 8, 7}}); err != nil {
 		t.Fatal(err)
 	}
 	if err = w.AppendRaw([]byte{1, 2, 3, 4}); err != nil {
@@ -75,6 +82,22 @@ func TestRunLifecycleAndReplay(t *testing.T) {
 	raw, err := rawReader.Next()
 	if err != nil || !bytes.Equal(raw, []byte{1, 2, 3, 4}) {
 		t.Fatalf("raw = %x, %v", raw, err)
+	}
+	journalFile, err := os.Open(filepath.Join(w.Directory(), "transport.journal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer journalFile.Close()
+	journalReader, err := transportjournal.NewReader(journalFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	journalData, failures, err := transportjournal.Replay(journalReader, "stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(journalData, []byte{9, 8, 7}) || len(failures) != 0 {
+		t.Fatalf("journal data=%x failures=%#v", journalData, failures)
 	}
 }
 func TestAbortLeavesIncompleteMarker(t *testing.T) {

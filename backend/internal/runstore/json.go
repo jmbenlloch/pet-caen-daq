@@ -13,6 +13,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 const SchemaVersion = 1
@@ -40,6 +41,7 @@ type Writer struct {
 	manifest Manifest
 	closed   bool
 	raw      *rawcapture.Writer
+	journal  *transportjournal.Writer
 }
 
 func Create(parent string, manifest Manifest) (*Writer, error) {
@@ -66,6 +68,26 @@ func Create(parent string, manifest Manifest) (*Writer, error) {
 	return w, nil
 }
 func (w *Writer) Directory() string { return w.dir }
+func (w *Writer) EnableTransportJournal() error {
+	if w.closed {
+		return errors.New("run writer is closed")
+	}
+	if w.journal != nil {
+		return errors.New("transport journal is already enabled")
+	}
+	file, err := os.OpenFile(filepath.Join(w.dir, "transport.journal"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	if err != nil {
+		return fmt.Errorf("create transport journal: %w", err)
+	}
+	journal, err := transportjournal.NewWriter(file)
+	if err != nil {
+		file.Close()
+		return err
+	}
+	w.journal = journal
+	return nil
+}
+func (w *Writer) TransportJournal() transportjournal.Sink { return w.journal }
 func (w *Writer) EnableRawCapture() error {
 	if w.closed {
 		return errors.New("run writer is closed")
@@ -143,6 +165,11 @@ func (w *Writer) Finalize(completedAt, reason string) error {
 			return err
 		}
 	}
+	if w.journal != nil {
+		if err := w.journal.Close(); err != nil {
+			return err
+		}
+	}
 	w.manifest.CompletedAt = completedAt
 	w.manifest.TerminationReason = reason
 	if err := w.writeManifest(); err != nil {
@@ -162,6 +189,11 @@ func (w *Writer) Abort() error {
 	if w.raw != nil {
 		if rawErr := w.raw.Close(); eventsErr == nil {
 			eventsErr = rawErr
+		}
+	}
+	if w.journal != nil {
+		if journalErr := w.journal.Close(); eventsErr == nil {
+			eventsErr = journalErr
 		}
 	}
 	return eventsErr

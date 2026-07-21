@@ -3,9 +3,12 @@ package dt5215
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 // ReadStreamBatch reads exactly one batch from the stream TCP connection. Its
@@ -38,7 +41,7 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 		_ = c.stream.SetReadDeadline(time.Time{})
 	}()
 	header := make([]byte, 12)
-	if _, err := io.ReadFull(c.stream, header); err != nil {
+	if err := c.readStreamEvidence(ctx, "header", header); err != nil {
 		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
@@ -47,13 +50,15 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	w2 := binary.LittleEndian.Uint32(header[8:])
 	rows := int(w2 >> 8)
 	if binary.LittleEndian.Uint32(header) != 0xffffffff || binary.LittleEndian.Uint32(header[4:]) != 0xffffffff {
-		return nil, nil, fmt.Errorf("invalid stream batch sentinel")
+		err := c.recordFramingFailure("header", fmt.Errorf("invalid stream batch sentinel"))
+		return nil, nil, err
 	}
 	if rows == 0 || rows > MaxDescriptorRows {
-		return nil, nil, fmt.Errorf("invalid descriptor row count %d", rows)
+		err := c.recordFramingFailure("header", fmt.Errorf("invalid descriptor row count %d", rows))
+		return nil, nil, err
 	}
 	table := make([]byte, rows*32)
-	if _, err := io.ReadFull(c.stream, table); err != nil {
+	if err := c.readStreamEvidence(ctx, "descriptor", table); err != nil {
 		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
@@ -67,17 +72,19 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 		offset := uint64((w0 >> 24) | ((w1 & 0x00ffffff) << 8))
 		size := uint64(w0 & 0x00ffffff)
 		if size*4 > MaxStreamEventBytes {
-			return nil, nil, fmt.Errorf("descriptor %d payload too large", i)
+			err := c.recordFramingFailure("descriptor", fmt.Errorf("descriptor %d payload too large", i))
+			return nil, nil, err
 		}
 		if end := (offset + size) * 4; end > extent {
 			extent = end
 		}
 	}
 	if extent > MaxStreamBatchBytes {
-		return nil, nil, fmt.Errorf("stream batch payload extent %d is too large", extent)
+		err := c.recordFramingFailure("descriptor", fmt.Errorf("stream batch payload extent %d is too large", extent))
+		return nil, nil, err
 	}
 	payload := make([]byte, int(extent))
-	if _, err := io.ReadFull(c.stream, payload); err != nil {
+	if err := c.readStreamEvidence(ctx, "payload", payload); err != nil {
 		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
@@ -87,9 +94,59 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	batch = append(batch, payload...)
 	events, err := DecodeStreamBatch(batch)
 	if err != nil {
+		err = c.recordFramingFailure("decode", err)
 		return batch, nil, err
 	}
 	return batch, events, nil
+}
+
+func (c *Client) readStreamEvidence(ctx context.Context, stage string, target []byte) error {
+	for len(target) > 0 {
+		n, err := c.stream.Read(target)
+		if n > 0 {
+			data := append([]byte(nil), target[:n]...)
+			if c.journal != nil {
+				record := transportjournal.Record{Kind: transportjournal.Data, Offset: c.streamOffset, TimestampUnixNano: c.journalTime().UnixNano(), ConnectionID: c.streamConnectionID, Stage: stage, Data: data}
+				if journalErr := c.journal.AppendRecord(record); journalErr != nil {
+					return fmt.Errorf("journal stream %s at offset %d: %w", stage, c.streamOffset, journalErr)
+				}
+			}
+			c.streamOffset += uint64(n)
+			target = target[n:]
+		}
+		if err != nil {
+			if c.journal != nil {
+				reason := err.Error()
+				if ctxErr := operationContextError(ctx); ctxErr != nil {
+					reason = ctxErr.Error()
+				}
+				record := transportjournal.Record{Kind: transportjournal.Termination, Offset: c.streamOffset, TimestampUnixNano: c.journalTime().UnixNano(), ConnectionID: c.streamConnectionID, Stage: stage, Reason: reason}
+				if journalErr := c.journal.AppendRecord(record); journalErr != nil {
+					return errors.Join(err, fmt.Errorf("journal stream termination at offset %d: %w", c.streamOffset, journalErr))
+				}
+			}
+			return err
+		}
+		if n == 0 {
+			return io.ErrNoProgress
+		}
+	}
+	return nil
+}
+func (c *Client) recordFramingFailure(stage string, frameErr error) error {
+	if c.journal == nil {
+		return frameErr
+	}
+	if err := c.journal.AppendRecord(transportjournal.Record{Kind: transportjournal.FramingFailure, Offset: c.streamOffset, TimestampUnixNano: c.journalTime().UnixNano(), ConnectionID: c.streamConnectionID, Stage: stage, Reason: frameErr.Error()}); err != nil {
+		return errors.Join(frameErr, fmt.Errorf("journal framing failure at offset %d: %w", c.streamOffset, err))
+	}
+	return frameErr
+}
+func (c *Client) journalTime() time.Time {
+	if c.journalNow != nil {
+		return c.journalNow()
+	}
+	return time.Now()
 }
 
 const (

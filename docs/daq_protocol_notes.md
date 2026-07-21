@@ -265,6 +265,8 @@ Do not confuse:
 - JANUS processed binary/list/count/spectrum files written by `outputfiles.c`;
 - CSV conversion formats in `macros/BinToCsv`.
 
+The development artifacts now separate two native evidence layers: `wire.raw` stores complete validated DT5215 batches, while `transport.journal` stores each pre-framing socket-read fragment plus connection offsets, identity, timestamps, stages, and termination/framing reasons. Journal replay concatenates data records for one connection and preserves failure records so malformed headers/descriptors and connection-truncated fragments reproduce deterministically instead of disappearing below the complete-batch boundary.
+
 FERSlib already supports opening raw output, splitting subruns, and replaying raw files offline. Retaining this facility in an early replacement DAQ would be valuable for regression tests.
 
 The production Run 54 artifacts add a concrete processed-list example: Windows JANUS 4.3.0, output format 3.4, A5202 spectroscopy plus timing, four boards, and a 0.5 ns ToA LSB. A 256-event record-aligned prefix and the complete run log are committed under `test/fixtures/runs/run54/`; the 129,926,126-byte full binary is identified by hash but kept outside normal Git. This fixture validates JANUS list compatibility, not DT5215 TCP framing.
