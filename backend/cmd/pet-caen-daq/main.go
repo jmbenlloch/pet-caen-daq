@@ -44,6 +44,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	runParent := flags.String("runs", "./runs", "parent directory for run artifacts")
 	pipelineCapacity := flags.Int("pipeline-capacity", 32, "bounded stream-batch queue capacity")
 	drainTimeout := flags.Duration("drain-timeout", 5*time.Second, "maximum orderly stop-and-drain duration")
+	authorizeHV := flags.Bool("authorize-hv-config", false, "explicitly authorize applying configured DT5202 HV peripheral setpoints")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -106,6 +107,20 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return err
 	}
 	service.PublishRecoveryDiagnostics(publisher, incomplete, time.Now())
+	configurator, err := acquisition.NewConfigurator(states, client, service.ConfigurationProgressPublisher(publisher, states, nil))
+	if err != nil {
+		return err
+	}
+	targets := make([]acquisition.ConfigurationTarget, 0, len(connections))
+	for _, connection := range connections {
+		targets = append(targets, acquisition.ConfigurationTarget{Board: connection.Board, Chain: uint16(connection.Chain), Node: uint16(connection.Node)})
+	}
+	configurationCtx, cancelConfiguration := context.WithTimeout(ctx, 30*time.Second)
+	_, err = configurator.Configure(configurationCtx, document, targets, acquisition.ConfigureOptions{Actor: "backend_startup", Hard: true, AuthorizeHV: *authorizeHV})
+	cancelConfiguration()
+	if err != nil {
+		return fmt.Errorf("apply startup configuration: %w", err)
+	}
 
 	systemService := &service.SystemService{Source: publisher}
 	runService := &service.RunService{Controller: coordinator, Telemetry: publisher}
@@ -126,7 +141,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		defer shutdownCancel()
 		_ = server.Shutdown(shutdownCtx)
 	}()
-	fmt.Fprintf(output, "PET CAEN DAQ instance=%s listen=%s state=idle\n", publisher.Snapshot().GetInstanceId(), *listenAddress)
+	fmt.Fprintf(output, "PET CAEN DAQ instance=%s listen=%s state=ready hv_authorized=%t\n", publisher.Snapshot().GetInstanceId(), *listenAddress, *authorizeHV)
 	err = server.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		<-shutdownDone

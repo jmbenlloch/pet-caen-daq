@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 )
 
 type coordinatorHardware struct {
@@ -17,6 +18,15 @@ type coordinatorHardware struct {
 	readCount int
 	readErr   error
 	startErr  error
+}
+
+// The coordinator and configurator deliberately share the production client,
+// while this test fake only exercises configurator validation before I/O.
+func (h *coordinatorHardware) WriteRegister(context.Context, uint16, uint16, uint32, uint32) error {
+	return nil
+}
+func (h *coordinatorHardware) ReadRegister(context.Context, uint16, uint16, uint32) (uint32, error) {
+	return 0, nil
 }
 
 func (h *coordinatorHardware) Synchronize(context.Context) error { return nil }
@@ -152,5 +162,28 @@ func TestCoordinatorRejectsInvalidStartWithoutCreatingPipeline(t *testing.T) {
 	}, 1, time.Second)
 	if err := coordinator.Start(context.Background(), "run-1", "operator"); err == nil || created {
 		t.Fatalf("error=%v created=%v", err, created)
+	}
+}
+
+func TestConfiguratorRejectsDuplicateTargetAndPublishesFailure(t *testing.T) {
+	states, _ := NewStateMachine(StateIdle, nil)
+	var progress []ConfigurationProgress
+	configurator, err := NewConfigurator(states, &coordinatorHardware{}, func(update ConfigurationProgress) {
+		progress = append(progress, update)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := &janusconfig.Document{}
+	_, err = configurator.Configure(context.Background(), document, []ConfigurationTarget{{Board: 0}, {Board: 0}}, ConfigureOptions{Actor: "operator"})
+	if err == nil || states.Snapshot().State != StateFault {
+		t.Fatalf("error=%v state=%s", err, states.Snapshot().State)
+	}
+	if len(progress) != 1 || progress[0].Stage != ConfigurationFailed || progress[0].Err == nil {
+		t.Fatalf("progress=%#v", progress)
+	}
+	history := states.History()
+	if len(history) != 2 || history[0].From != StateIdle || history[0].To != StateConfiguring || history[1].To != StateFault {
+		t.Fatalf("history=%#v", history)
 	}
 }
