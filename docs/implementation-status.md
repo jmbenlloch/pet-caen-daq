@@ -20,6 +20,15 @@ The initial frontend is served by Vite during development and proxies the API to
 the backend on port 8080. Production static serving, run history/artifact views,
 and Playwright browser workflows remain subsequent Phase 3 slices.
 
+The run-control client now retains the authoritative completed `RunSummary`
+returned by `StopRun` rather than trying to reconstruct completion from the next
+telemetry snapshot. The dashboard presents the latest run's termination reason,
+event/raw-batch counts, incomplete state, and artifact kind, size, and SHA-256
+metadata. Component coverage exercises discovered-board rendering and the
+validated ready-to-running operator workflow through an injected API boundary.
+Historical run browsing and artifact download still require explicit backend API
+methods; the frontend does not infer history from transient telemetry.
+
 ## Phase 2 acquisition service foundations
 
 Started on 2026-07-21:

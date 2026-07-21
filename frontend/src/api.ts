@@ -5,6 +5,7 @@ import {
   SystemService,
   type StartRunRequest,
   type StopRunRequest,
+  type RunSummary,
   type TelemetrySnapshot,
   type ValidationIssue,
 } from './gen/pet/caen/daq/v1/system_pb'
@@ -13,8 +14,13 @@ export interface DaqApi {
   snapshot(): Promise<TelemetrySnapshot | undefined>
   telemetry(signal: AbortSignal): AsyncIterable<TelemetrySnapshot>
   validate(configuration: string): Promise<{ valid: boolean; issues: ValidationIssue[] }>
-  start(request: StartRunRequest): Promise<TelemetrySnapshot | undefined>
-  stop(request: StopRunRequest): Promise<TelemetrySnapshot | undefined>
+  start(request: StartRunRequest): Promise<RunCommandResult>
+  stop(request: StopRunRequest): Promise<RunCommandResult>
+}
+
+export interface RunCommandResult {
+  run?: RunSummary
+  snapshot?: TelemetrySnapshot
 }
 
 export function createDaqApi(baseUrl = window.location.origin): DaqApi {
@@ -36,10 +42,12 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
       return { valid: response.valid, issues: response.issues }
     },
     async start(request) {
-      return (await runs.startRun(request)).snapshot
+      const response = await runs.startRun(request)
+      return { run: response.run, snapshot: response.snapshot }
     },
     async stop(request) {
-      return (await runs.stopRun(request)).snapshot
+      const response = await runs.stopRun(request)
+      return { run: response.run, snapshot: response.snapshot }
     },
   }
 }

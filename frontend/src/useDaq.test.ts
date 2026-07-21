@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DaqApi } from './api'
 import {
   SystemState,
+  RunSummarySchema,
   TelemetrySnapshotSchema,
   type StartRunRequest,
   type StopRunRequest,
@@ -42,8 +43,8 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
     ),
     telemetry: deferredStream(),
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
-    start: vi.fn().mockResolvedValue(undefined),
-    stop: vi.fn().mockResolvedValue(undefined),
+    start: vi.fn().mockResolvedValue({}),
+    stop: vi.fn().mockResolvedValue({}),
     ...overrides,
   }
 }
@@ -68,7 +69,7 @@ describe('useDaq', () => {
   })
 
   it('does not start a run when configuration validation fails', async () => {
-    const start = vi.fn<(request: StartRunRequest) => Promise<undefined>>()
+    const start = vi.fn<(request: StartRunRequest) => Promise<Record<string, never>>>()
     const api = fakeApi({
       validate: vi.fn().mockResolvedValue({ valid: false, issues: [] }),
       start,
@@ -89,7 +90,12 @@ describe('useDaq', () => {
   })
 
   it('stops the exact active run identity', async () => {
-    const stop = vi.fn<(request: StopRunRequest) => Promise<undefined>>()
+    const completed = create(RunSummarySchema, {
+      runId: 'run-55',
+      terminationReason: 'operator stop',
+      eventCount: 42n,
+    })
+    const stop = vi.fn<(request: StopRunRequest) => Promise<{ run: typeof completed }>>()
     const api = fakeApi({
       snapshot: vi.fn().mockResolvedValue(
         create(TelemetrySnapshotSchema, {
@@ -97,7 +103,7 @@ describe('useDaq', () => {
           currentRun: { runId: 'run-55' },
         }),
       ),
-      stop,
+      stop: stop.mockResolvedValue({ run: completed }),
     })
     const { store, wrapper } = mountStore(api)
     void store.connect()
@@ -108,6 +114,7 @@ describe('useDaq', () => {
     expect(stop).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'run-55', requestedBy: 'operator' }),
     )
+    expect(store.latestCompletedRun.value).toEqual(completed)
     wrapper.unmount()
   })
 })

@@ -26,3 +26,11 @@ export const healthLabel: Record<HealthStatus, string> = {
 export function compact(value: bigint | undefined) {
   return new Intl.NumberFormat().format(value ?? 0n)
 }
+
+export function bytes(value: bigint | undefined) {
+  const amount = Number(value ?? 0n)
+  if (amount < 1024) return `${amount} B`
+  if (amount < 1024 ** 2) return `${(amount / 1024).toFixed(1)} KiB`
+  if (amount < 1024 ** 3) return `${(amount / 1024 ** 2).toFixed(1)} MiB`
+  return `${(amount / 1024 ** 3).toFixed(1)} GiB`
+}

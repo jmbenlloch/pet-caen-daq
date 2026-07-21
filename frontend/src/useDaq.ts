@@ -6,6 +6,7 @@ import {
   StopRunRequestSchema,
   SystemState,
   type TelemetrySnapshot,
+  type RunSummary,
   type ValidationIssue,
 } from './gen/pet/caen/daq/v1/system_pb'
 
@@ -18,6 +19,7 @@ export function useDaq(api: DaqApi) {
   const error = ref('')
   const busy = ref(false)
   const validationIssues = ref<ValidationIssue[]>([])
+  const latestCompletedRun = ref<RunSummary>()
   let streamController: AbortController | undefined
   let staleTimer: number | undefined
   let reconnectTimer: number | undefined
@@ -78,17 +80,16 @@ export function useDaq(api: DaqApi) {
       const valid = await validate(input.configuration)
       if (!valid) return
       busy.value = true
-      accept(
-        await api.start(
-          create(StartRunRequestSchema, {
-            runId: input.runId,
-            requestedBy: input.requestedBy,
-            janusConfiguration: input.configuration,
-            captureRaw: input.captureRaw,
-            journalTransport: input.journalTransport,
-          }),
-        ),
+      const result = await api.start(
+        create(StartRunRequestSchema, {
+          runId: input.runId,
+          requestedBy: input.requestedBy,
+          janusConfiguration: input.configuration,
+          captureRaw: input.captureRaw,
+          journalTransport: input.journalTransport,
+        }),
       )
+      accept(result.snapshot)
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {
@@ -102,7 +103,9 @@ export function useDaq(api: DaqApi) {
     busy.value = true
     error.value = ''
     try {
-      accept(await api.stop(create(StopRunRequestSchema, { runId, requestedBy })))
+      const result = await api.stop(create(StopRunRequestSchema, { runId, requestedBy }))
+      accept(result.snapshot)
+      if (result.run) latestCompletedRun.value = result.run
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {
@@ -126,6 +129,7 @@ export function useDaq(api: DaqApi) {
     error: readonly(error),
     busy: readonly(busy),
     validationIssues: readonly(validationIssues),
+    latestCompletedRun: readonly(latestCompletedRun),
     canStart: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     canStop: computed(() => snapshot.value?.state === SystemState.RUNNING && !busy.value),
     connect,

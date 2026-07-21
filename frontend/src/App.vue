@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { createDaqApi } from './api'
+import { createDaqApi, type DaqApi } from './api'
 import { DiagnosticSeverity, HealthStatus } from './gen/pet/caen/daq/v1/system_pb'
-import { compact, healthLabel, stateLabel } from './presentation'
+import { bytes, compact, healthLabel, stateLabel } from './presentation'
 import { useDaq } from './useDaq'
 
-const daq = useDaq(createDaqApi())
+const props = defineProps<{ api?: DaqApi }>()
+const daq = useDaq(props.api ?? createDaqApi())
 const runId = ref('')
 const requestedBy = ref('operator')
 const configuration = ref('')
@@ -222,6 +223,52 @@ onMounted(() => daq.connect())
             </p>
           </section>
         </aside>
+      </section>
+
+      <section
+        v-if="daq.latestCompletedRun.value"
+        class="completed panel"
+        aria-labelledby="completed-heading"
+      >
+        <div class="completed-summary">
+          <div>
+            <p class="eyebrow">Latest completed run</p>
+            <h2 id="completed-heading">{{ daq.latestCompletedRun.value.runId }}</h2>
+          </div>
+          <dl class="completed-counts">
+            <div>
+              <dt>Termination</dt>
+              <dd>{{ daq.latestCompletedRun.value.terminationReason || 'Completed normally' }}</dd>
+            </div>
+            <div>
+              <dt>Events</dt>
+              <dd>{{ compact(daq.latestCompletedRun.value.eventCount) }}</dd>
+            </div>
+            <div>
+              <dt>Raw batches</dt>
+              <dd>{{ compact(daq.latestCompletedRun.value.rawBatchCount) }}</dd>
+            </div>
+          </dl>
+        </div>
+        <div v-if="daq.latestCompletedRun.value.incomplete" class="incomplete" role="alert">
+          This run is incomplete. Preserve and inspect its evidence before recovery.
+        </div>
+        <div class="artifacts" aria-label="Run artifacts">
+          <article
+            v-for="artifact in daq.latestCompletedRun.value.artifacts"
+            :key="artifact.name"
+            class="artifact"
+          >
+            <div>
+              <strong>{{ artifact.name }}</strong>
+              <span>{{ artifact.kind }} · {{ bytes(artifact.sizeBytes) }}</span>
+            </div>
+            <code :title="artifact.sha256">{{ artifact.sha256 || 'Digest unavailable' }}</code>
+          </article>
+          <p v-if="!daq.latestCompletedRun.value.artifacts.length" class="empty">
+            No artifact metadata was returned.
+          </p>
+        </div>
       </section>
 
       <section class="boards-section" aria-labelledby="boards-heading">
