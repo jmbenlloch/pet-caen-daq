@@ -132,6 +132,26 @@ func (w *Writer) AppendDecoded(wire dt5215.StreamEvent, event dt5202.Spectroscop
 	}
 	return w.Append(Envelope{Kind: "spectroscopy_timing", Sequence: w.manifest.EventCount + 1, Payload: payload})
 }
+
+// AppendEvent persists any qualifier-dispatched project event while retaining
+// the DT5215 descriptor identity required to correlate decoded and raw data.
+func (w *Writer) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
+	if event.Kind == "" {
+		return errors.New("decoded event kind is required")
+	}
+	payload, err := json.Marshal(struct {
+		Chain     uint8        `json:"chain"`
+		Node      uint8        `json:"node"`
+		Qualifier uint8        `json:"qualifier"`
+		TriggerID uint64       `json:"trigger_id,string"`
+		Timestamp uint64       `json:"timestamp,string"`
+		Event     dt5202.Event `json:"event"`
+	}{Chain: wire.Chain, Node: wire.Descriptor.Node, Qualifier: wire.Descriptor.Qualifier, TriggerID: wire.Descriptor.TriggerID, Timestamp: wire.Descriptor.Timestamp, Event: event})
+	if err != nil {
+		return fmt.Errorf("encode decoded %s event: %w", event.Kind, err)
+	}
+	return w.Append(Envelope{Kind: string(event.Kind), Sequence: w.manifest.EventCount + 1, Payload: payload})
+}
 func (w *Writer) Append(e Envelope) error {
 	if w.closed {
 		return errors.New("run writer is closed")

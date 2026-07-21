@@ -20,6 +20,8 @@ A long-running acquisition coordinator now serializes start and stop operations 
 
 ConnectRPC run-control handlers now validate required identity and the static JANUS configuration before start, enforce exact active-run identity on stop, invoke the long-running coordinator, map lifecycle rejection to typed RPC status, and publish complete running, ready, or fault snapshots. Successful stop records completion time and termination reason and clears the current run only after coordinator drain/finalization succeeds.
 
+The development run writer now directly implements the bounded pipeline's typed event sink for spectroscopy, timing, counting, waveform, service, and test events. Each JSON Lines envelope retains chain/node, qualifier, trigger ID, timestamp, and the complete project-owned decoded event, with 64-bit values encoded as decimal strings. The original Phase 1 spectroscopy append method and envelope kind remain available for replay compatibility.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:

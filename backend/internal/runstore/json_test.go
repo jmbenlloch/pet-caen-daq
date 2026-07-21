@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
@@ -103,6 +105,57 @@ func TestRunLifecycleAndReplay(t *testing.T) {
 	}
 	if !bytes.Equal(journalData, []byte{9, 8, 7}) || len(failures) != 0 {
 		t.Fatalf("journal data=%x failures=%#v", journalData, failures)
+	}
+}
+func TestWriterPersistsEveryTypedEventKind(t *testing.T) {
+	w, err := Create(t.TempDir(), Manifest{RunID: "all-kinds"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := []dt5202.EventKind{dt5202.EventSpectroscopy, dt5202.EventTiming, dt5202.EventCounting, dt5202.EventWaveform, dt5202.EventService, dt5202.EventTest}
+	for i, kind := range kinds {
+		wire := dt5215.StreamEvent{Chain: uint8(i % 4), Descriptor: dt5215.Descriptor{Qualifier: uint8(i + 1), TriggerID: uint64(100 + i), Timestamp: uint64(200 + i)}}
+		if err := w.AppendEvent(wire, dt5202.Event{Kind: kind, Qualifier: uint8(i + 1)}); err != nil {
+			t.Fatalf("append %s: %v", kind, err)
+		}
+	}
+	if err := w.Finalize("2026-07-21T15:01:00Z", "complete"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(w.Directory(), "events.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewReader(bytes.NewReader(data), 0)
+	for i, want := range kinds {
+		envelope, err := r.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if envelope.Kind != string(want) || envelope.Sequence != uint64(i+1) {
+			t.Fatalf("envelope %d = %+v", i, envelope)
+		}
+		var payload struct {
+			TriggerID uint64       `json:"trigger_id,string"`
+			Timestamp uint64       `json:"timestamp,string"`
+			Event     dt5202.Event `json:"event"`
+		}
+		if err := json.Unmarshal(envelope.Payload, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Event.Kind != want || payload.TriggerID != uint64(100+i) || payload.Timestamp != uint64(200+i) {
+			t.Fatalf("payload %d = %+v", i, payload)
+		}
+	}
+}
+func TestWriterRejectsUntypedEvent(t *testing.T) {
+	w, err := Create(t.TempDir(), Manifest{RunID: "missing-kind"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Abort()
+	if err := w.AppendEvent(dt5215.StreamEvent{}, dt5202.Event{}); err == nil {
+		t.Fatal("accepted event without kind")
 	}
 }
 func TestAbortLeavesIncompleteMarker(t *testing.T) {
