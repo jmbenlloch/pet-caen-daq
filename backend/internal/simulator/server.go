@@ -22,6 +22,8 @@ type Board struct {
 	CitirocLoads     [2]uint32
 	HVRegisters      map[uint32]uint32
 	hvSelector       uint32
+	CommonPedestal   uint16
+	Pedestal         dt5202.PedestalCalibration
 }
 
 type Topology struct {
@@ -40,7 +42,12 @@ func ProductionTopology() Topology {
 			ProductID:        pid,
 			FirmwareRevision: 0x07080000 | uint32(chain),
 			Status:           1,
+			CommonPedestal:   50,
 		}}
+		for channel := range topology.Chains[chain][0].Pedestal.LowGain {
+			topology.Chains[chain][0].Pedestal.LowGain[channel] = 50
+			topology.Chains[chain][0].Pedestal.HighGain[channel] = 50
+		}
 	}
 	return topology
 }
@@ -339,6 +346,18 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 		switch command {
 		case dt5215.CommandAcquisitionStart:
 			board.Status = 2
+			if board.Registers[uint32(dt5202.AcquisitionControl)]&(3<<18) != 0 {
+				s.eventSequence++
+				batch, err := generatedBatch(uint8(target.chain), uint8(target.node), s.eventSequence, dt5202.QualifierService, board)
+				if err != nil {
+					return writeStatus(connection, 22)
+				}
+				select {
+				case s.streamData <- batch:
+				default:
+					return writeStatus(connection, 11)
+				}
+			}
 		case dt5215.CommandAcquisitionStop:
 			board.Status = 1
 		case dt5215.CommandGlobalReset:
@@ -352,7 +371,10 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 				return writeStatus(connection, 10)
 			}
 			s.eventSequence++
-			batch := testPulseBatch(uint8(target.chain), uint8(target.node), s.eventSequence)
+			batch, err := generatedBatch(uint8(target.chain), uint8(target.node), s.eventSequence, 0, board)
+			if err != nil {
+				return writeStatus(connection, 22)
+			}
 			select {
 			case s.streamData <- batch:
 			default:
@@ -368,18 +390,14 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 	}
 	return writeStatus(connection, 0)
 }
-func testPulseBatch(chain, node uint8, sequence uint64) []byte {
-	payload := make([]byte, 16)
-	binary.LittleEndian.PutUint64(payload, uint64(1)<<chain)
-	binary.LittleEndian.PutUint32(payload[8:], uint32(100+sequence)|(uint32(200+sequence)<<16))
-	binary.LittleEndian.PutUint32(payload[12:], uint32(5+chain)<<25|uint32(10+chain)<<16|uint32(300+sequence))
+func eventBatch(chain, node, qualifier uint8, sequence uint64, payload []byte) []byte {
 	batch := make([]byte, 12+32+len(payload))
 	binary.LittleEndian.PutUint32(batch, 0xffffffff)
 	binary.LittleEndian.PutUint32(batch[4:], 0xffffffff)
 	binary.LittleEndian.PutUint32(batch[8:], uint32(chain)|(1<<8))
 	binary.LittleEndian.PutUint32(batch[12:], uint32(len(payload)/4))
 	binary.LittleEndian.PutUint32(batch[24:], uint32(sequence<<16))
-	binary.LittleEndian.PutUint32(batch[40:], uint32(node)|uint32(dt5202.QualifierSpectroscopy|dt5202.QualifierTiming|dt5202.QualifierBothGains)<<8)
+	binary.LittleEndian.PutUint32(batch[40:], uint32(node)|uint32(qualifier)<<8)
 	copy(batch[44:], payload)
 	return batch
 }

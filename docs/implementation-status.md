@@ -176,3 +176,14 @@ Implemented on 2026-07-21:
 - byte-exact golden vectors, explicit unsupported-qualifier diagnostics, bounded timing/test data, malformed/truncated/oversized-event tests, and qualifier-dispatch fuzz coverage.
 
 These layouts are `source-confirmed` against the bundled JANUS/FERSlib decoder; real DT5215 capture compatibility remains scheduled for Phase 4. The Go decoder deliberately rejects out-of-range and duplicate channel entries that FERSlib silently ignores or overwrites, and bounds fixed-size vendor arrays before decoding.
+
+## Phase 1 expanded simulator event behavior
+
+Implemented on 2026-07-21:
+
+- deterministic command-triggered generation for spectroscopy, spectroscopy-plus-timing, timing common-start/common-stop, counting, and waveform acquisition modes;
+- deterministic service-version-1 events at acquisition start when service events are enabled;
+- register-backed channel-enable and charge/time discriminator masks, per-channel gains and fine thresholds, coarse timing thresholds, counting zero suppression, and waveform length; and
+- simulator pedestal calibration and raw-energy generation whose host-side correction recovers the deterministic signal, plus spectroscopy zero-suppression filtering from effective per-channel thresholds.
+
+Pure conformance tests decode every generated event through the project-owned DT5215 and DT5202 decoders. A real-socket integration test changes acquisition modes on a running simulated board and verifies the resulting service, timing, counting, and waveform events. These behaviors are deterministic development models, not claims about the exact physical detector response.

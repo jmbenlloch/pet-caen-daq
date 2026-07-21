@@ -190,6 +190,78 @@ func TestControlAndPartialStreamWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSimulatorGeneratesConfiguredEventModes(t *testing.T) {
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	if err = client.Synchronize(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.WriteRegister(ctx, 0, 0, uint32(dt5202.AcquisitionControl), 1<<18|uint32(dt5202.QualifierSpectroscopy)); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.SendCommand(ctx, 0, 0, dt5215.CommandAcquisitionStart, 0); err != nil {
+		t.Fatal(err)
+	}
+	serviceWire, err := client.ReadStreamBatch(ctx)
+	if err != nil || len(serviceWire) != 1 {
+		t.Fatalf("service events = %#v, %v", serviceWire, err)
+	}
+	service, err := dt5202.DecodeEvent(serviceWire[0].Descriptor.Qualifier, serviceWire[0].Descriptor.TriggerID, serviceWire[0].Descriptor.Timestamp, serviceWire[0].Payload)
+	if err != nil || service.Kind != dt5202.EventService {
+		t.Fatalf("service = %#v, %v", service, err)
+	}
+	if err = client.WriteRegister(ctx, 0, 0, uint32(dt5202.ChannelMaskLow), 1<<3); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, mode := range []uint32{uint32(dt5202.QualifierTiming), uint32(dt5202.QualifierCommonStop), uint32(dt5202.QualifierCounting), uint32(dt5202.QualifierWaveform)} {
+		if err = client.WriteRegister(ctx, 0, 0, uint32(dt5202.AcquisitionControl), mode); err != nil {
+			t.Fatal(err)
+		}
+		if mode == uint32(dt5202.QualifierWaveform) {
+			if err = client.WriteRegister(ctx, 0, 0, uint32(dt5202.WaveformLength), 3); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err = client.SendCommand(ctx, 0, 0, dt5215.CommandTestPulse, 0); err != nil {
+			t.Fatal(err)
+		}
+		events, err := client.ReadStreamBatch(ctx)
+		if err != nil || len(events) != 1 {
+			t.Fatalf("mode %#x events = %#v, %v", mode, events, err)
+		}
+		decoded, err := dt5202.DecodeEvent(events[0].Descriptor.Qualifier, events[0].Descriptor.TriggerID, events[0].Descriptor.Timestamp, events[0].Payload)
+		if err != nil {
+			t.Fatalf("mode %#x: %v", mode, err)
+		}
+		switch mode {
+		case uint32(dt5202.QualifierTiming), uint32(dt5202.QualifierCommonStop):
+			if decoded.Kind != dt5202.EventTiming || len(decoded.Timing.Hits) != 1 || decoded.Timing.Hits[0].Channel != 3 {
+				t.Fatalf("mode %#x decoded = %#v", mode, decoded)
+			}
+		case uint32(dt5202.QualifierCounting):
+			if decoded.Kind != dt5202.EventCounting || decoded.Counting.ChannelMask != 1<<3 {
+				t.Fatalf("counting = %#v", decoded)
+			}
+		case uint32(dt5202.QualifierWaveform):
+			if decoded.Kind != dt5202.EventWaveform || len(decoded.Waveform.Samples) != 3 {
+				t.Fatalf("waveform = %#v", decoded)
+			}
+		}
+	}
+}
+
 func testBatch() []byte {
 	payload := make([]byte, 16)
 	binary.LittleEndian.PutUint64(payload, 1)
