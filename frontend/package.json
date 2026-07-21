@@ -1,0 +1,40 @@
+{
+  "name": "pet-caen-daq-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.12.1",
+    "@connectrpc/connect": "2.1.2",
+    "@connectrpc/connect-web": "2.1.2",
+    "vue": "3.5.40"
+  },
+  "devDependencies": {
+    "@bufbuild/protoc-gen-es": "2.12.1",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.61.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "26.1.1",
+    "@vitejs/plugin-vue": "6.0.8",
+    "@vitest/coverage-v8": "4.1.10",
+    "@vue/eslint-config-typescript": "14.9.0",
+    "@vue/test-utils": "2.4.11",
+    "eslint": "10.7.0",
+    "eslint-plugin-vue": "10.10.0",
+    "jsdom": "29.1.1",
+    "prettier": "3.9.6",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "8.1.5",
+    "vitest": "4.1.10",
+    "vue-tsc": "3.3.7"
+  }
+}

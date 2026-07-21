@@ -20,6 +20,14 @@ task test
 task ci
 ```
 
+Install the pinned frontend dependencies once, then start the operator UI. The
+development server proxies ConnectRPC requests to the backend on port 8080.
+
+```sh
+npm --prefix frontend ci
+task dev:frontend
+```
+
 ## Start here
 
 - [Project instructions](AGENTS.md)

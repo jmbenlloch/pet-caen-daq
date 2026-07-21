@@ -1,5 +1,25 @@
 # Implementation status
 
+## Phase 3 operator frontend
+
+Started on 2026-07-21:
+
+- a Vue 3, TypeScript, Tailwind CSS, and Vite application now consumes generated
+  Protobuf-ES service descriptors through the ConnectRPC browser transport;
+- the initial operator dashboard presents authoritative acquisition state,
+  reconnect/staleness status, discovered boards, pipeline/storage health, and
+  backend diagnostics;
+- configuration can be pasted or loaded from a local file, statically validated,
+  and submitted through guarded start/stop-and-drain controls with optional raw
+  and transport-journal evidence; and
+- a tested client-state boundary replaces state from complete snapshots, marks
+  telemetry stale after five seconds, reconnects after stream failure, validates
+  before start, and stops only the exact active run identity.
+
+The initial frontend is served by Vite during development and proxies the API to
+the backend on port 8080. Production static serving, run history/artifact views,
+and Playwright browser workflows remain subsequent Phase 3 slices.
+
 ## Phase 2 acquisition service foundations
 
 Started on 2026-07-21:

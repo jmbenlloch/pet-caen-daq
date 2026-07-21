@@ -9,3 +9,7 @@ plugins:
     out: backend/gen
     opt:
       - paths=source_relative
+  - local: protoc-gen-es
+    out: frontend/src/gen
+    opt:
+      - target=ts

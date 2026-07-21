@@ -5,7 +5,7 @@ env:
   GOMODCACHE: "{{.ROOT_DIR}}/.cache/go-mod"
 
 vars:
-  GO_PACKAGES: ./...
+  GO_PACKAGES: ./backend/...
 
 tasks:
   default:
@@ -14,19 +14,21 @@ tasks:
       - task --list
 
   generate:
-    desc: Generate protobuf and ConnectRPC Go bindings
+    desc: Generate protobuf and ConnectRPC Go and TypeScript bindings
     cmds:
-      - buf generate
+      - PATH="{{.ROOT_DIR}}/frontend/node_modules/.bin:$PATH" buf generate
 
   format:
     desc: Format project source
     cmds:
       - gofmt -w backend
+      - npm --prefix frontend run format
 
   format:check:
     desc: Check source formatting without modifying files
     cmds:
       - test -z "$(gofmt -l backend)"
+      - npm --prefix frontend run format:check
 
   lint:
     desc: Run static and schema checks
@@ -34,11 +36,13 @@ tasks:
     cmds:
       - go vet {{.GO_PACKAGES}}
       - buf lint
+      - npm --prefix frontend run lint
 
   test:unit:
     desc: Run Go unit tests
     cmds:
       - go test {{.GO_PACKAGES}}
+      - npm --prefix frontend run test
 
   test:integration:
     desc: Run Go integration tests
@@ -50,11 +54,22 @@ tasks:
     deps: [test:unit, test:integration]
 
   build:
-    desc: Build backend and simulator commands
+    desc: Build backend, simulator, and frontend
     cmds:
       - mkdir -p bin
       - go build -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq
       - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
+      - npm --prefix frontend run build
+
+  dev:frontend:
+    desc: Start the frontend development server (proxies API to localhost:8080)
+    cmds:
+      - npm --prefix frontend run dev
+
+  test:e2e:
+    desc: Run Playwright browser tests
+    cmds:
+      - npm --prefix frontend run test:e2e
 
   build-win:
     desc: Build backend and simulator commands for Windows on amd64
