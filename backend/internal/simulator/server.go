@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
@@ -61,8 +62,9 @@ type Server struct {
 	once          sync.Once
 	mu            sync.Mutex
 	synchronized  bool
-	streamData    chan []byte
+	streamData    chan streamItem
 	eventSequence uint64
+	faults        []Fault
 }
 
 func Start(controlAddress, streamAddress string, topology Topology) (*Server, error) {
@@ -75,16 +77,23 @@ func Start(controlAddress, streamAddress string, topology Topology) (*Server, er
 		control.Close()
 		return nil, fmt.Errorf("listen stream: %w", err)
 	}
-	server := &Server{control: control, stream: stream, topology: topology, done: make(chan struct{}), streamData: make(chan []byte, 16)}
+	server := &Server{control: control, stream: stream, topology: topology, done: make(chan struct{}), streamData: make(chan streamItem, 16)}
 	server.wg.Add(2)
 	go server.acceptControl()
 	go server.acceptStream()
 	return server, nil
 }
 
-func (s *Server) ControlAddress() string        { return s.control.Addr().String() }
-func (s *Server) StreamAddress() string         { return s.stream.Addr().String() }
-func (s *Server) QueueStreamBatch(batch []byte) { s.streamData <- append([]byte(nil), batch...) }
+func (s *Server) ControlAddress() string { return s.control.Addr().String() }
+func (s *Server) StreamAddress() string  { return s.stream.Addr().String() }
+func (s *Server) QueueStreamBatch(batch []byte) {
+	s.mu.Lock()
+	item, drop := s.prepareStreamItem(batch, false, false)
+	s.mu.Unlock()
+	if !drop {
+		s.streamData <- item
+	}
+}
 
 func (s *Server) BoardSnapshot(chain, node int) (Board, error) {
 	s.mu.Lock()
@@ -149,8 +158,36 @@ func (s *Server) acceptStream() {
 			defer connection.Close()
 			for {
 				select {
-				case data := <-s.streamData:
-					if writeAll(connection, data) != nil {
+				case item := <-s.streamData:
+					if item.fault != nil {
+						switch item.fault.Kind {
+						case FaultStreamDelay:
+							delay := item.fault.Delay
+							if delay == 0 {
+								delay = 5 * time.Second
+							}
+							timer := time.NewTimer(delay)
+							select {
+							case <-timer.C:
+							case <-s.done:
+								timer.Stop()
+								return
+							}
+						case FaultStreamDisconnect:
+							return
+						case FaultStreamTruncation:
+							n := item.fault.AfterBytes
+							if n == 0 {
+								n = 1
+							}
+							if n > len(item.data) {
+								n = len(item.data)
+							}
+							_ = writeAll(connection, item.data[:n])
+							return
+						}
+					}
+					if writeAll(connection, item.data) != nil {
 						return
 					}
 				case <-s.done:
@@ -168,29 +205,69 @@ func (s *Server) serveControl(connection net.Conn) {
 			return
 		}
 		var err error
+		s.mu.Lock()
+		fault, hasFault := s.takeFault(func(f Fault) bool {
+			return isControlFault(f.Kind) && (f.Operation == "" || f.Operation == string(opcode))
+		})
+		s.mu.Unlock()
+		if hasFault {
+			switch fault.Kind {
+			case FaultControlDelay:
+				delay := fault.Delay
+				if delay == 0 {
+					delay = 5 * time.Second
+				}
+				timer := time.NewTimer(delay)
+				select {
+				case <-timer.C:
+				case <-s.done:
+					timer.Stop()
+					return
+				}
+			case FaultControlTimeout:
+				delay := fault.Delay
+				if delay == 0 {
+					delay = 5 * time.Second
+				}
+				timer := time.NewTimer(delay)
+				select {
+				case <-timer.C:
+					return
+				case <-s.done:
+					timer.Stop()
+					return
+				}
+			case FaultControlDisconnect:
+				return
+			}
+		}
+		writer := net.Conn(connection)
+		if hasFault && fault.Kind == FaultPartialReply {
+			writer = &faultWriter{Conn: connection, fault: fault}
+		}
 		switch string(opcode) {
 		case "CINF":
-			err = s.handleChainInfo(connection)
+			err = s.handleChainInfo(writer)
 		case "ENUM":
-			err = s.handleEnumerate(connection)
+			err = s.handleEnumerate(writer)
 		case "RREG":
-			err = s.handleReadRegister(connection)
+			err = s.handleReadRegister(writer)
 		case "WREG":
-			err = s.handleWriteRegister(connection)
+			err = s.handleWriteRegister(writer)
 		case "FCMD", "DCMD":
-			err = s.handleCommand(connection, string(opcode))
+			err = s.handleCommand(writer, string(opcode))
 		case "SNT0":
 			s.mu.Lock()
 			s.synchronized = true
 			s.mu.Unlock()
-			err = writeStatus(connection, 0)
+			err = writeStatus(writer, 0)
 		case "RLNK":
 			s.mu.Lock()
 			s.synchronized = false
 			s.mu.Unlock()
-			err = writeStatus(connection, 0)
+			err = writeStatus(writer, 0)
 		case "CLRS":
-			err = writeStatus(connection, 0)
+			err = writeStatus(writer, 0)
 		default:
 			return
 		}
@@ -352,10 +429,13 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 				if err != nil {
 					return writeStatus(connection, 22)
 				}
-				select {
-				case s.streamData <- batch:
-				default:
-					return writeStatus(connection, 11)
+				item, drop := s.prepareStreamItem(batch, true, false)
+				if !drop {
+					select {
+					case s.streamData <- item:
+					default:
+						return writeStatus(connection, 11)
+					}
 				}
 			}
 		case dt5215.CommandAcquisitionStop:
@@ -366,8 +446,12 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 				if err != nil {
 					return writeStatus(connection, 22)
 				}
+				item, drop := s.prepareStreamItem(batch, true, true)
+				if drop {
+					break
+				}
 				select {
-				case s.streamData <- batch:
+				case s.streamData <- item:
 				default:
 					return writeStatus(connection, 11)
 				}
@@ -387,8 +471,12 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 			if err != nil {
 				return writeStatus(connection, 22)
 			}
+			item, drop := s.prepareStreamItem(batch, false, false)
+			if drop {
+				break
+			}
 			select {
-			case s.streamData <- batch:
+			case s.streamData <- item:
 			default:
 				return writeStatus(connection, 11)
 			}

@@ -66,7 +66,7 @@ The same protocol fixtures should be consumable by parser tests and simulator re
 3. adjust the simulator to reproduce verified behavior;
 4. retain old fixtures for firmware compatibility unless explicitly unsupported.
 
-The simulator must support fault scripts rather than relying on timing races. A test should be able to specify, for example, “split the next reply after byte 3,” “delay stream data 500 ms,” or “disconnect after the second descriptor row.”
+The simulator supports validated FIFO one-shot fault scripts rather than relying on timing races. Tests can target a control opcode or the next stream batch with an exact delay, timeout, disconnect, partial reply, truncated stream position, malformed descriptor, invalid extent, CRC flag, missing service/completion event, or stalled drain. Multi-step offsets such as disconnecting after a particular descriptor row can be expressed as an exact stream byte position.
 
 ## CI quality gates
 

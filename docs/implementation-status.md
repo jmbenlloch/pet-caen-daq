@@ -198,3 +198,14 @@ Implemented on 2026-07-21:
 - joined error handling that preserves the original acquisition failure when stop, drain, raw capture, decoding, or pending-event storage also fails.
 
 The persisted test-pulse coordinator now performs this orderly stop-and-drain cleanup even when its acquisition context was canceled, using a separate bounded cleanup context. The ready-status service completion is a deterministic simulator/application contract inferred for testability; Phase 4 captures must establish the real DT5215 end-of-data signal or replace this inference with a capture-verified no-data/status mechanism.
+
+## Phase 1 deterministic simulator faults
+
+Implemented on 2026-07-21:
+
+- a validated FIFO one-shot fault script whose entries can target a specific control opcode or the next generated/queued stream batch;
+- control and command delays, explicit timeouts, control disconnects, and replies truncated after an exact byte count;
+- stream delays, disconnects, exact-byte truncation, malformed descriptor nodes, impossible payload sizes/offsets, and descriptor CRC flags; and
+- missing start service events, missing drain completion, and stalled-drain scenarios.
+
+Every fault is deterministic and consumed only by its matching operation class, so unrelated control and stream activity cannot reorder a scenario. Real-socket integration tests assert the corresponding timeout, cancellation, EOF, framing, CRC, and incomplete-drain diagnostics. Fault behavior remains a test facility and does not change the source-confirmed normal protocol path.

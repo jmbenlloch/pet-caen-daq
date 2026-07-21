@@ -39,7 +39,7 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	}()
 	header := make([]byte, 12)
 	if _, err := io.ReadFull(c.stream, header); err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
+		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
 		return nil, nil, fmt.Errorf("read stream batch header: %w", err)
@@ -54,7 +54,7 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	}
 	table := make([]byte, rows*32)
 	if _, err := io.ReadFull(c.stream, table); err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
+		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
 		return nil, nil, fmt.Errorf("read stream descriptor table: %w", err)
@@ -78,7 +78,7 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	}
 	payload := make([]byte, int(extent))
 	if _, err := io.ReadFull(c.stream, payload); err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
+		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
 		return nil, nil, fmt.Errorf("read stream payload: %w", err)

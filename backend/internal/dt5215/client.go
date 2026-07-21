@@ -159,12 +159,22 @@ func (c *Client) exchange(ctx context.Context, request []byte, responseSize int)
 	}
 	response := make([]byte, responseSize)
 	if _, err := io.ReadFull(c.control, response); err != nil {
-		if ctxErr := ctx.Err(); ctxErr != nil {
+		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, ctxErr
 		}
 		return nil, fmt.Errorf("read %d-byte response: %w", responseSize, err)
 	}
 	return response, nil
+}
+
+func operationContextError(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+		return context.DeadlineExceeded
+	}
+	return nil
 }
 
 func writeAll(writer io.Writer, data []byte) error {
