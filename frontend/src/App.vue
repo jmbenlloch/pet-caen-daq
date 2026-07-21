@@ -90,6 +90,28 @@ function openMask(field: ConfigurationField) {
   if (high) activeMask.value = { low: field, high }
 }
 
+function maskBoardSummaries(field: ConfigurationField) {
+  const highName = field.name.replace(/0$/, '1')
+  const globalHigh = configurationDocument.value.fields.find(
+    (candidate) => candidate.name === highName && candidate.index === undefined,
+  )
+  return Array.from({ length: 4 }, (_, board) => {
+    const index = String(board)
+    const low = configurationDocument.value.fields.find(
+      (candidate) => candidate.name === field.name && candidate.index === index,
+    )
+    const high = configurationDocument.value.fields.find(
+      (candidate) => candidate.name === highName && candidate.index === index,
+    )
+    return {
+      board,
+      low: low?.value ?? field.value,
+      high: high?.value ?? globalHigh?.value ?? '0x00000000',
+      inherited: !low && !high,
+    }
+  })
+}
+
 function maskVariants() {
   if (!activeMask.value) return []
   const variants = []
@@ -152,6 +174,34 @@ function channelOverrides(field: ConfigurationField) {
     result[board][Number(candidate.channel)] = candidate.value
   }
   return result
+}
+
+function nonZeroChannelOverrides(field: ConfigurationField) {
+  const counts = [0, 0, 0, 0]
+  for (const candidate of configurationDocument.value.fields) {
+    if (
+      candidate.name !== field.name ||
+      candidate.index === undefined ||
+      candidate.channel === undefined ||
+      Number(candidate.value) === 0
+    )
+      continue
+    const board = Number(candidate.index)
+    if (board >= 0 && board < counts.length) counts[board]++
+  }
+  return counts
+}
+
+function boardValues(field: ConfigurationField) {
+  return Array.from({ length: 4 }, (_, board) => {
+    const override = configurationDocument.value.fields.find(
+      (candidate) =>
+        candidate.name === field.name &&
+        candidate.index === String(board) &&
+        candidate.channel === undefined,
+    )
+    return { board, value: override?.value ?? field.value, inherited: !override }
+  })
 }
 
 function applyChannelOverrides(board: number, values: Record<number, string>) {
@@ -316,7 +366,12 @@ onMounted(() => daq.connect())
               </button>
             </div>
             <div class="parameter-list">
-              <article v-for="field in visibleFields" :key="field.id" class="parameter-row">
+              <article
+                v-for="field in visibleFields"
+                :key="field.id"
+                class="parameter-row"
+                :class="{ 'mask-parameter-row': isMaskField(field) }"
+              >
                 <div class="parameter-copy">
                   <label :for="field.id">
                     {{ field.name }}
@@ -338,7 +393,17 @@ onMounted(() => daq.connect())
                   <span>{{ field.value === '1' ? 'Enabled' : 'Disabled' }}</span>
                 </label>
                 <div v-else-if="isMaskField(field)" class="mask-summary">
-                  <code>{{ field.value }}</code>
+                  <div class="mask-board-values" :aria-label="`${field.name} values by board`">
+                    <div
+                      v-for="summary in maskBoardSummaries(field)"
+                      :key="summary.board"
+                      class="mask-board-value"
+                    >
+                      <strong>B{{ summary.board }}</strong>
+                      <code>{{ summary.low }} · {{ summary.high }}</code>
+                      <span v-if="summary.inherited">global</span>
+                    </div>
+                  </div>
                   <button type="button" class="secondary" @click="openMask(field)">
                     Configure channels
                   </button>
@@ -368,14 +433,41 @@ onMounted(() => daq.connect())
                   :value="field.value"
                   @change="setField(field, ($event.target as HTMLInputElement).value)"
                 />
-                <button
+                <div
                   v-if="parameterScope(field) === 'channel'"
-                  type="button"
-                  class="channel-overrides-button secondary"
-                  @click="activeChannelField = field"
+                  class="channel-override-summary"
+                  :aria-label="`${field.name} non-zero individual values`"
                 >
-                  Per-channel overrides
-                </button>
+                  <div class="channel-override-counts">
+                    <template v-if="nonZeroChannelOverrides(field).some(Boolean)">
+                      <span
+                        v-for="(count, board) in nonZeroChannelOverrides(field)"
+                        v-show="count"
+                        :key="board"
+                      >
+                        B{{ board }}: {{ count }} non-zero
+                      </span>
+                    </template>
+                    <span v-else>None non-zero</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="channel-overrides-button secondary"
+                    @click="activeChannelField = field"
+                  >
+                    Per-channel overrides
+                  </button>
+                </div>
+                <div
+                  v-if="field.name === 'HV_Vbias' && field.index === undefined"
+                  class="board-value-summary"
+                  aria-label="HV_Vbias values by board"
+                >
+                  <span v-for="item in boardValues(field)" :key="item.board">
+                    <strong>B{{ item.board }}</strong> {{ item.value }}
+                    <small v-if="item.inherited">global</small>
+                  </span>
+                </div>
               </article>
               <p v-if="!visibleFields.length" class="empty">No parameters match this filter.</p>
             </div>

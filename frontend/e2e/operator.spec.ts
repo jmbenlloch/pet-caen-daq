@@ -65,6 +65,13 @@ test('operator configures bounded values and channel masks without editing text'
   await mask.getByRole('button', { name: 'Channel 0', exact: true }).click()
   await expect(mask.getByText('63 enabled')).toBeVisible()
   await mask.getByRole('button', { name: 'Apply mask' }).click()
+  const maskSummary = page.getByLabel('ChEnableMask0 values by board')
+  const maskRows = maskSummary.locator('.mask-board-value')
+  await expect(maskRows).toHaveCount(4)
+  await expect(maskRows.nth(0)).toContainText(/B0.*0xFFFFFFFF · 0xFFFFFFFF/)
+  await expect(maskRows.nth(1)).toContainText(/B1.*0xFFFFFFFF · 0xFFFFFFFF/)
+  await expect(maskRows.nth(2)).toContainText(/B2.*0xFFFFFFFE · 0xFFFFFFFF/)
+  await expect(maskRows.nth(3)).toContainText(/B3.*0xFFFFFFFF · 0xFFFFFFFF.*global/)
 
   await page.getByRole('tab', { name: 'All', exact: true }).click()
   await page.getByLabel('Find a parameter').fill('MajorityLevel')
@@ -90,6 +97,26 @@ test('operator configures bounded values and channel masks without editing text'
   await channels.getByRole('combobox').selectOption('2')
   await channels.getByLabel('TD_FineThreshold board 2 channel 17', { exact: true }).fill('9')
   await channels.getByRole('button', { name: 'Apply overrides' }).click()
+  await expect(page.getByLabel('TD_FineThreshold non-zero individual values')).toContainText(
+    'B2: 1 non-zero',
+  )
+
+  await page.getByLabel('Find a parameter').fill('HV_Vbias')
+  const hvBoards = page.getByLabel('HV_Vbias values by board')
+  const hvRows = hvBoards.locator('span')
+  await expect(hvRows).toHaveCount(4)
+  for (let board = 0; board < 4; board++)
+    await expect(hvRows.nth(board)).toContainText(new RegExp(`B${board}.*45\\.4.*global`))
+
+  await page.getByLabel('Find a parameter').fill('HV_IndivAdj')
+  await page.getByRole('button', { name: 'Per-channel overrides' }).click()
+  const hvChannels = page.getByRole('dialog', { name: 'HV_IndivAdj' })
+  await hvChannels.getByRole('combobox').selectOption('1')
+  await hvChannels.getByLabel('HV_IndivAdj board 1 channel 4', { exact: true }).fill('12')
+  await hvChannels.getByRole('button', { name: 'Apply overrides' }).click()
+  await expect(page.getByLabel('HV_IndivAdj non-zero individual values')).toContainText(
+    'B1: 1 non-zero',
+  )
 
   await page.getByRole('button', { name: 'Edit source' }).click()
   await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
@@ -97,5 +124,8 @@ test('operator configures bounded values and channel masks without editing text'
   )
   await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
     /TD_FineThreshold\[2\]\[17\]\s+9/,
+  )
+  await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
+    /HV_IndivAdj\[1\]\[4\]\s+12/,
   )
 })

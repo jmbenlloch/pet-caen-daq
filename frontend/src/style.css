@@ -280,6 +280,9 @@ select:focus {
   padding: 13px 16px;
   border-bottom: 1px solid #1e3047;
 }
+.parameter-row.mask-parameter-row {
+  grid-template-columns: minmax(180px, 0.65fr) minmax(480px, 1.35fr);
+}
 .parameter-row:last-child {
   border-bottom: 0;
 }
@@ -383,10 +386,30 @@ select:focus {
   color: #ff9a9a;
 }
 .mask-summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
   align-items: center;
-  justify-content: flex-end;
   gap: 10px;
+  min-width: 0;
+}
+.mask-board-values {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.mask-board-value {
+  display: grid;
+  grid-template-columns: 22px minmax(160px, 1fr) 38px;
+  align-items: center;
+  gap: 6px;
+  color: #74889f;
+  font-size: 0.61rem;
+}
+.mask-board-value strong {
+  color: #dce7f4;
+}
+.mask-board-value span {
+  text-align: right;
 }
 .mask-summary code {
   color: #9dafc4;
@@ -475,10 +498,51 @@ select:focus {
   padding: 7px 5px;
   text-align: center;
 }
-.channel-overrides-button {
+.channel-override-summary {
   grid-column: 2;
-  justify-self: end;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   margin-top: -12px;
+}
+.channel-override-counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  color: #8498af;
+  font-size: 0.62rem;
+}
+.channel-override-counts span {
+  padding: 2px 5px;
+  border-radius: 99px;
+  background: #12243a;
+}
+.board-value-summary {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: -12px;
+  color: #9dafc4;
+  font-size: 0.65rem;
+}
+.board-value-summary span {
+  padding: 4px 6px;
+  border-radius: 5px;
+  background: #12243a;
+}
+.board-value-summary strong {
+  margin-right: 4px;
+  color: #dce7f4;
+}
+.board-value-summary small {
+  float: right;
+  color: #71859d;
+  font-size: 0.58rem;
+}
+.channel-overrides-button {
   padding: 4px 8px;
   border: 1px solid #34465f;
   border-radius: 6px;
@@ -874,13 +938,34 @@ textarea {
     grid-template-columns: 1fr;
     gap: 9px;
   }
+  .parameter-row.mask-parameter-row {
+    grid-template-columns: 1fr;
+  }
   .switch {
     justify-content: flex-start;
   }
   .mask-summary,
   .mask-footer {
     align-items: stretch;
+  }
+  .mask-summary {
+    grid-template-columns: 1fr;
+  }
+  .mask-board-value {
+    grid-template-columns: 22px minmax(0, 1fr) 38px;
+  }
+  .channel-override-summary {
+    grid-column: 1;
+    align-items: flex-start;
     flex-direction: column;
+    margin-top: 0;
+  }
+  .channel-override-counts {
+    justify-content: flex-start;
+  }
+  .board-value-summary {
+    grid-column: 1;
+    margin-top: 0;
   }
   .channel-values {
     grid-template-columns: repeat(4, 1fr);
