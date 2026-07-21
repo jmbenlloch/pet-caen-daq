@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
@@ -20,12 +21,13 @@ const SchemaVersion = 1
 const DefaultMaxRecordSize = 1 << 20
 
 type Manifest struct {
-	SchemaVersion     int    `json:"schema_version"`
-	RunID             string `json:"run_id"`
-	StartedAt         string `json:"started_at"`
-	CompletedAt       string `json:"completed_at,omitempty"`
-	TerminationReason string `json:"termination_reason,omitempty"`
-	EventCount        uint64 `json:"event_count,string"`
+	SchemaVersion      int                 `json:"schema_version"`
+	RunID              string              `json:"run_id"`
+	StartedAt          string              `json:"started_at"`
+	CompletedAt        string              `json:"completed_at,omitempty"`
+	TerminationReason  string              `json:"termination_reason,omitempty"`
+	EventCount         uint64              `json:"event_count,string"`
+	ConfigurationAudit *configaudit.Report `json:"configuration_audit,omitempty"`
 }
 
 type Envelope struct {

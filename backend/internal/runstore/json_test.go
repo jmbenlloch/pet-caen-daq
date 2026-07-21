@@ -10,12 +10,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
 func TestRunLifecycleAndReplay(t *testing.T) {
-	w, err := Create(t.TempDir(), Manifest{RunID: "54-replay", StartedAt: "2026-07-17T11:06:37Z"})
+	audit := &configaudit.Report{SchemaVersion: 1, Valid: true, Settings: []configaudit.Setting{{Name: "OF_RunInfo", Status: configaudit.Applied, Requested: "1"}}}
+	w, err := Create(t.TempDir(), Manifest{RunID: "54-replay", StartedAt: "2026-07-17T11:06:37Z", ConfigurationAudit: audit})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +71,9 @@ func TestRunLifecycleAndReplay(t *testing.T) {
 	}
 	if m.EventCount != 1 || m.TerminationReason != "completed" {
 		t.Fatalf("manifest = %#v", m)
+	}
+	if m.ConfigurationAudit == nil || len(m.ConfigurationAudit.Settings) != 1 || m.ConfigurationAudit.Settings[0].Name != "OF_RunInfo" {
+		t.Fatalf("configuration audit was not preserved: %#v", m.ConfigurationAudit)
 	}
 	rawFile, err := os.Open(filepath.Join(w.Directory(), "wire.raw"))
 	if err != nil {

@@ -141,6 +141,18 @@ Implemented on 2026-07-21:
 
 The production fixture now distinguishes inactive settings from unsupported/deferred settings. Probe settings are applied and read back; energy zero-suppression remains deferred only for spectroscopy mode, where its effective values require pedestal calibration data.
 
+## Phase 1 production semantic audit
+
+Implemented on 2026-07-21:
+
+- an ordered audit record for every topology, hardware, run-control, storage, and analysis assignment in the imported JANUS configuration;
+- explicit applied, inactive-with-reason, and rejected dispositions, including per-board effective hardware targets;
+- rejection of unresolved calibration-dependent settings and firmware revisions older than the firmware-5 digital-probe representation;
+- preservation of board firmware evidence and the complete requested/effective audit in `manifest.json`; and
+- production-fixture coverage proving that all 103 assignments have a disposition and that every applied assignment has an effective value.
+
+The Phase 1 JSON Lines runstore and service-supplied run directory are recorded as the effective storage behavior. JANUS binary/text products, online histograms, and disabled job/coincidence features remain explicitly inactive rather than being silently ignored.
+
 ## Phase 1 HV peripheral configuration
 
 Implemented on 2026-07-21:
