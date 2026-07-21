@@ -160,7 +160,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		return fmt.Errorf("apply startup configuration: %w", err)
 	}
 
-	systemService := &service.SystemService{Source: publisher}
+	systemService := &service.SystemService{Source: publisher, ConfigurationTemplate: string(configuration)}
 	boards := make([]configaudit.BoardEvidence, 0, len(topology.Boards))
 	for _, board := range topology.Boards {
 		boards = append(boards, configaudit.BoardEvidence{Board: int(board.Chain), FirmwareRevision: board.FirmwareRevision})

@@ -1,24 +1,20 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
-const configurationPath = new URL(
-  '../../test/fixtures/janus/config_same4_v3_good.txt',
-  import.meta.url,
-)
-
 test('operator completes a simulated run and downloads its persisted artifact', async ({
   page,
 }) => {
-  const configuration = await readFile(configurationPath, 'utf8')
   const runId = `browser-${Date.now()}`
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await expect(page.getByText('DT5202 · node 0')).toHaveCount(4)
   await expect(page.getByText('Live telemetry')).toBeVisible()
+  await expect(page.getByLabel('Configuration parameters')).toBeVisible()
+  await page.getByLabel('Find a parameter').fill('PresetTime')
+  await page.getByLabel('PresetTime').fill('30')
 
   await page.getByLabel('Run ID').fill(runId)
-  await page.getByLabel('JANUS configuration').fill(configuration)
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   await expect(page.getByText(runId, { exact: true })).toBeVisible()
@@ -47,7 +43,8 @@ test('operator receives structured validation feedback before hardware mutation'
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
-  await page.getByLabel('JANUS configuration').fill('Open TDlink 0 0')
+  await page.getByRole('button', { name: 'Edit source' }).click()
+  await page.getByLabel('JANUS configuration source').fill('Open TDlink 0 0')
   await page.getByRole('button', { name: 'Validate' }).click()
   await expect(page.getByLabel('Validation issues')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()

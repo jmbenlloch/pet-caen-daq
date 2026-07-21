@@ -41,6 +41,7 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
         state: SystemState.READY,
       }),
     ),
+    configurationTemplate: vi.fn().mockResolvedValue('Open[0] usb:host:tdl:0:0'),
     telemetry: deferredStream(),
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
     start: vi.fn().mockResolvedValue({}),

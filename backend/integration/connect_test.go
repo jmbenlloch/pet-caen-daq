@@ -16,11 +16,12 @@ import (
 )
 
 func TestGeneratedClientSnapshotStreamAndReconnect(t *testing.T) {
+	const configuration = "Open[0] usb:172.16.0.11:tdl:0:0\r\n"
 	publisher, err := telemetry.NewPublisher("instance-http", &daqv1.TelemetrySnapshot{State: daqv1.SystemState_SYSTEM_STATE_IDLE}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	path, handler := daqv1connect.NewSystemServiceHandler(&service.SystemService{Source: publisher})
+	path, handler := daqv1connect.NewSystemServiceHandler(&service.SystemService{Source: publisher, ConfigurationTemplate: configuration})
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
 	server := httptest.NewServer(mux)
@@ -33,6 +34,13 @@ func TestGeneratedClientSnapshotStreamAndReconnect(t *testing.T) {
 	}
 	if unary.Msg.Snapshot.GetInstanceId() != "instance-http" || unary.Msg.Snapshot.GetSequence() != 1 {
 		t.Fatalf("unary snapshot = %+v", unary.Msg.Snapshot)
+	}
+	template, err := client.GetConfigurationTemplate(context.Background(), connect.NewRequest(&daqv1.GetConfigurationTemplateRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if template.Msg.GetJanusConfiguration() != configuration {
+		t.Fatalf("configuration template = %q", template.Msg.GetJanusConfiguration())
 	}
 
 	streamCtx, cancelStream := context.WithCancel(context.Background())

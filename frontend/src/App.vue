@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { createDaqApi, type DaqApi } from './api'
+import {
+  isBooleanField,
+  parseConfiguration,
+  updateConfiguration,
+  type ConfigurationField,
+} from './configuration'
 import { DiagnosticSeverity, HealthStatus } from './gen/pet/caen/daq/v1/system_pb'
 import { bytes, compact, healthLabel, stateLabel } from './presentation'
 import { useDaq } from './useDaq'
@@ -9,10 +15,33 @@ const props = defineProps<{ api?: DaqApi }>()
 const daq = useDaq(props.api ?? createDaqApi())
 const runId = ref('')
 const requestedBy = ref('operator')
-const configuration = ref('')
+const configurationDocument = ref(parseConfiguration(''))
+const configuration = computed({
+  get: () => configurationDocument.value.source,
+  set: (source: string) => (configurationDocument.value = parseConfiguration(source)),
+})
 const captureRaw = ref(true)
 const journalTransport = ref(true)
 const configFile = ref<HTMLInputElement>()
+const selectedSection = ref('All')
+const parameterSearch = ref('')
+const showRawConfiguration = ref(false)
+
+const sections = computed(() => [
+  'All',
+  ...new Set(configurationDocument.value.fields.map((field) => field.section)),
+])
+const visibleFields = computed(() => {
+  const query = parameterSearch.value.trim().toLowerCase()
+  return configurationDocument.value.fields.filter(
+    (field) =>
+      (selectedSection.value === 'All' || field.section === selectedSection.value) &&
+      (!query ||
+        field.name.toLowerCase().includes(query) ||
+        field.help.toLowerCase().includes(query) ||
+        field.value.toLowerCase().includes(query)),
+  )
+})
 
 const state = computed(() => stateLabel[daq.snapshot.value?.state ?? 0])
 const boards = computed(() =>
@@ -30,6 +59,18 @@ async function loadConfiguration(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (file) configuration.value = await file.text()
 }
+
+function setField(field: ConfigurationField, value: string) {
+  configurationDocument.value = updateConfiguration(configurationDocument.value, field, value)
+}
+
+watch(
+  () => daq.configurationTemplate.value,
+  (template) => {
+    if (template && !configuration.value) configuration.value = template
+  },
+  { immediate: true },
+)
 
 onMounted(() => daq.connect())
 </script>
@@ -104,10 +145,24 @@ onMounted(() => daq.connect())
           </div>
 
           <div class="config-heading">
-            <label for="configuration">JANUS configuration</label>
-            <button class="link-button" type="button" @click="configFile?.click()">
-              Load file
-            </button>
+            <div>
+              <label>Acquisition parameters</label>
+              <p class="muted">
+                {{ configurationDocument.fields.length }} settings from the backend template
+              </p>
+            </div>
+            <div class="config-tools">
+              <button
+                class="link-button"
+                type="button"
+                @click="showRawConfiguration = !showRawConfiguration"
+              >
+                {{ showRawConfiguration ? 'Use parameter editor' : 'Edit source' }}
+              </button>
+              <button class="link-button" type="button" @click="configFile?.click()">
+                Import file
+              </button>
+            </div>
             <input
               ref="configFile"
               class="visually-hidden"
@@ -116,9 +171,85 @@ onMounted(() => daq.connect())
               @change="loadConfiguration"
             />
           </div>
+          <div
+            v-if="!showRawConfiguration"
+            class="parameter-editor"
+            aria-label="Configuration parameters"
+          >
+            <div class="parameter-toolbar">
+              <label>
+                Find a parameter
+                <input
+                  v-model="parameterSearch"
+                  type="search"
+                  placeholder="Threshold, trigger, gain…"
+                />
+              </label>
+              <span>{{ visibleFields.length }} shown</span>
+            </div>
+            <div class="section-tabs" role="tablist" aria-label="Parameter categories">
+              <button
+                v-for="section in sections"
+                :key="section"
+                type="button"
+                role="tab"
+                :aria-selected="selectedSection === section"
+                :class="{ active: selectedSection === section }"
+                @click="selectedSection = section"
+              >
+                {{ section }}
+              </button>
+            </div>
+            <div class="parameter-list">
+              <article v-for="field in visibleFields" :key="field.id" class="parameter-row">
+                <div class="parameter-copy">
+                  <label :for="field.id">
+                    {{ field.name }}
+                    <span v-if="field.index !== undefined" class="override"
+                      >Override {{ field.index }}</span
+                    >
+                  </label>
+                  <p>{{ field.help || `JANUS configuration line ${field.line}` }}</p>
+                </div>
+                <label v-if="isBooleanField(field)" class="switch">
+                  <input
+                    :id="field.id"
+                    type="checkbox"
+                    :checked="field.value === '1'"
+                    @change="
+                      setField(field, ($event.target as HTMLInputElement).checked ? '1' : '0')
+                    "
+                  />
+                  <span>{{ field.value === '1' ? 'Enabled' : 'Disabled' }}</span>
+                </label>
+                <select
+                  v-else-if="field.options.length"
+                  :id="field.id"
+                  :value="field.value"
+                  @change="setField(field, ($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-if="!field.options.includes(field.value)" :value="field.value">
+                    {{ field.value }}
+                  </option>
+                  <option v-for="option in field.options" :key="option" :value="option">
+                    {{ option }}
+                  </option>
+                </select>
+                <input
+                  v-else
+                  :id="field.id"
+                  :value="field.value"
+                  @change="setField(field, ($event.target as HTMLInputElement).value)"
+                />
+              </article>
+              <p v-if="!visibleFields.length" class="empty">No parameters match this filter.</p>
+            </div>
+          </div>
           <textarea
+            v-else
             id="configuration"
             v-model="configuration"
+            aria-label="JANUS configuration source"
             spellcheck="false"
             placeholder="Paste or load the production JANUS configuration"
           />

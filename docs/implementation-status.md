@@ -36,6 +36,14 @@ The initial frontend is served by Vite during development and proxies the API to
 the backend on port 8080. Production static serving, run history/artifact views,
 and Playwright browser workflows remain subsequent Phase 3 slices.
 
+The text-only configuration box has been replaced by a searchable, categorized
+parameter editor initialized from the backend's exact startup JANUS document.
+It renders comment-documented choices as selects, binary settings as switches,
+free-form values with their units/ranges, and indexed assignments as explicit
+board/channel overrides. File import and an advanced source editor remain
+available, and every edit still passes through the same backend validation and
+effective-configuration audit before hardware mutation.
+
 The run-control client now retains the authoritative completed `RunSummary`
 returned by `StopRun` rather than trying to reconstruct completion from the next
 telemetry snapshot. The dashboard presents the latest run's termination reason,

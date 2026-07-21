@@ -38,6 +38,9 @@ const (
 	// SystemServiceGetSystemSnapshotProcedure is the fully-qualified name of the SystemService's
 	// GetSystemSnapshot RPC.
 	SystemServiceGetSystemSnapshotProcedure = "/pet.caen.daq.v1.SystemService/GetSystemSnapshot"
+	// SystemServiceGetConfigurationTemplateProcedure is the fully-qualified name of the SystemService's
+	// GetConfigurationTemplate RPC.
+	SystemServiceGetConfigurationTemplateProcedure = "/pet.caen.daq.v1.SystemService/GetConfigurationTemplate"
 	// SystemServiceValidateConfigurationProcedure is the fully-qualified name of the SystemService's
 	// ValidateConfiguration RPC.
 	SystemServiceValidateConfigurationProcedure = "/pet.caen.daq.v1.SystemService/ValidateConfiguration"
@@ -58,6 +61,7 @@ const (
 // SystemServiceClient is a client for the pet.caen.daq.v1.SystemService service.
 type SystemServiceClient interface {
 	GetSystemSnapshot(context.Context, *connect.Request[v1.GetSystemSnapshotRequest]) (*connect.Response[v1.GetSystemSnapshotResponse], error)
+	GetConfigurationTemplate(context.Context, *connect.Request[v1.GetConfigurationTemplateRequest]) (*connect.Response[v1.GetConfigurationTemplateResponse], error)
 	ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error)
 	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest]) (*connect.ServerStreamForClient[v1.StreamTelemetryResponse], error)
 }
@@ -79,6 +83,12 @@ func NewSystemServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(systemServiceMethods.ByName("GetSystemSnapshot")),
 			connect.WithClientOptions(opts...),
 		),
+		getConfigurationTemplate: connect.NewClient[v1.GetConfigurationTemplateRequest, v1.GetConfigurationTemplateResponse](
+			httpClient,
+			baseURL+SystemServiceGetConfigurationTemplateProcedure,
+			connect.WithSchema(systemServiceMethods.ByName("GetConfigurationTemplate")),
+			connect.WithClientOptions(opts...),
+		),
 		validateConfiguration: connect.NewClient[v1.ValidateConfigurationRequest, v1.ValidateConfigurationResponse](
 			httpClient,
 			baseURL+SystemServiceValidateConfigurationProcedure,
@@ -96,14 +106,20 @@ func NewSystemServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 
 // systemServiceClient implements SystemServiceClient.
 type systemServiceClient struct {
-	getSystemSnapshot     *connect.Client[v1.GetSystemSnapshotRequest, v1.GetSystemSnapshotResponse]
-	validateConfiguration *connect.Client[v1.ValidateConfigurationRequest, v1.ValidateConfigurationResponse]
-	streamTelemetry       *connect.Client[v1.StreamTelemetryRequest, v1.StreamTelemetryResponse]
+	getSystemSnapshot        *connect.Client[v1.GetSystemSnapshotRequest, v1.GetSystemSnapshotResponse]
+	getConfigurationTemplate *connect.Client[v1.GetConfigurationTemplateRequest, v1.GetConfigurationTemplateResponse]
+	validateConfiguration    *connect.Client[v1.ValidateConfigurationRequest, v1.ValidateConfigurationResponse]
+	streamTelemetry          *connect.Client[v1.StreamTelemetryRequest, v1.StreamTelemetryResponse]
 }
 
 // GetSystemSnapshot calls pet.caen.daq.v1.SystemService.GetSystemSnapshot.
 func (c *systemServiceClient) GetSystemSnapshot(ctx context.Context, req *connect.Request[v1.GetSystemSnapshotRequest]) (*connect.Response[v1.GetSystemSnapshotResponse], error) {
 	return c.getSystemSnapshot.CallUnary(ctx, req)
+}
+
+// GetConfigurationTemplate calls pet.caen.daq.v1.SystemService.GetConfigurationTemplate.
+func (c *systemServiceClient) GetConfigurationTemplate(ctx context.Context, req *connect.Request[v1.GetConfigurationTemplateRequest]) (*connect.Response[v1.GetConfigurationTemplateResponse], error) {
+	return c.getConfigurationTemplate.CallUnary(ctx, req)
 }
 
 // ValidateConfiguration calls pet.caen.daq.v1.SystemService.ValidateConfiguration.
@@ -119,6 +135,7 @@ func (c *systemServiceClient) StreamTelemetry(ctx context.Context, req *connect.
 // SystemServiceHandler is an implementation of the pet.caen.daq.v1.SystemService service.
 type SystemServiceHandler interface {
 	GetSystemSnapshot(context.Context, *connect.Request[v1.GetSystemSnapshotRequest]) (*connect.Response[v1.GetSystemSnapshotResponse], error)
+	GetConfigurationTemplate(context.Context, *connect.Request[v1.GetConfigurationTemplateRequest]) (*connect.Response[v1.GetConfigurationTemplateResponse], error)
 	ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error)
 	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest], *connect.ServerStream[v1.StreamTelemetryResponse]) error
 }
@@ -134,6 +151,12 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 		SystemServiceGetSystemSnapshotProcedure,
 		svc.GetSystemSnapshot,
 		connect.WithSchema(systemServiceMethods.ByName("GetSystemSnapshot")),
+		connect.WithHandlerOptions(opts...),
+	)
+	systemServiceGetConfigurationTemplateHandler := connect.NewUnaryHandler(
+		SystemServiceGetConfigurationTemplateProcedure,
+		svc.GetConfigurationTemplate,
+		connect.WithSchema(systemServiceMethods.ByName("GetConfigurationTemplate")),
 		connect.WithHandlerOptions(opts...),
 	)
 	systemServiceValidateConfigurationHandler := connect.NewUnaryHandler(
@@ -152,6 +175,8 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 		switch r.URL.Path {
 		case SystemServiceGetSystemSnapshotProcedure:
 			systemServiceGetSystemSnapshotHandler.ServeHTTP(w, r)
+		case SystemServiceGetConfigurationTemplateProcedure:
+			systemServiceGetConfigurationTemplateHandler.ServeHTTP(w, r)
 		case SystemServiceValidateConfigurationProcedure:
 			systemServiceValidateConfigurationHandler.ServeHTTP(w, r)
 		case SystemServiceStreamTelemetryProcedure:
@@ -167,6 +192,10 @@ type UnimplementedSystemServiceHandler struct{}
 
 func (UnimplementedSystemServiceHandler) GetSystemSnapshot(context.Context, *connect.Request[v1.GetSystemSnapshotRequest]) (*connect.Response[v1.GetSystemSnapshotResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.GetSystemSnapshot is not implemented"))
+}
+
+func (UnimplementedSystemServiceHandler) GetConfigurationTemplate(context.Context, *connect.Request[v1.GetConfigurationTemplateRequest]) (*connect.Response[v1.GetConfigurationTemplateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.GetConfigurationTemplate is not implemented"))
 }
 
 func (UnimplementedSystemServiceHandler) ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error) {

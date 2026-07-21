@@ -27,3 +27,15 @@ func TestGetSystemSnapshotIncludesCompatibleAndCompleteRepresentations(t *testin
 		t.Fatalf("complete snapshot = %+v", message.Snapshot)
 	}
 }
+
+func TestGetConfigurationTemplateReturnsExactStartupDocument(t *testing.T) {
+	const configuration = "Open[0] usb:172.16.0.11:tdl:0:0\r\n"
+	service := &SystemService{ConfigurationTemplate: configuration}
+	response, err := service.GetConfigurationTemplate(context.Background(), connect.NewRequest(&daqv1.GetConfigurationTemplateRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Msg.GetJanusConfiguration() != configuration {
+		t.Fatalf("configuration = %q", response.Msg.GetJanusConfiguration())
+	}
+}

@@ -21,6 +21,7 @@ export function useDaq(api: DaqApi) {
   const validationIssues = ref<ValidationIssue[]>([])
   const latestCompletedRun = ref<RunSummary>()
   const runHistory = ref<RunSummary[]>([])
+  const configurationTemplate = ref('')
   let streamController: AbortController | undefined
   let staleTimer: number | undefined
   let reconnectTimer: number | undefined
@@ -42,6 +43,9 @@ export function useDaq(api: DaqApi) {
     streamController = new AbortController()
     try {
       void refreshHistory()
+      if (!configurationTemplate.value) {
+        configurationTemplate.value = await api.configurationTemplate()
+      }
       accept(await api.snapshot())
       for await (const next of api.telemetry(streamController.signal)) accept(next)
       if (!streamController.signal.aborted) throw new Error('Telemetry stream ended')
@@ -160,6 +164,7 @@ export function useDaq(api: DaqApi) {
     validationIssues: readonly(validationIssues),
     latestCompletedRun: readonly(latestCompletedRun),
     runHistory: readonly(runHistory),
+    configurationTemplate: readonly(configurationTemplate),
     canStart: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     canStop: computed(() => snapshot.value?.state === SystemState.RUNNING && !busy.value),
     connect,

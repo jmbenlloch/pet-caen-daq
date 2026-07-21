@@ -16,7 +16,8 @@ type SnapshotSource interface {
 
 type SystemService struct {
 	daqv1connect.UnimplementedSystemServiceHandler
-	Source SnapshotSource
+	Source                SnapshotSource
+	ConfigurationTemplate string
 }
 
 func (s *SystemService) GetSystemSnapshot(_ context.Context, _ *connect.Request[daqv1.GetSystemSnapshotRequest]) (*connect.Response[daqv1.GetSystemSnapshotResponse], error) {
@@ -28,6 +29,10 @@ func (s *SystemService) GetSystemSnapshot(_ context.Context, _ *connect.Request[
 		Snapshot:   snapshot,
 	}
 	return connect.NewResponse(response), nil
+}
+
+func (s *SystemService) GetConfigurationTemplate(_ context.Context, _ *connect.Request[daqv1.GetConfigurationTemplateRequest]) (*connect.Response[daqv1.GetConfigurationTemplateResponse], error) {
+	return connect.NewResponse(&daqv1.GetConfigurationTemplateResponse{JanusConfiguration: s.ConfigurationTemplate}), nil
 }
 
 func (s *SystemService) ValidateConfiguration(_ context.Context, request *connect.Request[daqv1.ValidateConfigurationRequest]) (*connect.Response[daqv1.ValidateConfigurationResponse], error) {

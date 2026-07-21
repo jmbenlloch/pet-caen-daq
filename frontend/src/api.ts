@@ -12,6 +12,7 @@ import {
 
 export interface DaqApi {
   snapshot(): Promise<TelemetrySnapshot | undefined>
+  configurationTemplate(): Promise<string>
   telemetry(signal: AbortSignal): AsyncIterable<TelemetrySnapshot>
   validate(configuration: string): Promise<{ valid: boolean; issues: ValidationIssue[] }>
   start(request: StartRunRequest): Promise<RunCommandResult>
@@ -33,6 +34,9 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
   return {
     async snapshot() {
       return (await system.getSystemSnapshot({})).snapshot
+    },
+    async configurationTemplate() {
+      return (await system.getConfigurationTemplate({})).janusConfiguration
     },
     async *telemetry(signal) {
       for await (const response of system.streamTelemetry({}, { signal })) {

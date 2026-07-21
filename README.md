@@ -45,6 +45,12 @@ The operator dashboard also lists persisted runs from the configured `-runs`
 directory. Artifact downloads are streamed through the generated RunService API
 and are limited to files recorded in each run's manifest.
 
+Run configuration uses a searchable, categorized parameter editor initialized
+from the exact JANUS document loaded by the backend. Documented options are
+presented as choices, binary flags as switches, and indexed overrides identify
+their board or channel. Operators can still import a JANUS file or open the raw
+source editor; all paths produce the same text submitted to backend validation.
+
 On Windows, after starting the backend, a bounded evidence-capturing hardware run
 can be launched with `scripts\take-data.ps1`. Pass `-PeriodicTestPulse` to submit
 an in-memory `TestPulseSource PTRG` override without modifying the configuration

@@ -40,6 +40,11 @@ function dashboardApi(): DaqApi {
         ],
       }),
     ),
+    configurationTemplate: vi
+      .fn()
+      .mockResolvedValue(
+        '# Run control\nPresetTime 15 # Preset Time, Range=[1 s, 3600 s]\nEnableJobs 0 # Enable Jobs',
+      ),
     telemetry: pendingTelemetry,
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
     start: vi.fn().mockResolvedValue({
@@ -77,11 +82,14 @@ describe('operator dashboard', () => {
     expect(wrapper.text()).toContain('events.jsonl · 4.0 KiB')
 
     await wrapper.get('input[placeholder="run-0055"]').setValue('run-55')
-    await wrapper.get('#configuration').setValue('Open TDlink 0 0')
+    expect(wrapper.text()).toContain('PresetTime')
+    expect(wrapper.text()).toContain('EnableJobs')
+    await wrapper.get('#PresetTime\\[default\\]\\@2').setValue('30')
+    await wrapper.get('#PresetTime\\[default\\]\\@2').trigger('change')
     await wrapper.get('button.primary').trigger('click')
     await flushPromises()
 
-    expect(api.validate).toHaveBeenCalledWith('Open TDlink 0 0')
+    expect(api.validate).toHaveBeenCalledWith(expect.stringContaining('PresetTime 30'))
     expect(api.start).toHaveBeenCalledWith(
       expect.objectContaining({
         runId: 'run-55',

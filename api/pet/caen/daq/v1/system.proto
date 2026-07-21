@@ -10,6 +10,7 @@ option go_package = "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq
 // reconnect-safe stream of complete telemetry snapshots.
 service SystemService {
   rpc GetSystemSnapshot(GetSystemSnapshotRequest) returns (GetSystemSnapshotResponse) {}
+  rpc GetConfigurationTemplate(GetConfigurationTemplateRequest) returns (GetConfigurationTemplateResponse) {}
   rpc ValidateConfiguration(ValidateConfigurationRequest) returns (ValidateConfigurationResponse) {}
   rpc StreamTelemetry(StreamTelemetryRequest) returns (stream StreamTelemetryResponse) {}
 }
@@ -24,6 +25,14 @@ service RunService {
 }
 
 message GetSystemSnapshotRequest {}
+
+message GetConfigurationTemplateRequest {}
+
+message GetConfigurationTemplateResponse {
+  // Exact JANUS configuration loaded by the backend at startup. The frontend
+  // edits this document and submits the resulting text for normal validation.
+  string janus_configuration = 1;
+}
 
 message GetSystemSnapshotResponse {
   // Deprecated discovery-slice fields retained for wire compatibility.
