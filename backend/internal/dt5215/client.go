@@ -134,6 +134,9 @@ func (c *Client) ReadRegister(ctx context.Context, chain, node uint16, address u
 func (c *Client) exchange(ctx context.Context, request []byte, responseSize int) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	deadline := time.Now().Add(defaultOperationTimeout)
 	if contextDeadline, ok := ctx.Deadline(); ok && contextDeadline.Before(deadline) {
@@ -142,13 +145,23 @@ func (c *Client) exchange(ctx context.Context, request []byte, responseSize int)
 	if err := c.control.SetDeadline(deadline); err != nil {
 		return nil, fmt.Errorf("set control deadline: %w", err)
 	}
-	defer c.control.SetDeadline(time.Time{})
+	cancelDone := make(chan struct{})
+	stopCancel := context.AfterFunc(ctx, func() { _ = c.control.SetDeadline(time.Now()); close(cancelDone) })
+	defer func() {
+		if !stopCancel() {
+			<-cancelDone
+		}
+		_ = c.control.SetDeadline(time.Time{})
+	}()
 
 	if err := writeAll(c.control, request); err != nil {
 		return nil, fmt.Errorf("write request: %w", err)
 	}
 	response := make([]byte, responseSize)
 	if _, err := io.ReadFull(c.control, response); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, fmt.Errorf("read %d-byte response: %w", responseSize, err)
 	}
 	return response, nil

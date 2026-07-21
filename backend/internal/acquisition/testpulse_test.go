@@ -11,13 +11,25 @@ import (
 type fakeHardware struct {
 	commands []uint32
 	readErr  error
+	stopErr  error
 }
 
 func (f *fakeHardware) Synchronize(context.Context) error { return nil }
 func (f *fakeHardware) ClearStream(context.Context) error { return nil }
 func (f *fakeHardware) SendCommand(_ context.Context, _, _ uint16, c, _ uint32) error {
 	f.commands = append(f.commands, c)
+	if c == dt5215.CommandAcquisitionStop {
+		return f.stopErr
+	}
 	return nil
+}
+func TestRunTestPulsePreservesAcquisitionErrorWhenStopFails(t *testing.T) {
+	primary, stop := errors.New("stream disconnected"), errors.New("stop rejected")
+	hardware := &fakeHardware{readErr: primary, stopErr: stop}
+	err := RunTestPulse(context.Background(), hardware, fakeSink{}, 1)
+	if !errors.Is(err, primary) || !errors.Is(err, stop) {
+		t.Fatalf("error = %v", err)
+	}
 }
 func (f *fakeHardware) ReadRawStreamBatch(context.Context) ([]byte, []dt5215.StreamEvent, error) {
 	return nil, nil, f.readErr

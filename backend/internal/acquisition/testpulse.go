@@ -3,8 +3,8 @@ package acquisition
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
@@ -38,10 +38,27 @@ func RunTestPulse(ctx context.Context, hardware TestPulseHardware, sink TestPuls
 		return fmt.Errorf("start acquisition: %w", err)
 	}
 	defer func() {
-		stopErr := hardware.SendCommand(context.WithoutCancel(ctx), 0xff, 0xff, dt5215.CommandAcquisitionStop, 0)
-		if stopErr != nil {
-			err = errors.Join(err, fmt.Errorf("stop acquisition: %w", stopErr))
-		}
+		drainCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
+		defer cancel()
+		_, stopErr := StopAndDrain(drainCtx, hardware, expectedChains, func(raw []byte, events []dt5215.StreamEvent) error {
+			if captureErr := sink.AppendRaw(raw); captureErr != nil {
+				return fmt.Errorf("capture raw batch: %w", captureErr)
+			}
+			for _, wireEvent := range events {
+				if wireEvent.Descriptor.Qualifier == dt5202.QualifierService {
+					continue
+				}
+				decoded, decodeErr := dt5202.DecodeSpectroscopy(wireEvent.Descriptor.Qualifier, wireEvent.Descriptor.TriggerID, wireEvent.Descriptor.Timestamp, wireEvent.Payload)
+				if decodeErr != nil {
+					return fmt.Errorf("decode pending chain %d node %d: %w", wireEvent.Chain, wireEvent.Descriptor.Node, decodeErr)
+				}
+				if sinkErr := sink.AppendDecoded(wireEvent, decoded); sinkErr != nil {
+					return fmt.Errorf("store pending chain %d event: %w", wireEvent.Chain, sinkErr)
+				}
+			}
+			return nil
+		})
+		err = JoinStopError(err, stopErr)
 	}()
 	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandTestPulse, 0); err != nil {
 		return fmt.Errorf("send test pulse: %w", err)

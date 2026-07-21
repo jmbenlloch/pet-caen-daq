@@ -359,7 +359,19 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 				}
 			}
 		case dt5215.CommandAcquisitionStop:
-			board.Status = 1
+			if board.Status == 2 {
+				board.Status = 1
+				s.eventSequence++
+				batch, err := generatedBatch(uint8(target.chain), uint8(target.node), s.eventSequence, dt5202.QualifierService, board)
+				if err != nil {
+					return writeStatus(connection, 22)
+				}
+				select {
+				case s.streamData <- batch:
+				default:
+					return writeStatus(connection, 11)
+				}
+			}
 		case dt5215.CommandGlobalReset:
 			board.Status = 1
 			board.Registers = make(map[uint32]uint32)

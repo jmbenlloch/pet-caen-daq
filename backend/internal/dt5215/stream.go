@@ -19,6 +19,9 @@ func (c *Client) ReadStreamBatch(ctx context.Context) ([]StreamEvent, error) {
 func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent, error) {
 	c.streamMu.Lock()
 	defer c.streamMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	deadline := time.Now().Add(defaultOperationTimeout)
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
@@ -26,9 +29,19 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	if err := c.stream.SetReadDeadline(deadline); err != nil {
 		return nil, nil, fmt.Errorf("set stream deadline: %w", err)
 	}
-	defer c.stream.SetReadDeadline(time.Time{})
+	cancelDone := make(chan struct{})
+	stopCancel := context.AfterFunc(ctx, func() { _ = c.stream.SetReadDeadline(time.Now()); close(cancelDone) })
+	defer func() {
+		if !stopCancel() {
+			<-cancelDone
+		}
+		_ = c.stream.SetReadDeadline(time.Time{})
+	}()
 	header := make([]byte, 12)
 	if _, err := io.ReadFull(c.stream, header); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, nil, ctxErr
+		}
 		return nil, nil, fmt.Errorf("read stream batch header: %w", err)
 	}
 	w2 := binary.LittleEndian.Uint32(header[8:])
@@ -41,6 +54,9 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	}
 	table := make([]byte, rows*32)
 	if _, err := io.ReadFull(c.stream, table); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, nil, ctxErr
+		}
 		return nil, nil, fmt.Errorf("read stream descriptor table: %w", err)
 	}
 	var extent uint64
@@ -62,6 +78,9 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	}
 	payload := make([]byte, int(extent))
 	if _, err := io.ReadFull(c.stream, payload); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, nil, ctxErr
+		}
 		return nil, nil, fmt.Errorf("read stream payload: %w", err)
 	}
 	batch := append(header, table...)

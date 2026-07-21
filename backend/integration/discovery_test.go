@@ -262,6 +262,52 @@ func TestSimulatorGeneratesConfiguredEventModes(t *testing.T) {
 	}
 }
 
+func TestSimulatorStopDeliversPendingEventAndCompletionIdempotently(t *testing.T) {
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	if err = client.Synchronize(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.SendCommand(ctx, 0, 0, dt5215.CommandAcquisitionStart, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.SendCommand(ctx, 0, 0, dt5215.CommandTestPulse, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.SendCommand(ctx, 0, 0, dt5215.CommandAcquisitionStop, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err = client.SendCommand(ctx, 0, 0, dt5215.CommandAcquisitionStop, 0); err != nil {
+		t.Fatalf("idempotent stop: %v", err)
+	}
+	first, err := client.ReadStreamBatch(ctx)
+	if err != nil || len(first) != 1 {
+		t.Fatalf("pending=%#v %v", first, err)
+	}
+	decoded, err := dt5202.DecodeEvent(first[0].Descriptor.Qualifier, first[0].Descriptor.TriggerID, first[0].Descriptor.Timestamp, first[0].Payload)
+	if err != nil || decoded.Kind != dt5202.EventSpectroscopy {
+		t.Fatalf("pending decoded=%#v %v", decoded, err)
+	}
+	second, err := client.ReadStreamBatch(ctx)
+	if err != nil || len(second) != 1 {
+		t.Fatalf("completion=%#v %v", second, err)
+	}
+	decoded, err = dt5202.DecodeEvent(second[0].Descriptor.Qualifier, second[0].Descriptor.TriggerID, second[0].Descriptor.Timestamp, second[0].Payload)
+	if err != nil || decoded.Kind != dt5202.EventService || decoded.Service.Status == nil || !dt5202.Status(*decoded.Service.Status).Has(dt5202.StatusReady) {
+		t.Fatalf("completion decoded=%#v %v", decoded, err)
+	}
+}
+
 func testBatch() []byte {
 	payload := make([]byte, 16)
 	binary.LittleEndian.PutUint64(payload, 1)

@@ -182,6 +182,8 @@ The implemented safe sequence is more than start/stop commands:
 
 FERSlib exposes this as `FERS_OpenDevice`, `FERS_LoadConfigFile` or `FERS_SetParam`, `FERS_configure`, `FERS_InitReadout`, `FERS_SyncTDLchains`, `FERS_StartAcquisition`, `FERS_GetEvent`, `FERS_StopAcquisition`, `FERS_CloseReadout`, and `FERS_CloseDevice`. Exact declarations and error values are in `FERSlib.h`.
 
+FERSlib's TDlink receive thread enters `RXSTATUS_EMPTYING` after stop and declares itself idle after a no-data timeout or a stop timeout; the bundled source does not establish a DT5215 wire-level end marker. The Go simulator therefore uses a ready-status service event per chain as an explicit, deterministic drain-completion contract. This is `inferred`, not source-confirmed hardware behavior. Production drain remains deadline-bounded, and Phase 4 must replace or verify the completion rule using real stream/control captures.
+
 ## DT5215 stream framing (TCP 9000)
 
 The stream is not a simple sequence of DT5202 packets. The concentrator sends batches per chain:

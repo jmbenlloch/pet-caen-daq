@@ -187,3 +187,14 @@ Implemented on 2026-07-21:
 - simulator pedestal calibration and raw-energy generation whose host-side correction recovers the deterministic signal, plus spectroscopy zero-suppression filtering from effective per-channel thresholds.
 
 Pure conformance tests decode every generated event through the project-owned DT5215 and DT5202 decoders. A real-socket integration test changes acquisition modes on a running simulated board and verifies the resulting service, timing, counting, and waveform events. These behaviors are deterministic development models, not claims about the exact physical detector response.
+
+## Phase 1 stop and drain
+
+Implemented on 2026-07-21:
+
+- an explicit stop-and-drain operation that broadcasts stop, continues delivering complete pending batches, and completes only after every expected chain reports ready status in a service event;
+- deterministic simulator completion events after stop, idempotent repeated stop commands, and FIFO delivery of data queued before completion;
+- bounded drain through caller cancellation/deadline with distinct incomplete-chain diagnostics for missing completion, missing service events, stalled streams, disconnects, and timeouts; and
+- joined error handling that preserves the original acquisition failure when stop, drain, raw capture, decoding, or pending-event storage also fails.
+
+The persisted test-pulse coordinator now performs this orderly stop-and-drain cleanup even when its acquisition context was canceled, using a separate bounded cleanup context. The ready-status service completion is a deterministic simulator/application contract inferred for testability; Phase 4 captures must establish the real DT5215 end-of-data signal or replace this inference with a capture-verified no-data/status mechanism.

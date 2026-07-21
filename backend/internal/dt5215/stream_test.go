@@ -1,8 +1,12 @@
 package dt5215
 
 import (
+	"context"
 	"encoding/binary"
+	"errors"
+	"net"
 	"testing"
+	"time"
 )
 
 func TestDecodeStreamBatch(t *testing.T) {
@@ -29,6 +33,22 @@ func TestDecodeStreamBatch(t *testing.T) {
 	e := events[0]
 	if e.Chain != 1 || e.Descriptor.Node != 2 || e.Descriptor.Qualifier != 3 || !e.Descriptor.CRCError || e.Descriptor.PayloadSizeWords != 3 || len(e.Payload) != 12 {
 		t.Fatalf("event = %#v", e)
+	}
+}
+func TestReadRawStreamBatchCancellationInterruptsStalledRead(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	client := &Client{stream: clientConn}
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(10*time.Millisecond, cancel)
+	started := time.Now()
+	_, _, err := client.ReadRawStreamBatch(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v", err)
+	}
+	if time.Since(started) > time.Second {
+		t.Fatalf("cancellation took %s", time.Since(started))
 	}
 }
 func TestDecodeStreamBatchRejectsMalformed(t *testing.T) {
