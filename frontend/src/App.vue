@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import defaultConfiguration from '../../test/fixtures/janus/config_same4_v3_good.txt?raw'
 import { createDaqApi, type DaqApi } from './api'
+import BoardOverrides from './BoardOverrides.vue'
 import ChannelOverrides from './ChannelOverrides.vue'
 import MaskEditor from './MaskEditor.vue'
 import NumericField from './NumericField.vue'
@@ -36,6 +37,7 @@ const selectedSection = ref('All')
 const parameterSearch = ref('')
 const showRawConfiguration = ref(false)
 const activeMask = ref<{ low: ConfigurationField; high: ConfigurationField }>()
+const activeBoardField = ref<ConfigurationField>()
 const activeChannelField = ref<ConfigurationField>()
 
 const sections = computed(() => [
@@ -47,6 +49,7 @@ const visibleFields = computed(() => {
   return configurationDocument.value.fields.filter(
     (field) =>
       !(isMaskField(field) && (field.name.endsWith('1') || field.index !== undefined)) &&
+      !(parameterScope(field) === 'board' && field.index !== undefined) &&
       field.channel === undefined &&
       (selectedSection.value === 'All' || field.section === selectedSection.value) &&
       (!query ||
@@ -202,6 +205,29 @@ function boardValues(field: ConfigurationField) {
     )
     return { board, value: override?.value ?? field.value, inherited: !override }
   })
+}
+
+function boardOverrides(field: ConfigurationField) {
+  const result: Record<number, string> = {}
+  for (const candidate of configurationDocument.value.fields) {
+    if (candidate.name !== field.name || candidate.index === undefined) continue
+    result[Number(candidate.index)] = candidate.value
+  }
+  return result
+}
+
+function applyBoardOverrides(values: Record<number, string>) {
+  if (!activeBoardField.value) return
+  for (let board = 0; board < 4; board++) {
+    configurationDocument.value = setConfigurationValue(
+      configurationDocument.value,
+      activeBoardField.value.name,
+      board,
+      undefined,
+      values[board],
+    )
+  }
+  activeBoardField.value = undefined
 }
 
 function applyChannelOverrides(board: number, values: Record<number, string>) {
@@ -459,14 +485,25 @@ onMounted(() => daq.connect())
                   </button>
                 </div>
                 <div
-                  v-if="field.name === 'HV_Vbias' && field.index === undefined"
+                  v-if="
+                    parameterScope(field) === 'board' &&
+                    !isMaskField(field) &&
+                    field.index === undefined
+                  "
                   class="board-value-summary"
-                  aria-label="HV_Vbias values by board"
+                  :aria-label="`${field.name} values by board`"
                 >
                   <span v-for="item in boardValues(field)" :key="item.board">
                     <strong>B{{ item.board }}</strong> {{ item.value }}
                     <small v-if="item.inherited">global</small>
                   </span>
+                  <button
+                    type="button"
+                    class="board-overrides-button secondary"
+                    @click="activeBoardField = field"
+                  >
+                    Per-board overrides
+                  </button>
                 </div>
               </article>
               <p v-if="!visibleFields.length" class="empty">No parameters match this filter.</p>
@@ -742,6 +779,14 @@ onMounted(() => daq.connect())
       :variants="maskVariants()"
       @apply="applyMask"
       @close="activeMask = undefined"
+    />
+    <BoardOverrides
+      v-if="activeBoardField && numericConstraint(activeBoardField)"
+      :field="activeBoardField"
+      :constraint="numericConstraint(activeBoardField)!"
+      :overrides="boardOverrides(activeBoardField)"
+      @apply="applyBoardOverrides"
+      @close="activeBoardField = undefined"
     />
     <ChannelOverrides
       v-if="activeChannelField && numericConstraint(activeChannelField)"

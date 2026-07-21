@@ -101,6 +101,18 @@ test('operator configures bounded values and channel masks without editing text'
     'B2: 1 non-zero',
   )
 
+  await page.getByLabel('Find a parameter').fill('TD_CoarseThreshold')
+  const coarseBoards = page.getByLabel('TD_CoarseThreshold values by board')
+  await expect(coarseBoards).toContainText(/B0.*181/)
+  await expect(coarseBoards).toContainText(/B1.*183.*global/)
+  await expect(coarseBoards).toContainText(/B2.*179/)
+  await expect(coarseBoards).toContainText(/B3.*178/)
+  await page.getByRole('button', { name: 'Per-board overrides' }).click()
+  const coarse = page.getByRole('dialog', { name: 'TD_CoarseThreshold' })
+  await coarse.getByLabel('TD_CoarseThreshold board 2', { exact: true }).fill('220')
+  await coarse.getByRole('button', { name: 'Apply overrides' }).click()
+  await expect(coarseBoards).toContainText(/B2.*220/)
+
   await page.getByLabel('Find a parameter').fill('HV_Vbias')
   const hvBoards = page.getByLabel('HV_Vbias values by board')
   const hvRows = hvBoards.locator('span')
@@ -124,6 +136,9 @@ test('operator configures bounded values and channel masks without editing text'
   )
   await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
     /TD_FineThreshold\[2\]\[17\]\s+9/,
+  )
+  await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
+    /TD_CoarseThreshold\[2\]\s+220/,
   )
   await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
     /HV_IndivAdj\[1\]\[4\]\s+12/,

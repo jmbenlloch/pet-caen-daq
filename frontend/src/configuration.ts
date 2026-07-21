@@ -72,6 +72,8 @@ const channelScopedParameters = new Set([
   'ZS_Threshold_HG',
 ])
 
+const boardScopedParameters = new Set(['HV_Vbias', 'HV_Imax', 'TD_CoarseThreshold'])
+
 export function parseConfiguration(source: string): ConfigurationDocument {
   const fields: ConfigurationField[] = []
   let section = 'Connection'
@@ -145,7 +147,7 @@ export function setConfigurationValue(
 
 export function parameterScope(field: ConfigurationField): 'global' | 'board' | 'channel' {
   if (channelScopedParameters.has(field.name)) return 'channel'
-  if (isMaskField(field) || field.name === 'TD_CoarseThreshold') return 'board'
+  if (isMaskField(field) || boardScopedParameters.has(field.name)) return 'board'
   return 'global'
 }
 

@@ -528,6 +528,34 @@ select:focus {
   color: #9dafc4;
   font-size: 0.65rem;
 }
+.board-overrides-button {
+  grid-column: 1 / -1;
+  justify-self: end;
+  padding: 4px 8px;
+  border: 1px solid #34465f;
+  border-radius: 6px;
+  color: #72dcb9;
+  background: transparent;
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+.board-dialog {
+  width: min(620px, 100%);
+}
+.board-values {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+.board-values label {
+  color: #8498af;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.board-values input:not([type='checkbox']) {
+  margin-top: 5px;
+}
 .board-value-summary span {
   padding: 4px 6px;
   border-radius: 5px;
@@ -966,6 +994,9 @@ textarea {
   .board-value-summary {
     grid-column: 1;
     margin-top: 0;
+  }
+  .board-values {
+    grid-template-columns: repeat(2, 1fr);
   }
   .channel-values {
     grid-template-columns: repeat(4, 1fr);
