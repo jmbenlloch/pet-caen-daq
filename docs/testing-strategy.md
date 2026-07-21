@@ -70,6 +70,12 @@ The simulator supports validated FIFO one-shot fault scripts rather than relying
 
 ## CI quality gates
 
+The critical operator workflow runs with `task test:e2e`. Locally this uses the
+pinned `mcr.microsoft.com/playwright:v1.61.1-noble` image and dedicated loopback
+ports; `task test:e2e:ci` uses an already installed matching Chromium in CI.
+Both launch the built UI through the Go backend and deterministic simulator,
+and keep Playwright traces and screenshots for failures.
+
 The eventual CI pipeline should require:
 
 - formatting and linting for Go, protobuf, TypeScript, Vue, CSS, Markdown, Dockerfiles, and shell files as applicable;

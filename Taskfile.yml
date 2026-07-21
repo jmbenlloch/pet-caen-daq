@@ -67,7 +67,14 @@ tasks:
       - npm --prefix frontend run dev
 
   test:e2e:
-    desc: Run Playwright browser tests
+    desc: Build and run Playwright browser tests in the pinned Docker image
+    deps: [build]
+    cmds:
+      - docker run --rm --network host -v "{{.ROOT_DIR}}:/workspace:ro" -w /workspace/frontend mcr.microsoft.com/playwright:v1.61.1-noble npm run test:e2e
+
+  test:e2e:ci:
+    desc: Run Playwright browser tests with an installed local Chromium
+    deps: [build]
     cmds:
       - npm --prefix frontend run test:e2e
 

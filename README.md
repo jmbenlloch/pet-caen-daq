@@ -18,6 +18,7 @@ Project workflows use [Task](https://taskfile.dev/docs/installation) through the
 task generate
 task test
 task ci
+task test:e2e
 ```
 
 Install the pinned frontend dependencies once, then start the operator UI. The
@@ -43,6 +44,11 @@ same HTTP origin.
 The operator dashboard also lists persisted runs from the configured `-runs`
 directory. Artifact downloads are streamed through the generated RunService API
 and are limited to files recorded in each run's manifest.
+
+`task test:e2e` builds the commands and frontend, then runs the pinned
+Playwright Chromium container against a real simulator-backed backend. It uses
+dedicated loopback ports and stores all transient runs and failure artifacts
+under the container's `/tmp`.
 
 ## Start here
 

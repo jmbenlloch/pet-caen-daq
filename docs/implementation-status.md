@@ -26,8 +26,8 @@ telemetry snapshot. The dashboard presents the latest run's termination reason,
 event/raw-batch counts, incomplete state, and artifact kind, size, and SHA-256
 metadata. Component coverage exercises discovered-board rendering and the
 validated ready-to-running operator workflow through an injected API boundary.
-Historical run browsing and artifact download still require explicit backend API
-methods; the frontend does not infer history from transient telemetry.
+Historical run browsing and artifact download use explicit backend API methods;
+the frontend does not infer history from transient telemetry.
 
 The backend can now optionally serve a built operator application from an
 explicit `-frontend-dir`. Startup rejects a missing index or symbolic links,
@@ -42,6 +42,14 @@ returns the newest runs first, reports corrupt storage instead of hiding it,
 and streams downloads only for regular artifact files recorded by a finalized
 manifest. The dashboard loads that history across backend restarts and offers
 the recorded decoded, raw, and transport-journal artifacts for download.
+
+Pinned Playwright Chromium workflows now exercise the built application through
+the embedded backend and native simulator. They verify discovered topology and
+live telemetry, structured invalid-configuration feedback, a complete validated
+start/stop-and-drain operation, persistent history across page reload, and an
+actual decoded-artifact browser download. Local execution uses Docker through
+`task test:e2e`; CI installs the matching pinned Chromium and retains traces and
+screenshots on failures.
 
 ## Phase 2 acquisition service foundations
 

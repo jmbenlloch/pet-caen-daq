@@ -51,3 +51,20 @@ jobs:
 
       - name: Run CI checks
         run: task ci
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser workflows
+        run: task test:e2e:ci
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-artifacts
+          path: |
+            /tmp/pet-caen-playwright-results
+            /tmp/pet-caen-playwright-report
+          if-no-files-found: ignore
