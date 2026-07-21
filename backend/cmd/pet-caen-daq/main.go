@@ -25,6 +25,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/service"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/webui"
 )
 
 func main() {
@@ -43,6 +44,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	controlAddress := flags.String("control", "172.16.0.11:9760", "DT5215 control address")
 	streamAddress := flags.String("stream", "172.16.0.11:9000", "DT5215 stream address")
 	listenAddress := flags.String("listen", "127.0.0.1:8080", "ConnectRPC HTTP listen address")
+	frontendDirectory := flags.String("frontend-dir", "", "optional built frontend directory to serve on the same HTTP origin")
 	runParent := flags.String("runs", "./runs", "parent directory for run artifacts")
 	pipelineCapacity := flags.Int("pipeline-capacity", 32, "bounded stream-batch queue capacity")
 	drainTimeout := flags.Duration("drain-timeout", 5*time.Second, "maximum orderly stop-and-drain duration")
@@ -160,6 +162,13 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	runPath, runHandler := daqv1connect.NewRunServiceHandler(runService)
 	mux.Handle(systemPath, systemHandler)
 	mux.Handle(runPath, runHandler)
+	if *frontendDirectory != "" {
+		frontendHandler, frontendErr := webui.New(*frontendDirectory)
+		if frontendErr != nil {
+			return frontendErr
+		}
+		mux.Handle("/", frontendHandler)
+	}
 	server := &http.Server{Addr: *listenAddress, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 
 	serverCtx, stopServer := context.WithCancel(ctx)
@@ -172,7 +181,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		defer shutdownCancel()
 		_ = server.Shutdown(shutdownCtx)
 	}()
-	fmt.Fprintf(output, "PET CAEN DAQ instance=%s listen=%s state=ready hv_authorized=%t\n", publisher.Snapshot().GetInstanceId(), *listenAddress, *authorizeHV)
+	fmt.Fprintf(output, "PET CAEN DAQ instance=%s listen=%s state=ready hv_authorized=%t frontend=%t\n", publisher.Snapshot().GetInstanceId(), *listenAddress, *authorizeHV, *frontendDirectory != "")
 	err = server.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
 		<-shutdownDone

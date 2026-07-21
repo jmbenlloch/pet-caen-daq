@@ -29,6 +29,13 @@ validated ready-to-running operator workflow through an injected API boundary.
 Historical run browsing and artifact download still require explicit backend API
 methods; the frontend does not infer history from transient telemetry.
 
+The backend can now optionally serve a built operator application from an
+explicit `-frontend-dir`. Startup rejects a missing index or symbolic links,
+ConnectRPC service paths retain precedence, hashed assets receive immutable cache
+headers, the application shell is never cached, missing file-like resources stay
+404s, and extensionless browser routes receive the SPA shell. Development
+continues to use Vite's same-origin proxy; no broad CORS policy was introduced.
+
 ## Phase 2 acquisition service foundations
 
 Started on 2026-07-21:

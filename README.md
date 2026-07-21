@@ -28,6 +28,18 @@ npm --prefix frontend ci
 task dev:frontend
 ```
 
+For a single-origin deployment, build the repository and point the backend at
+the generated application directory:
+
+```sh
+task build
+./bin/pet-caen-daq -config config.txt -frontend-dir frontend/dist
+```
+
+The frontend directory is optional. When enabled, the backend validates it at
+startup, serves browser routes through `index.html`, and keeps ConnectRPC on the
+same HTTP origin.
+
 ## Start here
 
 - [Project instructions](AGENTS.md)
