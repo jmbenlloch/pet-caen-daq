@@ -32,6 +32,10 @@ Storage-backed run sessions now expose race-safe decoded-event and raw-batch cou
 
 A cancellable run-health monitor now samples the active storage-backed pipeline immediately and at a configured cadence, coalescing pipeline and storage measurements into one complete telemetry publication per sample. Its tick source is injectable for deterministic tests, slow telemetry consumers remain isolated by the snapshot publisher, and monitor cancellation exits without manufacturing an acquisition fault.
 
+The backend command now runs a long-lived HTTP ConnectRPC service after parsing/classifying the JANUS configuration, validating and discovering the provisioned topology, creating run storage, and reporting restart evidence. It mounts system and run services, publishes an instance-scoped idle topology snapshot, and performs bounded graceful HTTP and hardware shutdown on process cancellation. Discovery deliberately leaves the system idle: the run endpoint cannot transition to starting until hardware configuration application is wired, preventing an unconfigured acquisition from being presented as ready.
+
+An HTTP integration test now uses the checked-in generated ConnectRPC client against the mounted system handler. It verifies the unary complete snapshot, the stream's immediate initial snapshot, a live sequence/state/run update, cancellation, and a new connection receiving the latest complete snapshot rather than replaying deltas.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:
