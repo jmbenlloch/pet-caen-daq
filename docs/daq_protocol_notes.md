@@ -152,6 +152,12 @@ The project-owned Citiroc representation is now implemented in `backend/internal
 
 Normal JANUS configuration does not construct or upload these words on the host. FPGA firmware builds the stream from the DT5202 configuration registers. The source-confirmed production command sequence is therefore a write of `a_scbs_ctrl=0`, `CMD_CFG_ASIC`, a write of `a_scbs_ctrl=0x200`, and a second `CMD_CFG_ASIC`. The Go implementation follows that sequence. Explicit stream construction is retained for golden comparison and future manual loading, but must not be presented as a production manual-load image until every power-control value has been requested or deliberately defaulted.
 
+## HV peripheral configuration
+
+The DT5202 HV module is accessed indirectly through `a_hv_regaddr` and `a_hv_regdata`. A write selector is `(data_type << 8) | peripheral_register`; data type 0 is signed integer, 1 is fixed point scaled by 10,000, 2 is unsigned integer, and 3 is float. The bus initialization selector is `0x2001`. Each selector and data write is followed by polling acquisition-status bit 17 (I2C busy), while bit 18 reports I2C failure.
+
+The source-confirmed hard-configuration sequence initializes the bus, selects PID precision through peripheral register 30, writes voltage register 2 twice, current-limit register 5 twice, temperature coefficients 7/8/9 twice, and feedback coefficient/enable registers 28/1 twice. Repeated writes reproduce FERSlib's workaround for unreliable first accesses. Applying this plan is a separate explicit operation because changing HV setpoints is safety-relevant; ordinary FPGA configuration does not implicitly perform it.
+
 The user configuration vocabulary and units are completely represented by `Config_t` in `FERS_config.h`, parsing in `FERS_paramparser.c`, and the example/definition files under `bin/`. `FERS_LoadConfigFile`, `FERS_SetParam`, `FERS_GetParam`, and `FERS_configure` are suitable first-version APIs even if JANUS itself is not used.
 
 ## Run-control sequence for this topology

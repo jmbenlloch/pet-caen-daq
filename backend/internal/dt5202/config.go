@@ -22,6 +22,7 @@ type ConfigurationPlan struct {
 	Board    int
 	Writes   []RegisterWrite
 	Citiroc  [2]CitirocChip
+	HV       HVPlan
 	Deferred []string
 	Inactive []InactiveSetting
 }
@@ -121,6 +122,28 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 			return 0, fmt.Errorf("line %d: unsupported time unit %q", a.Line, unit)
 		}
 		return v, nil
+	}
+	decimalUnit := func(name string, units map[string]float64) (float64, error) {
+		a, err := require(name)
+		if err != nil {
+			return 0, err
+		}
+		fields := strings.Fields(a.Value)
+		if len(fields) < 1 || len(fields) > 2 {
+			return 0, fmt.Errorf("line %d: invalid %s value %q", a.Line, name, a.Value)
+		}
+		value, err := strconv.ParseFloat(fields[0], 64)
+		if err != nil {
+			return 0, fmt.Errorf("line %d: invalid %s value %q", a.Line, name, a.Value)
+		}
+		if len(fields) == 2 {
+			multiplier, ok := units[fields[1]]
+			if !ok {
+				return 0, fmt.Errorf("line %d: unsupported %s unit %q", a.Line, name, fields[1])
+			}
+			value *= multiplier
+		}
+		return value, nil
 	}
 
 	acqMode, err := choice("AcquisitionMode", map[string]uint32{"SPECTROSCOPY": 1, "TIMING_CSTART": 2, "SPECT_TIMING": 3, "COUNTING": 4, "WAVEFORM": 8, "TIMING_CSTOP": 0x12})
@@ -340,6 +363,53 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	hvVoltage, err := decimalUnit("HV_Vbias", map[string]float64{"uV": 1e-6, "mV": 1e-3, "V": 1})
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	if hvVoltage < 20 || hvVoltage > 85 {
+		return ConfigurationPlan{}, fmt.Errorf("HV_Vbias %.6g V outside DT5202 production range [20,85] V", hvVoltage)
+	}
+	hvCurrent, err := decimalUnit("HV_Imax", map[string]float64{"uA": 1e-3, "mA": 1, "A": 1e3})
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	if hvCurrent < 0 {
+		return ConfigurationPlan{}, fmt.Errorf("HV_Imax %.6g mA must not be negative", hvCurrent)
+	}
+	feedbackCoefficient, err := decimalUnit("TempFeedbackCoeff", map[string]float64{})
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	feedbackEnable, err := u32("EnableTempFeedback", 1)
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	tempSensor, err := require("TempSensType")
+	if err != nil {
+		return ConfigurationPlan{}, err
+	}
+	coefficients := [3]float64{}
+	switch tempSensor.Value {
+	case "TMP37":
+		coefficients = [3]float64{0, 50, 0}
+	case "LM94021_G11":
+		coefficients = [3]float64{194.25, -73.63, 0}
+	case "LM94021_G00":
+		coefficients = [3]float64{188.12, -181.62, 0}
+	default:
+		fields := strings.Fields(tempSensor.Value)
+		if len(fields) != 3 {
+			return ConfigurationPlan{}, fmt.Errorf("line %d: TempSensType must be a known sensor or three coefficients", tempSensor.Line)
+		}
+		for index := range fields {
+			value, parseErr := strconv.ParseFloat(fields[index], 64)
+			if parseErr != nil {
+				return ConfigurationPlan{}, fmt.Errorf("line %d: invalid TempSensType coefficient %q", tempSensor.Line, fields[index])
+			}
+			coefficients[index] = value
+		}
+	}
 
 	plan := ConfigurationPlan{Board: board, Writes: []RegisterWrite{
 		{ChannelMaskLow, mask0}, {ChannelMaskHigh, mask1}, {AcquisitionControl, acqControl},
@@ -387,7 +457,8 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	common := CitirocCommon{DiscriminatorMask: qdMask0, LowShapingTime: uint8(lgShape), HighShapingTime: uint8(hgShape), ChargeCoarseThreshold: uint16(qd), TimeCoarseThreshold: uint16(td), FastShaperOnLowGain: fastShaper != 0, InputDACReference45V: hvRange != 0, PeakSensingExternalTrigger: true, OTAForceOn: true, NegativeTriggerPolarity: true}
 	plan.Citiroc = SplitCitirocChannels(citirocChannels, common)
 	plan.Citiroc[1].Common.DiscriminatorMask = qdMask1
-	plan.Deferred = []string{"HV_Vbias", "HV_Imax", "TempSensType", "TempFeedbackCoeff", "EnableTempFeedback", "Pedestal"}
+	plan.HV = buildHVPlan(hvVoltage, hvCurrent, coefficients, feedbackEnable != 0, feedbackCoefficient)
+	plan.Deferred = []string{"Pedestal"}
 	if acqMode == 1 {
 		plan.Deferred = append(plan.Deferred, "ZS_Threshold_LG", "ZS_Threshold_HG")
 	} else {

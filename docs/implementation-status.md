@@ -140,3 +140,16 @@ Implemented on 2026-07-21:
 - explicit requested-versus-effective reasons for production settings made inactive by `TestPulseSource OFF`, `AcquisitionMode SPECT_TIMING`, or disabled analog probes.
 
 The production fixture now distinguishes inactive settings from unsupported/deferred settings. Probe settings are applied and read back; energy zero-suppression remains deferred only for spectroscopy mode, where its effective values require pedestal calibration data.
+
+## Phase 1 HV peripheral configuration
+
+Implemented on 2026-07-21:
+
+- strict voltage/current unit parsing and production-range validation;
+- named and three-coefficient temperature-sensor translation;
+- exact signed/fixed-point ×10,000 peripheral encoding;
+- source-ordered bus initialization, PID, duplicated voltage/current, duplicated sensor-coefficient, and duplicated temperature-feedback transactions;
+- bounded I2C busy polling with failure and cancellation handling; and
+- simulator-backed application of the production 45.4 V, 1.0 mA, TMP37, feedback-disabled plan on all four boards.
+
+HV application is deliberately separate from ordinary FPGA configuration so callers must explicitly authorize the safety-relevant setpoint operation. This completes production fixture translation except for pedestal calibration; spectroscopy-only zero suppression remains dependent on those measured pedestal values.

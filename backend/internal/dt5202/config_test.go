@@ -50,6 +50,9 @@ func TestPlanProductionConfiguration(t *testing.T) {
 		if len(plan.Deferred) == 0 {
 			t.Fatalf("board %d has no explicit deferred settings", board)
 		}
+		if plan.HV.VoltageV != 45.4 || plan.HV.CurrentLimitMA != 1 || plan.HV.TemperatureCoefficients != [3]float64{0, 50, 0} || plan.HV.TemperatureFeedback || len(plan.HV.Transactions) != 15 {
+			t.Fatalf("board %d HV plan = %#v", board, plan.HV)
+		}
 		if got, want := len(plan.Inactive), 7; got != want {
 			t.Fatalf("board %d inactive settings = %d, want %d: %#v", board, got, want, plan.Inactive)
 		}

@@ -281,6 +281,9 @@ func TestProductionConfigurationAppliesAndValidatesFourBoards(t *testing.T) {
 		if err := dt5202.ApplyConfiguration(ctx, client, uint16(board), 0, plan, true); err != nil {
 			t.Fatalf("apply board %d: %v", board, err)
 		}
+		if err := dt5202.ApplyHVConfiguration(ctx, client, uint16(board), 0, plan.HV); err != nil {
+			t.Fatalf("apply board %d HV: %v", board, err)
+		}
 		snapshot, err := server.BoardSnapshot(board, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -293,6 +296,11 @@ func TestProductionConfigurationAppliesAndValidatesFourBoards(t *testing.T) {
 		}
 		if snapshot.CitirocLoads != [2]uint32{1, 1} {
 			t.Errorf("board %d Citiroc loads = %v", board, snapshot.CitirocLoads)
+		}
+		for selector, want := range map[uint32]uint32{0x21e: 1, 0x102: 454000, 0x105: 10000, 0x108: 500000, 0x11c: 0xfffaa8d0, 0x001: 0} {
+			if got := snapshot.HVRegisters[selector]; got != want {
+				t.Errorf("board %d HV selector %#x = %#x, want %#x", board, selector, got, want)
+			}
 		}
 	}
 }

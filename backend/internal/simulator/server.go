@@ -20,6 +20,8 @@ type Board struct {
 	Status           uint32
 	Registers        map[uint32]uint32
 	CitirocLoads     [2]uint32
+	HVRegisters      map[uint32]uint32
+	hvSelector       uint32
 }
 
 type Topology struct {
@@ -87,6 +89,10 @@ func (s *Server) BoardSnapshot(chain, node int) (Board, error) {
 	board.Registers = make(map[uint32]uint32, len(s.topology.Chains[chain][node].Registers))
 	for address, value := range s.topology.Chains[chain][node].Registers {
 		board.Registers[address] = value
+	}
+	board.HVRegisters = make(map[uint32]uint32, len(s.topology.Chains[chain][node].HVRegisters))
+	for address, value := range s.topology.Chains[chain][node].HVRegisters {
+		board.HVRegisters[address] = value
 	}
 	return board, nil
 }
@@ -286,6 +292,14 @@ func (s *Server) handleWriteRegister(connection net.Conn) error {
 		board.Registers = make(map[uint32]uint32)
 	}
 	board.Registers[address] = value
+	if address == uint32(dt5202.HVRegisterAddress) {
+		board.hvSelector = value
+	} else if address == uint32(dt5202.HVRegisterData) && board.hvSelector != 0x2001 {
+		if board.HVRegisters == nil {
+			board.HVRegisters = make(map[uint32]uint32)
+		}
+		board.HVRegisters[board.hvSelector] = value
+	}
 	return writeStatus(connection, 0)
 }
 func (s *Server) handleCommand(connection net.Conn, operation string) error {
@@ -331,6 +345,8 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 			board.Status = 1
 			board.Registers = make(map[uint32]uint32)
 			board.CitirocLoads = [2]uint32{}
+			board.HVRegisters = make(map[uint32]uint32)
+			board.hvSelector = 0
 		case dt5215.CommandTestPulse:
 			if board.Status != 2 {
 				return writeStatus(connection, 10)
