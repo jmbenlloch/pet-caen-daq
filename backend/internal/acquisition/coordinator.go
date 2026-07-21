@@ -147,6 +147,8 @@ func (c *Coordinator) ActiveRunID() string {
 	return c.active.id
 }
 
+func (c *Coordinator) StateSnapshot() StateSnapshot { return c.states.Snapshot() }
+
 func (c *Coordinator) LastError() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()

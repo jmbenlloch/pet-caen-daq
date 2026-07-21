@@ -18,6 +18,8 @@ The ConnectRPC configuration-validation method now uses the same lossless JANUS 
 
 A long-running acquisition coordinator now serializes start and stop operations over the explicit state machine. It synchronizes and clears the stream before start, continuously routes immutable raw/event batches through the bounded pipeline, cancels the reader before an orderly bounded stop-and-drain, and returns to ready only after pipeline finalization. Start, stream, drain, and pipeline failures retain their primary cause, attempt safe cleanup where possible, and leave the system in fault with a queryable diagnostic.
 
+ConnectRPC run-control handlers now validate required identity and the static JANUS configuration before start, enforce exact active-run identity on stop, invoke the long-running coordinator, map lifecycle rejection to typed RPC status, and publish complete running, ready, or fault snapshots. Successful stop records completion time and termination reason and clears the current run only after coordinator drain/finalization succeeds.
+
 ## Vertical slice 1: read-only topology discovery
 
 Implemented on 2026-07-20:
