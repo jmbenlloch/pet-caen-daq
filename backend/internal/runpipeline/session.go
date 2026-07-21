@@ -19,7 +19,6 @@ import (
 
 type Options struct {
 	Parent       string
-	CaptureRaw   bool
 	Capacity     int
 	Backpressure acquisition.BackpressurePolicy
 	Now          func() time.Time
@@ -27,7 +26,7 @@ type Options struct {
 
 type Factory struct{ Options Options }
 
-func (f Factory) New(runID string) (acquisition.RunPipeline, error) {
+func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisition.RunPipeline, error) {
 	options := f.Options
 	if options.Parent == "" {
 		return nil, fmt.Errorf("run storage parent is required")
@@ -38,17 +37,28 @@ func (f Factory) New(runID string) (acquisition.RunPipeline, error) {
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	writer, err := runstore.Create(options.Parent, runstore.Manifest{RunID: runID, StartedAt: options.Now().UTC().Format(time.RFC3339Nano)})
+	writer, err := runstore.Create(options.Parent, runstore.Manifest{
+		RunID: runID, StartedAt: options.Now().UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
+		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
+		RequestedConfiguration: runOptions.RequestedConfiguration, EffectiveConfiguration: runOptions.EffectiveConfiguration,
+		ConfigurationAudit: runOptions.ConfigurationAudit,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if options.CaptureRaw {
+	if runOptions.CaptureRaw {
 		if err := writer.EnableRawCapture(); err != nil {
 			_ = writer.Abort()
 			return nil, err
 		}
 	}
-	sink := &sink{writer: writer, captureRaw: options.CaptureRaw}
+	if runOptions.JournalTransport {
+		if err := writer.EnableTransportJournal(); err != nil {
+			_ = writer.Abort()
+			return nil, err
+		}
+	}
+	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw}
 	pipeline, err := acquisition.NewPipeline(options.Capacity, options.Backpressure, sink)
 	if err != nil {
 		_ = writer.Abort()

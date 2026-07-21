@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -10,16 +11,20 @@ import (
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1/daqv1connect"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type RunController interface {
-	Start(context.Context, string, string) error
+	Start(context.Context, string, string, acquisition.RunOptions) error
 	Stop(context.Context, string) error
 	ActiveRunID() string
 	StateSnapshot() acquisition.StateSnapshot
 }
+
+type ConfigurationApplier func(context.Context, *janusconfig.Document, string) (acquisition.ConfigurationResult, error)
 
 type SnapshotPublisher interface {
 	Snapshot() *daqv1.TelemetrySnapshot
@@ -31,6 +36,8 @@ type RunService struct {
 	Controller RunController
 	Telemetry  SnapshotPublisher
 	Now        func() time.Time
+	Configure  ConfigurationApplier
+	Boards     []configaudit.BoardEvidence
 
 	mu      sync.Mutex
 	current *daqv1.RunSummary
@@ -44,7 +51,32 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if issues := ValidateJANUSConfiguration(message.GetJanusConfiguration()); len(issues) != 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("configuration is invalid: %s", issues[0].GetMessage()))
 	}
-	if err := s.Controller.Start(ctx, message.GetRunId(), message.GetRequestedBy()); err != nil {
+	if s.Configure == nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("run configuration application is unavailable"))
+	}
+	document, err := janusconfig.Parse(bytes.NewBufferString(message.GetJanusConfiguration()))
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	configured, err := s.Configure(ctx, document, message.GetRequestedBy())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("apply run configuration: %w", err))
+	}
+	if state := s.Controller.StateSnapshot().State; state != acquisition.StateReady {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("configuration completed in state %s, want ready", state))
+	}
+	audit, err := configaudit.Build(document, configured.Plans, s.Boards)
+	if err != nil || !audit.Valid {
+		if err == nil {
+			err = fmt.Errorf("effective configuration audit rejected one or more settings")
+		}
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	options := acquisition.RunOptions{
+		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
+		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
+	}
+	if err := s.Controller.Start(ctx, message.GetRunId(), message.GetRequestedBy(), options); err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 	}
 	run := &daqv1.RunSummary{RunId: message.GetRunId(), StartedAt: timestamppb.New(s.now()), Incomplete: true}

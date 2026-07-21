@@ -2,6 +2,7 @@ package runpipeline
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,14 +10,19 @@ import (
 	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 )
 
 func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 	parent := t.TempDir()
-	factory := Factory{Options: Options{Parent: parent, CaptureRaw: true, Capacity: 2, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return time.Unix(100, 0) }}}
-	created, err := factory.New("42")
+	factory := Factory{Options: Options{Parent: parent, Capacity: 2, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return time.Unix(100, 0) }}}
+	audit := &configaudit.Report{SchemaVersion: 1, Valid: true}
+	created, err := factory.New("42", acquisition.RunOptions{
+		CaptureRaw: true, JournalTransport: true, RequestedBy: "operator",
+		RequestedConfiguration: "Open 0=0", EffectiveConfiguration: []dt5202.ConfigurationPlan{{Board: 0}}, ConfigurationAudit: audit,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,10 +41,28 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 	if stats.Directory != session.Directory() || stats.BytesWritten == 0 || stats.EventCount != 1 || stats.RawBatches != 1 || !stats.Finalized || stats.LastError != "" {
 		t.Fatalf("storage stats = %+v", stats)
 	}
-	for _, name := range []string{"manifest.json", "events.jsonl", "wire.raw"} {
+	for _, name := range []string{"manifest.json", "events.jsonl", "wire.raw", "transport.journal"} {
 		if _, err := os.Stat(filepath.Join(session.Directory(), name)); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
 		}
+	}
+	manifestData, err := os.ReadFile(filepath.Join(session.Directory(), "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		RequestedBy            string                     `json:"requested_by"`
+		CaptureRaw             bool                       `json:"capture_raw"`
+		JournalTransport       bool                       `json:"journal_transport"`
+		RequestedConfiguration string                     `json:"requested_configuration"`
+		EffectiveConfiguration []dt5202.ConfigurationPlan `json:"effective_configuration"`
+		ConfigurationAudit     *configaudit.Report        `json:"configuration_audit"`
+	}
+	if err := json.Unmarshal(manifestData, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.RequestedBy != "operator" || !manifest.CaptureRaw || !manifest.JournalTransport || manifest.RequestedConfiguration != "Open 0=0" || len(manifest.EffectiveConfiguration) != 1 || manifest.ConfigurationAudit == nil {
+		t.Fatalf("manifest = %+v", manifest)
 	}
 	if _, err := os.Stat(filepath.Join(session.Directory(), "incomplete")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("incomplete marker remains: %v", err)
@@ -47,7 +71,7 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 
 func TestSessionAbortRetainsIncompleteMarker(t *testing.T) {
 	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock}}
-	created, err := factory.New("failed")
+	created, err := factory.New("failed", acquisition.RunOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -95,7 +95,7 @@ func readyCoordinator(t *testing.T, hardware *coordinatorHardware) (*Coordinator
 	t.Helper()
 	states, _ := NewStateMachine(StateReady, nil)
 	pipeline := &coordinatorPipeline{}
-	coordinator, err := NewCoordinator(states, hardware, func(string) (RunPipeline, error) { return pipeline, nil }, 1, time.Second)
+	coordinator, err := NewCoordinator(states, hardware, func(string, RunOptions) (RunPipeline, error) { return pipeline, nil }, 1, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func readyCoordinator(t *testing.T, hardware *coordinatorHardware) (*Coordinator
 func TestCoordinatorStartsReadsAndDrainsToReady(t *testing.T) {
 	hardware := &coordinatorHardware{}
 	coordinator, states, pipeline := readyCoordinator(t, hardware)
-	if err := coordinator.Start(context.Background(), "run-1", "operator"); err != nil {
+	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	if states.Snapshot().State != StateRunning || coordinator.ActiveRunID() != "run-1" {
@@ -128,7 +128,7 @@ func TestCoordinatorStartFailureMovesToFaultAndClosesPipeline(t *testing.T) {
 	sentinel := errors.New("start rejected")
 	hardware := &coordinatorHardware{startErr: sentinel}
 	coordinator, states, pipeline := readyCoordinator(t, hardware)
-	err := coordinator.Start(context.Background(), "run-1", "operator")
+	err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{})
 	if !errors.Is(err, sentinel) || states.Snapshot().State != StateFault || !pipeline.closed || !pipeline.aborted || pipeline.finalized {
 		t.Fatalf("error=%v state=%s pipeline=%+v", err, states.Snapshot().State, pipeline)
 	}
@@ -138,7 +138,7 @@ func TestCoordinatorStreamFailureStopsAndRecordsPrimaryError(t *testing.T) {
 	sentinel := errors.New("stream disconnected")
 	hardware := &coordinatorHardware{readErr: sentinel}
 	coordinator, states, _ := readyCoordinator(t, hardware)
-	if err := coordinator.Start(context.Background(), "run-1", "operator"); err != nil {
+	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(time.Second)
@@ -156,11 +156,11 @@ func TestCoordinatorStreamFailureStopsAndRecordsPrimaryError(t *testing.T) {
 func TestCoordinatorRejectsInvalidStartWithoutCreatingPipeline(t *testing.T) {
 	states, _ := NewStateMachine(StateIdle, nil)
 	created := false
-	coordinator, _ := NewCoordinator(states, &coordinatorHardware{}, func(string) (RunPipeline, error) {
+	coordinator, _ := NewCoordinator(states, &coordinatorHardware{}, func(string, RunOptions) (RunPipeline, error) {
 		created = true
 		return &coordinatorPipeline{}, nil
 	}, 1, time.Second)
-	if err := coordinator.Start(context.Background(), "run-1", "operator"); err == nil || created {
+	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{}); err == nil || created {
 		t.Fatalf("error=%v created=%v", err, created)
 	}
 }

@@ -17,6 +17,7 @@ import (
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1/daqv1connect"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
@@ -92,7 +93,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 
 	states, _ := acquisition.NewStateMachine(acquisition.StateIdle, nil)
 	factory := runpipeline.Factory{Options: runpipeline.Options{
-		Parent: *runParent, CaptureRaw: true, Capacity: *pipelineCapacity, Backpressure: acquisition.BackpressureBlock,
+		Parent: *runParent, Capacity: *pipelineCapacity, Backpressure: acquisition.BackpressureBlock,
 	}}
 	coordinator, err := acquisition.NewCoordinator(states, client, factory.New, 4, *drainTimeout)
 	if err != nil {
@@ -123,7 +124,16 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	}
 
 	systemService := &service.SystemService{Source: publisher}
-	runService := &service.RunService{Controller: coordinator, Telemetry: publisher}
+	boards := make([]configaudit.BoardEvidence, 0, len(topology.Boards))
+	for _, board := range topology.Boards {
+		boards = append(boards, configaudit.BoardEvidence{Board: int(board.Chain), FirmwareRevision: board.FirmwareRevision})
+	}
+	runService := &service.RunService{
+		Controller: coordinator, Telemetry: publisher, Boards: boards,
+		Configure: func(configureCtx context.Context, runDocument *janusconfig.Document, actor string) (acquisition.ConfigurationResult, error) {
+			return configurator.Configure(configureCtx, runDocument, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: *authorizeHV})
+		},
+	}
 	mux := http.NewServeMux()
 	systemPath, systemHandler := daqv1connect.NewSystemServiceHandler(systemService)
 	runPath, runHandler := daqv1connect.NewRunServiceHandler(runService)

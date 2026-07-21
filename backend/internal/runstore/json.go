@@ -21,13 +21,18 @@ const SchemaVersion = 1
 const DefaultMaxRecordSize = 1 << 20
 
 type Manifest struct {
-	SchemaVersion      int                 `json:"schema_version"`
-	RunID              string              `json:"run_id"`
-	StartedAt          string              `json:"started_at"`
-	CompletedAt        string              `json:"completed_at,omitempty"`
-	TerminationReason  string              `json:"termination_reason,omitempty"`
-	EventCount         uint64              `json:"event_count,string"`
-	ConfigurationAudit *configaudit.Report `json:"configuration_audit,omitempty"`
+	SchemaVersion          int                        `json:"schema_version"`
+	RunID                  string                     `json:"run_id"`
+	RequestedBy            string                     `json:"requested_by,omitempty"`
+	StartedAt              string                     `json:"started_at"`
+	CompletedAt            string                     `json:"completed_at,omitempty"`
+	TerminationReason      string                     `json:"termination_reason,omitempty"`
+	EventCount             uint64                     `json:"event_count,string"`
+	CaptureRaw             bool                       `json:"capture_raw"`
+	JournalTransport       bool                       `json:"journal_transport"`
+	RequestedConfiguration string                     `json:"requested_configuration,omitempty"`
+	EffectiveConfiguration []dt5202.ConfigurationPlan `json:"effective_configuration,omitempty"`
+	ConfigurationAudit     *configaudit.Report        `json:"configuration_audit,omitempty"`
 }
 
 type Envelope struct {

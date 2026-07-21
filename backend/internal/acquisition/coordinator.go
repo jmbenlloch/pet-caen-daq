@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 )
 
@@ -22,7 +24,16 @@ type RunPipeline interface {
 	Close() error
 }
 
-type PipelineFactory func(runID string) (RunPipeline, error)
+type RunOptions struct {
+	CaptureRaw             bool
+	JournalTransport       bool
+	RequestedBy            string
+	RequestedConfiguration string
+	EffectiveConfiguration []dt5202.ConfigurationPlan
+	ConfigurationAudit     *configaudit.Report
+}
+
+type PipelineFactory func(runID string, options RunOptions) (RunPipeline, error)
 
 type RunPipelineFinalizer interface {
 	Finalize(completedAt, reason string) error
@@ -69,7 +80,7 @@ func NewCoordinator(states *StateMachine, hardware CoordinatorHardware, newPipel
 	return &Coordinator{states: states, hardware: hardware, newPipeline: newPipeline, expectedChains: expectedChains, drainTimeout: drainTimeout}, nil
 }
 
-func (c *Coordinator) Start(ctx context.Context, runID, actor string) error {
+func (c *Coordinator) Start(ctx context.Context, runID, actor string, options RunOptions) error {
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
 	if runID == "" {
@@ -78,7 +89,7 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string) error {
 	if _, err := c.states.Move(StateStarting, actor); err != nil {
 		return err
 	}
-	pipeline, err := c.newPipeline(runID)
+	pipeline, err := c.newPipeline(runID, options)
 	if err != nil {
 		return c.failStart(fmt.Errorf("create run pipeline: %w", err), actor, nil)
 	}
