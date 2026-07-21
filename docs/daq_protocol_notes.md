@@ -250,6 +250,8 @@ Each sample word contains HG bits 13:0, LG bits 27:14, and four digital-probe bi
 
 The decoder supports test payloads and multiple service-event versions. Service data include FPGA/board/detector/HV temperatures, HV voltage/current/status, acquisition status, and optional per-channel/T-OR/Q-OR counters. This format has version-dependent branches; port the decoder rather than relying on a short prose summary. JANUS expects service events roughly once per second and warns after about two seconds without one.
 
+The native Go decoder now covers every DT5202 branch above. It accepts source-confirmed service versions 0 and 1, preserves the version and format of a header-only future-version event, and rejects unexpected future-version payload fields until their layout is known. Unlike the bundled C decoder, it diagnoses unsupported qualifier combinations, invalid/duplicate channel entries, truncated sections, fixed-array overflow attempts, and payloads beyond the normalized 64 KiB event boundary.
+
 ## Raw capture and JANUS files are different layers
 
 Do not confuse:

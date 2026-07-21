@@ -165,3 +165,14 @@ Implemented on 2026-07-21:
 - confirmation that spectroscopy-plus-timing leaves energy-only zero suppression inactive while still applying host-side pedestal correction.
 
 With deterministic calibration evidence supplied, the complete production fixture has no deferred hardware-owned settings in the four-board simulator integration path. Reading the protected pedestal flash page natively remains necessary before real-hardware configuration; no code writes or modifies calibration flash.
+
+## Phase 1 complete DT5202 event decoding
+
+Implemented on 2026-07-21:
+
+- qualifier-dispatched, project-owned decoding for timing common-start, timing common-stop, timing streaming, counting, waveform, service-version 0/1, forward-version service headers, and test events;
+- spectroscopy and counting relative-timestamp qualifier handling plus all source-confirmed spectroscopy single/both-gain and optional-timing combinations;
+- source-compatible timing-reference, leading-edge-only, ToT, T-OR/Q-OR, waveform-probe, temperature, HV-monitor/status, board-status, and service-counter field translations; and
+- byte-exact golden vectors, explicit unsupported-qualifier diagnostics, bounded timing/test data, malformed/truncated/oversized-event tests, and qualifier-dispatch fuzz coverage.
+
+These layouts are `source-confirmed` against the bundled JANUS/FERSlib decoder; real DT5215 capture compatibility remains scheduled for Phase 4. The Go decoder deliberately rejects out-of-range and duplicate channel entries that FERSlib silently ignores or overwrites, and bounds fixed-size vendor arrays before decoding.
