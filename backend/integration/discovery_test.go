@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -387,6 +388,74 @@ func TestProductionConfigurationDiscoversSimulatedTopology(t *testing.T) {
 			t.Fatalf("board %d = %#v", index, board)
 		}
 	}
+}
+
+func TestReadOnlyInspectionAcceptsReadyProductionTopology(t *testing.T) {
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", simulator.ProductionTopology())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	inspected, err := client.InspectProductionTopology(ctx, productionConnections())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inspected.Boards) != 4 {
+		t.Fatalf("boards = %d, want 4", len(inspected.Boards))
+	}
+	for chain, enumeration := range inspected.Enumerations {
+		if enumeration != (dt5215.EnumerationInfo{}) {
+			t.Fatalf("chain %d was enumerated during read-only inspection: %#v", chain, enumeration)
+		}
+	}
+}
+
+func TestReadOnlyInspectionRejectsLinksRequiringInitialization(t *testing.T) {
+	topology := simulator.ProductionTopology()
+	for chain := 0; chain < 4; chain++ {
+		topology.LinkStatuses[chain] = 2
+	}
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", topology)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	if _, err := client.InspectProductionTopology(ctx, productionConnections()); err == nil || !strings.Contains(err.Error(), "read-only inspection") {
+		t.Fatalf("inspection error = %v", err)
+	}
+	for chain := 0; chain < 4; chain++ {
+		info, err := client.ChainInfo(ctx, uint16(chain))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Status != 2 {
+			t.Fatalf("chain %d status = %d, inspection initialized link", chain, info.Status)
+		}
+	}
+}
+
+func productionConnections() []janusconfig.Connection {
+	connections := make([]janusconfig.Connection, 4)
+	for chain := range connections {
+		connections[chain] = janusconfig.Connection{Board: chain, Interface: "usb", Host: "172.16.0.11", Chain: chain, Node: 0}
+	}
+	return connections
 }
 
 func TestNativePedestalFlashLoadingIsReadOnly(t *testing.T) {

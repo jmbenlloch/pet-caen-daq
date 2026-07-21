@@ -252,6 +252,17 @@ type Topology struct {
 // links when CINF reports a pre-enumeration state, and reads board identity and
 // status registers.
 func (c *Client) DiscoverProductionTopology(ctx context.Context, expected []janusconfig.Connection) (Topology, error) {
+	return c.productionTopology(ctx, expected, true)
+}
+
+// InspectProductionTopology validates an already initialized production
+// topology using only CINF and RREG requests. It never resets, enumerates, or
+// synchronizes links, making it suitable for opt-in read-only hardware checks.
+func (c *Client) InspectProductionTopology(ctx context.Context, expected []janusconfig.Connection) (Topology, error) {
+	return c.productionTopology(ctx, expected, false)
+}
+
+func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.Connection, initialize bool) (Topology, error) {
 	if err := janusconfig.ValidateProductionTopology(expected); err != nil {
 		return Topology{}, fmt.Errorf("expected topology: %w", err)
 	}
@@ -288,6 +299,9 @@ func (c *Client) DiscoverProductionTopology(ctx context.Context, expected []janu
 	}
 
 	if requiresEnumeration {
+		if !initialize {
+			return Topology{}, fmt.Errorf("one or more expected TDlinks require runtime initialization; read-only inspection will not reset, enumerate, or synchronize links")
+		}
 		if err := c.ResetLinks(ctx); err != nil {
 			return Topology{}, fmt.Errorf("initialize TDlinks: %w", err)
 		}

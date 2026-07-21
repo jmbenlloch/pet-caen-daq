@@ -68,6 +68,12 @@ Exit criterion: protocol paths used by the first production milestone are captur
 
 ## Phase 5: hardware integration
 
+Progress as of 2026-07-21: an opt-in read-only topology/identity/status
+acceptance command and initial provisioning, acquisition, evidence-retention,
+fault, and recovery procedures are implemented. Controlled authorized-HV,
+fault-injection, throughput, and stability exercises still require the real
+system.
+
 - Run read-only discovery/status tests.
 - Run controlled configuration and test-pulse acquisition.
 - Validate four-board synchronization, throughput, backpressure, recovery, and long-run stability.

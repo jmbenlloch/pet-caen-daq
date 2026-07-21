@@ -71,6 +71,15 @@ tasks:
     cmds:
       - npm --prefix frontend run dev
 
+  hardware:inspect:
+    desc: Read and validate an already-ready DT5215/DT5202 topology without hardware writes
+    vars:
+      CONFIG: '{{default "test/fixtures/janus/config_same4_v3_good.txt" .CONFIG}}'
+      CONTROL: '{{default "172.16.0.11:9760" .CONTROL}}'
+      STREAM: '{{default "172.16.0.11:9000" .STREAM}}'
+    cmds:
+      - go run ./backend/cmd/pet-caen-daq -inspect-only -config "{{.CONFIG}}" -control "{{.CONTROL}}" -stream "{{.STREAM}}"
+
   test:e2e:
     desc: Build and run Playwright browser tests in the pinned Docker image
     deps: [build]

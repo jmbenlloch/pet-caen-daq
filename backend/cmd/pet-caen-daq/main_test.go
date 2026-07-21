@@ -18,6 +18,13 @@ func TestRunRequiresConfigurationBeforeNetworkAccess(t *testing.T) {
 	}
 }
 
+func TestInspectOnlyStillRequiresConfiguration(t *testing.T) {
+	err := run(context.Background(), []string{"-inspect-only"}, io.Discard)
+	if err == nil || !strings.Contains(err.Error(), "-config is required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestListenHTTPExplainsHowToSelectAnotherPort(t *testing.T) {
 	_, err := listenHTTP("invalid-address")
 	if err == nil || !strings.Contains(err.Error(), "-listen 127.0.0.1:8081") {

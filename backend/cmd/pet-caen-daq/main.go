@@ -50,6 +50,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	pipelineCapacity := flags.Int("pipeline-capacity", 32, "bounded stream-batch queue capacity")
 	drainTimeout := flags.Duration("drain-timeout", 5*time.Second, "maximum orderly stop-and-drain duration")
 	authorizeHV := flags.Bool("authorize-hv-config", false, "explicitly authorize applying configured DT5202 HV peripheral setpoints")
+	inspectOnly := flags.Bool("inspect-only", false, "read and validate an already-ready topology, then exit without hardware writes")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -77,15 +78,17 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	if *pipelineCapacity <= 0 || *drainTimeout <= 0 {
 		return fmt.Errorf("pipeline capacity and drain timeout must be positive")
 	}
-	listener, err := listenHTTP(*listenAddress)
-	if err != nil {
-		return err
+	var listener net.Listener
+	if !*inspectOnly {
+		listener, err = listenHTTP(*listenAddress)
+		if err != nil {
+			return err
+		}
+		defer listener.Close()
+		if err := os.MkdirAll(*runParent, 0o750); err != nil {
+			return fmt.Errorf("create run storage parent: %w", err)
+		}
 	}
-	defer listener.Close()
-	if err := os.MkdirAll(*runParent, 0o750); err != nil {
-		return fmt.Errorf("create run storage parent: %w", err)
-	}
-
 	// Real DT5215 link reset, four-chain enumeration, and synchronization take
 	// about 36 seconds in capture-verified production hardware.
 	discoveryCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -94,7 +97,12 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		cancel()
 		return err
 	}
-	topology, err := client.DiscoverProductionTopology(discoveryCtx, connections)
+	var topology dt5215.Topology
+	if *inspectOnly {
+		topology, err = client.InspectProductionTopology(discoveryCtx, connections)
+	} else {
+		topology, err = client.DiscoverProductionTopology(discoveryCtx, connections)
+	}
 	cancel()
 	if err != nil {
 		client.Close()
@@ -102,6 +110,10 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	printDiscoveredDevices(output, topology)
 	defer client.Close()
+	if *inspectOnly {
+		fmt.Fprintln(output, "inspection complete mode=read-only hardware_writes=0")
+		return nil
+	}
 
 	states, _ := acquisition.NewStateMachine(acquisition.StateIdle, nil)
 	factory := runpipeline.Factory{Options: runpipeline.Options{

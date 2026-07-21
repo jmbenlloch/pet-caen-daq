@@ -63,6 +63,7 @@ under the container's `/tmp`.
 - [Testing strategy](docs/testing-strategy.md)
 - [Protocol evidence and hardware notes](docs/daq_protocol_notes.md)
 - [Real-hardware captures and patch history](docs/real-hardware-capture-evidence.md)
+- [Hardware operating and recovery procedures](docs/hardware-operations.md)
 - [Production JANUS fixture provenance](test/fixtures/janus/README.md)
 - [Production Run 54 replay fixture](test/fixtures/runs/run54/README.md)
 - [Implementation roadmap](docs/roadmap.md)
