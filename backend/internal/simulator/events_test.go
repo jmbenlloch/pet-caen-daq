@@ -101,6 +101,9 @@ func TestGeneratedSpectroscopyUsesConfigurationAndPedestal(t *testing.T) {
 	if event.Energies[0].HighGain != 141 || event.Energies[0].LowGain != 243 {
 		t.Fatalf("raw energies = %#v", event.Energies)
 	}
+	if !event.Energies[0].Discriminator {
+		t.Fatalf("simulated spectroscopy energy has no discriminator trigger: %#v", event.Energies[0])
+	}
 	corrected := dt5202.ApplyPedestalCalibration(*event, board.CommonPedestal, board.Pedestal)
 	if corrected.Energies[0].HighGain != 121 || corrected.Energies[0].LowGain != 213 {
 		t.Fatalf("corrected energies = %#v", corrected.Energies)

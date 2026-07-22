@@ -137,12 +137,12 @@ func spectroscopyPayload(chain uint8, sequence uint64, mode uint8, board *Board)
 		}
 		low, high := pulseEnergy(board, channel, sequence, true), pulseEnergy(board, channel, sequence, false)
 		if both {
-			binary.LittleEndian.PutUint32(payload[offset:], uint32(high)|uint32(low)<<16)
+			binary.LittleEndian.PutUint32(payload[offset:], uint32(high)|1<<15|uint32(low)<<16)
 			offset += 4
 		} else {
-			value := high
+			value := high | 1<<15
 			if gainSelect == 2 {
-				value = low | 1<<14
+				value = low | 1<<14 | 1<<15
 			}
 			binary.LittleEndian.PutUint16(payload[offset:], value)
 			offset += 2
