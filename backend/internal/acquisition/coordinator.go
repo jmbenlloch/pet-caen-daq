@@ -33,6 +33,13 @@ type RunOptions struct {
 	RequestedConfiguration string
 	EffectiveConfiguration []dt5202.ConfigurationPlan
 	ConfigurationAudit     *configaudit.Report
+	Histograms             HistogramOptions
+}
+
+type HistogramOptions struct {
+	EnergyBins int
+	ToABins    int
+	ToTBins    int
 }
 
 type PipelineFactory func(runID string, options RunOptions) (RunPipeline, error)

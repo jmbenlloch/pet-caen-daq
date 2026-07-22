@@ -8,6 +8,9 @@ import {
   type RunSummary,
   type TelemetrySnapshot,
   type ValidationIssue,
+  type HistogramDataset,
+  type HistogramKind,
+  type HistogramSelection,
 } from './gen/pet/caen/daq/v1/system_pb'
 
 export interface DaqApi {
@@ -24,6 +27,11 @@ export interface DaqApi {
   ): Promise<TelemetrySnapshot>
   listRuns(limit?: number): Promise<RunSummary[]>
   downloadArtifact(runId: string, artifactName: string): Promise<Blob>
+  histograms(
+    runId: string,
+    kind: HistogramKind,
+    selections: HistogramSelection[],
+  ): Promise<HistogramDataset[]>
 }
 
 export interface RunCommandResult {
@@ -82,6 +90,9 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
         offset += chunk.byteLength
       }
       return new Blob([data], { type: 'application/octet-stream' })
+    },
+    async histograms(runId, kind, selections) {
+      return (await runs.getHistograms({ runId, kind, selections })).datasets
     },
   }
 }

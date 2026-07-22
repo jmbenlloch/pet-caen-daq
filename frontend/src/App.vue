@@ -6,6 +6,7 @@ import BoardOverrides from './BoardOverrides.vue'
 import ChannelOverrides from './ChannelOverrides.vue'
 import MaskEditor from './MaskEditor.vue'
 import NumericField from './NumericField.vue'
+import PlotWorkspace from './PlotWorkspace.vue'
 import StatisticsTab from './StatisticsTab.vue'
 import {
   isBooleanField,
@@ -19,7 +20,7 @@ import {
   updateConfiguration,
   type ConfigurationField,
 } from './configuration'
-import { DiagnosticSeverity, HealthStatus } from './gen/pet/caen/daq/v1/system_pb'
+import { DiagnosticSeverity, HealthStatus, SystemState } from './gen/pet/caen/daq/v1/system_pb'
 import { bytes, compact, healthLabel, stateLabel } from './presentation'
 import { useDaq } from './useDaq'
 
@@ -845,6 +846,14 @@ onMounted(() => daq.connect())
         :statistics="daq.snapshot.value?.statistics"
         :pipeline="daq.snapshot.value?.pipeline"
         :storage="daq.snapshot.value?.storage"
+      />
+
+      <PlotWorkspace
+        :boards="boards"
+        :running="daq.snapshot.value?.state === SystemState.RUNNING"
+        :loading="daq.histogramsLoading.value"
+        :datasets="daq.histogramDatasets.value"
+        @request="daq.loadHistograms"
       />
 
       <section class="boards-section" aria-labelledby="boards-heading">

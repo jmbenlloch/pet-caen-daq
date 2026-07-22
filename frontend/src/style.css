@@ -1029,6 +1029,59 @@ textarea {
   color: #a9bad0;
   font-size: 0.78rem;
 }
+.plots {
+  margin-top: 32px;
+}
+.plot-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 20px;
+}
+.histogram-datasets {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+.histogram-dataset {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.35fr) 1fr;
+  gap: 16px;
+  border: 1px solid #293b52;
+  border-radius: 8px;
+  padding: 13px;
+}
+.histogram-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.histogram-metadata span {
+  color: #8194ac;
+  font-size: 0.7rem;
+}
+.histogram-placeholder {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 58px;
+  border: 1px dashed #38506d;
+  border-radius: 6px;
+  padding: 10px;
+  color: #71869f;
+  font-size: 0.7rem;
+}
+.histogram-placeholder span {
+  flex-basis: 100%;
+}
+.histogram-placeholder code {
+  color: #8de4c7;
+  background: #10291f;
+  border-radius: 3px;
+  padding: 2px 4px;
+}
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -1052,6 +1105,9 @@ textarea {
   }
   .channel-statistics {
     grid-template-columns: repeat(4, minmax(80px, 1fr));
+  }
+  .plot-controls {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
   }
 }
 @media (max-width: 620px) {
@@ -1144,5 +1200,9 @@ textarea {
   }
   .channel-statistics {
     grid-template-columns: repeat(2, minmax(90px, 1fr));
+  }
+  .plot-controls,
+  .histogram-dataset {
+    grid-template-columns: 1fr;
   }
 }

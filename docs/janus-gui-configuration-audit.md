@@ -37,8 +37,8 @@ below, along with the controls created directly by the Python GUI. The strongest
 coverage is the DT5202 hardware path: acquisition, trigger,
 discriminator, gain, shaping, probe, test-pulse, HV, per-board and per-channel
 settings are translated to native FPGA/Citiroc/HV operations and verified. The
-largest gaps are JANUS job scheduling, automatic stop modes, event building,
-online histograms, JANUS output formats/rotation, raw register access, and the
+largest gaps are JANUS job scheduling, event building, advanced/historical
+plot families, JANUS output formats/rotation, raw register access, and the
 full historical log experience.
 
 High-priority frontend gaps after the current milestones are:
@@ -158,10 +158,10 @@ High-priority frontend gaps after the current milestones are:
 | `LG_ShapingTime` | Low-gain slow-shaper peaking time. | Global select: 12.5–87.5 ns. | **Complete.** |
 | `HoldDelay` | Delay from bunch trigger to peak-detector hold. | Global time. | **Complete in backend.** Frontend lacks a specific range/8 ns step. |
 | `MuxClkPeriod` | Analog multiplexer readout period. | Global time; JANUS recommends 300 ns. | **Complete in backend.** Frontend lacks a dedicated legal-range constraint. |
-| `EHistoNbin` | PHA histogram bin count. | Global combo: disabled, 256–8K. | **Inactive by design.** No online PHA histogram. |
-| `ToAHistoNbin` | ToA histogram bin count. | Global combo: disabled, 256–16K. | **Inactive by design.** |
-| `ToARebin` | ToA histogram rebin factor. | Global integer. | **Inactive by design.** |
-| `ToAHistoMin` | ToA histogram lower edge. | Global time. | **Inactive by design.** |
+| `EHistoNbin` | PHA histogram bin count. | Global combo: disabled, 256–8K. | **Complete for live accumulation.** The active run lazily stores bounded HG/LG arrays per board/channel and selected sets are requestable. Durable histogram artifacts remain missing. |
+| `ToAHistoNbin` | ToA histogram bin count. | Global combo: disabled, 256–16K. | **Complete for the initial live domain.** Per-channel ToA arrays are accumulated and requested independently of telemetry. |
+| `ToARebin` | ToA histogram rebin factor. | Global integer. | **Partial.** Editable/audited, but the initial accumulator maps the full decoded 25-bit domain and does not yet apply JANUS rebinning. |
+| `ToAHistoMin` | ToA histogram lower edge. | Global time. | **Partial.** Editable/audited but not yet applied to the initial live domain. |
 | `MCSHistoNbin` | Counting-mode MCS bin count. | Global combo: disabled, 256–16K. | **Inactive by design.** |
 
 ## Test-Probe tab
@@ -215,10 +215,10 @@ part of the operator-facing JANUS GUI and affect acquisition or analysis.
 | Connect/plug | Connects the Python GUI to JanusC and the configured FERS boards. | **Replaced.** The web client continuously connects to the service; backend discovery owns hardware connection. Live/stale state is visible. |
 | Start | Saves/applies configuration as needed and starts the selected run. | **Complete for the project's run model.** Start validates, configures, authorizes HV as required, synchronizes, starts, and persists a run. |
 | Stop | Sends the JANUS stop command. | **Complete.** Stop/drain/finalization is idempotent and fault-aware. |
-| Freeze | Freezes plot refresh without pausing acquisition. | **Missing.** There is no live plot stream to freeze. |
-| Refresh plot | Requests a single plot refresh. | **Missing.** |
+| Freeze | Freezes plot refresh without pausing acquisition. | **Complete in equivalent form.** Live refresh can be disabled while server accumulation continues. |
+| Refresh plot | Requests a single plot refresh. | **Complete for histogram data.** The workspace requests the selected datasets on demand. |
 | Clear | Clears histograms/statistics and restarts the JANUS run. | **Missing.** No online histogram/statistics accumulator exists. |
-| Trace selector | Opens an 8-trace assignment window: trace slot, board, online/offline/browse source, run/file, channel, 8-channel octet, X calibration, and optional pixel-map layout. | **Missing.** The web UI has no online/offline trace plot subsystem. |
+| Trace selector | Opens an 8-trace assignment window: trace slot, board, online/offline/browse source, run/file, channel, 8-channel octet, X calibration, and optional pixel-map layout. | **Partial.** The workspace selects an online board and up to 64 explicit/ranged channels. Offline files, calibration, trace slots, and pixel maps remain missing. |
 | Staircase | Opens threshold-scan settings (board, min/max threshold, step, dwell), starts command `y`, and shows progress. | **Missing.** Configuration accepts staircase output policy but cannot execute a scan. |
 | Hold-delay scan | Opens hold-delay sweep settings (board, min/max delay, 8 ns step, averaging points), starts command `Y`, and shows progress. | **Missing.** |
 | Save configuration as | Writes current defaults and sparse exceptions to a selected JANUS file. | **Partial.** Configuration is preserved/submitted and source is editable, but there is no dedicated browser download/export action. |
@@ -226,7 +226,7 @@ part of the operator-facing JANUS GUI and affect acquisition or analysis.
 | Load configuration | Loads a JANUS text file into all controls. | **Complete.** Browser file load plus reset-to-sample and backend-template load are present. |
 | Binary-to-CSV converter | Selects JANUS binary files, optionally converts ToA/ToT to ns, optionally emits a file-name list, and invokes the converter. | **Missing.** Project artifacts use JSON Lines and have no JANUS binary writer/converter UI. |
 | Run number spinbox | Selects numeric run 0–10000 and participates in jobs/file naming. | **Replaced.** Web runs use a required path-safe string run ID plus requester identity. |
-| Plot Type | Selects PHA LG/HG, ToA, ToT, channel trigger rate, MCS, waveform, 2-D trigger/charge, staircase, or hold-delay plots. | **Missing.** No online plotting subsystem. |
+| Plot Type | Selects PHA LG/HG, ToA, ToT, channel trigger rate, MCS, waveform, 2-D trigger/charge, staircase, or hold-delay plots. | **Partial.** Typed live datasets exist for PHA LG/HG, ToA, and ToT. The frontend intentionally has no plotting library yet; other families remain missing. |
 | Statistics Type | Selects channel trigger rate/count, timestamp rate/count, or PHA rate/count. | **Complete.** Type selects the counter family and Integral selects count versus live interval rate. |
 | Apply | Saves changed controls and applies configuration when state permits. | **Replaced.** Validate and Start are explicit; Start applies the validated configuration transactionally. There is no separate mutate-hardware-only action in the web UI. |
 | Status/run LEDs and text | Shows JanusC connection/acquisition status and run activity. | **Complete in equivalent form.** The dashboard shows live/stale connection, system state, active run, sequence, and diagnostics. |

@@ -83,6 +83,7 @@ function dashboardApi(): DaqApi {
       }),
     ]),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
+    histograms: vi.fn().mockResolvedValue([]),
   }
 }
 

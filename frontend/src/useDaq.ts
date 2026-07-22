@@ -8,6 +8,9 @@ import {
   type TelemetrySnapshot,
   type RunSummary,
   type ValidationIssue,
+  type HistogramDataset,
+  type HistogramKind,
+  type HistogramSelection,
 } from './gen/pet/caen/daq/v1/system_pb'
 
 const staleAfterMs = 5_000
@@ -22,14 +25,18 @@ export function useDaq(api: DaqApi) {
   const latestCompletedRun = ref<RunSummary>()
   const runHistory = ref<RunSummary[]>([])
   const configurationTemplate = ref('')
+  const histogramDatasets = ref<HistogramDataset[]>([])
+  const histogramsLoading = ref(false)
   let streamController: AbortController | undefined
   let staleTimer: number | undefined
   let reconnectTimer: number | undefined
+  let histogramRequestSequence = 0
   let stopped = false
 
   function accept(next: TelemetrySnapshot | undefined) {
     if (!next) return
     snapshot.value = next
+    if (!next.currentRun) histogramDatasets.value = []
     if (next.latestCompletedRun) latestCompletedRun.value = next.latestCompletedRun
     connected.value = true
     stale.value = false
@@ -159,6 +166,25 @@ export function useDaq(api: DaqApi) {
     }
   }
 
+  async function loadHistograms(kind: HistogramKind, selections: HistogramSelection[]) {
+    const runId = snapshot.value?.currentRun?.runId
+    if (!runId) {
+      histogramDatasets.value = []
+      return
+    }
+    histogramsLoading.value = true
+    const sequence = ++histogramRequestSequence
+    try {
+      const datasets = await api.histograms(runId, kind, selections)
+      if (sequence === histogramRequestSequence && snapshot.value?.currentRun?.runId === runId)
+        histogramDatasets.value = datasets
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      if (sequence === histogramRequestSequence) histogramsLoading.value = false
+    }
+  }
+
   function disconnect() {
     stopped = true
     streamController?.abort()
@@ -178,6 +204,8 @@ export function useDaq(api: DaqApi) {
     latestCompletedRun: readonly(latestCompletedRun),
     runHistory: readonly(runHistory),
     configurationTemplate: readonly(configurationTemplate),
+    histogramDatasets: readonly(histogramDatasets),
+    histogramsLoading: readonly(histogramsLoading),
     canStart: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     canStop: computed(() => snapshot.value?.state === SystemState.RUNNING && !busy.value),
     canSwitchHV: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
@@ -187,6 +215,7 @@ export function useDaq(api: DaqApi) {
     startRun,
     stopRun,
     setHighVoltage,
+    loadHistograms,
     refreshHistory,
     downloadArtifact,
   }

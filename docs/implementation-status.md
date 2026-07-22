@@ -94,6 +94,16 @@ The run-control frontend exposes this policy directly, shows the active target
 and remaining time/events, and keeps manual Stop and drain enabled in every
 preset mode.
 
+Live plotting now has a library-independent data foundation. Each active run
+lazily accumulates bounded per-board/per-channel PHA high/low, ToA, and ToT
+histograms on the server using JANUS bin-count settings. A typed run endpoint
+returns only selected channel sets with axis metadata, entries, underflow, and
+overflow rather than inflating the telemetry stream. The frontend workspace
+supports board/channel-range selection, manual or one-second refresh, stale
+response suppression, and a populated-bin preview; no JavaScript plotting
+library has been added. See `docs/histogram-design.md` for the boundary and next
+extensions.
+
 The run-control client now retains the authoritative completed `RunSummary`
 returned by `StopRun` rather than trying to reconstruct completion from the next
 telemetry snapshot. The dashboard presents the latest run's termination reason,

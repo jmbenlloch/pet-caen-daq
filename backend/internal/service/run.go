@@ -175,6 +175,10 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if err != nil {
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_STOP_POLICY", err)
 	}
+	histogramOptions, err := parseHistogramOptions(document)
+	if err != nil {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_CONFIGURATION", err)
+	}
 	configured, err := s.Configure(ctx, document, message.GetRequestedBy())
 	if err != nil {
 		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_APPLICATION_FAILED", fmt.Errorf("apply run configuration: %w", err))
@@ -192,6 +196,7 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	options := acquisition.RunOptions{
 		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
+		Histograms: histogramOptions,
 	}
 	if err := s.Controller.Start(ctx, message.GetRunId(), message.GetRequestedBy(), options); err != nil {
 		if errors.Is(err, runstore.ErrRunExists) {

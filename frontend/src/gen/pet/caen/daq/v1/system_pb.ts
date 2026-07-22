@@ -12,7 +12,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file pet/caen/daq/v1/system.proto.
  */
 export const file_pet_caen_daq_v1_system: GenFile = /*@__PURE__*/
-  fileDesc("ChxwZXQvY2Flbi9kYXEvdjEvc3lzdGVtLnByb3RvEg9wZXQuY2Flbi5kYXEudjEiGgoYR2V0U3lzdGVtU25hcHNob3RSZXF1ZXN0IiEKH0dldENvbmZpZ3VyYXRpb25UZW1wbGF0ZVJlcXVlc3QiPwogR2V0Q29uZmlndXJhdGlvblRlbXBsYXRlUmVzcG9uc2USGwoTamFudXNfY29uZmlndXJhdGlvbhgBIAEoCSLHAQoZR2V0U3lzdGVtU25hcHNob3RSZXNwb25zZRIXCgtpbnN0YW5jZV9pZBgBIAEoCUICGAESLwoFc3RhdGUYAiABKA4yHC5wZXQuY2Flbi5kYXEudjEuU3lzdGVtU3RhdGVCAhgBEioKBmNoYWlucxgDIAMoCzIWLnBldC5jYWVuLmRhcS52MS5DaGFpbkICGAESNAoIc25hcHNob3QYBCABKAsyIi5wZXQuY2Flbi5kYXEudjEuVGVsZW1ldHJ5U25hcHNob3QiOwocVmFsaWRhdGVDb25maWd1cmF0aW9uUmVxdWVzdBIbChNqYW51c19jb25maWd1cmF0aW9uGAEgASgJInQKHVZhbGlkYXRlQ29uZmlndXJhdGlvblJlc3BvbnNlEg0KBXZhbGlkGAEgASgIEhIKBmVycm9ycxgCIAMoCUICGAESMAoGaXNzdWVzGAMgAygLMiAucGV0LmNhZW4uZGFxLnYxLlZhbGlkYXRpb25Jc3N1ZSJ9Cg9WYWxpZGF0aW9uSXNzdWUSNQoIc2V2ZXJpdHkYASABKA4yIy5wZXQuY2Flbi5kYXEudjEuVmFsaWRhdGlvblNldmVyaXR5Eg0KBWZpZWxkGAIgASgJEhMKC3NvdXJjZV9saW5lGAMgASgNEg8KB21lc3NhZ2UYBCABKAkiGAoWU3RyZWFtVGVsZW1ldHJ5UmVxdWVzdCJPChdTdHJlYW1UZWxlbWV0cnlSZXNwb25zZRI0CghzbmFwc2hvdBgBIAEoCzIiLnBldC5jYWVuLmRhcS52MS5UZWxlbWV0cnlTbmFwc2hvdCJOChVTZXRIaWdoVm9sdGFnZVJlcXVlc3QSDgoGYm9hcmRzGAEgAygNEg8KB2VuYWJsZWQYAiABKAgSFAoMcmVxdWVzdGVkX2J5GAMgASgJIk4KFlNldEhpZ2hWb2x0YWdlUmVzcG9uc2USNAoIc25hcHNob3QYASABKAsyIi5wZXQuY2Flbi5kYXEudjEuVGVsZW1ldHJ5U25hcHNob3QihAEKD1N0YXJ0UnVuUmVxdWVzdBIOCgZydW5faWQYASABKAkSGwoTamFudXNfY29uZmlndXJhdGlvbhgCIAEoCRITCgtjYXB0dXJlX3JhdxgDIAEoCBIZChFqb3VybmFsX3RyYW5zcG9ydBgEIAEoCBIUCgxyZXF1ZXN0ZWRfYnkYBSABKAkicgoQU3RhcnRSdW5SZXNwb25zZRIoCgNydW4YASABKAsyGy5wZXQuY2Flbi5kYXEudjEuUnVuU3VtbWFyeRI0CghzbmFwc2hvdBgCIAEoCzIiLnBldC5jYWVuLmRhcS52MS5UZWxlbWV0cnlTbmFwc2hvdCI2Cg5TdG9wUnVuUmVxdWVzdBIOCgZydW5faWQYASABKAkSFAoMcmVxdWVzdGVkX2J5GAIgASgJInEKD1N0b3BSdW5SZXNwb25zZRIoCgNydW4YASABKAsyGy5wZXQuY2Flbi5kYXEudjEuUnVuU3VtbWFyeRI0CghzbmFwc2hvdBgCIAEoCzIiLnBldC5jYWVuLmRhcS52MS5UZWxlbWV0cnlTbmFwc2hvdCIgCg9MaXN0UnVuc1JlcXVlc3QSDQoFbGltaXQYASABKA0iPQoQTGlzdFJ1bnNSZXNwb25zZRIpCgRydW5zGAEgAygLMhsucGV0LmNhZW4uZGFxLnYxLlJ1blN1bW1hcnkiQAoXRG93bmxvYWRBcnRpZmFjdFJlcXVlc3QSDgoGcnVuX2lkGAEgASgJEhUKDWFydGlmYWN0X25hbWUYAiABKAkiKAoYRG93bmxvYWRBcnRpZmFjdFJlc3BvbnNlEgwKBGRhdGEYASABKAwigwQKEVRlbGVtZXRyeVNuYXBzaG90EhMKC2luc3RhbmNlX2lkGAEgASgJEhAKCHNlcXVlbmNlGAIgASgEEi8KC29ic2VydmVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgVzdGF0ZRgEIAEoDjIcLnBldC5jYWVuLmRhcS52MS5TeXN0ZW1TdGF0ZRIwCgtjdXJyZW50X3J1bhgFIAEoCzIbLnBldC5jYWVuLmRhcS52MS5SdW5TdW1tYXJ5EiYKBmNoYWlucxgGIAMoCzIWLnBldC5jYWVuLmRhcS52MS5DaGFpbhI0CghwaXBlbGluZRgHIAEoCzIiLnBldC5jYWVuLmRhcS52MS5QaXBlbGluZVRlbGVtZXRyeRIyCgdzdG9yYWdlGAggASgLMiEucGV0LmNhZW4uZGFxLnYxLlN0b3JhZ2VUZWxlbWV0cnkSMAoLZGlhZ25vc3RpY3MYCSADKAsyGy5wZXQuY2Flbi5kYXEudjEuRGlhZ25vc3RpYxI4CgpzdGF0aXN0aWNzGAogASgLMiQucGV0LmNhZW4uZGFxLnYxLlN0YXRpc3RpY3NUZWxlbWV0cnkSOQoUbGF0ZXN0X2NvbXBsZXRlZF9ydW4YCyABKAsyGy5wZXQuY2Flbi5kYXEudjEuUnVuU3VtbWFyeSJlChNTdGF0aXN0aWNzVGVsZW1ldHJ5EhwKFGVsYXBzZWRfbWlsbGlzZWNvbmRzGAEgASgEEjAKBmJvYXJkcxgCIAMoCzIgLnBldC5jYWVuLmRhcS52MS5Cb2FyZFN0YXRpc3RpY3MihQIKD0JvYXJkU3RhdGlzdGljcxINCgVjaGFpbhgBIAEoDRIMCgRub2RlGAIgASgNEhEKCXRpbWVzdGFtcBgDIAEoBBISCgp0cmlnZ2VyX2lkGAQgASgEEhUKDXRyaWdnZXJfY291bnQYBSABKAQSGgoSbG9zdF90cmlnZ2VyX2NvdW50GAYgASgEEhkKEWV2ZW50X2J1aWxkX2NvdW50GAcgASgEEhIKCmRhdGFfYnl0ZXMYCCABKAQSHgoWY2hhbm5lbF90cmlnZ2VyX2NvdW50cxgJIAMoBBIYChB0aW1lc3RhbXBfY291bnRzGAogAygEEhIKCnBoYV9jb3VudHMYCyADKAQi2wIKClJ1blN1bW1hcnkSDgoGcnVuX2lkGAEgASgJEi4KCnN0YXJ0ZWRfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGNvbXBsZXRlZF9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGgoSdGVybWluYXRpb25fcmVhc29uGAQgASgJEhMKC2V2ZW50X2NvdW50GAUgASgEEhcKD3Jhd19iYXRjaF9jb3VudBgGIAEoBBISCgppbmNvbXBsZXRlGAcgASgIEiwKCWFydGlmYWN0cxgIIAMoCzIZLnBldC5jYWVuLmRhcS52MS5BcnRpZmFjdBIRCglzdG9wX21vZGUYCSABKAkSIAoYcHJlc2V0X3RpbWVfbWlsbGlzZWNvbmRzGAogASgEEhoKEnByZXNldF9ldmVudF9jb3VudBgLIAEoBCJKCghBcnRpZmFjdBIMCgRraW5kGAEgASgJEgwKBG5hbWUYAiABKAkSEgoKc2l6ZV9ieXRlcxgDIAEoBBIOCgZzaGEyNTYYBCABKAkifgoFQ2hhaW4SDQoFaW5kZXgYASABKA0SDwoHZW5hYmxlZBgCIAEoCBItCgZoZWFsdGgYAyABKA4yHS5wZXQuY2Flbi5kYXEudjEuSGVhbHRoU3RhdHVzEiYKBmJvYXJkcxgEIAMoCzIWLnBldC5jYWVuLmRhcS52MS5Cb2FyZCL4AgoFQm9hcmQSDAoEbm9kZRgBIAEoDRISCgpwcm9kdWN0X2lkGAIgASgNEhUKDWZwZ2FfZmlybXdhcmUYAyABKA0SLQoGaGVhbHRoGAQgASgOMh0ucGV0LmNhZW4uZGFxLnYxLkhlYWx0aFN0YXR1cxIaChJmcGdhX3RlbXBlcmF0dXJlX2MYBSABKAESGwoTYm9hcmRfdGVtcGVyYXR1cmVfYxgGIAEoARIeChZkZXRlY3Rvcl90ZW1wZXJhdHVyZV9jGAcgASgBEhQKDGh2X3ZvbHRhZ2VfdhgIIAEoARIUCgxodl9jdXJyZW50X2EYCSABKAESDQoFaHZfb24YCiABKAgSEwoLZXZlbnRfY291bnQYCyABKAQSGAoQaHZfdGVtcGVyYXR1cmVfYxgMIAEoARISCgpodl9yYW1waW5nGA0gASgIEhcKD2h2X292ZXJfY3VycmVudBgOIAEoCBIXCg9odl9vdmVyX3ZvbHRhZ2UYDyABKAgipQEKEVBpcGVsaW5lVGVsZW1ldHJ5EhYKDnF1ZXVlX2NhcGFjaXR5GAEgASgEEhMKC3F1ZXVlX2RlcHRoGAIgASgEEhgKEGFjY2VwdGVkX2JhdGNoZXMYAyABKAQSGAoQcmVqZWN0ZWRfYmF0Y2hlcxgEIAEoBBIWCg5kZWNvZGVkX2V2ZW50cxgFIAEoBBIXCg9kZWNvZGVfZmFpbHVyZXMYBiABKAQimgEKEFN0b3JhZ2VUZWxlbWV0cnkSLQoGaGVhbHRoGAEgASgOMh0ucGV0LmNhZW4uZGFxLnYxLkhlYWx0aFN0YXR1cxIVCg1ydW5fZGlyZWN0b3J5GAIgASgJEhUKDWJ5dGVzX3dyaXR0ZW4YAyABKAQSFQoNcGVuZGluZ19ieXRlcxgEIAEoBBISCgpsYXN0X2Vycm9yGAUgASgJIrABCgpEaWFnbm9zdGljEjUKCHNldmVyaXR5GAEgASgOMiMucGV0LmNhZW4uZGFxLnYxLkRpYWdub3N0aWNTZXZlcml0eRIMCgRjb2RlGAIgASgJEg8KB21lc3NhZ2UYAyABKAkSDQoFY2hhaW4YBCABKAkSDAoEbm9kZRgFIAEoCRIvCgtvYnNlcnZlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAqeQoSVmFsaWRhdGlvblNldmVyaXR5EiMKH1ZBTElEQVRJT05fU0VWRVJJVFlfVU5TUEVDSUZJRUQQABIfChtWQUxJREFUSU9OX1NFVkVSSVRZX1dBUk5JTkcQARIdChlWQUxJREFUSU9OX1NFVkVSSVRZX0VSUk9SEAIq1AIKC1N5c3RlbVN0YXRlEhwKGFNZU1RFTV9TVEFURV9VTlNQRUNJRklFRBAAEh0KGVNZU1RFTV9TVEFURV9ESVNDT05ORUNURUQQARIVChFTWVNURU1fU1RBVEVfSURMRRACEhYKElNZU1RFTV9TVEFURV9GQVVMVBADEhsKF1NZU1RFTV9TVEFURV9DT05ORUNUSU5HEAQSHAoYU1lTVEVNX1NUQVRFX0NPTkZJR1VSSU5HEAUSFgoSU1lTVEVNX1NUQVRFX1JFQURZEAYSGQoVU1lTVEVNX1NUQVRFX1NUQVJUSU5HEAcSGAoUU1lTVEVNX1NUQVRFX1JVTk5JTkcQCBIZChVTWVNURU1fU1RBVEVfU1RPUFBJTkcQCRIZChVTWVNURU1fU1RBVEVfRFJBSU5JTkcQChIbChdTWVNURU1fU1RBVEVfUkVDT1ZFUklORxALKpMBCgxIZWFsdGhTdGF0dXMSHQoZSEVBTFRIX1NUQVRVU19VTlNQRUNJRklFRBAAEhkKFUhFQUxUSF9TVEFUVVNfVU5LTk9XThABEhQKEEhFQUxUSF9TVEFUVVNfT0sQAhIaChZIRUFMVEhfU1RBVFVTX0RFR1JBREVEEAMSFwoTSEVBTFRIX1NUQVRVU19GQVVMVBAEKpcBChJEaWFnbm9zdGljU2V2ZXJpdHkSIwofRElBR05PU1RJQ19TRVZFUklUWV9VTlNQRUNJRklFRBAAEhwKGERJQUdOT1NUSUNfU0VWRVJJVFlfSU5GTxABEh8KG0RJQUdOT1NUSUNfU0VWRVJJVFlfV0FSTklORxACEh0KGURJQUdOT1NUSUNfU0VWRVJJVFlfRVJST1IQAzLKBAoNU3lzdGVtU2VydmljZRJsChFHZXRTeXN0ZW1TbmFwc2hvdBIpLnBldC5jYWVuLmRhcS52MS5HZXRTeXN0ZW1TbmFwc2hvdFJlcXVlc3QaKi5wZXQuY2Flbi5kYXEudjEuR2V0U3lzdGVtU25hcHNob3RSZXNwb25zZSIAEoEBChhHZXRDb25maWd1cmF0aW9uVGVtcGxhdGUSMC5wZXQuY2Flbi5kYXEudjEuR2V0Q29uZmlndXJhdGlvblRlbXBsYXRlUmVxdWVzdBoxLnBldC5jYWVuLmRhcS52MS5HZXRDb25maWd1cmF0aW9uVGVtcGxhdGVSZXNwb25zZSIAEngKFVZhbGlkYXRlQ29uZmlndXJhdGlvbhItLnBldC5jYWVuLmRhcS52MS5WYWxpZGF0ZUNvbmZpZ3VyYXRpb25SZXF1ZXN0Gi4ucGV0LmNhZW4uZGFxLnYxLlZhbGlkYXRlQ29uZmlndXJhdGlvblJlc3BvbnNlIgASaAoPU3RyZWFtVGVsZW1ldHJ5EicucGV0LmNhZW4uZGFxLnYxLlN0cmVhbVRlbGVtZXRyeVJlcXVlc3QaKC5wZXQuY2Flbi5kYXEudjEuU3RyZWFtVGVsZW1ldHJ5UmVzcG9uc2UiADABEmMKDlNldEhpZ2hWb2x0YWdlEiYucGV0LmNhZW4uZGFxLnYxLlNldEhpZ2hWb2x0YWdlUmVxdWVzdBonLnBldC5jYWVuLmRhcS52MS5TZXRIaWdoVm9sdGFnZVJlc3BvbnNlIgAy7wIKClJ1blNlcnZpY2USUQoIU3RhcnRSdW4SIC5wZXQuY2Flbi5kYXEudjEuU3RhcnRSdW5SZXF1ZXN0GiEucGV0LmNhZW4uZGFxLnYxLlN0YXJ0UnVuUmVzcG9uc2UiABJOCgdTdG9wUnVuEh8ucGV0LmNhZW4uZGFxLnYxLlN0b3BSdW5SZXF1ZXN0GiAucGV0LmNhZW4uZGFxLnYxLlN0b3BSdW5SZXNwb25zZSIAElEKCExpc3RSdW5zEiAucGV0LmNhZW4uZGFxLnYxLkxpc3RSdW5zUmVxdWVzdBohLnBldC5jYWVuLmRhcS52MS5MaXN0UnVuc1Jlc3BvbnNlIgASawoQRG93bmxvYWRBcnRpZmFjdBIoLnBldC5jYWVuLmRhcS52MS5Eb3dubG9hZEFydGlmYWN0UmVxdWVzdBopLnBldC5jYWVuLmRhcS52MS5Eb3dubG9hZEFydGlmYWN0UmVzcG9uc2UiADABQkZaRGdpdGh1Yi5jb20vam1iZW5sbG9jaC9wZXQtY2Flbi1kYXEvYmFja2VuZC9nZW4vcGV0L2NhZW4vZGFxL3YxO2RhcXYxYgZwcm90bzM", [file_google_protobuf_timestamp]);
+  fileDesc("ChxwZXQvY2Flbi9kYXEvdjEvc3lzdGVtLnByb3RvEg9wZXQuY2Flbi5kYXEudjEiGgoYR2V0U3lzdGVtU25hcHNob3RSZXF1ZXN0IiEKH0dldENvbmZpZ3VyYXRpb25UZW1wbGF0ZVJlcXVlc3QiPwogR2V0Q29uZmlndXJhdGlvblRlbXBsYXRlUmVzcG9uc2USGwoTamFudXNfY29uZmlndXJhdGlvbhgBIAEoCSLHAQoZR2V0U3lzdGVtU25hcHNob3RSZXNwb25zZRIXCgtpbnN0YW5jZV9pZBgBIAEoCUICGAESLwoFc3RhdGUYAiABKA4yHC5wZXQuY2Flbi5kYXEudjEuU3lzdGVtU3RhdGVCAhgBEioKBmNoYWlucxgDIAMoCzIWLnBldC5jYWVuLmRhcS52MS5DaGFpbkICGAESNAoIc25hcHNob3QYBCABKAsyIi5wZXQuY2Flbi5kYXEudjEuVGVsZW1ldHJ5U25hcHNob3QiOwocVmFsaWRhdGVDb25maWd1cmF0aW9uUmVxdWVzdBIbChNqYW51c19jb25maWd1cmF0aW9uGAEgASgJInQKHVZhbGlkYXRlQ29uZmlndXJhdGlvblJlc3BvbnNlEg0KBXZhbGlkGAEgASgIEhIKBmVycm9ycxgCIAMoCUICGAESMAoGaXNzdWVzGAMgAygLMiAucGV0LmNhZW4uZGFxLnYxLlZhbGlkYXRpb25Jc3N1ZSJ9Cg9WYWxpZGF0aW9uSXNzdWUSNQoIc2V2ZXJpdHkYASABKA4yIy5wZXQuY2Flbi5kYXEudjEuVmFsaWRhdGlvblNldmVyaXR5Eg0KBWZpZWxkGAIgASgJEhMKC3NvdXJjZV9saW5lGAMgASgNEg8KB21lc3NhZ2UYBCABKAkiGAoWU3RyZWFtVGVsZW1ldHJ5UmVxdWVzdCJPChdTdHJlYW1UZWxlbWV0cnlSZXNwb25zZRI0CghzbmFwc2hvdBgBIAEoCzIiLnBldC5jYWVuLmRhcS52MS5UZWxlbWV0cnlTbmFwc2hvdCJOChVTZXRIaWdoVm9sdGFnZVJlcXVlc3QSDgoGYm9hcmRzGAEgAygNEg8KB2VuYWJsZWQYAiABKAgSFAoMcmVxdWVzdGVkX2J5GAMgASgJIk4KFlNldEhpZ2hWb2x0YWdlUmVzcG9uc2USNAoIc25hcHNob3QYASABKAsyIi5wZXQuY2Flbi5kYXEudjEuVGVsZW1ldHJ5U25hcHNob3QihAEKD1N0YXJ0UnVuUmVxdWVzdBIOCgZydW5faWQYASABKAkSGwoTamFudXNfY29uZmlndXJhdGlvbhgCIAEoCRITCgtjYXB0dXJlX3JhdxgDIAEoCBIZChFqb3VybmFsX3RyYW5zcG9ydBgEIAEoCBIUCgxyZXF1ZXN0ZWRfYnkYBSABKAkicgoQU3RhcnRSdW5SZXNwb25zZRIoCgNydW4YASABKAsyGy5wZXQuY2Flbi5kYXEudjEuUnVuU3VtbWFyeRI0CghzbmFwc2hvdBgCIAEoCzIiLnBldC5jYWVuLmRhcS52MS5UZWxlbWV0cnlTbmFwc2hvdCI2Cg5TdG9wUnVuUmVxdWVzdBIOCgZydW5faWQYASABKAkSFAoMcmVxdWVzdGVkX2J5GAIgASgJInEKD1N0b3BSdW5SZXNwb25zZRIoCgNydW4YASABKAsyGy5wZXQuY2Flbi5kYXEudjEuUnVuU3VtbWFyeRI0CghzbmFwc2hvdBgCIAEoCzIiLnBldC5jYWVuLmRhcS52MS5UZWxlbWV0cnlTbmFwc2hvdCIgCg9MaXN0UnVuc1JlcXVlc3QSDQoFbGltaXQYASABKA0iPQoQTGlzdFJ1bnNSZXNwb25zZRIpCgRydW5zGAEgAygLMhsucGV0LmNhZW4uZGFxLnYxLlJ1blN1bW1hcnkiQAoXRG93bmxvYWRBcnRpZmFjdFJlcXVlc3QSDgoGcnVuX2lkGAEgASgJEhUKDWFydGlmYWN0X25hbWUYAiABKAkiKAoYRG93bmxvYWRBcnRpZmFjdFJlc3BvbnNlEgwKBGRhdGEYASABKAwijQEKFEdldEhpc3RvZ3JhbXNSZXF1ZXN0Eg4KBnJ1bl9pZBgBIAEoCRIsCgRraW5kGAIgASgOMh4ucGV0LmNhZW4uZGFxLnYxLkhpc3RvZ3JhbUtpbmQSNwoKc2VsZWN0aW9ucxgDIAMoCzIjLnBldC5jYWVuLmRhcS52MS5IaXN0b2dyYW1TZWxlY3Rpb24iQgoSSGlzdG9ncmFtU2VsZWN0aW9uEg0KBWNoYWluGAEgASgNEgwKBG5vZGUYAiABKA0SDwoHY2hhbm5lbBgDIAEoDSKKAQoVR2V0SGlzdG9ncmFtc1Jlc3BvbnNlEg4KBnJ1bl9pZBgBIAEoCRIsCgRraW5kGAIgASgOMh4ucGV0LmNhZW4uZGFxLnYxLkhpc3RvZ3JhbUtpbmQSMwoIZGF0YXNldHMYAyADKAsyIS5wZXQuY2Flbi5kYXEudjEuSGlzdG9ncmFtRGF0YXNldCKoAQoQSGlzdG9ncmFtRGF0YXNldBINCgVjaGFpbhgBIAEoDRIMCgRub2RlGAIgASgNEg8KB2NoYW5uZWwYAyABKA0SDwoHbWluaW11bRgEIAEoARIRCgliaW5fd2lkdGgYBSABKAESDAoEYmlucxgGIAMoBBIPCgdlbnRyaWVzGAcgASgEEhEKCXVuZGVyZmxvdxgIIAEoBBIQCghvdmVyZmxvdxgJIAEoBCKDBAoRVGVsZW1ldHJ5U25hcHNob3QSEwoLaW5zdGFuY2VfaWQYASABKAkSEAoIc2VxdWVuY2UYAiABKAQSLwoLb2JzZXJ2ZWRfYXQYAyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEisKBXN0YXRlGAQgASgOMhwucGV0LmNhZW4uZGFxLnYxLlN5c3RlbVN0YXRlEjAKC2N1cnJlbnRfcnVuGAUgASgLMhsucGV0LmNhZW4uZGFxLnYxLlJ1blN1bW1hcnkSJgoGY2hhaW5zGAYgAygLMhYucGV0LmNhZW4uZGFxLnYxLkNoYWluEjQKCHBpcGVsaW5lGAcgASgLMiIucGV0LmNhZW4uZGFxLnYxLlBpcGVsaW5lVGVsZW1ldHJ5EjIKB3N0b3JhZ2UYCCABKAsyIS5wZXQuY2Flbi5kYXEudjEuU3RvcmFnZVRlbGVtZXRyeRIwCgtkaWFnbm9zdGljcxgJIAMoCzIbLnBldC5jYWVuLmRhcS52MS5EaWFnbm9zdGljEjgKCnN0YXRpc3RpY3MYCiABKAsyJC5wZXQuY2Flbi5kYXEudjEuU3RhdGlzdGljc1RlbGVtZXRyeRI5ChRsYXRlc3RfY29tcGxldGVkX3J1bhgLIAEoCzIbLnBldC5jYWVuLmRhcS52MS5SdW5TdW1tYXJ5ImUKE1N0YXRpc3RpY3NUZWxlbWV0cnkSHAoUZWxhcHNlZF9taWxsaXNlY29uZHMYASABKAQSMAoGYm9hcmRzGAIgAygLMiAucGV0LmNhZW4uZGFxLnYxLkJvYXJkU3RhdGlzdGljcyKFAgoPQm9hcmRTdGF0aXN0aWNzEg0KBWNoYWluGAEgASgNEgwKBG5vZGUYAiABKA0SEQoJdGltZXN0YW1wGAMgASgEEhIKCnRyaWdnZXJfaWQYBCABKAQSFQoNdHJpZ2dlcl9jb3VudBgFIAEoBBIaChJsb3N0X3RyaWdnZXJfY291bnQYBiABKAQSGQoRZXZlbnRfYnVpbGRfY291bnQYByABKAQSEgoKZGF0YV9ieXRlcxgIIAEoBBIeChZjaGFubmVsX3RyaWdnZXJfY291bnRzGAkgAygEEhgKEHRpbWVzdGFtcF9jb3VudHMYCiADKAQSEgoKcGhhX2NvdW50cxgLIAMoBCLbAgoKUnVuU3VtbWFyeRIOCgZydW5faWQYASABKAkSLgoKc3RhcnRlZF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMY29tcGxldGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIaChJ0ZXJtaW5hdGlvbl9yZWFzb24YBCABKAkSEwoLZXZlbnRfY291bnQYBSABKAQSFwoPcmF3X2JhdGNoX2NvdW50GAYgASgEEhIKCmluY29tcGxldGUYByABKAgSLAoJYXJ0aWZhY3RzGAggAygLMhkucGV0LmNhZW4uZGFxLnYxLkFydGlmYWN0EhEKCXN0b3BfbW9kZRgJIAEoCRIgChhwcmVzZXRfdGltZV9taWxsaXNlY29uZHMYCiABKAQSGgoScHJlc2V0X2V2ZW50X2NvdW50GAsgASgEIkoKCEFydGlmYWN0EgwKBGtpbmQYASABKAkSDAoEbmFtZRgCIAEoCRISCgpzaXplX2J5dGVzGAMgASgEEg4KBnNoYTI1NhgEIAEoCSJ+CgVDaGFpbhINCgVpbmRleBgBIAEoDRIPCgdlbmFibGVkGAIgASgIEi0KBmhlYWx0aBgDIAEoDjIdLnBldC5jYWVuLmRhcS52MS5IZWFsdGhTdGF0dXMSJgoGYm9hcmRzGAQgAygLMhYucGV0LmNhZW4uZGFxLnYxLkJvYXJkIvgCCgVCb2FyZBIMCgRub2RlGAEgASgNEhIKCnByb2R1Y3RfaWQYAiABKA0SFQoNZnBnYV9maXJtd2FyZRgDIAEoDRItCgZoZWFsdGgYBCABKA4yHS5wZXQuY2Flbi5kYXEudjEuSGVhbHRoU3RhdHVzEhoKEmZwZ2FfdGVtcGVyYXR1cmVfYxgFIAEoARIbChNib2FyZF90ZW1wZXJhdHVyZV9jGAYgASgBEh4KFmRldGVjdG9yX3RlbXBlcmF0dXJlX2MYByABKAESFAoMaHZfdm9sdGFnZV92GAggASgBEhQKDGh2X2N1cnJlbnRfYRgJIAEoARINCgVodl9vbhgKIAEoCBITCgtldmVudF9jb3VudBgLIAEoBBIYChBodl90ZW1wZXJhdHVyZV9jGAwgASgBEhIKCmh2X3JhbXBpbmcYDSABKAgSFwoPaHZfb3Zlcl9jdXJyZW50GA4gASgIEhcKD2h2X292ZXJfdm9sdGFnZRgPIAEoCCKlAQoRUGlwZWxpbmVUZWxlbWV0cnkSFgoOcXVldWVfY2FwYWNpdHkYASABKAQSEwoLcXVldWVfZGVwdGgYAiABKAQSGAoQYWNjZXB0ZWRfYmF0Y2hlcxgDIAEoBBIYChByZWplY3RlZF9iYXRjaGVzGAQgASgEEhYKDmRlY29kZWRfZXZlbnRzGAUgASgEEhcKD2RlY29kZV9mYWlsdXJlcxgGIAEoBCKaAQoQU3RvcmFnZVRlbGVtZXRyeRItCgZoZWFsdGgYASABKA4yHS5wZXQuY2Flbi5kYXEudjEuSGVhbHRoU3RhdHVzEhUKDXJ1bl9kaXJlY3RvcnkYAiABKAkSFQoNYnl0ZXNfd3JpdHRlbhgDIAEoBBIVCg1wZW5kaW5nX2J5dGVzGAQgASgEEhIKCmxhc3RfZXJyb3IYBSABKAkisAEKCkRpYWdub3N0aWMSNQoIc2V2ZXJpdHkYASABKA4yIy5wZXQuY2Flbi5kYXEudjEuRGlhZ25vc3RpY1NldmVyaXR5EgwKBGNvZGUYAiABKAkSDwoHbWVzc2FnZRgDIAEoCRINCgVjaGFpbhgEIAEoCRIMCgRub2RlGAUgASgJEi8KC29ic2VydmVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCp5ChJWYWxpZGF0aW9uU2V2ZXJpdHkSIwofVkFMSURBVElPTl9TRVZFUklUWV9VTlNQRUNJRklFRBAAEh8KG1ZBTElEQVRJT05fU0VWRVJJVFlfV0FSTklORxABEh0KGVZBTElEQVRJT05fU0VWRVJJVFlfRVJST1IQAiqiAQoNSGlzdG9ncmFtS2luZBIeChpISVNUT0dSQU1fS0lORF9VTlNQRUNJRklFRBAAEiAKHEhJU1RPR1JBTV9LSU5EX1BIQV9ISUdIX0dBSU4QARIfChtISVNUT0dSQU1fS0lORF9QSEFfTE9XX0dBSU4QAhIWChJISVNUT0dSQU1fS0lORF9UT0EQAxIWChJISVNUT0dSQU1fS0lORF9UT1QQBCrUAgoLU3lzdGVtU3RhdGUSHAoYU1lTVEVNX1NUQVRFX1VOU1BFQ0lGSUVEEAASHQoZU1lTVEVNX1NUQVRFX0RJU0NPTk5FQ1RFRBABEhUKEVNZU1RFTV9TVEFURV9JRExFEAISFgoSU1lTVEVNX1NUQVRFX0ZBVUxUEAMSGwoXU1lTVEVNX1NUQVRFX0NPTk5FQ1RJTkcQBBIcChhTWVNURU1fU1RBVEVfQ09ORklHVVJJTkcQBRIWChJTWVNURU1fU1RBVEVfUkVBRFkQBhIZChVTWVNURU1fU1RBVEVfU1RBUlRJTkcQBxIYChRTWVNURU1fU1RBVEVfUlVOTklORxAIEhkKFVNZU1RFTV9TVEFURV9TVE9QUElORxAJEhkKFVNZU1RFTV9TVEFURV9EUkFJTklORxAKEhsKF1NZU1RFTV9TVEFURV9SRUNPVkVSSU5HEAsqkwEKDEhlYWx0aFN0YXR1cxIdChlIRUFMVEhfU1RBVFVTX1VOU1BFQ0lGSUVEEAASGQoVSEVBTFRIX1NUQVRVU19VTktOT1dOEAESFAoQSEVBTFRIX1NUQVRVU19PSxACEhoKFkhFQUxUSF9TVEFUVVNfREVHUkFERUQQAxIXChNIRUFMVEhfU1RBVFVTX0ZBVUxUEAQqlwEKEkRpYWdub3N0aWNTZXZlcml0eRIjCh9ESUFHTk9TVElDX1NFVkVSSVRZX1VOU1BFQ0lGSUVEEAASHAoYRElBR05PU1RJQ19TRVZFUklUWV9JTkZPEAESHwobRElBR05PU1RJQ19TRVZFUklUWV9XQVJOSU5HEAISHQoZRElBR05PU1RJQ19TRVZFUklUWV9FUlJPUhADMsoECg1TeXN0ZW1TZXJ2aWNlEmwKEUdldFN5c3RlbVNuYXBzaG90EikucGV0LmNhZW4uZGFxLnYxLkdldFN5c3RlbVNuYXBzaG90UmVxdWVzdBoqLnBldC5jYWVuLmRhcS52MS5HZXRTeXN0ZW1TbmFwc2hvdFJlc3BvbnNlIgASgQEKGEdldENvbmZpZ3VyYXRpb25UZW1wbGF0ZRIwLnBldC5jYWVuLmRhcS52MS5HZXRDb25maWd1cmF0aW9uVGVtcGxhdGVSZXF1ZXN0GjEucGV0LmNhZW4uZGFxLnYxLkdldENvbmZpZ3VyYXRpb25UZW1wbGF0ZVJlc3BvbnNlIgASeAoVVmFsaWRhdGVDb25maWd1cmF0aW9uEi0ucGV0LmNhZW4uZGFxLnYxLlZhbGlkYXRlQ29uZmlndXJhdGlvblJlcXVlc3QaLi5wZXQuY2Flbi5kYXEudjEuVmFsaWRhdGVDb25maWd1cmF0aW9uUmVzcG9uc2UiABJoCg9TdHJlYW1UZWxlbWV0cnkSJy5wZXQuY2Flbi5kYXEudjEuU3RyZWFtVGVsZW1ldHJ5UmVxdWVzdBooLnBldC5jYWVuLmRhcS52MS5TdHJlYW1UZWxlbWV0cnlSZXNwb25zZSIAMAESYwoOU2V0SGlnaFZvbHRhZ2USJi5wZXQuY2Flbi5kYXEudjEuU2V0SGlnaFZvbHRhZ2VSZXF1ZXN0GicucGV0LmNhZW4uZGFxLnYxLlNldEhpZ2hWb2x0YWdlUmVzcG9uc2UiADLRAwoKUnVuU2VydmljZRJRCghTdGFydFJ1bhIgLnBldC5jYWVuLmRhcS52MS5TdGFydFJ1blJlcXVlc3QaIS5wZXQuY2Flbi5kYXEudjEuU3RhcnRSdW5SZXNwb25zZSIAEk4KB1N0b3BSdW4SHy5wZXQuY2Flbi5kYXEudjEuU3RvcFJ1blJlcXVlc3QaIC5wZXQuY2Flbi5kYXEudjEuU3RvcFJ1blJlc3BvbnNlIgASUQoITGlzdFJ1bnMSIC5wZXQuY2Flbi5kYXEudjEuTGlzdFJ1bnNSZXF1ZXN0GiEucGV0LmNhZW4uZGFxLnYxLkxpc3RSdW5zUmVzcG9uc2UiABJrChBEb3dubG9hZEFydGlmYWN0EigucGV0LmNhZW4uZGFxLnYxLkRvd25sb2FkQXJ0aWZhY3RSZXF1ZXN0GikucGV0LmNhZW4uZGFxLnYxLkRvd25sb2FkQXJ0aWZhY3RSZXNwb25zZSIAMAESYAoNR2V0SGlzdG9ncmFtcxIlLnBldC5jYWVuLmRhcS52MS5HZXRIaXN0b2dyYW1zUmVxdWVzdBomLnBldC5jYWVuLmRhcS52MS5HZXRIaXN0b2dyYW1zUmVzcG9uc2UiAEJGWkRnaXRodWIuY29tL2ptYmVubGxvY2gvcGV0LWNhZW4tZGFxL2JhY2tlbmQvZ2VuL3BldC9jYWVuL2RhcS92MTtkYXF2MWIGcHJvdG8z", [file_google_protobuf_timestamp]);
 
 /**
  * @generated from message pet.caen.daq.v1.GetSystemSnapshotRequest
@@ -436,6 +436,144 @@ export const DownloadArtifactResponseSchema: GenMessage<DownloadArtifactResponse
   messageDesc(file_pet_caen_daq_v1_system, 18);
 
 /**
+ * @generated from message pet.caen.daq.v1.GetHistogramsRequest
+ */
+export type GetHistogramsRequest = Message<"pet.caen.daq.v1.GetHistogramsRequest"> & {
+  /**
+   * @generated from field: string run_id = 1;
+   */
+  runId: string;
+
+  /**
+   * @generated from field: pet.caen.daq.v1.HistogramKind kind = 2;
+   */
+  kind: HistogramKind;
+
+  /**
+   * @generated from field: repeated pet.caen.daq.v1.HistogramSelection selections = 3;
+   */
+  selections: HistogramSelection[];
+};
+
+/**
+ * Describes the message pet.caen.daq.v1.GetHistogramsRequest.
+ * Use `create(GetHistogramsRequestSchema)` to create a new message.
+ */
+export const GetHistogramsRequestSchema: GenMessage<GetHistogramsRequest> = /*@__PURE__*/
+  messageDesc(file_pet_caen_daq_v1_system, 19);
+
+/**
+ * @generated from message pet.caen.daq.v1.HistogramSelection
+ */
+export type HistogramSelection = Message<"pet.caen.daq.v1.HistogramSelection"> & {
+  /**
+   * @generated from field: uint32 chain = 1;
+   */
+  chain: number;
+
+  /**
+   * @generated from field: uint32 node = 2;
+   */
+  node: number;
+
+  /**
+   * @generated from field: uint32 channel = 3;
+   */
+  channel: number;
+};
+
+/**
+ * Describes the message pet.caen.daq.v1.HistogramSelection.
+ * Use `create(HistogramSelectionSchema)` to create a new message.
+ */
+export const HistogramSelectionSchema: GenMessage<HistogramSelection> = /*@__PURE__*/
+  messageDesc(file_pet_caen_daq_v1_system, 20);
+
+/**
+ * @generated from message pet.caen.daq.v1.GetHistogramsResponse
+ */
+export type GetHistogramsResponse = Message<"pet.caen.daq.v1.GetHistogramsResponse"> & {
+  /**
+   * @generated from field: string run_id = 1;
+   */
+  runId: string;
+
+  /**
+   * @generated from field: pet.caen.daq.v1.HistogramKind kind = 2;
+   */
+  kind: HistogramKind;
+
+  /**
+   * @generated from field: repeated pet.caen.daq.v1.HistogramDataset datasets = 3;
+   */
+  datasets: HistogramDataset[];
+};
+
+/**
+ * Describes the message pet.caen.daq.v1.GetHistogramsResponse.
+ * Use `create(GetHistogramsResponseSchema)` to create a new message.
+ */
+export const GetHistogramsResponseSchema: GenMessage<GetHistogramsResponse> = /*@__PURE__*/
+  messageDesc(file_pet_caen_daq_v1_system, 21);
+
+/**
+ * @generated from message pet.caen.daq.v1.HistogramDataset
+ */
+export type HistogramDataset = Message<"pet.caen.daq.v1.HistogramDataset"> & {
+  /**
+   * @generated from field: uint32 chain = 1;
+   */
+  chain: number;
+
+  /**
+   * @generated from field: uint32 node = 2;
+   */
+  node: number;
+
+  /**
+   * @generated from field: uint32 channel = 3;
+   */
+  channel: number;
+
+  /**
+   * @generated from field: double minimum = 4;
+   */
+  minimum: number;
+
+  /**
+   * @generated from field: double bin_width = 5;
+   */
+  binWidth: number;
+
+  /**
+   * @generated from field: repeated uint64 bins = 6;
+   */
+  bins: bigint[];
+
+  /**
+   * @generated from field: uint64 entries = 7;
+   */
+  entries: bigint;
+
+  /**
+   * @generated from field: uint64 underflow = 8;
+   */
+  underflow: bigint;
+
+  /**
+   * @generated from field: uint64 overflow = 9;
+   */
+  overflow: bigint;
+};
+
+/**
+ * Describes the message pet.caen.daq.v1.HistogramDataset.
+ * Use `create(HistogramDatasetSchema)` to create a new message.
+ */
+export const HistogramDatasetSchema: GenMessage<HistogramDataset> = /*@__PURE__*/
+  messageDesc(file_pet_caen_daq_v1_system, 22);
+
+/**
  * @generated from message pet.caen.daq.v1.TelemetrySnapshot
  */
 export type TelemetrySnapshot = Message<"pet.caen.daq.v1.TelemetrySnapshot"> & {
@@ -500,7 +638,7 @@ export type TelemetrySnapshot = Message<"pet.caen.daq.v1.TelemetrySnapshot"> & {
  * Use `create(TelemetrySnapshotSchema)` to create a new message.
  */
 export const TelemetrySnapshotSchema: GenMessage<TelemetrySnapshot> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 19);
+  messageDesc(file_pet_caen_daq_v1_system, 23);
 
 /**
  * @generated from message pet.caen.daq.v1.StatisticsTelemetry
@@ -525,7 +663,7 @@ export type StatisticsTelemetry = Message<"pet.caen.daq.v1.StatisticsTelemetry">
  * Use `create(StatisticsTelemetrySchema)` to create a new message.
  */
 export const StatisticsTelemetrySchema: GenMessage<StatisticsTelemetry> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 20);
+  messageDesc(file_pet_caen_daq_v1_system, 24);
 
 /**
  * @generated from message pet.caen.daq.v1.BoardStatistics
@@ -592,7 +730,7 @@ export type BoardStatistics = Message<"pet.caen.daq.v1.BoardStatistics"> & {
  * Use `create(BoardStatisticsSchema)` to create a new message.
  */
 export const BoardStatisticsSchema: GenMessage<BoardStatistics> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 21);
+  messageDesc(file_pet_caen_daq_v1_system, 25);
 
 /**
  * @generated from message pet.caen.daq.v1.RunSummary
@@ -659,7 +797,7 @@ export type RunSummary = Message<"pet.caen.daq.v1.RunSummary"> & {
  * Use `create(RunSummarySchema)` to create a new message.
  */
 export const RunSummarySchema: GenMessage<RunSummary> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 22);
+  messageDesc(file_pet_caen_daq_v1_system, 26);
 
 /**
  * @generated from message pet.caen.daq.v1.Artifact
@@ -691,7 +829,7 @@ export type Artifact = Message<"pet.caen.daq.v1.Artifact"> & {
  * Use `create(ArtifactSchema)` to create a new message.
  */
 export const ArtifactSchema: GenMessage<Artifact> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 23);
+  messageDesc(file_pet_caen_daq_v1_system, 27);
 
 /**
  * @generated from message pet.caen.daq.v1.Chain
@@ -723,7 +861,7 @@ export type Chain = Message<"pet.caen.daq.v1.Chain"> & {
  * Use `create(ChainSchema)` to create a new message.
  */
 export const ChainSchema: GenMessage<Chain> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 24);
+  messageDesc(file_pet_caen_daq_v1_system, 28);
 
 /**
  * @generated from message pet.caen.daq.v1.Board
@@ -810,7 +948,7 @@ export type Board = Message<"pet.caen.daq.v1.Board"> & {
  * Use `create(BoardSchema)` to create a new message.
  */
 export const BoardSchema: GenMessage<Board> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 25);
+  messageDesc(file_pet_caen_daq_v1_system, 29);
 
 /**
  * @generated from message pet.caen.daq.v1.PipelineTelemetry
@@ -852,7 +990,7 @@ export type PipelineTelemetry = Message<"pet.caen.daq.v1.PipelineTelemetry"> & {
  * Use `create(PipelineTelemetrySchema)` to create a new message.
  */
 export const PipelineTelemetrySchema: GenMessage<PipelineTelemetry> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 26);
+  messageDesc(file_pet_caen_daq_v1_system, 30);
 
 /**
  * @generated from message pet.caen.daq.v1.StorageTelemetry
@@ -889,7 +1027,7 @@ export type StorageTelemetry = Message<"pet.caen.daq.v1.StorageTelemetry"> & {
  * Use `create(StorageTelemetrySchema)` to create a new message.
  */
 export const StorageTelemetrySchema: GenMessage<StorageTelemetry> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 27);
+  messageDesc(file_pet_caen_daq_v1_system, 31);
 
 /**
  * @generated from message pet.caen.daq.v1.Diagnostic
@@ -931,7 +1069,7 @@ export type Diagnostic = Message<"pet.caen.daq.v1.Diagnostic"> & {
  * Use `create(DiagnosticSchema)` to create a new message.
  */
 export const DiagnosticSchema: GenMessage<Diagnostic> = /*@__PURE__*/
-  messageDesc(file_pet_caen_daq_v1_system, 28);
+  messageDesc(file_pet_caen_daq_v1_system, 32);
 
 /**
  * @generated from enum pet.caen.daq.v1.ValidationSeverity
@@ -958,6 +1096,42 @@ export enum ValidationSeverity {
  */
 export const ValidationSeveritySchema: GenEnum<ValidationSeverity> = /*@__PURE__*/
   enumDesc(file_pet_caen_daq_v1_system, 0);
+
+/**
+ * @generated from enum pet.caen.daq.v1.HistogramKind
+ */
+export enum HistogramKind {
+  /**
+   * @generated from enum value: HISTOGRAM_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: HISTOGRAM_KIND_PHA_HIGH_GAIN = 1;
+   */
+  PHA_HIGH_GAIN = 1,
+
+  /**
+   * @generated from enum value: HISTOGRAM_KIND_PHA_LOW_GAIN = 2;
+   */
+  PHA_LOW_GAIN = 2,
+
+  /**
+   * @generated from enum value: HISTOGRAM_KIND_TOA = 3;
+   */
+  TOA = 3,
+
+  /**
+   * @generated from enum value: HISTOGRAM_KIND_TOT = 4;
+   */
+  TOT = 4,
+}
+
+/**
+ * Describes the enum pet.caen.daq.v1.HistogramKind.
+ */
+export const HistogramKindSchema: GenEnum<HistogramKind> = /*@__PURE__*/
+  enumDesc(file_pet_caen_daq_v1_system, 1);
 
 /**
  * @generated from enum pet.caen.daq.v1.SystemState
@@ -1028,7 +1202,7 @@ export enum SystemState {
  * Describes the enum pet.caen.daq.v1.SystemState.
  */
 export const SystemStateSchema: GenEnum<SystemState> = /*@__PURE__*/
-  enumDesc(file_pet_caen_daq_v1_system, 1);
+  enumDesc(file_pet_caen_daq_v1_system, 2);
 
 /**
  * @generated from enum pet.caen.daq.v1.HealthStatus
@@ -1064,7 +1238,7 @@ export enum HealthStatus {
  * Describes the enum pet.caen.daq.v1.HealthStatus.
  */
 export const HealthStatusSchema: GenEnum<HealthStatus> = /*@__PURE__*/
-  enumDesc(file_pet_caen_daq_v1_system, 2);
+  enumDesc(file_pet_caen_daq_v1_system, 3);
 
 /**
  * @generated from enum pet.caen.daq.v1.DiagnosticSeverity
@@ -1095,7 +1269,7 @@ export enum DiagnosticSeverity {
  * Describes the enum pet.caen.daq.v1.DiagnosticSeverity.
  */
 export const DiagnosticSeveritySchema: GenEnum<DiagnosticSeverity> = /*@__PURE__*/
-  enumDesc(file_pet_caen_daq_v1_system, 3);
+  enumDesc(file_pet_caen_daq_v1_system, 4);
 
 /**
  * SystemService exposes point-in-time health/configuration queries and a
@@ -1185,6 +1359,14 @@ export const RunService: GenService<{
     methodKind: "server_streaming";
     input: typeof DownloadArtifactRequestSchema;
     output: typeof DownloadArtifactResponseSchema;
+  },
+  /**
+   * @generated from rpc pet.caen.daq.v1.RunService.GetHistograms
+   */
+  getHistograms: {
+    methodKind: "unary";
+    input: typeof GetHistogramsRequestSchema;
+    output: typeof GetHistogramsResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_pet_caen_daq_v1_system, 1);

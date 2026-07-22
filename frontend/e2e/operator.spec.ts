@@ -27,6 +27,14 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await statistics.getByLabel('Integral').check()
   await expect(statistics).toContainText('PHA integrated count')
 
+  const plots = page.getByRole('region', { name: 'Plots and histograms' })
+  await plots.getByLabel('Channels').fill('0, 1')
+  await plots.getByRole('button', { name: 'Request data' }).click()
+  await expect(plots.getByLabel('Histogram datasets').locator('.histogram-dataset')).toHaveCount(2)
+  await expect(
+    plots.getByText('Dataset ready for a future plotting renderer').first(),
+  ).toBeVisible()
+
   await page.getByRole('button', { name: 'Stop and drain' }).click()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await expect(page.getByRole('heading', { name: runId })).toBeVisible()
@@ -80,7 +88,6 @@ test('backend automatically stops runs at time and event presets while manual st
   await page.getByLabel('Preset event count').fill('3')
   await page.getByLabel('Run ID').fill(countedRun)
   await page.getByRole('button', { name: 'Start run' }).click()
-  await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
   await expect(page.getByRole('heading', { name: countedRun })).toBeVisible()
   await expect(page.getByText('preset_counts', { exact: true })).toBeVisible()

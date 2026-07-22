@@ -60,7 +60,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 			return nil, err
 		}
 	}
-	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: options.Now()}
+	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: options.Now(), histogramOptions: runOptions.Histograms, histograms: make(map[histogramKey]*histogramAccumulator)}
 	pipeline, err := acquisition.NewPipeline(options.Capacity, options.Backpressure, sink)
 	if err != nil {
 		_ = writer.Abort()
@@ -160,14 +160,16 @@ func (s *Session) recordError(err error) {
 }
 
 type sink struct {
-	writer     *runstore.Writer
-	captureRaw bool
-	events     atomic.Uint64
-	rawBatches atomic.Uint64
-	mu         sync.Mutex
-	boards     map[boardKey]BoardStats
-	now        func() time.Time
-	startedAt  time.Time
+	writer           *runstore.Writer
+	captureRaw       bool
+	events           atomic.Uint64
+	rawBatches       atomic.Uint64
+	mu               sync.Mutex
+	boards           map[boardKey]BoardStats
+	now              func() time.Time
+	startedAt        time.Time
+	histogramOptions acquisition.HistogramOptions
+	histograms       map[histogramKey]*histogramAccumulator
 }
 
 type boardKey struct{ chain, node uint8 }
@@ -228,6 +230,7 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 		board.Timestamp = wire.Descriptor.Timestamp
 	}
 	accumulateChannels(&board, event)
+	s.accumulateHistograms(key.chain, key.node, event)
 	if service := event.Service; service != nil {
 		board.FPGATemperature = cloneFloat(service.FPGATemperature)
 		board.BoardTemperature = cloneFloat(service.BoardTemperature)

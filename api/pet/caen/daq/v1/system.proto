@@ -23,6 +23,7 @@ service RunService {
   rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {}
   rpc DownloadArtifact(DownloadArtifactRequest) returns (stream DownloadArtifactResponse) {}
+  rpc GetHistograms(GetHistogramsRequest) returns (GetHistogramsResponse) {}
 }
 
 message GetSystemSnapshotRequest {}
@@ -126,6 +127,44 @@ message DownloadArtifactRequest {
 
 message DownloadArtifactResponse {
   bytes data = 1;
+}
+
+message GetHistogramsRequest {
+  string run_id = 1;
+  HistogramKind kind = 2;
+  repeated HistogramSelection selections = 3;
+}
+
+message HistogramSelection {
+  uint32 chain = 1;
+  uint32 node = 2;
+  uint32 channel = 3;
+}
+
+enum HistogramKind {
+  HISTOGRAM_KIND_UNSPECIFIED = 0;
+  HISTOGRAM_KIND_PHA_HIGH_GAIN = 1;
+  HISTOGRAM_KIND_PHA_LOW_GAIN = 2;
+  HISTOGRAM_KIND_TOA = 3;
+  HISTOGRAM_KIND_TOT = 4;
+}
+
+message GetHistogramsResponse {
+  string run_id = 1;
+  HistogramKind kind = 2;
+  repeated HistogramDataset datasets = 3;
+}
+
+message HistogramDataset {
+  uint32 chain = 1;
+  uint32 node = 2;
+  uint32 channel = 3;
+  double minimum = 4;
+  double bin_width = 5;
+  repeated uint64 bins = 6;
+  uint64 entries = 7;
+  uint64 underflow = 8;
+  uint64 overflow = 9;
 }
 
 message TelemetrySnapshot {
