@@ -18,8 +18,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ request: [kind: HistogramKind, selections: HistogramSelection[]] }>()
 const kind = ref(HistogramKind.PHA_HIGH_GAIN)
-const boardKey = ref('0:0')
-const channels = ref('0')
+const selected = ref(new Set<string>())
+const selectorOpen = ref(false)
 const autoRefresh = ref(true)
 const logarithmic = ref(false)
 const selectionError = ref('')
@@ -28,44 +28,57 @@ let timer: number | undefined
 watch(
   () => props.boards,
   (boards) => {
-    if (boards.length && !boards.some((board) => `${board.chain}:${board.node}` === boardKey.value))
-      boardKey.value = `${boards[0].chain}:${boards[0].node}`
+    const available = new Set(boards.map((board) => `${board.chain}:${board.node}`))
+    const retained = new Set(
+      [...selected.value].filter((key) => available.has(key.split(':').slice(0, 2).join(':'))),
+    )
+    if (!retained.size && boards.length) retained.add(`${boards[0].chain}:${boards[0].node}:0`)
+    selected.value = retained
   },
   { immediate: true },
 )
 
-function parseChannels(value: string) {
-  const selected = new Set<number>()
-  for (const token of value.split(',')) {
-    const part = token.trim()
-    if (!part) continue
-    const match = /^(\d+)(?:-(\d+))?$/.exec(part)
-    if (!match) throw new Error(`Invalid channel selection “${part}”`)
-    const first = Number(match[1]),
-      last = Number(match[2] ?? match[1])
-    if (first > last || first < 0 || last > 63)
-      throw new Error(`Channel range ${part} is outside 0–63`)
-    for (let channel = first; channel <= last; channel++) selected.add(channel)
+function selectionKey(chain: number, node: number, channel: number) {
+  return `${chain}:${node}:${channel}`
+}
+
+function toggleSelection(chain: number, node: number, channel: number) {
+  const next = new Set(selected.value)
+  const key = selectionKey(chain, node, channel)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  selected.value = next
+}
+
+function selectBoard(chain: number, node: number, value: boolean) {
+  const next = new Set(selected.value)
+  for (let channel = 0; channel < 64; channel++) {
+    const key = selectionKey(chain, node, channel)
+    if (value) next.add(key)
+    else next.delete(key)
   }
-  if (!selected.size) throw new Error('Select at least one channel')
-  return [...selected].sort((a, b) => a - b)
+  selected.value = next
 }
 
 function request() {
   if (!props.running) return
-  try {
-    const [chain, node] = boardKey.value.split(':').map(Number)
-    const selections = parseChannels(channels.value).map((channel) => ({
+  if (!selected.value.size) {
+    selectionError.value = 'Select at least one channel'
+    return
+  }
+  const selections = [...selected.value]
+    .map((key) => key.split(':').map(Number))
+    .sort(([chainA, nodeA, channelA], [chainB, nodeB, channelB]) =>
+      chainA - chainB || nodeA - nodeB || channelA - channelB,
+    )
+    .map(([chain, node, channel]) => ({
       $typeName: 'pet.caen.daq.v1.HistogramSelection' as const,
       chain,
       node,
       channel,
     }))
-    selectionError.value = ''
-    emit('request', kind.value, selections)
-  } catch (reason) {
-    selectionError.value = reason instanceof Error ? reason.message : String(reason)
-  }
+  selectionError.value = ''
+  emit('request', kind.value, selections)
 }
 
 function updateTimer() {
@@ -112,18 +125,18 @@ const kindLabel = computed(
           <option :value="HistogramKind.TOT">Time over threshold</option>
         </select></label
       >
-      <label
-        >Board<select v-model="boardKey">
-          <option
-            v-for="board in boards"
-            :key="`${board.chain}:${board.node}`"
-            :value="`${board.chain}:${board.node}`"
-          >
-            Board {{ board.chain }} · node {{ board.node }}
-          </option>
-        </select></label
-      >
-      <label>Channels<input v-model="channels" placeholder="0, 2, 8-15" /></label>
+      <label class="histogram-channel-control"
+        >Channels
+        <button
+          type="button"
+          class="secondary"
+          aria-haspopup="true"
+          :aria-expanded="selectorOpen"
+          @click="selectorOpen = !selectorOpen"
+        >
+          {{ selected.size }} selected
+        </button>
+      </label>
       <label class="switch compact-switch"
         ><input v-model="autoRefresh" type="checkbox" /><span>Live refresh</span></label
       >
@@ -134,6 +147,34 @@ const kindLabel = computed(
         {{ loading ? 'Loading…' : 'Request data' }}
       </button>
     </div>
+    <section v-if="selectorOpen" class="histogram-channel-selector" aria-label="Histogram channels">
+      <article
+        v-for="board in boards"
+        :key="`${board.chain}:${board.node}`"
+        class="histogram-board-selector"
+      >
+        <header>
+          <strong>Board {{ board.chain }} · node {{ board.node }}</strong>
+          <span>
+            <button type="button" @click="selectBoard(board.chain, board.node, true)">All</button>
+            <button type="button" @click="selectBoard(board.chain, board.node, false)">Clear</button>
+          </span>
+        </header>
+        <div class="channel-grid histogram-channel-grid">
+          <button
+            v-for="channel in 64"
+            :key="channel - 1"
+            type="button"
+            :class="{ active: selected.has(selectionKey(board.chain, board.node, channel - 1)) }"
+            :aria-pressed="selected.has(selectionKey(board.chain, board.node, channel - 1))"
+            :aria-label="`Board ${board.chain} node ${board.node} channel ${channel - 1}`"
+            @click="toggleSelection(board.chain, board.node, channel - 1)"
+          >
+            {{ channel - 1 }}
+          </button>
+        </div>
+      </article>
+    </section>
     <p v-if="selectionError" class="field-error" role="alert">{{ selectionError }}</p>
     <p v-if="!running && !datasets.length" class="empty">
       Start a run to request accumulated histogram data.

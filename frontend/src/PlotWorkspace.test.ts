@@ -8,7 +8,10 @@ describe('PlotWorkspace', () => {
   it('requests selected channel sets and presents returned bins to the live plot', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
-        boards: [{ chain: 1, ...create(BoardSchema, { node: 2 }) }],
+        boards: [
+          { chain: 1, ...create(BoardSchema, { node: 2 }) },
+          { chain: 3, ...create(BoardSchema, { node: 0 }) },
+        ],
         running: true,
         loading: false,
         datasets: [],
@@ -20,8 +23,14 @@ describe('PlotWorkspace', () => {
         },
       },
     })
-    await wrapper.get('input[placeholder="0, 2, 8-15"]').setValue('0, 2, 8-9')
-    await wrapper.get('button').trigger('click')
+    await wrapper.get('[aria-haspopup="true"]').trigger('click')
+    await wrapper.get('[aria-label="Board 1 node 2 channel 2"]').trigger('click')
+    await wrapper.get('[aria-label="Board 1 node 2 channel 8"]').trigger('click')
+    await wrapper.get('[aria-label="Board 1 node 2 channel 9"]').trigger('click')
+    await wrapper.get('[aria-label="Board 3 node 0 channel 4"]').trigger('click')
+    const requestButton = wrapper.findAll('button').find((button) => button.text() === 'Request data')
+    expect(requestButton).toBeDefined()
+    await requestButton!.trigger('click')
     const request = wrapper.emitted('request')?.[0]
     expect(request?.[0]).toBe(HistogramKind.PHA_HIGH_GAIN)
     expect(request?.[1]).toEqual([
@@ -29,6 +38,7 @@ describe('PlotWorkspace', () => {
       expect.objectContaining({ channel: 2 }),
       expect.objectContaining({ channel: 8 }),
       expect.objectContaining({ channel: 9 }),
+      expect.objectContaining({ chain: 3, node: 0, channel: 4 }),
     ])
 
     await wrapper.setProps({

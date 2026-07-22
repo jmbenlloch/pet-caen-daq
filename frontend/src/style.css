@@ -1107,10 +1107,50 @@ textarea {
 }
 .plot-controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto auto auto;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto auto auto;
   align-items: end;
   gap: 12px;
   margin-top: 20px;
+}
+.histogram-channel-control button {
+  width: 100%;
+  text-align: left;
+}
+.histogram-channel-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.histogram-board-selector {
+  border: 1px solid #293b52;
+  border-radius: 8px;
+  padding: 12px;
+  background: #0b1726;
+}
+.histogram-board-selector header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.histogram-board-selector header span {
+  display: flex;
+  gap: 6px;
+}
+.histogram-board-selector header button {
+  padding: 4px 8px;
+  color: #a9bad0;
+  background: #17263a;
+}
+.histogram-channel-grid {
+  gap: 4px;
+  margin-top: 10px;
+}
+.histogram-channel-grid button {
+  min-width: 0;
+  aspect-ratio: auto;
+  padding: 6px 2px;
 }
 .histogram-datasets {
   display: grid;
@@ -1240,6 +1280,7 @@ textarea {
 [data-theme='light'] .board-card,
 [data-theme='light'] .artifact,
 [data-theme='light'] .histogram-dataset,
+[data-theme='light'] .histogram-board-selector,
 [data-theme='light'] .channel-statistic {
   border-color: #c8d5e3;
   background: #ffffff;
@@ -1351,6 +1392,9 @@ textarea {
   .plot-controls {
     grid-template-columns: repeat(2, minmax(150px, 1fr));
   }
+  .histogram-channel-selector {
+    grid-template-columns: 1fr;
+  }
 }
 @media (max-width: 620px) {
   .search-heading,
@@ -1452,6 +1496,7 @@ textarea {
     grid-template-columns: repeat(2, minmax(90px, 1fr));
   }
   .plot-controls,
+  .histogram-channel-selector,
   .histogram-dataset {
     grid-template-columns: 1fr;
   }
