@@ -9,7 +9,7 @@ import (
 type Run struct {
 	RunID, RequestedBy, StartedAt, CompletedAt, TerminationReason string
 	EventCount, RawBatchCount                                     uint64
-	CaptureRaw, JournalTransport, Incomplete                      bool
+	CaptureRaw, JournalTransport, Incomplete, Available           bool
 	ManifestPath, ManifestSHA256, ConfigurationSHA256             string
 }
 
@@ -18,6 +18,7 @@ type Query struct {
 	MinimumEventCount                              uint64
 	Configuration                                  []Predicate
 	Limit                                          int
+	IncludeUnavailable                             bool
 }
 
 type Predicate struct {
@@ -39,6 +40,9 @@ func (c *Catalog) List(ctx context.Context, query Query) ([]Run, error) {
 		return nil, fmt.Errorf("limit must be between 0 and 1000")
 	}
 	where, args := []string{"1=1"}, []any{}
+	if !query.IncludeUnavailable {
+		where = append(where, "r.available = 1")
+	}
 	if query.StartedAfter != "" {
 		where = append(where, "r.started_at >= ?")
 		args = append(args, query.StartedAfter)
@@ -65,7 +69,7 @@ func (c *Catalog) List(ctx context.Context, query Query) ([]Run, error) {
 	}
 	statement := `SELECT r.run_id, r.requested_by, r.started_at, COALESCE(r.completed_at,''),
 COALESCE(r.termination_reason,''), r.event_count, r.raw_batch_count, r.capture_raw,
-r.journal_transport, r.incomplete, r.manifest_path, r.manifest_sha256,
+r.journal_transport, r.incomplete, r.available, r.manifest_path, r.manifest_sha256,
 COALESCE(r.configuration_sha256,'') FROM runs r WHERE ` + strings.Join(where, " AND ") + ` ORDER BY r.started_at DESC, r.run_id DESC`
 	if query.Limit > 0 {
 		statement += " LIMIT ?"
@@ -81,7 +85,7 @@ COALESCE(r.configuration_sha256,'') FROM runs r WHERE ` + strings.Join(where, " 
 		var run Run
 		if err := rows.Scan(&run.RunID, &run.RequestedBy, &run.StartedAt, &run.CompletedAt,
 			&run.TerminationReason, &run.EventCount, &run.RawBatchCount, &run.CaptureRaw,
-			&run.JournalTransport, &run.Incomplete, &run.ManifestPath, &run.ManifestSHA256,
+			&run.JournalTransport, &run.Incomplete, &run.Available, &run.ManifestPath, &run.ManifestSHA256,
 			&run.ConfigurationSHA256); err != nil {
 			return nil, fmt.Errorf("scan run catalog: %w", err)
 		}

@@ -22,6 +22,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/service"
@@ -47,6 +48,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	listenAddress := flags.String("listen", "127.0.0.1:8080", "ConnectRPC HTTP listen address")
 	frontendDirectory := flags.String("frontend-dir", "", "optional built frontend directory to serve on the same HTTP origin")
 	runParent := flags.String("runs", "./runs", "parent directory for run artifacts")
+	catalogPath := flags.String("catalog", "", "SQLite run catalog path (default: <runs>/catalog.sqlite3)")
 	pipelineCapacity := flags.Int("pipeline-capacity", 32, "bounded stream-batch queue capacity")
 	drainTimeout := flags.Duration("drain-timeout", 5*time.Second, "maximum orderly stop-and-drain duration")
 	authorizeHV := flags.Bool("authorize-hv-config", false, "explicitly authorize applying configured DT5202 HV peripheral setpoints")
@@ -89,6 +91,9 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 			return fmt.Errorf("create run storage parent: %w", err)
 		}
 	}
+	if *catalogPath == "" {
+		*catalogPath = filepath.Join(*runParent, "catalog.sqlite3")
+	}
 	// Real DT5215 link reset, four-chain enumeration, and synchronization take
 	// about 36 seconds in capture-verified production hardware.
 	discoveryCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
@@ -102,6 +107,21 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		topology, err = client.InspectProductionTopology(discoveryCtx, connections)
 	} else {
 		topology, err = client.DiscoverProductionTopology(discoveryCtx, connections)
+	}
+	catalog, catalogErr := runcatalog.Open(*catalogPath)
+	if catalogErr != nil {
+		fmt.Fprintf(output, "run catalog unavailable path=%s error=%v\n", *catalogPath, catalogErr)
+	} else {
+		defer catalog.Close()
+		report, reconcileErr := catalog.Reconcile(ctx, *runParent)
+		if reconcileErr != nil {
+			fmt.Fprintf(output, "run catalog reconciliation failed path=%s error=%v\n", *catalogPath, reconcileErr)
+		} else {
+			fmt.Fprintf(output, "run catalog reconciled indexed=%d unchanged=%d unavailable=%d problems=%d\n", report.Indexed, report.Unchanged, report.MarkedUnavailable, len(report.Problems))
+			for _, problem := range report.Problems {
+				fmt.Fprintf(output, "run catalog problem run_id=%s error=%s\n", problem.RunID, problem.Error)
+			}
+		}
 	}
 	cancel()
 	if err != nil {
@@ -195,6 +215,15 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		Configure: func(configureCtx context.Context, runDocument *janusconfig.Document, actor string) (acquisition.ConfigurationResult, error) {
 			return configurator.Configure(configureCtx, runDocument, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: *authorizeHV})
 		},
+	}
+	if catalog != nil {
+		runService.ReconcileCatalog = func(reconcileCtx context.Context, parent string) error {
+			_, err := catalog.Reconcile(reconcileCtx, parent)
+			return err
+		}
+		runService.CatalogError = func(err error) {
+			fmt.Fprintf(output, "run catalog update failed: %v\n", err)
+		}
 	}
 	mux := http.NewServeMux()
 	systemPath, systemHandler := daqv1connect.NewSystemServiceHandler(systemService)

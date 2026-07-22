@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -34,5 +35,22 @@ func TestRunHistory(t *testing.T) {
 	_, err = service.ListRuns(context.Background(), connect.NewRequest(&daqv1.ListRunsRequest{Limit: 101}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("limit error = %v", err)
+	}
+}
+
+func TestCompletedRunReconcilesCatalogWithoutFailingOnCatalogError(t *testing.T) {
+	called := false
+	reported := error(nil)
+	service := &RunService{
+		RunParent: "runs",
+		ReconcileCatalog: func(_ context.Context, parent string) error {
+			called = parent == "runs"
+			return errors.New("catalog locked")
+		},
+		CatalogError: func(err error) { reported = err },
+	}
+	service.reconcileCatalog(context.Background())
+	if !called || reported == nil || reported.Error() != "catalog locked" {
+		t.Fatalf("called=%t reported=%v", called, reported)
 	}
 }

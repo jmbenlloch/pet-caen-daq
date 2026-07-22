@@ -15,7 +15,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 type Catalog struct{ db *sql.DB }
 
@@ -94,14 +94,15 @@ func (c *Catalog) IndexManifest(ctx context.Context, request IndexRequest) (err 
 	_, err = tx.ExecContext(ctx, `
 INSERT INTO runs(run_id, schema_version, requested_by, started_at, completed_at,
  termination_reason, event_count, raw_batch_count, capture_raw, journal_transport,
- incomplete, manifest_path, manifest_sha256, configuration_sha256, indexed_at)
-VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ incomplete, available, manifest_path, manifest_sha256, configuration_sha256, indexed_at)
+VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
 ON CONFLICT(run_id) DO UPDATE SET
  schema_version=excluded.schema_version, requested_by=excluded.requested_by,
  started_at=excluded.started_at, completed_at=excluded.completed_at,
  termination_reason=excluded.termination_reason, event_count=excluded.event_count,
  raw_batch_count=excluded.raw_batch_count, capture_raw=excluded.capture_raw,
  journal_transport=excluded.journal_transport, incomplete=excluded.incomplete,
+ available=1,
  manifest_path=excluded.manifest_path, manifest_sha256=excluded.manifest_sha256,
  configuration_sha256=excluded.configuration_sha256, indexed_at=excluded.indexed_at`,
 		m.RunID, m.SchemaVersion, m.RequestedBy, m.StartedAt, nullable(m.CompletedAt),

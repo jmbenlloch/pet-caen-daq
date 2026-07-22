@@ -41,14 +41,16 @@ type SnapshotPublisher interface {
 
 type RunService struct {
 	daqv1connect.UnimplementedRunServiceHandler
-	Controller     RunController
-	Telemetry      SnapshotPublisher
-	Now            func() time.Time
-	Configure      ConfigurationApplier
-	Boards         []configaudit.BoardEvidence
-	HealthInterval time.Duration
-	RunExists      func(string) (bool, error)
-	RunParent      string
+	Controller       RunController
+	Telemetry        SnapshotPublisher
+	Now              func() time.Time
+	Configure        ConfigurationApplier
+	Boards           []configaudit.BoardEvidence
+	HealthInterval   time.Duration
+	RunExists        func(string) (bool, error)
+	RunParent        string
+	ReconcileCatalog func(context.Context, string) error
+	CatalogError     func(error)
 
 	opMu          sync.Mutex
 	mu            sync.Mutex
@@ -276,6 +278,7 @@ func (s *RunService) stopActive(ctx context.Context, runID, requestedBy, reason 
 			run.Artifacts = append(run.Artifacts, &daqv1.Artifact{Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256})
 		}
 	}
+	s.reconcileCatalog(ctx)
 	s.mu.Lock()
 	s.current = nil
 	if s.completed == nil {
@@ -287,6 +290,15 @@ func (s *RunService) stopActive(ctx context.Context, runID, requestedBy, reason 
 	snapshot.LatestCompletedRun = proto.Clone(run).(*daqv1.RunSummary)
 	snapshot = s.Telemetry.Publish(snapshot)
 	return connect.NewResponse(&daqv1.StopRunResponse{Run: run, Snapshot: snapshot}), nil
+}
+
+func (s *RunService) reconcileCatalog(ctx context.Context) {
+	if s.ReconcileCatalog == nil {
+		return
+	}
+	if err := s.ReconcileCatalog(ctx, s.RunParent); err != nil && s.CatalogError != nil {
+		s.CatalogError(err)
+	}
 }
 
 var validRunID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)
