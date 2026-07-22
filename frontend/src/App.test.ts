@@ -139,4 +139,24 @@ describe('operator dashboard', () => {
     expect(wrapper.get('#system-heading').text()).toBe('Running')
     wrapper.unmount()
   })
+
+  it('commits a preset count before the numeric control loses focus', async () => {
+    const api = dashboardApi()
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    await wrapper.get('input[placeholder="run-0055"]').setValue('counted-run')
+    await wrapper.get('select').setValue('PRESET_COUNTS')
+    const presetCounts = wrapper.get('input[type="number"][min="1"]')
+    const presetCountsInput = presetCounts.element as HTMLInputElement
+    presetCountsInput.value = '3'
+    await presetCounts.trigger('input')
+    await wrapper.get('button.primary').trigger('click')
+    await flushPromises()
+
+    expect(api.validate).toHaveBeenCalledOnce()
+    expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/StopRunMode\s+PRESET_COUNTS/)
+    expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/PresetCounts\s+3/)
+    wrapper.unmount()
+  })
 })

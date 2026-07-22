@@ -423,7 +423,7 @@ onMounted(() => daq.connect())
                 type="number"
                 min="0.001"
                 step="1"
-                @change="setGlobalField('PresetTime', ($event.target as HTMLInputElement).value)"
+                @input="setGlobalField('PresetTime', ($event.target as HTMLInputElement).value)"
               />
             </label>
             <label v-if="stopMode === 'PRESET_COUNTS'">
@@ -433,7 +433,7 @@ onMounted(() => daq.connect())
                 type="number"
                 min="1"
                 step="1"
-                @change="setGlobalField('PresetCounts', ($event.target as HTMLInputElement).value)"
+                @input="setGlobalField('PresetCounts', ($event.target as HTMLInputElement).value)"
               />
             </label>
           </div>
@@ -568,7 +568,7 @@ onMounted(() => daq.connect())
                     :value="field.value"
                     list="temperature-sensor-types"
                     placeholder="Sensor name or c0 c1 c2"
-                    @change="setField(field, ($event.target as HTMLInputElement).value)"
+                    @input="setField(field, ($event.target as HTMLInputElement).value)"
                   />
                   <datalist id="temperature-sensor-types">
                     <option v-for="option in field.options" :key="option" :value="option" />
@@ -585,7 +585,7 @@ onMounted(() => daq.connect())
                   v-else
                   :id="field.id"
                   :value="field.value"
-                  @change="setField(field, ($event.target as HTMLInputElement).value)"
+                  @input="setField(field, ($event.target as HTMLInputElement).value)"
                 />
                 <div
                   v-if="parameterScope(field) === 'channel'"

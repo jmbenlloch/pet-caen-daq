@@ -57,13 +57,14 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await page.getByRole('button', { name: 'Stop and drain' }).click()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await expect(page.getByRole('heading', { name: runId })).toBeVisible()
-  await expect(page.getByLabel('Stored runs').getByText(runId, { exact: true })).toBeVisible()
+  const storedRun = page
+    .getByLabel('Stored runs')
+    .locator('.history-run')
+    .filter({ hasText: runId })
+  await expect(storedRun.getByText(runId, { exact: true })).toBeVisible()
 
   const downloadPromise = page.waitForEvent('download')
-  await page
-    .getByLabel('Stored runs')
-    .getByRole('button', { name: /events\.jsonl/ })
-    .click()
+  await storedRun.getByRole('button', { name: /events\.jsonl/ }).click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toBe('events.jsonl')
   expect((await readFile(await download.path())).byteLength).toBeGreaterThan(0)
