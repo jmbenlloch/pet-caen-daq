@@ -90,6 +90,243 @@ Raw evidence remains separate from decoded HDF5 data in version one:
 pre-framing evidence. Embedding them in HDF5 would couple evidence recovery to
 the HDF5 library and make a damaged container a single point of failure.
 
+## Observed run corpus and event examples
+
+The JSON corpus under `pcap/runs` was inventoried before fixing the proposed
+schema. It contains six manifests and six `events.jsonl` files. Five event
+files are empty. All six manifests request `SPECT_TIMING`; only
+`run-go-native-detector-hvon-003` contains decoded events:
+
+| Run | Manifest event count | Event kinds observed |
+| --- | ---: | --- |
+| `run-go-native-001` | 0 | none |
+| `run-go-native-detector-001` | 0 | none |
+| `run-go-native-detector-hvon-001` | 0 | none |
+| `run-go-native-detector-hvon-002` | 0 | none |
+| `run-go-native-detector-hvon-003` | 87,989 | spectroscopy only |
+| `run-go-native-ptrg-001` | 0 | none |
+
+The examples below have two evidence levels. The spectroscopy example is
+abbreviated from the populated real run. The other five examples are concrete
+outputs implied by the byte-level golden decoder fixtures in
+`backend/internal/dt5202/event_test.go`; they demonstrate the implemented data
+model but were not observed in this retained run corpus. Production acceptance
+still requires real-board fixtures for those modes.
+
+### Spectroscopy: observed real-run example
+
+```json
+{
+  "schema_version": 1,
+  "kind": "spectroscopy",
+  "sequence": "1",
+  "payload": {
+    "chain": 1,
+    "node": 0,
+    "qualifier": 51,
+    "trigger_id": "0",
+    "timestamp": "26865",
+    "event": {
+      "kind": "spectroscopy",
+      "qualifier": 51,
+      "spectroscopy": {
+        "trigger_id": "0",
+        "timestamp": "26865",
+        "channel_mask": "18446744073709551615",
+        "energies": [
+          {
+            "channel": 0,
+            "low_gain": 263,
+            "high_gain": 2225,
+            "has_low_gain": true,
+            "has_high_gain": true,
+            "discriminator": true
+          }
+        ],
+        "timings": [
+          {"channel": 63, "toa": 861, "tot": 0}
+        ],
+        "time_reference": 428870
+      }
+    }
+  }
+}
+```
+
+The arrays are abbreviated: the original record has 64 energy entries and 13
+timing entries. Qualifier 51 (`0x33`) identifies the captured combined
+spectroscopy/timing form with both energy gains. The all-ones channel mask says
+that all 64 energy entries are present; it does not say that all 64 sensors
+caused the trigger.
+
+The energy path and timing path must remain conceptually separate in the HDF5
+schema:
+
+```text
+detector pulse
+   +-- slow shaping --> peak hold --> ADC --> energy value
+   +-- charge discriminator (QD) --> energy.discriminator
+   +-- time discriminator (TD) --> TDC --> timing hit
+
+enabled channel trigger signals
+   --> trigger logic --> bunch trigger --> accepted spectroscopy event
+```
+
+`energy.discriminator` is packed energy bit 15. The bundled FERSlib decoder
+places the corresponding channel bit in `qdmask`, so it represents assertion
+of the channel's charge discriminator. It is not proof that the channel alone
+caused the final trigger. Trigger acceptance also depends on trigger source,
+masks, logic/majority, signal overlap, validation, and veto.
+
+An energy entry is present because its channel is included in the event's
+energy mask. It may contain a pulse, baseline, noise, or unrelated activity.
+The retained run reads both gains for all enabled channels. Its relevant
+settings include `GainSelect BOTH`, full channel masks, QD coarse threshold
+250, board-dependent TD coarse thresholds around 178--183, `TriggerLogic
+MAJ64`, and `MajorityLevel 4`.
+
+A `timings` entry is a separate TDC observation from the time-discriminator
+path. `toa` is the encoded channel-edge time relative to the hardware timing
+reference convention; `tot` is time over threshold when enabled. The event
+timestamp, payload `time_reference`, and per-channel `toa` have different
+roles and must remain separate fields.
+
+The retained run uses `TrefSource TLOGIC`, `TrefWindow 1.0 us`, `TrefDelay
+-500 ns`, and `EnableToT 0`. Only 26,277 events (29.9%) contain at least one
+timing entry; 61,712 (70.1%) contain none. An accepted spectroscopy event
+therefore cannot be modeled as requiring TDC children. QD and TD thresholds and
+masks differ, an edge may fall outside the reference window, and timing-path
+holdoff/dead time may suppress a measurement. In general neither QD assertion
+nor event acceptance implies a TDC hit.
+
+Other configuration needed to interpret spectroscopy includes analog HG/LG
+gain, shaping times, hold delay, multiplexer period, pedestal calibration,
+energy zero suppression, QD/TD fine thresholds and masks, fast-shaper input,
+validation/veto settings, HV bias and individual adjustment, temperature
+feedback, trigger-ID mode, synchronization, topology, and firmware revision.
+These dependencies reinforce the requirement to embed requested, audited, and
+effective configuration in the HDF5 file.
+
+### Timing-only: golden-fixture example, not observed in the corpus
+
+```json
+{
+  "kind": "timing",
+  "qualifier": 2,
+  "timing": {
+    "trigger_id": "7",
+    "timestamp": "291",
+    "time_reference": "4666",
+    "hits": [
+      {"channel": 3, "toa": 13398, "tot": 18}
+    ]
+  }
+}
+```
+
+This common-start fixture shows a fine reference derived from the coarse
+timestamp and one channel hit. The same event type also covers common-stop and
+streaming qualifiers. Qualifier, ToA allocation, ToT availability, and timing
+reference semantics must therefore remain explicit rather than inferred from
+the HDF5 group name.
+
+### Counting: golden-fixture example, not observed in the corpus
+
+```json
+{
+  "kind": "counting",
+  "qualifier": 132,
+  "counting": {
+    "trigger_id": "11",
+    "timestamp": "12",
+    "relative_timestamp_clock": 99,
+    "channel_mask": "4",
+    "counts": [
+      {"channel": 2, "value": 123}
+    ],
+    "t_or_count": 456,
+    "q_or_count": 789
+  }
+}
+```
+
+The channel mask is derived from the channels whose counters are present.
+T-OR and Q-OR counters use reserved wire channel identifiers and are stored as
+dedicated scalar fields, not ordinary channel rows.
+
+### Waveform: golden-fixture example, not observed in the corpus
+
+```json
+{
+  "kind": "waveform",
+  "qualifier": 8,
+  "waveform": {
+    "trigger_id": "1",
+    "timestamp": "2",
+    "samples": [
+      {"high_gain": 111, "low_gain": 222, "digital_probes": 10}
+    ]
+  }
+}
+```
+
+Each packed word contains one high-gain sample, one low-gain sample, and four
+digital-probe bits. The current decoded type does not attach a channel number
+or sample interval to each sample, so storage must not invent either. The exact
+waveform acquisition configuration provides the missing interpretation.
+
+### Service: golden-fixture example, not observed in the corpus
+
+```json
+{
+  "kind": "service",
+  "qualifier": 47,
+  "service": {
+    "timestamp": "55",
+    "version": 1,
+    "format": 3,
+    "fpga_temperature_c": -21.1625,
+    "board_temperature_c": 25,
+    "detector_temperature_c": 25.6,
+    "hv_temperature_c": 51.2,
+    "hv_voltage_v": 45.4,
+    "hv_current_a": 0.001,
+    "hv_on": true,
+    "hv_ramping": false,
+    "hv_over_current": true,
+    "hv_over_voltage": false,
+    "status": 17185,
+    "counters": [
+      {"channel": 7, "value": 88}
+    ],
+    "t_or_count": 99,
+    "q_or_count": 111
+  }
+}
+```
+
+Optional telemetry requires explicit validity bits. A service version newer than the
+implemented decoder retains its remaining bytes as `unknown_payload`; those
+bytes belong in a flat byte pool so evidence is not discarded.
+
+### Test: golden-fixture example, not observed in the corpus
+
+```json
+{
+  "kind": "test",
+  "qualifier": 255,
+  "test": {
+    "trigger_id": "8",
+    "timestamp": "9",
+    "words": [287454020, 2864434397]
+  }
+}
+```
+
+The decimal words are `0x11223344` and `0xaabbccdd`. Test events retain up to
+four opaque 32-bit words. They should be stored losslessly without assigning a
+meaning not established by the event producer.
+
 ## Proposed file layout
 
 The decoded artifact is `events.h5`. Dataset names and numeric enum values are
