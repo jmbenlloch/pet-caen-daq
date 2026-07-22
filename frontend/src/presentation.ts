@@ -34,3 +34,10 @@ export function bytes(value: bigint | undefined) {
   if (amount < 1024 ** 3) return `${(amount / 1024 ** 2).toFixed(1)} MiB`
   return `${(amount / 1024 ** 3).toFixed(1)} GiB`
 }
+
+export function localDateTime(value: { seconds: bigint; nanos: number } | undefined) {
+  if (!value) return 'Not reported'
+  const milliseconds = Number(value.seconds) * 1000 + value.nanos / 1_000_000
+  const date = new Date(milliseconds)
+  return Number.isNaN(date.getTime()) ? 'Not reported' : date.toLocaleString()
+}

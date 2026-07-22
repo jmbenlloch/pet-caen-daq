@@ -8,6 +8,7 @@ import (
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type RunHealthSource interface {
@@ -112,6 +113,9 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 					}
 					if observation.HVCurrent != nil {
 						board.HvCurrentA = *observation.HVCurrent
+					}
+					if observation.TelemetryObservedAt != nil {
+						board.TelemetryObservedAt = timestamppb.New(*observation.TelemetryObservedAt)
 					}
 					board.HvOn = observation.HVOn
 					board.HvRamping = observation.HVRamping

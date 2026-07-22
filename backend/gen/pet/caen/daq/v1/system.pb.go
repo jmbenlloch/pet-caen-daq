@@ -2784,8 +2784,10 @@ type Board struct {
 	HvRamping            bool                   `protobuf:"varint,13,opt,name=hv_ramping,json=hvRamping,proto3" json:"hv_ramping,omitempty"`
 	HvOverCurrent        bool                   `protobuf:"varint,14,opt,name=hv_over_current,json=hvOverCurrent,proto3" json:"hv_over_current,omitempty"`
 	HvOverVoltage        bool                   `protobuf:"varint,15,opt,name=hv_over_voltage,json=hvOverVoltage,proto3" json:"hv_over_voltage,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Wall-clock time when service telemetry was last received from this board.
+	TelemetryObservedAt *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=telemetry_observed_at,json=telemetryObservedAt,proto3" json:"telemetry_observed_at,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Board) Reset() {
@@ -2921,6 +2923,13 @@ func (x *Board) GetHvOverVoltage() bool {
 		return x.HvOverVoltage
 	}
 	return false
+}
+
+func (x *Board) GetTelemetryObservedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.TelemetryObservedAt
+	}
+	return nil
 }
 
 type PipelineTelemetry struct {
@@ -3366,7 +3375,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x05index\x18\x01 \x01(\rR\x05index\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x125\n" +
 	"\x06health\x18\x03 \x01(\x0e2\x1d.pet.caen.daq.v1.HealthStatusR\x06health\x12.\n" +
-	"\x06boards\x18\x04 \x03(\v2\x16.pet.caen.daq.v1.BoardR\x06boards\"\xbd\x04\n" +
+	"\x06boards\x18\x04 \x03(\v2\x16.pet.caen.daq.v1.BoardR\x06boards\"\x8d\x05\n" +
 	"\x05Board\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\rR\x04node\x12\x1d\n" +
 	"\n" +
@@ -3388,7 +3397,8 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\n" +
 	"hv_ramping\x18\r \x01(\bR\thvRamping\x12&\n" +
 	"\x0fhv_over_current\x18\x0e \x01(\bR\rhvOverCurrent\x12&\n" +
-	"\x0fhv_over_voltage\x18\x0f \x01(\bR\rhvOverVoltage\"\x81\x02\n" +
+	"\x0fhv_over_voltage\x18\x0f \x01(\bR\rhvOverVoltage\x12N\n" +
+	"\x15telemetry_observed_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\x13telemetryObservedAt\"\x81\x02\n" +
 	"\x11PipelineTelemetry\x12%\n" +
 	"\x0equeue_capacity\x18\x01 \x01(\x04R\rqueueCapacity\x12\x1f\n" +
 	"\vqueue_depth\x18\x02 \x01(\x04R\n" +
@@ -3575,36 +3585,37 @@ var file_pet_caen_daq_v1_system_proto_depIdxs = []int32{
 	4,  // 39: pet.caen.daq.v1.Chain.health:type_name -> pet.caen.daq.v1.HealthStatus
 	43, // 40: pet.caen.daq.v1.Chain.boards:type_name -> pet.caen.daq.v1.Board
 	4,  // 41: pet.caen.daq.v1.Board.health:type_name -> pet.caen.daq.v1.HealthStatus
-	4,  // 42: pet.caen.daq.v1.StorageTelemetry.health:type_name -> pet.caen.daq.v1.HealthStatus
-	5,  // 43: pet.caen.daq.v1.Diagnostic.severity:type_name -> pet.caen.daq.v1.DiagnosticSeverity
-	47, // 44: pet.caen.daq.v1.Diagnostic.observed_at:type_name -> google.protobuf.Timestamp
-	6,  // 45: pet.caen.daq.v1.SystemService.GetSystemSnapshot:input_type -> pet.caen.daq.v1.GetSystemSnapshotRequest
-	7,  // 46: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:input_type -> pet.caen.daq.v1.GetConfigurationTemplateRequest
-	10, // 47: pet.caen.daq.v1.SystemService.ValidateConfiguration:input_type -> pet.caen.daq.v1.ValidateConfigurationRequest
-	13, // 48: pet.caen.daq.v1.SystemService.StreamTelemetry:input_type -> pet.caen.daq.v1.StreamTelemetryRequest
-	15, // 49: pet.caen.daq.v1.SystemService.SetHighVoltage:input_type -> pet.caen.daq.v1.SetHighVoltageRequest
-	17, // 50: pet.caen.daq.v1.RunService.StartRun:input_type -> pet.caen.daq.v1.StartRunRequest
-	19, // 51: pet.caen.daq.v1.RunService.StopRun:input_type -> pet.caen.daq.v1.StopRunRequest
-	21, // 52: pet.caen.daq.v1.RunService.ListRuns:input_type -> pet.caen.daq.v1.ListRunsRequest
-	23, // 53: pet.caen.daq.v1.RunService.SearchRuns:input_type -> pet.caen.daq.v1.SearchRunsRequest
-	31, // 54: pet.caen.daq.v1.RunService.DownloadArtifact:input_type -> pet.caen.daq.v1.DownloadArtifactRequest
-	33, // 55: pet.caen.daq.v1.RunService.GetHistograms:input_type -> pet.caen.daq.v1.GetHistogramsRequest
-	9,  // 56: pet.caen.daq.v1.SystemService.GetSystemSnapshot:output_type -> pet.caen.daq.v1.GetSystemSnapshotResponse
-	8,  // 57: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:output_type -> pet.caen.daq.v1.GetConfigurationTemplateResponse
-	11, // 58: pet.caen.daq.v1.SystemService.ValidateConfiguration:output_type -> pet.caen.daq.v1.ValidateConfigurationResponse
-	14, // 59: pet.caen.daq.v1.SystemService.StreamTelemetry:output_type -> pet.caen.daq.v1.StreamTelemetryResponse
-	16, // 60: pet.caen.daq.v1.SystemService.SetHighVoltage:output_type -> pet.caen.daq.v1.SetHighVoltageResponse
-	18, // 61: pet.caen.daq.v1.RunService.StartRun:output_type -> pet.caen.daq.v1.StartRunResponse
-	20, // 62: pet.caen.daq.v1.RunService.StopRun:output_type -> pet.caen.daq.v1.StopRunResponse
-	22, // 63: pet.caen.daq.v1.RunService.ListRuns:output_type -> pet.caen.daq.v1.ListRunsResponse
-	24, // 64: pet.caen.daq.v1.RunService.SearchRuns:output_type -> pet.caen.daq.v1.SearchRunsResponse
-	32, // 65: pet.caen.daq.v1.RunService.DownloadArtifact:output_type -> pet.caen.daq.v1.DownloadArtifactResponse
-	35, // 66: pet.caen.daq.v1.RunService.GetHistograms:output_type -> pet.caen.daq.v1.GetHistogramsResponse
-	56, // [56:67] is the sub-list for method output_type
-	45, // [45:56] is the sub-list for method input_type
-	45, // [45:45] is the sub-list for extension type_name
-	45, // [45:45] is the sub-list for extension extendee
-	0,  // [0:45] is the sub-list for field type_name
+	47, // 42: pet.caen.daq.v1.Board.telemetry_observed_at:type_name -> google.protobuf.Timestamp
+	4,  // 43: pet.caen.daq.v1.StorageTelemetry.health:type_name -> pet.caen.daq.v1.HealthStatus
+	5,  // 44: pet.caen.daq.v1.Diagnostic.severity:type_name -> pet.caen.daq.v1.DiagnosticSeverity
+	47, // 45: pet.caen.daq.v1.Diagnostic.observed_at:type_name -> google.protobuf.Timestamp
+	6,  // 46: pet.caen.daq.v1.SystemService.GetSystemSnapshot:input_type -> pet.caen.daq.v1.GetSystemSnapshotRequest
+	7,  // 47: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:input_type -> pet.caen.daq.v1.GetConfigurationTemplateRequest
+	10, // 48: pet.caen.daq.v1.SystemService.ValidateConfiguration:input_type -> pet.caen.daq.v1.ValidateConfigurationRequest
+	13, // 49: pet.caen.daq.v1.SystemService.StreamTelemetry:input_type -> pet.caen.daq.v1.StreamTelemetryRequest
+	15, // 50: pet.caen.daq.v1.SystemService.SetHighVoltage:input_type -> pet.caen.daq.v1.SetHighVoltageRequest
+	17, // 51: pet.caen.daq.v1.RunService.StartRun:input_type -> pet.caen.daq.v1.StartRunRequest
+	19, // 52: pet.caen.daq.v1.RunService.StopRun:input_type -> pet.caen.daq.v1.StopRunRequest
+	21, // 53: pet.caen.daq.v1.RunService.ListRuns:input_type -> pet.caen.daq.v1.ListRunsRequest
+	23, // 54: pet.caen.daq.v1.RunService.SearchRuns:input_type -> pet.caen.daq.v1.SearchRunsRequest
+	31, // 55: pet.caen.daq.v1.RunService.DownloadArtifact:input_type -> pet.caen.daq.v1.DownloadArtifactRequest
+	33, // 56: pet.caen.daq.v1.RunService.GetHistograms:input_type -> pet.caen.daq.v1.GetHistogramsRequest
+	9,  // 57: pet.caen.daq.v1.SystemService.GetSystemSnapshot:output_type -> pet.caen.daq.v1.GetSystemSnapshotResponse
+	8,  // 58: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:output_type -> pet.caen.daq.v1.GetConfigurationTemplateResponse
+	11, // 59: pet.caen.daq.v1.SystemService.ValidateConfiguration:output_type -> pet.caen.daq.v1.ValidateConfigurationResponse
+	14, // 60: pet.caen.daq.v1.SystemService.StreamTelemetry:output_type -> pet.caen.daq.v1.StreamTelemetryResponse
+	16, // 61: pet.caen.daq.v1.SystemService.SetHighVoltage:output_type -> pet.caen.daq.v1.SetHighVoltageResponse
+	18, // 62: pet.caen.daq.v1.RunService.StartRun:output_type -> pet.caen.daq.v1.StartRunResponse
+	20, // 63: pet.caen.daq.v1.RunService.StopRun:output_type -> pet.caen.daq.v1.StopRunResponse
+	22, // 64: pet.caen.daq.v1.RunService.ListRuns:output_type -> pet.caen.daq.v1.ListRunsResponse
+	24, // 65: pet.caen.daq.v1.RunService.SearchRuns:output_type -> pet.caen.daq.v1.SearchRunsResponse
+	32, // 66: pet.caen.daq.v1.RunService.DownloadArtifact:output_type -> pet.caen.daq.v1.DownloadArtifactResponse
+	35, // 67: pet.caen.daq.v1.RunService.GetHistograms:output_type -> pet.caen.daq.v1.GetHistogramsResponse
+	57, // [57:68] is the sub-list for method output_type
+	46, // [46:57] is the sub-list for method input_type
+	46, // [46:46] is the sub-list for extension type_name
+	46, // [46:46] is the sub-list for extension extendee
+	0,  // [0:46] is the sub-list for field type_name
 }
 
 func init() { file_pet_caen_daq_v1_system_proto_init() }

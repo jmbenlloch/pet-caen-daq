@@ -189,6 +189,7 @@ type BoardStats struct {
 	HVOverCurrent       bool
 	HVOverVoltage       bool
 	AcquisitionStatus   *uint16
+	TelemetryObservedAt *time.Time
 	Timestamp           uint64
 	TriggerID           uint64
 	TriggerCount        uint64
@@ -232,6 +233,8 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 	accumulateChannels(&board, event)
 	s.accumulateHistograms(key.chain, key.node, event)
 	if service := event.Service; service != nil {
+		observedAt := s.now()
+		board.TelemetryObservedAt = &observedAt
 		board.FPGATemperature = cloneFloat(service.FPGATemperature)
 		board.BoardTemperature = cloneFloat(service.BoardTemperature)
 		board.DetectorTemperature = cloneFloat(service.DetectorTemperature)
@@ -285,6 +288,7 @@ func (s *sink) BoardStats() []BoardStats {
 	defer s.mu.Unlock()
 	result := make([]BoardStats, 0, len(s.boards))
 	for _, board := range s.boards {
+		board.TelemetryObservedAt = cloneTime(board.TelemetryObservedAt)
 		board.FPGATemperature = cloneFloat(board.FPGATemperature)
 		board.BoardTemperature = cloneFloat(board.BoardTemperature)
 		board.DetectorTemperature = cloneFloat(board.DetectorTemperature)
@@ -303,6 +307,14 @@ func (s *sink) BoardStats() []BoardStats {
 }
 
 func cloneFloat(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}
+
+func cloneTime(value *time.Time) *time.Time {
 	if value == nil {
 		return nil
 	}

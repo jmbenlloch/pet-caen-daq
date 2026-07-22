@@ -326,6 +326,8 @@ message Board {
   bool hv_ramping = 13;
   bool hv_over_current = 14;
   bool hv_over_voltage = 15;
+  // Wall-clock time when service telemetry was last received from this board.
+  google.protobuf.Timestamp telemetry_observed_at = 16;
 }
 
 enum HealthStatus {

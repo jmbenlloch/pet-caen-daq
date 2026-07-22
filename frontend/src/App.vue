@@ -29,7 +29,7 @@ import {
   SystemState,
   type SearchRunsRequest,
 } from './gen/pet/caen/daq/v1/system_pb'
-import { bytes, compact, healthLabel, stateLabel } from './presentation'
+import { bytes, compact, healthLabel, localDateTime, stateLabel } from './presentation'
 import { useDaq } from './useDaq'
 
 const props = defineProps<{ api?: DaqApi }>()
@@ -1289,6 +1289,10 @@ onMounted(() => daq.connect())
               <div>
                 <dt>Events</dt>
                 <dd>{{ compact(board.eventCount) }}</dd>
+              </div>
+              <div>
+                <dt>Telemetry updated</dt>
+                <dd>{{ localDateTime(board.telemetryObservedAt) }}</dd>
               </div>
             </dl>
             <button

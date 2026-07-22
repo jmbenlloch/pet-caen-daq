@@ -26,10 +26,11 @@ func (s *mutableRunHealth) StatisticsElapsed() time.Duration         { return s.
 func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 	publisher, _ := telemetry.NewPublisher("instance-a", &daqv1.TelemetrySnapshot{CurrentRun: &daqv1.RunSummary{RunId: "42"}, Chains: []*daqv1.Chain{{Index: 0, Boards: []*daqv1.Board{{Node: 0}}}}}, nil)
 	temperature, voltage, current := 41.5, 52.1, 0.02
+	boardObservedAt := time.Date(2026, 7, 22, 17, 30, 0, 0, time.UTC)
 	source := &mutableRunHealth{
 		pipeline: acquisition.PipelineStats{Capacity: 8, QueueDepth: 2, AcceptedBatches: 3},
 		storage:  runpipeline.StorageStats{Directory: "/runs/run-42", BytesWritten: 100, EventCount: 2, RawBatches: 1},
-		boards:   []runpipeline.BoardStats{{Chain: 0, Node: 0, EventCount: 2, TriggerCount: 2, TriggerID: 9, DataBytes: 64, FPGATemperature: &temperature, HVVoltage: &voltage, HVCurrent: &current, HVOn: true}},
+		boards:   []runpipeline.BoardStats{{Chain: 0, Node: 0, EventCount: 2, TriggerCount: 2, TriggerID: 9, DataBytes: 64, FPGATemperature: &temperature, HVVoltage: &voltage, HVCurrent: &current, HVOn: true, TelemetryObservedAt: &boardObservedAt}},
 		elapsed:  2 * time.Second,
 	}
 	ticks := make(chan time.Time)
@@ -50,6 +51,9 @@ func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 	}
 	if first.Statistics.GetElapsedMilliseconds() != 2000 || first.Statistics.Boards[0].GetTriggerId() != 9 || first.Statistics.Boards[0].GetDataBytes() != 64 {
 		t.Fatalf("statistics = %+v", first.Statistics)
+	}
+	if first.Chains[0].Boards[0].GetTelemetryObservedAt().AsTime() != boardObservedAt {
+		t.Fatalf("board telemetry timestamp = %v", first.Chains[0].Boards[0].GetTelemetryObservedAt())
 	}
 	source.pipeline.QueueDepth = 0
 	source.pipeline.DecodedEvents = 9

@@ -208,6 +208,8 @@ Implemented on 2026-07-20:
 - reads of product ID, FPGA firmware revision, and acquisition status registers;
 - a typed Go topology returned as JSON by the initial command-line backend;
 - a deterministic native-protocol DT5215/DT5202 TCP simulator;
+- per-board wall-clock service-telemetry receipt timestamps, exposed separately
+  from raw hardware event timestamps so operators can identify stale values;
 - golden codec and configuration-parser unit tests plus simulator-backed integration tests, including incorrect provisioning and pre-enumeration link states;
 - an initial Buf API module and generated Go/ConnectRPC bindings for configuration validation and system snapshots.
 

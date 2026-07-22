@@ -96,7 +96,8 @@ func TestSessionAbortRetainsIncompleteMarker(t *testing.T) {
 }
 
 func TestSessionRetainsLatestBoardServiceTelemetry(t *testing.T) {
-	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock}}
+	observedAt := time.Date(2026, 7, 22, 17, 30, 0, 0, time.UTC)
+	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return observedAt }}}
 	created, err := factory.New("service", acquisition.RunOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -111,7 +112,7 @@ func TestSessionRetainsLatestBoardServiceTelemetry(t *testing.T) {
 		t.Fatal(err)
 	}
 	boards := session.BoardStats()
-	if len(boards) != 1 || boards[0].Chain != 2 || boards[0].Node != 3 || boards[0].EventCount != 1 || boards[0].FPGATemperature == nil || *boards[0].FPGATemperature != temperature || boards[0].HVVoltage == nil || *boards[0].HVVoltage != voltage || !boards[0].HVOverVoltage || boards[0].AcquisitionStatus == nil || *boards[0].AcquisitionStatus != status {
+	if len(boards) != 1 || boards[0].Chain != 2 || boards[0].Node != 3 || boards[0].EventCount != 1 || boards[0].FPGATemperature == nil || *boards[0].FPGATemperature != temperature || boards[0].HVVoltage == nil || *boards[0].HVVoltage != voltage || !boards[0].HVOverVoltage || boards[0].AcquisitionStatus == nil || *boards[0].AcquisitionStatus != status || boards[0].TelemetryObservedAt == nil || !boards[0].TelemetryObservedAt.Equal(observedAt) {
 		t.Fatalf("boards = %+v", boards)
 	}
 	if err := session.Close(); err != nil {
