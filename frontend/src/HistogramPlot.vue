@@ -101,6 +101,10 @@ function render() {
   else plot.setData(alignedData(), false)
 }
 
+function resetZoom() {
+  plot?.setData(alignedData(), true)
+}
+
 watch(() => props.datasets, render, { deep: true })
 watch([() => props.theme, () => props.logarithmic], rebuild)
 
@@ -120,10 +124,15 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div
-    ref="host"
-    class="histogram-plot"
-    role="img"
-    aria-label="Live selected-channel histogram plot"
-  ></div>
+  <div class="histogram-plot-shell">
+    <div class="histogram-plot-actions">
+      <button type="button" class="secondary" @click="resetZoom">Reset zoom</button>
+    </div>
+    <div
+      ref="host"
+      class="histogram-plot"
+      role="img"
+      aria-label="Live selected-channel histogram plot"
+    ></div>
+  </div>
 </template>

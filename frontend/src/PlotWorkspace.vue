@@ -89,12 +89,6 @@ function updateTimer() {
 watch([autoRefresh, () => props.running], updateTimer, { immediate: true })
 onBeforeUnmount(() => window.clearInterval(timer))
 
-function populated(dataset: DeepReadonly<HistogramDataset>) {
-  return dataset.bins
-    .map((count, index) => ({ index, count }))
-    .filter((bin) => bin.count > 0n)
-    .slice(0, 12)
-}
 const kindLabel = computed(
   () =>
     ({
@@ -204,12 +198,6 @@ const kindLabel = computed(
             >Underflow {{ compact(dataset.underflow) }} · overflow
             {{ compact(dataset.overflow) }}</span
           >
-        </div>
-        <div class="histogram-bin-preview" aria-label="Populated bin preview">
-          <span>First populated bins</span
-          ><code v-for="bin in populated(dataset)" :key="bin.index"
-            >{{ bin.index }}:{{ compact(bin.count) }}</code
-          ><small v-if="!populated(dataset).length">No populated bins yet</small>
         </div>
       </article>
     </div>
