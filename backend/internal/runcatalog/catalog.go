@@ -16,6 +16,7 @@ import (
 )
 
 const schemaVersion = 2
+const timestampFormat = "2006-01-02T15:04:05.000000000Z07:00"
 
 type Catalog struct{ db *sql.DB }
 
@@ -91,6 +92,17 @@ func (c *Catalog) IndexManifest(ctx context.Context, request IndexRequest) (err 
 		}
 	}()
 	m := request.Manifest
+	startedAt, err := canonicalTimestamp(m.StartedAt)
+	if err != nil {
+		return fmt.Errorf("index run %q start time: %w", m.RunID, err)
+	}
+	completedAt := ""
+	if m.CompletedAt != "" {
+		completedAt, err = canonicalTimestamp(m.CompletedAt)
+		if err != nil {
+			return fmt.Errorf("index run %q completion time: %w", m.RunID, err)
+		}
+	}
 	_, err = tx.ExecContext(ctx, `
 INSERT INTO runs(run_id, schema_version, requested_by, started_at, completed_at,
  termination_reason, event_count, raw_batch_count, capture_raw, journal_transport,
@@ -105,7 +117,7 @@ ON CONFLICT(run_id) DO UPDATE SET
  available=1,
  manifest_path=excluded.manifest_path, manifest_sha256=excluded.manifest_sha256,
  configuration_sha256=excluded.configuration_sha256, indexed_at=excluded.indexed_at`,
-		m.RunID, m.SchemaVersion, m.RequestedBy, m.StartedAt, nullable(m.CompletedAt),
+		m.RunID, m.SchemaVersion, m.RequestedBy, startedAt, nullable(completedAt),
 		nullable(m.TerminationReason), int64(m.EventCount), int64(m.RawBatchCount),
 		m.CaptureRaw, m.JournalTransport, request.Incomplete, request.ManifestPath,
 		request.ManifestSHA256, nullable(request.ConfigurationSHA256), time.Now().UTC().Format(time.RFC3339Nano))
@@ -144,6 +156,14 @@ VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, m.RunID, value.Layer,
 		return fmt.Errorf("commit run catalog: %w", err)
 	}
 	return nil
+}
+
+func canonicalTimestamp(value string) (string, error) {
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return "", err
+	}
+	return parsed.UTC().Format(timestampFormat), nil
 }
 
 func validateIndexRequest(r IndexRequest) error {

@@ -56,6 +56,8 @@ const (
 	RunServiceStopRunProcedure = "/pet.caen.daq.v1.RunService/StopRun"
 	// RunServiceListRunsProcedure is the fully-qualified name of the RunService's ListRuns RPC.
 	RunServiceListRunsProcedure = "/pet.caen.daq.v1.RunService/ListRuns"
+	// RunServiceSearchRunsProcedure is the fully-qualified name of the RunService's SearchRuns RPC.
+	RunServiceSearchRunsProcedure = "/pet.caen.daq.v1.RunService/SearchRuns"
 	// RunServiceDownloadArtifactProcedure is the fully-qualified name of the RunService's
 	// DownloadArtifact RPC.
 	RunServiceDownloadArtifactProcedure = "/pet.caen.daq.v1.RunService/DownloadArtifact"
@@ -243,6 +245,7 @@ type RunServiceClient interface {
 	StartRun(context.Context, *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error)
 	StopRun(context.Context, *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error)
 	ListRuns(context.Context, *connect.Request[v1.ListRunsRequest]) (*connect.Response[v1.ListRunsResponse], error)
+	SearchRuns(context.Context, *connect.Request[v1.SearchRunsRequest]) (*connect.Response[v1.SearchRunsResponse], error)
 	DownloadArtifact(context.Context, *connect.Request[v1.DownloadArtifactRequest]) (*connect.ServerStreamForClient[v1.DownloadArtifactResponse], error)
 	GetHistograms(context.Context, *connect.Request[v1.GetHistogramsRequest]) (*connect.Response[v1.GetHistogramsResponse], error)
 }
@@ -276,6 +279,12 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceMethods.ByName("ListRuns")),
 			connect.WithClientOptions(opts...),
 		),
+		searchRuns: connect.NewClient[v1.SearchRunsRequest, v1.SearchRunsResponse](
+			httpClient,
+			baseURL+RunServiceSearchRunsProcedure,
+			connect.WithSchema(runServiceMethods.ByName("SearchRuns")),
+			connect.WithClientOptions(opts...),
+		),
 		downloadArtifact: connect.NewClient[v1.DownloadArtifactRequest, v1.DownloadArtifactResponse](
 			httpClient,
 			baseURL+RunServiceDownloadArtifactProcedure,
@@ -296,6 +305,7 @@ type runServiceClient struct {
 	startRun         *connect.Client[v1.StartRunRequest, v1.StartRunResponse]
 	stopRun          *connect.Client[v1.StopRunRequest, v1.StopRunResponse]
 	listRuns         *connect.Client[v1.ListRunsRequest, v1.ListRunsResponse]
+	searchRuns       *connect.Client[v1.SearchRunsRequest, v1.SearchRunsResponse]
 	downloadArtifact *connect.Client[v1.DownloadArtifactRequest, v1.DownloadArtifactResponse]
 	getHistograms    *connect.Client[v1.GetHistogramsRequest, v1.GetHistogramsResponse]
 }
@@ -315,6 +325,11 @@ func (c *runServiceClient) ListRuns(ctx context.Context, req *connect.Request[v1
 	return c.listRuns.CallUnary(ctx, req)
 }
 
+// SearchRuns calls pet.caen.daq.v1.RunService.SearchRuns.
+func (c *runServiceClient) SearchRuns(ctx context.Context, req *connect.Request[v1.SearchRunsRequest]) (*connect.Response[v1.SearchRunsResponse], error) {
+	return c.searchRuns.CallUnary(ctx, req)
+}
+
 // DownloadArtifact calls pet.caen.daq.v1.RunService.DownloadArtifact.
 func (c *runServiceClient) DownloadArtifact(ctx context.Context, req *connect.Request[v1.DownloadArtifactRequest]) (*connect.ServerStreamForClient[v1.DownloadArtifactResponse], error) {
 	return c.downloadArtifact.CallServerStream(ctx, req)
@@ -330,6 +345,7 @@ type RunServiceHandler interface {
 	StartRun(context.Context, *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error)
 	StopRun(context.Context, *connect.Request[v1.StopRunRequest]) (*connect.Response[v1.StopRunResponse], error)
 	ListRuns(context.Context, *connect.Request[v1.ListRunsRequest]) (*connect.Response[v1.ListRunsResponse], error)
+	SearchRuns(context.Context, *connect.Request[v1.SearchRunsRequest]) (*connect.Response[v1.SearchRunsResponse], error)
 	DownloadArtifact(context.Context, *connect.Request[v1.DownloadArtifactRequest], *connect.ServerStream[v1.DownloadArtifactResponse]) error
 	GetHistograms(context.Context, *connect.Request[v1.GetHistogramsRequest]) (*connect.Response[v1.GetHistogramsResponse], error)
 }
@@ -359,6 +375,12 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceMethods.ByName("ListRuns")),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceSearchRunsHandler := connect.NewUnaryHandler(
+		RunServiceSearchRunsProcedure,
+		svc.SearchRuns,
+		connect.WithSchema(runServiceMethods.ByName("SearchRuns")),
+		connect.WithHandlerOptions(opts...),
+	)
 	runServiceDownloadArtifactHandler := connect.NewServerStreamHandler(
 		RunServiceDownloadArtifactProcedure,
 		svc.DownloadArtifact,
@@ -379,6 +401,8 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceStopRunHandler.ServeHTTP(w, r)
 		case RunServiceListRunsProcedure:
 			runServiceListRunsHandler.ServeHTTP(w, r)
+		case RunServiceSearchRunsProcedure:
+			runServiceSearchRunsHandler.ServeHTTP(w, r)
 		case RunServiceDownloadArtifactProcedure:
 			runServiceDownloadArtifactHandler.ServeHTTP(w, r)
 		case RunServiceGetHistogramsProcedure:
@@ -402,6 +426,10 @@ func (UnimplementedRunServiceHandler) StopRun(context.Context, *connect.Request[
 
 func (UnimplementedRunServiceHandler) ListRuns(context.Context, *connect.Request[v1.ListRunsRequest]) (*connect.Response[v1.ListRunsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.ListRuns is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) SearchRuns(context.Context, *connect.Request[v1.SearchRunsRequest]) (*connect.Response[v1.SearchRunsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.SearchRuns is not implemented"))
 }
 
 func (UnimplementedRunServiceHandler) DownloadArtifact(context.Context, *connect.Request[v1.DownloadArtifactRequest], *connect.ServerStream[v1.DownloadArtifactResponse]) error {

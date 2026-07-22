@@ -109,7 +109,7 @@ func TestReconcileRefreshesStaleAndRestoresAvailability(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer catalog.Close()
-	if err := catalog.IndexManifest(context.Background(), IndexRequest{Manifest: runstore.Manifest{SchemaVersion: 1, RunID: "42", StartedAt: "old"}, ManifestPath: "old", ManifestSHA256: "stale"}); err != nil {
+	if err := catalog.IndexManifest(context.Background(), IndexRequest{Manifest: runstore.Manifest{SchemaVersion: 1, RunID: "42", StartedAt: "2020-01-01T00:00:00Z"}, ManifestPath: "old", ManifestSHA256: "stale"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := catalog.db.Exec(`UPDATE runs SET available = 0 WHERE run_id = '42'`); err != nil {

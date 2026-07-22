@@ -111,4 +111,28 @@ func TestListValidatesPredicatesAndLimits(t *testing.T) {
 	}
 }
 
+func TestListUsesStableExclusivePaginationCursor(t *testing.T) {
+	catalog, err := Open(filepath.Join(t.TempDir(), "catalog.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer catalog.Close()
+	for _, item := range []struct{ id, started string }{{"c", "2026-07-22T12:00:00Z"}, {"b", "2026-07-22T12:00:00Z"}, {"a", "2026-07-22T11:00:00Z"}} {
+		if err := catalog.IndexManifest(context.Background(), IndexRequest{
+			Manifest:     runstore.Manifest{SchemaVersion: 1, RunID: item.id, StartedAt: item.started},
+			ManifestPath: "/runs/run-" + item.id + "/manifest.json", ManifestSHA256: "hash-" + item.id,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, err := catalog.List(context.Background(), Query{Limit: 2})
+	if err != nil || len(first) != 2 || first[0].RunID != "c" || first[1].RunID != "b" {
+		t.Fatalf("first page=%+v error=%v", first, err)
+	}
+	second, err := catalog.List(context.Background(), Query{Limit: 2, BeforeStartedAt: first[1].StartedAt, BeforeRunID: first[1].RunID})
+	if err != nil || len(second) != 1 || second[0].RunID != "a" {
+		t.Fatalf("second page=%+v error=%v", second, err)
+	}
+}
+
 func pointer[T any](value T) *T { return &value }

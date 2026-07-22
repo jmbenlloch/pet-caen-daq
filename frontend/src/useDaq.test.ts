@@ -6,6 +6,7 @@ import type { DaqApi } from './api'
 import {
   SystemState,
   RunSummarySchema,
+  SearchRunsRequestSchema,
   TelemetrySnapshotSchema,
   type StartRunRequest,
   type StopRunRequest,
@@ -50,6 +51,7 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
       .fn()
       .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.READY })),
     listRuns: vi.fn().mockResolvedValue([]),
+    searchRuns: vi.fn().mockResolvedValue({ runs: [], nextPageToken: '' }),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
     histograms: vi.fn().mockResolvedValue([]),
     ...overrides,
@@ -122,6 +124,37 @@ describe('useDaq', () => {
       expect.objectContaining({ runId: 'run-55', requestedBy: 'operator' }),
     )
     expect(store.latestCompletedRun.value).toEqual(completed)
+    wrapper.unmount()
+  })
+
+  it('ignores stale searches and appends the requested next page', async () => {
+    const newest = create(RunSummarySchema, { runId: 'newest' })
+    const next = create(RunSummarySchema, { runId: 'next' })
+    type SearchResponse = { runs: (typeof newest)[]; nextPageToken: string }
+    let resolveFirst!: (value: SearchResponse) => void
+    const first = new Promise<SearchResponse>((resolve) => {
+      resolveFirst = resolve
+    })
+    const searchRuns = vi
+      .fn()
+      .mockReturnValueOnce(first)
+      .mockResolvedValueOnce({ runs: [newest], nextPageToken: 'page-2' })
+      .mockResolvedValueOnce({ runs: [next], nextPageToken: '' })
+    const { store, wrapper } = mountStore(fakeApi({ searchRuns }))
+    const request = create(SearchRunsRequestSchema, { limit: 20 })
+
+    void store.searchRuns(request)
+    await store.searchRuns(request)
+    resolveFirst({ runs: [], nextPageToken: 'stale' })
+    await Promise.resolve()
+
+    expect(store.searchResults.value.map((run) => run.runId)).toEqual(['newest'])
+    expect(store.searchNextPageToken.value).toBe('page-2')
+    await store.searchRuns(
+      create(SearchRunsRequestSchema, { limit: 20, pageToken: 'page-2' }),
+      true,
+    )
+    expect(store.searchResults.value.map((run) => run.runId)).toEqual(['newest', 'next'])
     wrapper.unmount()
   })
 })

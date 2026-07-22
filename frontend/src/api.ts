@@ -11,6 +11,8 @@ import {
   type HistogramDataset,
   type HistogramKind,
   type HistogramSelection,
+  type SearchRunsRequest,
+  type SearchRunsResponse,
 } from './gen/pet/caen/daq/v1/system_pb'
 
 export interface DaqApi {
@@ -26,6 +28,7 @@ export interface DaqApi {
     requestedBy: string,
   ): Promise<TelemetrySnapshot>
   listRuns(limit?: number): Promise<RunSummary[]>
+  searchRuns(request: SearchRunsRequest): Promise<SearchRunsResponse>
   downloadArtifact(runId: string, artifactName: string): Promise<Blob>
   histograms(
     runId: string,
@@ -75,6 +78,9 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     },
     async listRuns(limit = 50) {
       return (await runs.listRuns({ limit })).runs
+    },
+    async searchRuns(request) {
+      return await runs.searchRuns(request)
     },
     async downloadArtifact(runId, artifactName) {
       const chunks: Uint8Array[] = []

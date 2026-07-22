@@ -19,6 +19,7 @@ type Query struct {
 	Configuration                                  []Predicate
 	Limit                                          int
 	IncludeUnavailable                             bool
+	BeforeStartedAt, BeforeRunID                   string
 }
 
 type Predicate struct {
@@ -39,6 +40,12 @@ func (c *Catalog) List(ctx context.Context, query Query) ([]Run, error) {
 	if query.Limit < 0 || query.Limit > 1000 {
 		return nil, fmt.Errorf("limit must be between 0 and 1000")
 	}
+	if len(query.Configuration) > 20 {
+		return nil, fmt.Errorf("at most 20 configuration predicates are allowed")
+	}
+	if (query.BeforeStartedAt == "") != (query.BeforeRunID == "") {
+		return nil, fmt.Errorf("pagination cursor requires start time and run ID")
+	}
 	where, args := []string{"1=1"}, []any{}
 	if !query.IncludeUnavailable {
 		where = append(where, "r.available = 1")
@@ -58,6 +65,10 @@ func (c *Catalog) List(ctx context.Context, query Query) ([]Run, error) {
 	if query.MinimumEventCount > 0 {
 		where = append(where, "r.event_count >= ?")
 		args = append(args, query.MinimumEventCount)
+	}
+	if query.BeforeStartedAt != "" {
+		where = append(where, "(r.started_at < ? OR (r.started_at = ? AND r.run_id < ?))")
+		args = append(args, query.BeforeStartedAt, query.BeforeStartedAt, query.BeforeRunID)
 	}
 	for i, predicate := range query.Configuration {
 		clause, values, err := predicateSQL(i, predicate)

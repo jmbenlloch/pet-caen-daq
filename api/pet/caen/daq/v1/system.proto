@@ -22,6 +22,7 @@ service RunService {
   rpc StartRun(StartRunRequest) returns (StartRunResponse) {}
   rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {}
+  rpc SearchRuns(SearchRunsRequest) returns (SearchRunsResponse) {}
   rpc DownloadArtifact(DownloadArtifactRequest) returns (stream DownloadArtifactResponse) {}
   rpc GetHistograms(GetHistogramsRequest) returns (GetHistogramsResponse) {}
 }
@@ -118,6 +119,70 @@ message ListRunsRequest {
 message ListRunsResponse {
   // Runs are ordered newest first using completion time, then start time and ID.
   repeated RunSummary runs = 1;
+}
+
+message SearchRunsRequest {
+  repeated ConfigurationPredicate configuration = 1;
+  google.protobuf.Timestamp started_after = 2;
+  google.protobuf.Timestamp started_before = 3;
+  string termination_reason = 4;
+  uint64 minimum_event_count = 5;
+  // Zero uses the server default. The maximum is 100.
+  uint32 limit = 6;
+  // Opaque cursor returned by the preceding response.
+  string page_token = 7;
+}
+
+message SearchRunsResponse {
+  repeated RunSummary runs = 1;
+  string next_page_token = 2;
+}
+
+enum ConfigurationLayer {
+  CONFIGURATION_LAYER_UNSPECIFIED = 0;
+  CONFIGURATION_LAYER_REQUESTED = 1;
+  CONFIGURATION_LAYER_RESOLVED = 2;
+}
+
+message ConfigurationPredicate {
+  string parameter = 1;
+  ConfigurationLayer layer = 2;
+  ConfigurationScope scope = 3;
+  oneof comparison {
+    IntegerComparison integer = 4;
+    RealComparison real = 5;
+    TextComparison text = 6;
+  }
+}
+
+message ConfigurationScope {
+  // An absent scope searches every scope. Global must be explicitly true.
+  oneof scope {
+    bool global = 1;
+    uint32 board = 2;
+    BoardChannelScope channel = 3;
+  }
+}
+
+message BoardChannelScope {
+  uint32 board = 1;
+  uint32 channel = 2;
+}
+
+message IntegerComparison {
+  optional int64 equal = 1;
+  optional int64 minimum = 2;
+  optional int64 maximum = 3;
+}
+
+message RealComparison {
+  optional double equal = 1;
+  optional double minimum = 2;
+  optional double maximum = 3;
+}
+
+message TextComparison {
+  string equal = 1;
 }
 
 message DownloadArtifactRequest {

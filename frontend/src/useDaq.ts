@@ -11,6 +11,7 @@ import {
   type HistogramDataset,
   type HistogramKind,
   type HistogramSelection,
+  type SearchRunsRequest,
 } from './gen/pet/caen/daq/v1/system_pb'
 
 const staleAfterMs = 5_000
@@ -24,6 +25,11 @@ export function useDaq(api: DaqApi) {
   const validationIssues = ref<ValidationIssue[]>([])
   const latestCompletedRun = ref<RunSummary>()
   const runHistory = ref<RunSummary[]>([])
+  const searchResults = ref<RunSummary[]>([])
+  const searchNextPageToken = ref('')
+  const searchLoading = ref(false)
+  const searchError = ref('')
+  const searchPerformed = ref(false)
   const configurationTemplate = ref('')
   const histogramDatasets = ref<HistogramDataset[]>([])
   const histogramsLoading = ref(false)
@@ -31,6 +37,7 @@ export function useDaq(api: DaqApi) {
   let staleTimer: number | undefined
   let reconnectTimer: number | undefined
   let histogramRequestSequence = 0
+  let searchRequestSequence = 0
   let stopped = false
 
   function accept(next: TelemetrySnapshot | undefined) {
@@ -72,6 +79,37 @@ export function useDaq(api: DaqApi) {
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     }
+  }
+
+  async function searchRuns(request: SearchRunsRequest, append = false) {
+    const sequence = ++searchRequestSequence
+    searchLoading.value = true
+    searchError.value = ''
+    if (!append) {
+      searchPerformed.value = true
+      searchResults.value = []
+      searchNextPageToken.value = ''
+    }
+    try {
+      const response = await api.searchRuns(request)
+      if (sequence !== searchRequestSequence) return
+      searchResults.value = append ? [...searchResults.value, ...response.runs] : response.runs
+      searchNextPageToken.value = response.nextPageToken
+    } catch (reason) {
+      if (sequence === searchRequestSequence)
+        searchError.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      if (sequence === searchRequestSequence) searchLoading.value = false
+    }
+  }
+
+  function clearSearch() {
+    searchRequestSequence++
+    searchResults.value = []
+    searchNextPageToken.value = ''
+    searchLoading.value = false
+    searchError.value = ''
+    searchPerformed.value = false
   }
 
   async function downloadArtifact(runId: string, artifactName: string) {
@@ -203,6 +241,11 @@ export function useDaq(api: DaqApi) {
     validationIssues: readonly(validationIssues),
     latestCompletedRun: readonly(latestCompletedRun),
     runHistory: readonly(runHistory),
+    searchResults: readonly(searchResults),
+    searchNextPageToken: readonly(searchNextPageToken),
+    searchLoading: readonly(searchLoading),
+    searchError: readonly(searchError),
+    searchPerformed: readonly(searchPerformed),
     configurationTemplate: readonly(configurationTemplate),
     histogramDatasets: readonly(histogramDatasets),
     histogramsLoading: readonly(histogramsLoading),
@@ -217,6 +260,8 @@ export function useDaq(api: DaqApi) {
     setHighVoltage,
     loadHistograms,
     refreshHistory,
+    searchRuns,
+    clearSearch,
     downloadArtifact,
   }
 }

@@ -82,6 +82,7 @@ function dashboardApi(): DaqApi {
         artifacts: [{ kind: 'decoded_events', name: 'events.jsonl', sizeBytes: 4096n }],
       }),
     ]),
+    searchRuns: vi.fn().mockResolvedValue({ runs: [], nextPageToken: '' }),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
     histograms: vi.fn().mockResolvedValue([]),
   }
@@ -157,6 +158,55 @@ describe('operator dashboard', () => {
     expect(api.validate).toHaveBeenCalledOnce()
     expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/StopRunMode\s+PRESET_COUNTS/)
     expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/PresetCounts\s+3/)
+    wrapper.unmount()
+  })
+
+  it('searches run configuration with typed scoped predicates and clears results', async () => {
+    const api = dashboardApi()
+    vi.mocked(api.searchRuns).mockResolvedValue({
+      runs: [create(RunSummarySchema, { runId: 'matching-run', eventCount: 120n })],
+      nextPageToken: '',
+      $typeName: 'pet.caen.daq.v1.SearchRunsResponse',
+    })
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Parameter 1"]').setValue('TD_CoarseThreshold')
+    await wrapper.get('[aria-label="Scope 1"]').setValue('channel')
+    await wrapper.get('[aria-label="Board 1"]').setValue('2')
+    await wrapper.get('[aria-label="Channel 1"]').setValue('17')
+    await wrapper.get('[aria-label="Type 1"]').setValue('integer')
+    await wrapper.get('[aria-label="Match 1"]').setValue('range')
+    await wrapper.get('[aria-label="Value 1"]').setValue('200')
+    await wrapper.get('[aria-label="Maximum 1"]').setValue('240')
+    await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
+    await flushPromises()
+
+    expect(api.searchRuns).toHaveBeenCalledWith(
+      expect.objectContaining({
+        configuration: [
+          expect.objectContaining({
+            parameter: 'TD_CoarseThreshold',
+            scope: expect.objectContaining({
+              scope: expect.objectContaining({
+                case: 'channel',
+                value: expect.objectContaining({ board: 2, channel: 17 }),
+              }),
+            }),
+            comparison: expect.objectContaining({
+              case: 'integer',
+              value: expect.objectContaining({ minimum: 200n, maximum: 240n }),
+            }),
+          }),
+        ],
+      }),
+    )
+    expect(wrapper.get('[aria-label="Search results"]').text()).toContain('matching-run')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Clear')!
+      .trigger('click')
+    expect(wrapper.find('[aria-label="Search results"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })

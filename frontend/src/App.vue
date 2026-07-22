@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { create } from '@bufbuild/protobuf'
 import defaultConfiguration from '../../test/fixtures/janus/config_same4_v3_good.txt?raw'
 import { createDaqApi, type DaqApi } from './api'
 import BoardOverrides from './BoardOverrides.vue'
@@ -20,7 +21,14 @@ import {
   updateConfiguration,
   type ConfigurationField,
 } from './configuration'
-import { DiagnosticSeverity, HealthStatus, SystemState } from './gen/pet/caen/daq/v1/system_pb'
+import {
+  ConfigurationLayer,
+  DiagnosticSeverity,
+  HealthStatus,
+  SearchRunsRequestSchema,
+  SystemState,
+  type SearchRunsRequest,
+} from './gen/pet/caen/daq/v1/system_pb'
 import { bytes, compact, healthLabel, stateLabel } from './presentation'
 import { useDaq } from './useDaq'
 
@@ -52,6 +60,159 @@ const showRawConfiguration = ref(false)
 const activeMask = ref<{ low: ConfigurationField; high: ConfigurationField }>()
 const activeBoardField = ref<ConfigurationField>()
 const activeChannelField = ref<ConfigurationField>()
+
+type SearchValueType = 'integer' | 'real' | 'text'
+type SearchScope = 'global' | 'board' | 'channel'
+interface SearchPredicateInput {
+  id: number
+  parameter: string
+  layer: ConfigurationLayer
+  scope: SearchScope
+  board: string
+  channel: string
+  valueType: SearchValueType
+  operator: 'equal' | 'range'
+  value: string
+  maximum: string
+}
+let nextSearchPredicateId = 1
+function newSearchPredicate(): SearchPredicateInput {
+  return {
+    id: nextSearchPredicateId++,
+    parameter: '',
+    layer: ConfigurationLayer.RESOLVED,
+    scope: 'global',
+    board: '0',
+    channel: '0',
+    valueType: 'text',
+    operator: 'equal',
+    value: '',
+    maximum: '',
+  }
+}
+const searchPredicates = ref<SearchPredicateInput[]>([newSearchPredicate()])
+const searchTerminationReason = ref('')
+const searchMinimumEvents = ref('')
+const searchFormError = ref('')
+const lastSearchRequest = ref<SearchRunsRequest>()
+
+function addSearchPredicate() {
+  searchPredicates.value.push(newSearchPredicate())
+}
+
+function removeSearchPredicate(id: number) {
+  searchPredicates.value = searchPredicates.value.filter((predicate) => predicate.id !== id)
+  if (!searchPredicates.value.length) searchPredicates.value = [newSearchPredicate()]
+}
+
+function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
+  searchFormError.value = ''
+  try {
+    const configuration = searchPredicates.value
+      .filter((predicate) => predicate.parameter.trim() || predicate.value.trim())
+      .map((predicate) => {
+        if (!predicate.parameter.trim() || !predicate.value.trim())
+          throw new Error('Each configuration filter needs a parameter and value.')
+        const scopeValue =
+          predicate.scope === 'global'
+            ? { case: 'global' as const, value: true }
+            : predicate.scope === 'board'
+              ? { case: 'board' as const, value: Number(predicate.board) }
+              : {
+                  case: 'channel' as const,
+                  value: { board: Number(predicate.board), channel: Number(predicate.channel) },
+                }
+        const scopedNumbers =
+          scopeValue.case === 'board'
+            ? [scopeValue.value]
+            : scopeValue.case === 'channel'
+              ? [scopeValue.value.board, scopeValue.value.channel]
+              : []
+        if (scopedNumbers.some((value) => !Number.isInteger(value) || value < 0))
+          throw new Error('Board and channel must be non-negative integers.')
+        const scope = { scope: scopeValue }
+        if (predicate.valueType === 'text') {
+          return {
+            parameter: predicate.parameter.trim(),
+            layer: predicate.layer,
+            scope,
+            comparison: { case: 'text' as const, value: { equal: predicate.value } },
+          }
+        }
+        if (predicate.operator === 'range' && !predicate.maximum.trim())
+          throw new Error('Range filters need both a minimum and maximum.')
+        if (predicate.valueType === 'integer') {
+          const value = BigInt(predicate.value)
+          return {
+            parameter: predicate.parameter.trim(),
+            layer: predicate.layer,
+            scope,
+            comparison: {
+              case: 'integer' as const,
+              value:
+                predicate.operator === 'range'
+                  ? { minimum: value, maximum: BigInt(predicate.maximum) }
+                  : { equal: value },
+            },
+          }
+        }
+        const value = Number(predicate.value)
+        const maximum = Number(predicate.maximum)
+        if (
+          !Number.isFinite(value) ||
+          (predicate.operator === 'range' && !Number.isFinite(maximum))
+        )
+          throw new Error('Real-number filters need valid numeric values.')
+        return {
+          parameter: predicate.parameter.trim(),
+          layer: predicate.layer,
+          scope,
+          comparison: {
+            case: 'real' as const,
+            value: predicate.operator === 'range' ? { minimum: value, maximum } : { equal: value },
+          },
+        }
+      })
+    const minimumEventCount = searchMinimumEvents.value.trim()
+      ? BigInt(searchMinimumEvents.value)
+      : 0n
+    return create(SearchRunsRequestSchema, {
+      configuration,
+      terminationReason: searchTerminationReason.value.trim(),
+      minimumEventCount,
+      limit: 20,
+      pageToken,
+    })
+  } catch (reason) {
+    searchFormError.value = reason instanceof Error ? reason.message : String(reason)
+    return undefined
+  }
+}
+
+async function submitRunSearch() {
+  const request = buildSearchRequest()
+  if (!request) return
+  lastSearchRequest.value = request
+  await daq.searchRuns(request)
+}
+
+async function loadMoreSearchResults() {
+  if (!lastSearchRequest.value || !daq.searchNextPageToken.value) return
+  const request = create(SearchRunsRequestSchema, {
+    ...lastSearchRequest.value,
+    pageToken: daq.searchNextPageToken.value,
+  })
+  await daq.searchRuns(request, true)
+}
+
+function clearRunSearch() {
+  searchPredicates.value = [newSearchPredicate()]
+  searchTerminationReason.value = ''
+  searchMinimumEvents.value = ''
+  searchFormError.value = ''
+  lastSearchRequest.value = undefined
+  daq.clearSearch()
+}
 
 const sections = computed(() => [
   'All',
@@ -832,6 +993,168 @@ onMounted(() => daq.connect())
             @click="daq.refreshHistory()"
           >
             Refresh
+          </button>
+        </div>
+        <form class="run-search" aria-label="Search stored runs" @submit.prevent="submitRunSearch">
+          <div class="search-heading">
+            <div>
+              <strong>Search configurations</strong>
+              <p>All filters must match. Numeric values use the catalog's canonical units.</p>
+            </div>
+            <button class="link-button" type="button" @click="addSearchPredicate">
+              Add filter
+            </button>
+          </div>
+          <div
+            v-for="(predicate, index) in searchPredicates"
+            :key="predicate.id"
+            class="search-predicate"
+          >
+            <label>
+              Parameter
+              <input
+                v-model="predicate.parameter"
+                :aria-label="`Parameter ${index + 1}`"
+                placeholder="HV_Vbias"
+              />
+            </label>
+            <label>
+              Layer
+              <select v-model="predicate.layer" :aria-label="`Layer ${index + 1}`">
+                <option :value="ConfigurationLayer.RESOLVED">Resolved</option>
+                <option :value="ConfigurationLayer.REQUESTED">Requested</option>
+              </select>
+            </label>
+            <label>
+              Scope
+              <select v-model="predicate.scope" :aria-label="`Scope ${index + 1}`">
+                <option value="global">Global</option>
+                <option value="board">Board</option>
+                <option value="channel">Channel</option>
+              </select>
+            </label>
+            <label v-if="predicate.scope !== 'global'">
+              Board
+              <input
+                v-model="predicate.board"
+                type="number"
+                min="0"
+                :aria-label="`Board ${index + 1}`"
+              />
+            </label>
+            <label v-if="predicate.scope === 'channel'">
+              Channel
+              <input
+                v-model="predicate.channel"
+                type="number"
+                min="0"
+                :aria-label="`Channel ${index + 1}`"
+              />
+            </label>
+            <label>
+              Type
+              <select v-model="predicate.valueType" :aria-label="`Type ${index + 1}`">
+                <option value="text">Text / enum</option>
+                <option value="integer">Integer</option>
+                <option value="real">Real</option>
+              </select>
+            </label>
+            <label v-if="predicate.valueType !== 'text'">
+              Match
+              <select v-model="predicate.operator" :aria-label="`Match ${index + 1}`">
+                <option value="equal">Equals</option>
+                <option value="range">Range</option>
+              </select>
+            </label>
+            <label>
+              {{
+                predicate.operator === 'range' && predicate.valueType !== 'text'
+                  ? 'Minimum'
+                  : 'Value'
+              }}
+              <input v-model="predicate.value" :aria-label="`Value ${index + 1}`" />
+            </label>
+            <label v-if="predicate.operator === 'range' && predicate.valueType !== 'text'">
+              Maximum
+              <input v-model="predicate.maximum" :aria-label="`Maximum ${index + 1}`" />
+            </label>
+            <button
+              v-if="searchPredicates.length > 1"
+              class="link-button remove-filter"
+              type="button"
+              :aria-label="`Remove filter ${index + 1}`"
+              @click="removeSearchPredicate(predicate.id)"
+            >
+              Remove
+            </button>
+          </div>
+          <div class="search-metadata">
+            <label>
+              Termination reason
+              <input v-model="searchTerminationReason" placeholder="preset_counts" />
+            </label>
+            <label>
+              Minimum events
+              <input v-model="searchMinimumEvents" type="number" min="0" />
+            </label>
+          </div>
+          <p v-if="searchFormError" class="field-error" role="alert">{{ searchFormError }}</p>
+          <p v-if="daq.searchError.value" class="field-error" role="alert">
+            Search failed: {{ daq.searchError.value }}
+          </p>
+          <div class="actions">
+            <button class="primary" type="submit" :disabled="daq.searchLoading.value">
+              {{ daq.searchLoading.value ? 'Searching…' : 'Search runs' }}
+            </button>
+            <button type="button" :disabled="daq.searchLoading.value" @click="clearRunSearch">
+              Clear
+            </button>
+          </div>
+        </form>
+        <div v-if="daq.searchPerformed.value" class="search-results" aria-live="polite">
+          <p
+            v-if="
+              !daq.searchLoading.value && !daq.searchResults.value.length && !daq.searchError.value
+            "
+            class="empty"
+          >
+            No runs match these filters.
+          </p>
+          <div v-else class="artifacts" aria-label="Search results">
+            <article
+              v-for="run in daq.searchResults.value"
+              :key="run.runId"
+              class="artifact history-run"
+            >
+              <div>
+                <strong>{{ run.runId }}</strong>
+                <span
+                  >{{ compact(run.eventCount) }} events ·
+                  {{ run.terminationReason || 'Completed' }}</span
+                >
+              </div>
+              <div class="history-actions">
+                <button
+                  v-for="artifact in run.artifacts"
+                  :key="artifact.name"
+                  class="link-button"
+                  type="button"
+                  :disabled="daq.busy.value"
+                  @click="daq.downloadArtifact(run.runId, artifact.name)"
+                >
+                  {{ artifact.name }} · {{ bytes(artifact.sizeBytes) }}
+                </button>
+              </div>
+            </article>
+          </div>
+          <button
+            v-if="daq.searchNextPageToken.value"
+            class="link-button load-more"
+            type="button"
+            :disabled="daq.searchLoading.value"
+            @click="loadMoreSearchResults"
+          >
+            Load more
           </button>
         </div>
         <div class="artifacts" aria-label="Stored runs">
