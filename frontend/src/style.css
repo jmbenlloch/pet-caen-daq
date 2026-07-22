@@ -228,6 +228,12 @@ input:not([type='checkbox']) {
   margin-top: 7px;
   padding: 10px 12px;
 }
+select {
+  display: block;
+  min-height: 40px;
+  margin-top: 7px;
+  padding: 9px 36px 9px 12px;
+}
 input:focus,
 textarea:focus,
 select:focus {
