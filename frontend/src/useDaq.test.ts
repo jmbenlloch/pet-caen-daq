@@ -86,8 +86,6 @@ describe('useDaq', () => {
     const { store, wrapper } = mountStore(api)
 
     await store.startRun({
-      runId: 'run-55',
-      requestedBy: 'operator',
       configuration: 'invalid',
       captureRaw: true,
       journalTransport: true,
@@ -118,7 +116,7 @@ describe('useDaq', () => {
     void store.connect()
     await vi.waitFor(() => expect(store.snapshot.value?.currentRun?.runId).toBe('run-55'))
 
-    await store.stopRun('operator')
+    await store.stopRun()
 
     expect(stop).toHaveBeenCalledWith(
       expect.objectContaining({ runId: 'run-55', requestedBy: 'operator' }),

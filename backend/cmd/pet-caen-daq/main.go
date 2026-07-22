@@ -201,16 +201,6 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	runService := &service.RunService{
 		Controller: coordinator, Telemetry: publisher, Boards: boards,
-		RunExists: func(runID string) (bool, error) {
-			_, err := os.Stat(filepath.Join(*runParent, "run-"+runID))
-			if err == nil {
-				return true, nil
-			}
-			if errors.Is(err, os.ErrNotExist) {
-				return false, nil
-			}
-			return false, err
-		},
 		RunParent: *runParent,
 		Configure: func(configureCtx context.Context, runDocument *janusconfig.Document, actor string) (acquisition.ConfigurationResult, error) {
 			return configurator.Configure(configureCtx, runDocument, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: *authorizeHV})
@@ -218,6 +208,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	}
 	if catalog != nil {
 		runService.Catalog = catalog
+		runService.AllocateRunID = catalog.AllocateRunID
 		runService.ReconcileCatalog = func(reconcileCtx context.Context, parent string) error {
 			_, err := catalog.Reconcile(reconcileCtx, parent)
 			return err

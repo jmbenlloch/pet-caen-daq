@@ -136,3 +136,31 @@ func TestListUsesStableExclusivePaginationCursor(t *testing.T) {
 }
 
 func pointer[T any](value T) *T { return &value }
+
+func TestCatalogAllocatesMonotonicRunIDsAboveIndexedRuns(t *testing.T) {
+	catalog, err := Open(filepath.Join(t.TempDir(), "catalog.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer catalog.Close()
+	ctx := context.Background()
+	for _, runID := range []string{"7", "legacy-name", "12"} {
+		if err := catalog.IndexManifest(ctx, IndexRequest{
+			Manifest:     runstore.Manifest{SchemaVersion: 1, RunID: runID, StartedAt: "2026-07-22T10:00:00Z"},
+			ManifestPath: "/runs/run-" + runID + "/manifest.json", ManifestSHA256: "hash-" + runID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	first, err := catalog.AllocateRunID(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := catalog.AllocateRunID(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != "13" || second != "14" {
+		t.Fatalf("allocated IDs = %q, %q", first, second)
+	}
+}

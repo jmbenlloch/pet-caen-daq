@@ -42,7 +42,8 @@ requests raw and transport-journal evidence, monitors state, and attempts an
 orderly stop after interruption.
 
 Before a detector run, confirm that the backend is ready, all four expected
-boards are listed, storage has enough free space, the run ID is unique, and the
+boards are listed, storage has enough free space, the SQLite catalog can allocate
+a unique monotonically increasing numeric run ID, and the
 submitted configuration is the intended byte-exact document. Afterward, retain
 `manifest.json`, `events.jsonl`, and any requested `wire.raw` and
 `transport.journal` artifacts and verify the manifest sizes and SHA-256 values.

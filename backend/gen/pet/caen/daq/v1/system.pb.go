@@ -917,7 +917,6 @@ func (x *SetHighVoltageResponse) GetSnapshot() *TelemetrySnapshot {
 
 type StartRunRequest struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
-	RunId              string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	JanusConfiguration string                 `protobuf:"bytes,2,opt,name=janus_configuration,json=janusConfiguration,proto3" json:"janus_configuration,omitempty"`
 	CaptureRaw         bool                   `protobuf:"varint,3,opt,name=capture_raw,json=captureRaw,proto3" json:"capture_raw,omitempty"`
 	JournalTransport   bool                   `protobuf:"varint,4,opt,name=journal_transport,json=journalTransport,proto3" json:"journal_transport,omitempty"`
@@ -954,13 +953,6 @@ func (x *StartRunRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use StartRunRequest.ProtoReflect.Descriptor instead.
 func (*StartRunRequest) Descriptor() ([]byte, []int) {
 	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *StartRunRequest) GetRunId() string {
-	if x != nil {
-		return x.RunId
-	}
-	return ""
 }
 
 func (x *StartRunRequest) GetJanusConfiguration() string {
@@ -3211,14 +3203,13 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x12!\n" +
 	"\frequested_by\x18\x03 \x01(\tR\vrequestedBy\"X\n" +
 	"\x16SetHighVoltageResponse\x12>\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xca\x01\n" +
-	"\x0fStartRunRequest\x12\x15\n" +
-	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12/\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xc1\x01\n" +
+	"\x0fStartRunRequest\x12/\n" +
 	"\x13janus_configuration\x18\x02 \x01(\tR\x12janusConfiguration\x12\x1f\n" +
 	"\vcapture_raw\x18\x03 \x01(\bR\n" +
 	"captureRaw\x12+\n" +
 	"\x11journal_transport\x18\x04 \x01(\bR\x10journalTransport\x12!\n" +
-	"\frequested_by\x18\x05 \x01(\tR\vrequestedBy\"\x81\x01\n" +
+	"\frequested_by\x18\x05 \x01(\tR\vrequestedByJ\x04\b\x01\x10\x02R\x06run_id\"\x81\x01\n" +
 	"\x10StartRunResponse\x12-\n" +
 	"\x03run\x18\x01 \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x03run\x12>\n" +
 	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"J\n" +

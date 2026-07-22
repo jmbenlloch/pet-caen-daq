@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 2
+const schemaVersion = 3
 const timestampFormat = "2006-01-02T15:04:05.000000000Z07:00"
 
 type Catalog struct{ db *sql.DB }
@@ -44,6 +45,19 @@ func Open(path string) (*Catalog, error) {
 }
 
 func (c *Catalog) Close() error { return c.db.Close() }
+
+// AllocateRunID atomically reserves the next monotonically increasing numeric
+// run identity. Allocated identities are never reused, even if run startup
+// subsequently fails.
+func (c *Catalog) AllocateRunID(ctx context.Context) (string, error) {
+	var id int64
+	if err := c.db.QueryRowContext(ctx, `
+UPDATE run_id_allocator SET next_id = next_id + 1 WHERE singleton = 1
+RETURNING next_id - 1`).Scan(&id); err != nil {
+		return "", fmt.Errorf("allocate run ID: %w", err)
+	}
+	return fmt.Sprintf("%d", id), nil
+}
 
 type ValueType string
 
@@ -123,6 +137,11 @@ ON CONFLICT(run_id) DO UPDATE SET
 		request.ManifestSHA256, nullable(request.ConfigurationSHA256), time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		return fmt.Errorf("index run %q: %w", m.RunID, err)
+	}
+	if numericID, parseErr := strconv.ParseInt(m.RunID, 10, 64); parseErr == nil && numericID > 0 {
+		if _, err = tx.ExecContext(ctx, `UPDATE run_id_allocator SET next_id = MAX(next_id, ? + 1) WHERE singleton = 1`, numericID); err != nil {
+			return fmt.Errorf("advance run ID allocator for run %q: %w", m.RunID, err)
+		}
 	}
 	if _, err = tx.ExecContext(ctx, `DELETE FROM artifacts WHERE run_id = ?`, m.RunID); err != nil {
 		return fmt.Errorf("replace artifacts for run %q: %w", m.RunID, err)

@@ -15,6 +15,7 @@ import {
 } from './gen/pet/caen/daq/v1/system_pb'
 
 const staleAfterMs = 5_000
+const operatorIdentity = 'operator'
 
 export function useDaq(api: DaqApi) {
   const snapshot = ref<TelemetrySnapshot>()
@@ -145,8 +146,6 @@ export function useDaq(api: DaqApi) {
   }
 
   async function startRun(input: {
-    runId: string
-    requestedBy: string
     configuration: string
     captureRaw: boolean
     journalTransport: boolean
@@ -159,8 +158,7 @@ export function useDaq(api: DaqApi) {
       busy.value = true
       const result = await api.start(
         create(StartRunRequestSchema, {
-          runId: input.runId,
-          requestedBy: input.requestedBy,
+          requestedBy: operatorIdentity,
           janusConfiguration: input.configuration,
           captureRaw: input.captureRaw,
           journalTransport: input.journalTransport,
@@ -174,13 +172,15 @@ export function useDaq(api: DaqApi) {
     }
   }
 
-  async function stopRun(requestedBy: string) {
+  async function stopRun() {
     const runId = snapshot.value?.currentRun?.runId
     if (!runId) return
     busy.value = true
     error.value = ''
     try {
-      const result = await api.stop(create(StopRunRequestSchema, { runId, requestedBy }))
+      const result = await api.stop(
+        create(StopRunRequestSchema, { runId, requestedBy: operatorIdentity }),
+      )
       accept(result.snapshot)
       if (result.run) latestCompletedRun.value = result.run
       await refreshHistory()
@@ -191,11 +191,11 @@ export function useDaq(api: DaqApi) {
     }
   }
 
-  async function setHighVoltage(boards: number[], enabled: boolean, requestedBy: string) {
+  async function setHighVoltage(boards: number[], enabled: boolean) {
     busy.value = true
     error.value = ''
     try {
-      accept(await api.setHighVoltage(boards, enabled, requestedBy))
+      accept(await api.setHighVoltage(boards, enabled, operatorIdentity))
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {

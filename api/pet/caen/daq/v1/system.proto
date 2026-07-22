@@ -89,7 +89,8 @@ message SetHighVoltageResponse {
 }
 
 message StartRunRequest {
-  string run_id = 1;
+  reserved 1;
+  reserved "run_id";
   string janus_configuration = 2;
   bool capture_raw = 3;
   bool journal_transport = 4;

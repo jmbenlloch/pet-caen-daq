@@ -116,7 +116,8 @@ describe('operator dashboard', () => {
     expect(wrapper.text()).toContain('run-54')
     expect(wrapper.text()).toContain('events.jsonl · 4.0 KiB')
 
-    await wrapper.get('input[placeholder="run-0055"]').setValue('run-55')
+    expect(wrapper.text()).not.toContain('Requested by')
+    expect(wrapper.text()).not.toContain('Run ID')
     expect(wrapper.text()).toContain('PresetTime')
     expect(wrapper.text()).toContain('EnableJobs')
     expect(
@@ -131,7 +132,6 @@ describe('operator dashboard', () => {
     expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/PresetTime\s+30/)
     expect(api.start).toHaveBeenCalledWith(
       expect.objectContaining({
-        runId: 'run-55',
         requestedBy: 'operator',
         captureRaw: true,
         journalTransport: true,
@@ -146,7 +146,6 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
 
-    await wrapper.get('input[placeholder="run-0055"]').setValue('counted-run')
     await wrapper.get('select').setValue('PRESET_COUNTS')
     const presetCounts = wrapper.get('input[type="number"][min="1"]')
     const presetCountsInput = presetCounts.element as HTMLInputElement

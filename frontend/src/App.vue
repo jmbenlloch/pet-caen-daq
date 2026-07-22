@@ -44,8 +44,6 @@ function toggleTheme() {
   document.documentElement.dataset.theme = theme.value
   window.localStorage.setItem('pet-caen-theme', theme.value)
 }
-const runId = ref('')
-const requestedBy = ref('operator')
 const configurationDocument = ref(parseConfiguration(defaultConfiguration))
 const configuration = computed({
   get: () => configurationDocument.value.source,
@@ -559,14 +557,6 @@ onMounted(() => daq.connect())
 
           <div class="fields">
             <label>
-              Run ID
-              <input v-model.trim="runId" autocomplete="off" placeholder="run-0055" />
-            </label>
-            <label>
-              Requested by
-              <input v-model.trim="requestedBy" autocomplete="name" />
-            </label>
-            <label>
               Run stop
               <select
                 :value="stopMode"
@@ -864,14 +854,12 @@ onMounted(() => daq.connect())
               type="button"
               :disabled="
                 !daq.canStart.value ||
-                !runId ||
-                !requestedBy ||
                 !configuration ||
                 configurationErrors.length > 0 ||
                 !!stopPolicyError
               "
               @click="
-                daq.startRun({ runId, requestedBy, configuration, captureRaw, journalTransport })
+                daq.startRun({ configuration, captureRaw, journalTransport })
               "
             >
               Start run
@@ -879,8 +867,8 @@ onMounted(() => daq.connect())
             <button
               class="danger"
               type="button"
-              :disabled="!daq.canStop.value || !requestedBy"
-              @click="daq.stopRun(requestedBy)"
+              :disabled="!daq.canStop.value"
+              @click="daq.stopRun()"
             >
               Stop and drain
             </button>
@@ -1212,16 +1200,16 @@ onMounted(() => daq.connect())
             <button
               type="button"
               class="secondary"
-              :disabled="!daq.canSwitchHV.value || !requestedBy"
-              @click="daq.setHighVoltage([], true, requestedBy)"
+              :disabled="!daq.canSwitchHV.value"
+              @click="daq.setHighVoltage([], true)"
             >
               All HV on
             </button>
             <button
               type="button"
               class="danger"
-              :disabled="!daq.canSwitchHV.value || !requestedBy"
-              @click="daq.setHighVoltage([], false, requestedBy)"
+              :disabled="!daq.canSwitchHV.value"
+              @click="daq.setHighVoltage([], false)"
             >
               All HV off
             </button>
@@ -1298,8 +1286,8 @@ onMounted(() => daq.connect())
             <button
               type="button"
               :class="board.hvOn ? 'danger' : 'secondary'"
-              :disabled="!daq.canSwitchHV.value || !requestedBy"
-              @click="daq.setHighVoltage([board.chain], !board.hvOn, requestedBy)"
+              :disabled="!daq.canSwitchHV.value"
+              @click="daq.setHighVoltage([board.chain], !board.hvOn)"
             >
               Turn board {{ board.chain }} HV {{ board.hvOn ? 'off' : 'on' }}
             </button>

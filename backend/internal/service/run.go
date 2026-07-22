@@ -56,11 +56,11 @@ type RunService struct {
 	Configure        ConfigurationApplier
 	Boards           []configaudit.BoardEvidence
 	HealthInterval   time.Duration
-	RunExists        func(string) (bool, error)
 	RunParent        string
 	ReconcileCatalog func(context.Context, string) error
 	CatalogError     func(error)
 	Catalog          RunCatalog
+	AllocateRunID    func(context.Context) (string, error)
 
 	opMu          sync.Mutex
 	mu            sync.Mutex
@@ -333,26 +333,14 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	}
 	defer s.opMu.Unlock()
 	message := request.Msg
-	if message.GetRunId() == "" || message.GetRequestedBy() == "" {
-		return nil, serviceError(connect.CodeInvalidArgument, "REQUIRED_IDENTITY", fmt.Errorf("run_id and requested_by are required"))
-	}
-	if !validRunID.MatchString(message.GetRunId()) {
-		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_ID", fmt.Errorf("run_id must match %s", validRunID.String()))
+	if message.GetRequestedBy() == "" {
+		return nil, serviceError(connect.CodeInvalidArgument, "REQUIRED_IDENTITY", fmt.Errorf("requested_by is required"))
 	}
 	if s.Controller.ActiveRunID() != "" {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ALREADY_ACTIVE", fmt.Errorf("run %q is already active", s.Controller.ActiveRunID()))
 	}
-	if s.completedRun(message.GetRunId()) != nil {
-		return nil, serviceError(connect.CodeAlreadyExists, "DUPLICATE_RUN_ID", fmt.Errorf("run %q was already completed", message.GetRunId()))
-	}
-	if s.RunExists != nil {
-		exists, err := s.RunExists(message.GetRunId())
-		if err != nil {
-			return nil, serviceError(connect.CodeInternal, "RUN_STORAGE_INSPECTION_FAILED", err)
-		}
-		if exists {
-			return nil, serviceError(connect.CodeAlreadyExists, "RUN_DIRECTORY_EXISTS", fmt.Errorf("run directory for %q already exists", message.GetRunId()))
-		}
+	if s.AllocateRunID == nil {
+		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ID_ALLOCATION_UNAVAILABLE", fmt.Errorf("run catalog ID allocation is not configured"))
 	}
 	if issues := ValidateJANUSConfiguration(message.GetJanusConfiguration()); len(issues) != 0 {
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_CONFIGURATION", fmt.Errorf("configuration is invalid: %s", issues[0].GetMessage()))
@@ -386,19 +374,26 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		}
 		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_AUDIT_FAILED", err)
 	}
+	runID, err := s.AllocateRunID(ctx)
+	if err != nil {
+		return nil, serviceError(connect.CodeInternal, "RUN_ID_ALLOCATION_FAILED", err)
+	}
+	if !validRunID.MatchString(runID) {
+		return nil, serviceError(connect.CodeInternal, "INVALID_ALLOCATED_RUN_ID", fmt.Errorf("allocated run ID %q is invalid", runID))
+	}
 	options := acquisition.RunOptions{
 		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
 		Histograms: histogramOptions,
 	}
-	if err := s.Controller.Start(ctx, message.GetRunId(), message.GetRequestedBy(), options); err != nil {
+	if err := s.Controller.Start(ctx, runID, message.GetRequestedBy(), options); err != nil {
 		if errors.Is(err, runstore.ErrRunExists) {
 			return nil, serviceError(connect.CodeAlreadyExists, "RUN_DIRECTORY_EXISTS", err)
 		}
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_START_FAILED", err)
 	}
 	run := &daqv1.RunSummary{
-		RunId: message.GetRunId(), StartedAt: timestamppb.New(s.now()), Incomplete: true,
+		RunId: runID, StartedAt: timestamppb.New(s.now()), Incomplete: true,
 		StopMode: stopPolicy.mode, PresetTimeMilliseconds: uint64(stopPolicy.duration.Milliseconds()), PresetEventCount: stopPolicy.eventCount,
 	}
 	s.mu.Lock()
@@ -406,7 +401,7 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	s.mu.Unlock()
 	snapshot := s.publish(run)
 	s.startMonitor()
-	s.startPresetMonitor(message.GetRunId(), stopPolicy)
+	s.startPresetMonitor(runID, stopPolicy)
 	return connect.NewResponse(&daqv1.StartRunResponse{Run: run, Snapshot: snapshot}), nil
 }
 

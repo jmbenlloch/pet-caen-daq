@@ -32,6 +32,11 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			return fmt.Errorf("apply run catalog schema version 2: %w", err)
 		}
 	}
+	if version < 3 {
+		if _, err := tx.ExecContext(ctx, schemaV3); err != nil {
+			return fmt.Errorf("apply run catalog schema version 3: %w", err)
+		}
+	}
 	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion)); err != nil {
 		return fmt.Errorf("record catalog schema version: %w", err)
 	}
@@ -96,4 +101,15 @@ CREATE INDEX config_scope_search ON configuration_values(parameter, board_index,
 const schemaV2 = `
 ALTER TABLE runs ADD COLUMN available INTEGER NOT NULL DEFAULT 1 CHECK(available IN (0,1));
 CREATE INDEX runs_available_started_at ON runs(available, started_at DESC, run_id DESC);
+`
+
+const schemaV3 = `
+CREATE TABLE run_id_allocator (
+ singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+ next_id INTEGER NOT NULL CHECK(next_id > 0)
+) STRICT;
+INSERT INTO run_id_allocator(singleton, next_id)
+SELECT 1, COALESCE(MAX(CAST(run_id AS INTEGER)), 0) + 1
+FROM runs
+WHERE run_id <> '' AND run_id NOT GLOB '*[^0-9]*';
 `

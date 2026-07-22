@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -72,7 +73,12 @@ func newRunService(t *testing.T, controller *fakeRunController) *RunService {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &RunService{Controller: controller, Telemetry: publisher, Configure: func(context.Context, *janusconfig.Document, string) (acquisition.ConfigurationResult, error) {
+	nextRunID := 42
+	return &RunService{Controller: controller, Telemetry: publisher, AllocateRunID: func(context.Context) (string, error) {
+		id := strconv.Itoa(nextRunID)
+		nextRunID++
+		return id, nil
+	}, Configure: func(context.Context, *janusconfig.Document, string) (acquisition.ConfigurationResult, error) {
 		return acquisition.ConfigurationResult{Plans: []dt5202.ConfigurationPlan{{Board: 0}}}, nil
 	}, Now: func() time.Time {
 		return time.Date(2026, 7, 21, 15, 0, 0, 0, time.UTC)
@@ -82,7 +88,7 @@ func newRunService(t *testing.T, controller *fakeRunController) *RunService {
 func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
 	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
 	service := newRunService(t, controller)
-	start, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology, CaptureRaw: true, JournalTransport: true}))
+	start, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology, CaptureRaw: true, JournalTransport: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +112,7 @@ func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
 
 func TestRunServiceValidatesRequestAndActiveIdentity(t *testing.T) {
 	service := newRunService(t, &fakeRunController{state: acquisition.StateReady})
-	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator"}))
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator"}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("start code = %v error=%v", connect.CodeOf(err), err)
 	}
@@ -129,7 +135,7 @@ func TestRunServicePublishesFaultAfterStopFailure(t *testing.T) {
 func TestRunServiceRejectsStartWhenConfigurationDoesNotReachReady(t *testing.T) {
 	controller := &fakeRunController{state: acquisition.StateConfiguring}
 	service := newRunService(t, controller)
-	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology}))
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition || controller.active != "" {
 		t.Fatalf("code=%v error=%v controller=%+v", connect.CodeOf(err), err, controller)
 	}
@@ -139,7 +145,7 @@ func TestRunServiceOwnsHealthMonitorThroughStop(t *testing.T) {
 	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
 	service := newRunService(t, controller)
 	service.HealthInterval = time.Hour
-	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology}))
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +171,7 @@ func TestRunServicePresetTimeStopsAndPublishesCompletion(t *testing.T) {
 	service := newRunService(t, controller)
 	service.HealthInterval = time.Hour
 	configuration := validTopology + "StopRunMode PRESET_TIME\nPresetTime 20 ms\n"
-	start, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "timed", RequestedBy: "operator", JanusConfiguration: configuration}))
+	start, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: configuration}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +194,7 @@ func TestRunServicePresetCountsStopsAtAuthoritativeEventCount(t *testing.T) {
 	service := newRunService(t, controller)
 	service.HealthInterval = time.Millisecond
 	configuration := validTopology + "StopRunMode PRESET_COUNTS\nPresetCounts 3\n"
-	if _, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "counted", RequestedBy: "operator", JanusConfiguration: configuration})); err != nil {
+	if _, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: configuration})); err != nil {
 		t.Fatal(err)
 	}
 	pipeline.events.Store(3)
@@ -202,10 +208,10 @@ func TestRunServicePresetCountsStopsAtAuthoritativeEventCount(t *testing.T) {
 	}
 }
 
-func TestRunServiceStopIsIdempotentAndCompletedIDCannotRestart(t *testing.T) {
+func TestRunServiceStopIsIdempotentAndNextStartUsesNextID(t *testing.T) {
 	controller := &fakeRunController{state: acquisition.StateReady}
 	service := newRunService(t, controller)
-	request := connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology})
+	request := connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology})
 	if _, err := service.StartRun(context.Background(), request); err != nil {
 		t.Fatal(err)
 	}
@@ -218,21 +224,22 @@ func TestRunServiceStopIsIdempotentAndCompletedIDCannotRestart(t *testing.T) {
 	if err != nil || !proto.Equal(first.Msg.GetRun(), second.Msg.GetRun()) {
 		t.Fatalf("first=%+v second=%+v error=%v", first.Msg, second, err)
 	}
-	_, err = service.StartRun(context.Background(), request)
-	if connect.CodeOf(err) != connect.CodeAlreadyExists || !strings.Contains(err.Error(), "[DUPLICATE_RUN_ID]") {
-		t.Fatalf("code=%v error=%v", connect.CodeOf(err), err)
+	next, err := service.StartRun(context.Background(), request)
+	if err != nil || next.Msg.GetRun().GetRunId() != "43" {
+		t.Fatalf("next=%+v error=%v", next, err)
 	}
 }
 
-func TestRunServiceRejectsExistingDirectoryAndUnsafeID(t *testing.T) {
+func TestRunServiceRejectsInvalidOrFailedAllocatedID(t *testing.T) {
 	service := newRunService(t, &fakeRunController{state: acquisition.StateReady})
-	service.RunExists = func(string) (bool, error) { return true, nil }
-	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology}))
-	if connect.CodeOf(err) != connect.CodeAlreadyExists || !strings.Contains(err.Error(), "[RUN_DIRECTORY_EXISTS]") {
+	service.AllocateRunID = func(context.Context) (string, error) { return "../escape", nil }
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology}))
+	if connect.CodeOf(err) != connect.CodeInternal || !strings.Contains(err.Error(), "[INVALID_ALLOCATED_RUN_ID]") {
 		t.Fatalf("code=%v error=%v", connect.CodeOf(err), err)
 	}
-	_, err = service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "../escape", RequestedBy: "operator", JanusConfiguration: validTopology}))
-	if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "[INVALID_RUN_ID]") {
+	service.AllocateRunID = func(context.Context) (string, error) { return "", errors.New("database unavailable") }
+	_, err = service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology}))
+	if connect.CodeOf(err) != connect.CodeInternal || !strings.Contains(err.Error(), "[RUN_ID_ALLOCATION_FAILED]") {
 		t.Fatalf("code=%v error=%v", connect.CodeOf(err), err)
 	}
 }
@@ -248,7 +255,7 @@ func TestRunServiceRejectsConcurrentOperation(t *testing.T) {
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RunId: "42", RequestedBy: "operator", JanusConfiguration: validTopology}))
+		_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology}))
 		done <- err
 	}()
 	<-entered

@@ -82,6 +82,7 @@ func TestGeneratedClientsCompleteSimulatedRunAndInspectArtifacts(t *testing.T) {
 	coordinator.SetFaultObserver(func(fault error) { service.PublishCoordinatorFault(publisher, fault, nil) })
 	runService := &service.RunService{
 		Controller: coordinator, Telemetry: publisher, Boards: boards, HealthInterval: 5 * time.Millisecond,
+		AllocateRunID: func(context.Context) (string, error) { return "1", nil },
 		Configure: func(ctx context.Context, requested *janusconfig.Document, actor string) (acquisition.ConfigurationResult, error) {
 			return configurator.Configure(ctx, requested, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true})
 		},
@@ -111,7 +112,7 @@ func TestGeneratedClientsCompleteSimulatedRunAndInspectArtifacts(t *testing.T) {
 		t.Fatalf("initial telemetry: %v", stream.Err())
 	}
 	start, err := runClient.StartRun(ctx, connect.NewRequest(&daqv1.StartRunRequest{
-		RunId: "generated-client", RequestedBy: "integration", JanusConfiguration: string(configuration), CaptureRaw: true, JournalTransport: true,
+		RequestedBy: "integration", JanusConfiguration: string(configuration), CaptureRaw: true, JournalTransport: true,
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +134,7 @@ func TestGeneratedClientsCompleteSimulatedRunAndInspectArtifacts(t *testing.T) {
 	if !seenLive {
 		t.Fatalf("live telemetry not observed: %v", stream.Err())
 	}
-	stop, err := runClient.StopRun(ctx, connect.NewRequest(&daqv1.StopRunRequest{RunId: "generated-client", RequestedBy: "integration"}))
+	stop, err := runClient.StopRun(ctx, connect.NewRequest(&daqv1.StopRunRequest{RunId: "1", RequestedBy: "integration"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +142,7 @@ func TestGeneratedClientsCompleteSimulatedRunAndInspectArtifacts(t *testing.T) {
 		t.Fatalf("stop=%+v", stop.Msg)
 	}
 
-	directory := filepath.Join(parent, "run-generated-client")
+	directory := filepath.Join(parent, "run-1")
 	manifestData, err := os.ReadFile(filepath.Join(directory, "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
