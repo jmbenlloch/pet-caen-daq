@@ -7,6 +7,11 @@
   background: #09111f;
   font-synthesis: none;
 }
+[data-theme='light'] {
+  color-scheme: light;
+  color: #17243a;
+  background: #eef3f8;
+}
 * {
   box-sizing: border-box;
 }
@@ -15,6 +20,27 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background: radial-gradient(circle at 15% 0%, #142944 0, transparent 30rem), #09111f;
+}
+.masthead-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 86px;
+  border: 1px solid #34465f;
+  border-radius: 99px;
+  padding: 8px 12px;
+  color: #cad6e5;
+  background: #17263a;
+}
+.theme-toggle span {
+  font-size: 1rem;
+  line-height: 1;
 }
 button,
 input,
@@ -1081,6 +1107,152 @@ textarea {
   background: #10291f;
   border-radius: 3px;
   padding: 2px 4px;
+}
+
+/* The light palette intentionally follows the same semantic hierarchy and
+   status colors as the dark interface; only surfaces, text and contrast move. */
+[data-theme='light'] body {
+  background: radial-gradient(circle at 15% 0%, #dceaf7 0, transparent 30rem), #eef3f8;
+}
+[data-theme='light'] .masthead {
+  border-bottom-color: #cbd7e5;
+}
+[data-theme='light'] .panel {
+  border-color: #c9d6e4;
+  background: linear-gradient(145deg, #ffffff, #f7f9fc);
+  box-shadow: 0 14px 42px #47627b18;
+}
+[data-theme='light'] .eyebrow,
+[data-theme='light'] .muted,
+[data-theme='light'] .connection small,
+[data-theme='light'] .run-now,
+[data-theme='light'] .empty,
+[data-theme='light'] .path,
+[data-theme='light'] .parameter-copy p,
+[data-theme='light'] .parameter-hint,
+[data-theme='light'] .histogram-metadata span,
+[data-theme='light'] .statistics-caption {
+  color: #60748d;
+}
+[data-theme='light'] .run-now strong,
+[data-theme='light'] .parameter-copy label,
+[data-theme='light'] .statistics-summary strong {
+  color: #17243a;
+}
+[data-theme='light'] .fields label,
+[data-theme='light'] .config-heading label,
+[data-theme='light'] .plot-controls label,
+[data-theme='light'] .statistics-controls label {
+  color: #42566f;
+}
+[data-theme='light'] input:not([type='checkbox']),
+[data-theme='light'] textarea,
+[data-theme='light'] select,
+[data-theme='light'] .parameter-editor,
+[data-theme='light'] .numeric-control {
+  border-color: #b8c7d8;
+  color: #17243a;
+  background: #ffffff;
+}
+[data-theme='light'] .parameter-toolbar,
+[data-theme='light'] .parameter-row,
+[data-theme='light'] .statistics-table th,
+[data-theme='light'] .statistics-table td {
+  border-color: #d6e0ea;
+}
+[data-theme='light'] .section-tabs button,
+[data-theme='light'] .link-button,
+[data-theme='light'] .secondary,
+[data-theme='light'] .theme-toggle,
+[data-theme='light'] .statistics-board-tabs button {
+  border-color: #b8c7d8;
+  color: #344c66;
+  background: #f4f7fa;
+}
+[data-theme='light'] .section-tabs button.active,
+[data-theme='light'] .statistics-board-tabs button[aria-selected='true'] {
+  border-color: #168f70;
+  color: #09684f;
+  background: #dff5ed;
+}
+[data-theme='light'] .board-card,
+[data-theme='light'] .artifact,
+[data-theme='light'] .histogram-dataset,
+[data-theme='light'] .channel-statistic {
+  border-color: #c8d5e3;
+  background: #ffffff;
+}
+[data-theme='light'] .histogram-placeholder {
+  border-color: #aabdd0;
+  color: #60748d;
+  background: #f8fafc;
+}
+[data-theme='light'] .histogram-placeholder code {
+  color: #086b51;
+  background: #dff5ed;
+}
+[data-theme='light'] .health-pill {
+  background: #e5ebf2;
+}
+[data-theme='light'] .health-pill.healthy,
+[data-theme='light'] .hv-state.on,
+[data-theme='light'] .safety {
+  color: #09684f;
+  background: #dff5ed;
+}
+[data-theme='light'] .health-pill.fault,
+[data-theme='light'] .hv-state.fault {
+  color: #a92e43;
+  background: #fde8ec;
+}
+[data-theme='light'] .health-pill.degraded,
+[data-theme='light'] .hv-state.ramping {
+  color: #80580b;
+  background: #fff3d6;
+}
+[data-theme='light'] .alert.error,
+[data-theme='light'] .field-error {
+  color: #92283a;
+  border-color: #e5aab5;
+  background: #fdecef;
+}
+[data-theme='light'] .alert.warning,
+[data-theme='light'] .incomplete {
+  color: #75500a;
+  border-color: #e4c476;
+  background: #fff7df;
+}
+[data-theme='light'] .modal-card {
+  border-color: #b8c7d8;
+  color: #17243a;
+  background: #ffffff;
+}
+[data-theme='light'] .mask-channel,
+[data-theme='light'] .channel-value,
+[data-theme='light'] .board-value {
+  border-color: #b8c7d8;
+  color: #344c66;
+  background: #f4f7fa;
+}
+[data-theme='light'] .mask-channel.enabled {
+  color: #ffffff;
+  border-color: #168f70;
+  background: #168f70;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body,
+  .panel,
+  input,
+  textarea,
+  select,
+  button {
+    transition:
+      color 160ms ease,
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease;
+  }
 }
 .visually-hidden {
   position: absolute;

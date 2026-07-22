@@ -26,6 +26,16 @@ import { useDaq } from './useDaq'
 
 const props = defineProps<{ api?: DaqApi }>()
 const daq = useDaq(props.api ?? createDaqApi())
+type Theme = 'dark' | 'light'
+const theme = ref<Theme>(
+  window.localStorage.getItem('pet-caen-theme') === 'light' ? 'light' : 'dark',
+)
+document.documentElement.dataset.theme = theme.value
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  document.documentElement.dataset.theme = theme.value
+  window.localStorage.setItem('pet-caen-theme', theme.value)
+}
 const runId = ref('')
 const requestedBy = ref('operator')
 const configurationDocument = ref(parseConfiguration(defaultConfiguration))
@@ -322,14 +332,26 @@ onMounted(() => daq.connect())
         <p class="eyebrow">PET detector control</p>
         <h1>CAEN acquisition</h1>
       </div>
-      <div class="connection" role="status" aria-live="polite">
-        <span
-          class="status-dot"
-          :class="{ live: daq.connected.value && !daq.stale.value }"
-          aria-hidden="true"
-        />
-        <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
-        <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
+      <div class="masthead-actions">
+        <div class="connection" role="status" aria-live="polite">
+          <span
+            class="status-dot"
+            :class="{ live: daq.connected.value && !daq.stale.value }"
+            aria-hidden="true"
+          />
+          <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
+          <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
+        </div>
+        <button
+          type="button"
+          class="theme-toggle"
+          :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
+          :title="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
+          @click="toggleTheme"
+        >
+          <span aria-hidden="true">{{ theme === 'dark' ? '☀' : '☾' }}</span>
+          {{ theme === 'dark' ? 'Light' : 'Dark' }}
+        </button>
       </div>
     </header>
 

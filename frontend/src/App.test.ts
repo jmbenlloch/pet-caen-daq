@@ -88,6 +88,19 @@ function dashboardApi(): DaqApi {
 }
 
 describe('operator dashboard', () => {
+  it('switches and persists the operator color theme', async () => {
+    localStorage.removeItem('pet-caen-theme')
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    await wrapper.get('[aria-label="Switch to light theme"]').trigger('click')
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(localStorage.getItem('pet-caen-theme')).toBe('light')
+    await wrapper.get('[aria-label="Switch to dark theme"]').trigger('click')
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    wrapper.unmount()
+  })
+
   it('renders discovered hardware and submits validated run controls', async () => {
     const api = dashboardApi()
     const wrapper = mount(App, { props: { api } })

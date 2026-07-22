@@ -1,6 +1,23 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
+test('operator selects a persistent light or dark interface theme', async ({ page }) => {
+  await page.goto('/')
+  const darkBackground = await page
+    .locator('body')
+    .evaluate((element) => getComputedStyle(element).backgroundImage)
+  await page.getByRole('button', { name: 'Switch to light theme' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  const lightBackground = await page
+    .locator('body')
+    .evaluate((element) => getComputedStyle(element).backgroundImage)
+  expect(lightBackground).not.toBe(darkBackground)
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await page.getByRole('button', { name: 'Switch to dark theme' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+})
+
 test('operator completes a simulated run and downloads its persisted artifact', async ({
   page,
 }) => {

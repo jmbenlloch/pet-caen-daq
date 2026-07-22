@@ -104,6 +104,12 @@ response suppression, and a populated-bin preview; no JavaScript plotting
 library has been added. See `docs/histogram-design.md` for the boundary and next
 extensions.
 
+The operator application now offers explicit light and dark color themes from
+the masthead. The selection is stored in browser-local preferences and restored
+on reload. Both palettes cover application surfaces, forms, configuration and
+mask editors, runtime tables, histogram placeholders, health/fault states, and
+responsive layouts while retaining the same status semantics.
+
 The run-control client now retains the authoritative completed `RunSummary`
 returned by `StopRun` rather than trying to reconstruct completion from the next
 telemetry snapshot. The dashboard presents the latest run's termination reason,
