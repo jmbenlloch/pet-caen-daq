@@ -33,6 +33,7 @@ describe('StatisticsTab', () => {
     await wrapper.setProps({ statistics: sample(2000n, 15n, 7n) })
     await wrapper.findAll('[role="tab"]')[1].trigger('click')
     expect(wrapper.text()).toContain('Per-channel metric')
+    expect(wrapper.text()).toContain('timestamp-bearing event rate')
     expect(wrapper.get('[aria-label="Board 0 channel statistics"]').text()).toContain('3.0 Hz')
 
     await wrapper.get('input[type="checkbox"]').setValue(true)

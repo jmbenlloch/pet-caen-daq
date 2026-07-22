@@ -111,6 +111,10 @@ const metricLabel = computed(
           <input v-model="integral" type="checkbox" />
           <span>Cumulative counts</span>
         </label>
+        <p class="statistics-controls-help">
+          Choose the per-channel view: discriminator-trigger rate, timestamp-bearing event rate,
+          or PHA-event rate. Enable cumulative counts to show totals instead of rates.
+        </p>
       </div>
       <p v-else class="statistics-controls-hint">Select a board for per-channel metrics.</p>
     </div>

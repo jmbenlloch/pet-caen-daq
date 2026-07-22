@@ -1050,6 +1050,13 @@ textarea {
   color: #8194ac;
   font-size: 0.75rem;
 }
+.statistics-controls-help {
+  flex-basis: 100%;
+  max-width: 520px;
+  color: #8194ac;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
 .statistics-controls label:not(.switch) {
   min-width: 180px;
 }
