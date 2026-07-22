@@ -9,6 +9,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type mutableRunHealth struct {
@@ -60,6 +61,8 @@ func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 	source.storage.EventCount = 9
 	source.boards[0].EventCount = 9
 	source.boards[0].HVOverCurrent = true
+	newerBoardObservation := boardObservedAt.Add(time.Second)
+	source.boards[0].TelemetryObservedAt = &newerBoardObservation
 	ticks <- time.Unix(1, 0)
 	second := <-updates
 	if second.Sequence != first.Sequence+1 || second.Pipeline.GetDecodedEvents() != 9 || second.CurrentRun.GetEventCount() != 9 || second.Chains[0].Boards[0].GetEventCount() != 9 || second.Chains[0].Boards[0].GetHealth() != daqv1.HealthStatus_HEALTH_STATUS_FAULT {
@@ -78,5 +81,18 @@ func TestHealthMonitorValidatesDependenciesAndCadence(t *testing.T) {
 	publisher, _ := telemetry.NewPublisher("instance-a", nil, nil)
 	if err := (&HealthMonitor{Publisher: publisher, Source: &mutableRunHealth{}}).Run(context.Background()); err == nil {
 		t.Fatal("accepted missing interval")
+	}
+}
+
+func TestBoardTelemetryOnlyAppliesNewerObservations(t *testing.T) {
+	current := time.Date(2026, 7, 22, 18, 0, 0, 0, time.UTC)
+	older := current.Add(-time.Second)
+	newer := current.Add(time.Second)
+	board := &daqv1.Board{TelemetryObservedAt: timestamppb.New(current)}
+	if shouldApplyBoardTelemetry(board, nil) || shouldApplyBoardTelemetry(board, &older) || shouldApplyBoardTelemetry(board, &current) {
+		t.Fatal("accepted missing, older, or equal board telemetry")
+	}
+	if !shouldApplyBoardTelemetry(board, &newer) {
+		t.Fatal("rejected newer board telemetry")
 	}
 }

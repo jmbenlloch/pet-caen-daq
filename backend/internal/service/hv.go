@@ -10,6 +10,7 @@ import (
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type HVTarget struct {
@@ -30,6 +31,7 @@ type NativeHVController struct {
 	Publisher  SnapshotPublisher
 	Targets    []HVTarget
 	Authorized bool
+	Now        func() time.Time
 	mu         sync.Mutex
 }
 
@@ -132,6 +134,7 @@ func (c *NativeHVController) refresh(ctx context.Context, targets []HVTarget) {
 		board.HvRamping = reading.Ramping
 		board.HvOverCurrent = reading.OverCurrent
 		board.HvOverVoltage = reading.OverVoltage
+		board.TelemetryObservedAt = timestamppb.New(c.now())
 		if reading.OverCurrent || reading.OverVoltage {
 			board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
 		} else {
@@ -139,6 +142,13 @@ func (c *NativeHVController) refresh(ctx context.Context, targets []HVTarget) {
 		}
 	}
 	c.Publisher.Publish(snapshot)
+}
+
+func (c *NativeHVController) now() time.Time {
+	if c.Now != nil {
+		return c.Now()
+	}
+	return time.Now()
 }
 
 func findBoard(snapshot *daqv1.TelemetrySnapshot, chain, node uint32) *daqv1.Board {

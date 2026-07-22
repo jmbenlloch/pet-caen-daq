@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
@@ -45,6 +46,7 @@ func TestNativeHVControllerEnforcesAuthorizationAndReadyState(t *testing.T) {
 	controller := &NativeHVController{
 		Hardware: hardware, States: states, Publisher: publisher,
 		Targets: []HVTarget{{Board: 0, Chain: 0, Node: 0}},
+		Now:     func() time.Time { return time.Date(2026, 7, 22, 18, 0, 0, 0, time.UTC) },
 	}
 	if err := controller.Set(context.Background(), []uint32{0}, true, "operator"); err == nil || !strings.Contains(err.Error(), "authorize") {
 		t.Fatalf("unauthorized error = %v", err)
@@ -54,7 +56,7 @@ func TestNativeHVControllerEnforcesAuthorizationAndReadyState(t *testing.T) {
 		t.Fatal(err)
 	}
 	board := publisher.Snapshot().GetChains()[0].GetBoards()[0]
-	if !board.GetHvOn() || board.GetHvVoltageV() != 45.4 || len(hardware.writes) != 4 {
+	if !board.GetHvOn() || board.GetHvVoltageV() != 45.4 || len(hardware.writes) != 4 || board.GetTelemetryObservedAt() == nil || board.GetTelemetryObservedAt().AsTime() != controller.Now() {
 		t.Fatalf("board = %#v, writes = %#v", board, hardware.writes)
 	}
 }

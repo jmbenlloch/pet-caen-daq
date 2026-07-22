@@ -95,34 +95,34 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 						continue
 					}
 					board.EventCount = observation.EventCount
-					board.Health = daqv1.HealthStatus_HEALTH_STATUS_OK
-					if observation.FPGATemperature != nil {
-						board.FpgaTemperatureC = *observation.FPGATemperature
-					}
-					if observation.BoardTemperature != nil {
-						board.BoardTemperatureC = *observation.BoardTemperature
-					}
-					if observation.DetectorTemperature != nil {
-						board.DetectorTemperatureC = *observation.DetectorTemperature
-					}
-					if observation.HVTemperature != nil {
-						board.HvTemperatureC = *observation.HVTemperature
-					}
-					if observation.HVVoltage != nil {
-						board.HvVoltageV = *observation.HVVoltage
-					}
-					if observation.HVCurrent != nil {
-						board.HvCurrentA = *observation.HVCurrent
-					}
-					if observation.TelemetryObservedAt != nil {
+					if shouldApplyBoardTelemetry(board, observation.TelemetryObservedAt) {
+						board.Health = daqv1.HealthStatus_HEALTH_STATUS_OK
+						if observation.FPGATemperature != nil {
+							board.FpgaTemperatureC = *observation.FPGATemperature
+						}
+						if observation.BoardTemperature != nil {
+							board.BoardTemperatureC = *observation.BoardTemperature
+						}
+						if observation.DetectorTemperature != nil {
+							board.DetectorTemperatureC = *observation.DetectorTemperature
+						}
+						if observation.HVTemperature != nil {
+							board.HvTemperatureC = *observation.HVTemperature
+						}
+						if observation.HVVoltage != nil {
+							board.HvVoltageV = *observation.HVVoltage
+						}
+						if observation.HVCurrent != nil {
+							board.HvCurrentA = *observation.HVCurrent
+						}
 						board.TelemetryObservedAt = timestamppb.New(*observation.TelemetryObservedAt)
-					}
-					board.HvOn = observation.HVOn
-					board.HvRamping = observation.HVRamping
-					board.HvOverCurrent = observation.HVOverCurrent
-					board.HvOverVoltage = observation.HVOverVoltage
-					if observation.HVOverCurrent || observation.HVOverVoltage {
-						board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
+						board.HvOn = observation.HVOn
+						board.HvRamping = observation.HVRamping
+						board.HvOverCurrent = observation.HVOverCurrent
+						board.HvOverVoltage = observation.HVOverVoltage
+						if observation.HVOverCurrent || observation.HVOverVoltage {
+							board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
+						}
 					}
 				}
 			}
@@ -147,3 +147,11 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 }
 
 func observationChain(observation runpipeline.BoardStats) uint32 { return uint32(observation.Chain) }
+
+func shouldApplyBoardTelemetry(board *daqv1.Board, observedAt *time.Time) bool {
+	if observedAt == nil {
+		return false
+	}
+	current := board.GetTelemetryObservedAt()
+	return current == nil || current.CheckValid() != nil || observedAt.After(current.AsTime())
+}
