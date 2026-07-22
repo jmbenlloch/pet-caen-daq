@@ -5,13 +5,19 @@ import { BoardSchema, HistogramDatasetSchema, HistogramKind } from './gen/pet/ca
 import PlotWorkspace from './PlotWorkspace.vue'
 
 describe('PlotWorkspace', () => {
-  it('requests selected channel sets and exposes returned bins without plotting them', async () => {
+  it('requests selected channel sets and presents returned bins to the live plot', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
         boards: [{ chain: 1, ...create(BoardSchema, { node: 2 }) }],
         running: true,
         loading: false,
         datasets: [],
+        theme: 'dark',
+      },
+      global: {
+        stubs: {
+          HistogramPlot: { template: '<div aria-label="Live selected-channel histogram plot" />' },
+        },
       },
     })
     await wrapper.get('input[placeholder="0, 2, 8-15"]').setValue('0, 2, 8-9')
@@ -38,6 +44,7 @@ describe('PlotWorkspace', () => {
       ],
     })
     expect(wrapper.get('[aria-label="Histogram datasets"]').text()).toContain('1:3')
-    expect(wrapper.text()).toContain('Dataset ready for a future plotting renderer')
+    wrapper.get('[aria-label="Live selected-channel histogram plot"]')
+    expect(wrapper.get('[aria-label="Populated bin preview"]').text()).toContain('1:3')
   })
 })

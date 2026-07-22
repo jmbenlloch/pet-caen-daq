@@ -33,10 +33,11 @@ queries are a later milestone.
 
 The plot workspace selects a family, board, and comma/range channel expression
 (for example `0, 2, 8-15`). It can request on demand or once per second. Stale
-responses from older selections/runs are discarded. Returned metadata and
-populated-bin previews prove the data boundary without committing the project to
-a JavaScript plotting library. A future renderer should consume the same typed
-datasets and remain independent of acquisition and accumulation.
+responses from older selections/runs are discarded. uPlot renders selected
+channels as stepped overlays with cursor inspection, horizontal drag-to-zoom,
+linear/logarithmic Y scales, responsive sizing, and both application themes.
+One-second data updates preserve the operator's current zoom. Metadata and a
+short populated-bin preview remain available beside the canvas.
 
 ## Next extensions
 
@@ -45,4 +46,5 @@ datasets and remain independent of acquisition and accumulation.
   channel histograms.
 - Add explicit clear/freeze semantics and multi-trace presentation state.
 - Persist finalized histograms and expose bounded historical-run queries.
-- Choose a plotting renderer only after measuring update size and render cost.
+- Extend the benchmarked uPlot renderer with explicit reset-zoom and trace
+  visibility controls as more plot families are introduced.

@@ -875,6 +875,7 @@ onMounted(() => daq.connect())
         :running="daq.snapshot.value?.state === SystemState.RUNNING"
         :loading="daq.histogramsLoading.value"
         :datasets="daq.histogramDatasets.value"
+        :theme="theme"
         @request="daq.loadHistograms"
       />
 

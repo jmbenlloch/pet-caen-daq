@@ -7,18 +7,21 @@ import {
   type HistogramSelection,
 } from './gen/pet/caen/daq/v1/system_pb'
 import { compact } from './presentation'
+import HistogramPlot from './HistogramPlot.vue'
 
 const props = defineProps<{
   boards: Array<{ chain: number; node: number } & DeepReadonly<Board>>
   running: boolean
   loading: boolean
   datasets: readonly DeepReadonly<HistogramDataset>[]
+  theme: 'dark' | 'light'
 }>()
 const emit = defineEmits<{ request: [kind: HistogramKind, selections: HistogramSelection[]] }>()
 const kind = ref(HistogramKind.PHA_HIGH_GAIN)
 const boardKey = ref('0:0')
 const channels = ref('0')
 const autoRefresh = ref(true)
+const logarithmic = ref(false)
 const selectionError = ref('')
 let timer: number | undefined
 
@@ -98,7 +101,7 @@ const kindLabel = computed(
         <p class="eyebrow">Server-side accumulated data</p>
         <h2 id="plots-heading">Plots and histograms</h2>
       </div>
-      <span class="safety">Rendering library intentionally not selected yet</span>
+      <span class="safety">uPlot · drag horizontally to zoom</span>
     </div>
     <div class="plot-controls">
       <label
@@ -124,12 +127,21 @@ const kindLabel = computed(
       <label class="switch compact-switch"
         ><input v-model="autoRefresh" type="checkbox" /><span>Live refresh</span></label
       >
+      <label class="switch compact-switch"
+        ><input v-model="logarithmic" type="checkbox" /><span>Log Y</span></label
+      >
       <button type="button" class="secondary" :disabled="!running || loading" @click="request">
         {{ loading ? 'Loading…' : 'Request data' }}
       </button>
     </div>
     <p v-if="selectionError" class="field-error" role="alert">{{ selectionError }}</p>
     <p v-if="!running" class="empty">Start a run to request accumulated histogram data.</p>
+    <HistogramPlot
+      v-if="datasets.length"
+      :datasets="datasets"
+      :theme="theme"
+      :logarithmic="logarithmic"
+    />
     <div v-if="datasets.length" class="histogram-datasets" aria-label="Histogram datasets">
       <article
         v-for="dataset in datasets"
@@ -147,8 +159,8 @@ const kindLabel = computed(
             {{ compact(dataset.overflow) }}</span
           >
         </div>
-        <div class="histogram-placeholder" aria-label="Histogram rendering placeholder">
-          <span>Dataset ready for a future plotting renderer</span
+        <div class="histogram-bin-preview" aria-label="Populated bin preview">
+          <span>First populated bins</span
           ><code v-for="bin in populated(dataset)" :key="bin.index"
             >{{ bin.index }}:{{ compact(bin.count) }}</code
           ><small v-if="!populated(dataset).length">No populated bins yet</small>

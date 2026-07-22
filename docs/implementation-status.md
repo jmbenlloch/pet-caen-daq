@@ -94,20 +94,20 @@ The run-control frontend exposes this policy directly, shows the active target
 and remaining time/events, and keeps manual Stop and drain enabled in every
 preset mode.
 
-Live plotting now has a library-independent data foundation. Each active run
+Live plotting now has a bounded data foundation. Each active run
 lazily accumulates bounded per-board/per-channel PHA high/low, ToA, and ToT
 histograms on the server using JANUS bin-count settings. A typed run endpoint
 returns only selected channel sets with axis metadata, entries, underflow, and
 overflow rather than inflating the telemetry stream. The frontend workspace
 supports board/channel-range selection, manual or one-second refresh, stale
-response suppression, and a populated-bin preview; no JavaScript plotting
-library has been added. See `docs/histogram-design.md` for the boundary and next
-extensions.
+response suppression, and uPlot stepped overlays with cursor inspection,
+horizontal zoom, linear/logarithmic Y axes, responsive sizing, and theme-aware
+colors. See `docs/histogram-design.md` for the boundary and next extensions.
 
 The operator application now offers explicit light and dark color themes from
 the masthead. The selection is stored in browser-local preferences and restored
 on reload. Both palettes cover application surfaces, forms, configuration and
-mask editors, runtime tables, histogram placeholders, health/fault states, and
+mask editors, runtime tables, histogram plots, health/fault states, and
 responsive layouts while retaining the same status semantics.
 
 The run-control client now retains the authoritative completed `RunSummary`

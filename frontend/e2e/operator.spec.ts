@@ -48,9 +48,11 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await plots.getByLabel('Channels').fill('0, 1')
   await plots.getByRole('button', { name: 'Request data' }).click()
   await expect(plots.getByLabel('Histogram datasets').locator('.histogram-dataset')).toHaveCount(2)
-  await expect(
-    plots.getByText('Dataset ready for a future plotting renderer').first(),
-  ).toBeVisible()
+  const histogramPlot = plots.getByLabel('Live selected-channel histogram plot')
+  await expect(histogramPlot).toBeVisible()
+  await expect(histogramPlot.locator('canvas').first()).toBeVisible()
+  await plots.getByLabel('Log Y').check()
+  await expect(histogramPlot.locator('canvas').first()).toBeVisible()
 
   await page.getByRole('button', { name: 'Stop and drain' }).click()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()

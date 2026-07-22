@@ -1060,7 +1060,7 @@ textarea {
 }
 .plot-controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto auto;
+  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto auto auto;
   align-items: end;
   gap: 12px;
   margin-top: 20px;
@@ -1087,7 +1087,22 @@ textarea {
   color: #8194ac;
   font-size: 0.7rem;
 }
-.histogram-placeholder {
+.histogram-plot {
+  min-width: 0;
+  margin-top: 18px;
+  overflow-x: auto;
+  color: #d9e4f2;
+}
+.histogram-plot .uplot {
+  font-family: inherit;
+}
+.histogram-plot .u-title {
+  color: #d9e4f2;
+}
+.histogram-plot .u-legend {
+  color: #a9bad0;
+}
+.histogram-bin-preview {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -1099,10 +1114,10 @@ textarea {
   color: #71869f;
   font-size: 0.7rem;
 }
-.histogram-placeholder span {
+.histogram-bin-preview span {
   flex-basis: 100%;
 }
-.histogram-placeholder code {
+.histogram-bin-preview code {
   color: #8de4c7;
   background: #10291f;
   border-radius: 3px;
@@ -1182,12 +1197,17 @@ textarea {
   border-color: #c8d5e3;
   background: #ffffff;
 }
-[data-theme='light'] .histogram-placeholder {
+[data-theme='light'] .histogram-plot,
+[data-theme='light'] .histogram-plot .u-title,
+[data-theme='light'] .histogram-plot .u-legend {
+  color: #344c66;
+}
+[data-theme='light'] .histogram-bin-preview {
   border-color: #aabdd0;
   color: #60748d;
   background: #f8fafc;
 }
-[data-theme='light'] .histogram-placeholder code {
+[data-theme='light'] .histogram-bin-preview code {
   color: #086b51;
   background: #dff5ed;
 }
