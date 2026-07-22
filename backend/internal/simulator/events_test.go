@@ -2,10 +2,54 @@ package simulator
 
 import (
 	"testing"
+	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 )
+
+func TestPeriodicEventsAdvanceForEveryRunningBoard(t *testing.T) {
+	topology := ProductionTopology()
+	for chain := range topology.Chains {
+		for node := range topology.Chains[chain] {
+			topology.Chains[chain][node].Status = uint32(dt5202.StatusRunning)
+		}
+	}
+	server := &Server{topology: topology, done: make(chan struct{}), streamData: make(chan streamItem, 16)}
+	defer func() {
+		close(server.done)
+		server.wg.Wait()
+	}()
+	if err := server.EnablePeriodicEvents(time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+
+	sequences := make([]uint64, 0, 8)
+	deadline := time.After(time.Second)
+	for len(sequences) < 8 {
+		select {
+		case item := <-server.streamData:
+			wire, decodeErr := dt5215.DecodeStreamBatch(item.data)
+			if decodeErr != nil || len(wire) != 1 {
+				t.Fatalf("decode periodic batch: events=%d err=%v", len(wire), decodeErr)
+			}
+			if wire[0].Descriptor.Timestamp == 0 {
+				t.Fatal("periodic event timestamp is zero")
+			}
+			sequences = append(sequences, wire[0].Descriptor.TriggerID)
+		case <-deadline:
+			t.Fatalf("received %d periodic events, want 8", len(sequences))
+		}
+	}
+	for index := 1; index < 4; index++ {
+		if sequences[index] != sequences[0] {
+			t.Fatalf("first tick trigger IDs = %v", sequences[:4])
+		}
+	}
+	if sequences[4] != sequences[0]+1 {
+		t.Fatalf("successive tick trigger IDs = %d then %d", sequences[0], sequences[4])
+	}
+}
 
 func configuredBoard(mode uint32, mask uint64) Board {
 	board := Board{Status: uint32(dt5202.StatusRunning), Registers: map[uint32]uint32{
@@ -33,6 +77,9 @@ func decodeGenerated(t *testing.T, qualifier uint8, board *Board) dt5202.Event {
 	event, err := dt5202.DecodeEvent(wire[0].Descriptor.Qualifier, wire[0].Descriptor.TriggerID, wire[0].Descriptor.Timestamp, wire[0].Payload)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if wire[0].Descriptor.TriggerID != 1 || wire[0].Descriptor.Timestamp != 1 {
+		t.Fatalf("descriptor trigger ID/timestamp = %d/%d, want 1/1", wire[0].Descriptor.TriggerID, wire[0].Descriptor.Timestamp)
 	}
 	return event
 }

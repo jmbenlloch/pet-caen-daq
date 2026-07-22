@@ -68,6 +68,7 @@ type Server struct {
 	synchronized  bool
 	streamData    chan streamItem
 	eventSequence uint64
+	periodicOnce  sync.Once
 	faults        []Fault
 }
 
@@ -90,6 +91,57 @@ func Start(controlAddress, streamAddress string, topology Topology) (*Server, er
 
 func (s *Server) ControlAddress() string { return s.control.Addr().String() }
 func (s *Server) StreamAddress() string  { return s.stream.Addr().String() }
+
+// EnablePeriodicEvents makes the standalone simulator behave like a live
+// detector by producing one event per running board on every interval. Tests
+// remain deterministic unless they explicitly enable this behavior.
+func (s *Server) EnablePeriodicEvents(interval time.Duration) error {
+	if interval <= 0 {
+		return fmt.Errorf("periodic event interval must be positive")
+	}
+	s.periodicOnce.Do(func() {
+		s.wg.Add(1)
+		go s.generatePeriodicEvents(interval)
+	})
+	return nil
+}
+
+func (s *Server) generatePeriodicEvents(interval time.Duration) {
+	defer s.wg.Done()
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.mu.Lock()
+			s.eventSequence++
+			sequence := s.eventSequence
+			for chain := range s.topology.Chains {
+				for node := range s.topology.Chains[chain] {
+					board := &s.topology.Chains[chain][node]
+					if !dt5202.Status(board.Status).Has(dt5202.StatusRunning) {
+						continue
+					}
+					batch, err := generatedBatch(uint8(chain), uint8(node), sequence, 0, board)
+					if err != nil {
+						continue
+					}
+					item, drop := s.prepareStreamItem(batch, false, false)
+					if !drop {
+						select {
+						case s.streamData <- item:
+						default:
+						}
+					}
+				}
+			}
+			s.mu.Unlock()
+		case <-s.done:
+			return
+		}
+	}
+}
+
 func (s *Server) QueueStreamBatch(batch []byte) {
 	s.mu.Lock()
 	item, drop := s.prepareStreamItem(batch, false, false)
@@ -541,7 +593,10 @@ func eventBatch(chain, node, qualifier uint8, sequence uint64, payload []byte) [
 	binary.LittleEndian.PutUint32(batch[4:], 0xffffffff)
 	binary.LittleEndian.PutUint32(batch[8:], uint32(chain)|(1<<8))
 	binary.LittleEndian.PutUint32(batch[12:], uint32(len(payload)/4))
-	binary.LittleEndian.PutUint32(batch[24:], uint32(sequence<<16))
+	timestamp := sequence & ((uint64(1) << 48) - 1)
+	binary.LittleEndian.PutUint32(batch[16:], uint32(timestamp&0xff)<<24)
+	binary.LittleEndian.PutUint32(batch[20:], uint32(timestamp>>8))
+	binary.LittleEndian.PutUint32(batch[24:], uint32(timestamp>>40)|uint32(sequence<<16))
 	binary.LittleEndian.PutUint32(batch[40:], uint32(node)|uint32(qualifier)<<8)
 	copy(batch[44:], payload)
 	return batch
