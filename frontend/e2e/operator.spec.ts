@@ -21,8 +21,6 @@ test('operator selects a persistent light or dark interface theme', async ({ pag
 test('operator completes a simulated run and downloads its persisted artifact', async ({
   page,
 }) => {
-  const runId = `browser-${Date.now()}`
-
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await expect(page.getByText('DT5202 · node 0')).toHaveCount(4)
@@ -31,21 +29,24 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await page.getByLabel('Find a parameter').fill('PresetTime')
   await page.getByRole('spinbutton', { name: 'PresetTime', exact: true }).fill('30')
 
-  await page.getByLabel('Run ID').fill(runId)
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
+  const activeRunId = page.locator('.run-now strong')
+  await expect(activeRunId).toHaveText(/^\d+$/)
+  const runId = (await activeRunId.textContent())!
   await expect(page.getByText(runId, { exact: true })).toBeVisible()
   const statistics = page.getByRole('region', { name: 'Statistics' })
   await expect(statistics.getByRole('tab', { name: 'Board 0' })).toBeVisible()
   await statistics.getByRole('tab', { name: 'Board 0' }).click()
   await expect(statistics.locator('.channel-statistic')).toHaveCount(64)
-  await statistics.getByLabel('Statistics type').selectOption('phaCounts')
+  await statistics.getByLabel('Per-channel metric').selectOption('phaCounts')
   await expect(statistics).toContainText('PHA rate over the latest telemetry interval')
-  await statistics.getByLabel('Integral').check()
+  await statistics.getByLabel('Cumulative counts').check()
   await expect(statistics).toContainText('PHA integrated count')
 
   const plots = page.getByRole('region', { name: 'Plots and histograms' })
-  await plots.getByLabel('Channels').fill('0, 1')
+  await plots.getByLabel('Channels').click()
+  await plots.getByRole('button', { name: 'Board 0 node 0 channel 1', exact: true }).click()
   await plots.getByRole('button', { name: 'Request data' }).click()
   await expect(plots.getByLabel('Histogram datasets').locator('.histogram-dataset')).toHaveCount(2)
   const histogramPlot = plots.getByLabel('Live selected-channel histogram plot')
@@ -60,7 +61,7 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   const storedRun = page
     .getByLabel('Stored runs')
     .locator('.history-run')
-    .filter({ hasText: runId })
+    .filter({ has: page.getByText(runId, { exact: true }) })
   await expect(storedRun.getByText(runId, { exact: true })).toBeVisible()
 
   const downloadPromise = page.waitForEvent('download')
@@ -92,23 +93,25 @@ test('backend automatically stops runs at time and event presets while manual st
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
 
-  const timedRun = `preset-time-${Date.now()}`
   await page.getByLabel('Run stop').selectOption('PRESET_TIME')
   await page.getByLabel('Preset time (seconds)').fill('1')
-  await page.getByLabel('Run ID').fill(timedRun)
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop and drain' })).toBeEnabled()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
+  const timedRun = (await page.locator('#completed-heading').textContent())!
+  expect(timedRun).toMatch(/^\d+$/)
   await expect(page.getByRole('heading', { name: timedRun })).toBeVisible()
   await expect(page.getByText('preset_time', { exact: true })).toBeVisible()
 
-  const countedRun = `preset-count-${Date.now()}`
   await page.getByLabel('Run stop').selectOption('PRESET_COUNTS')
   await page.getByLabel('Preset event count').fill('3')
-  await page.getByLabel('Run ID').fill(countedRun)
   await page.getByRole('button', { name: 'Start run' }).click()
-  await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
+  const completedHeading = page.locator('#completed-heading')
+  await expect(completedHeading).not.toHaveText(timedRun, { timeout: 10_000 })
+  const countedRun = (await completedHeading.textContent())!
+  expect(countedRun).toMatch(/^\d+$/)
+  expect(Number(countedRun)).toBeGreaterThan(Number(timedRun))
   await expect(page.getByRole('heading', { name: countedRun })).toBeVisible()
   await expect(page.getByText('preset_counts', { exact: true })).toBeVisible()
 })
