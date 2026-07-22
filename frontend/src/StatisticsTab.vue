@@ -98,9 +98,9 @@ const metricLabel = computed(
         <p class="eyebrow">Live runtime view</p>
         <h2 id="statistics-heading">Statistics</h2>
       </div>
-      <div class="statistics-controls">
+      <div v-if="selectedBoard !== 'all'" class="statistics-controls">
         <label>
-          Statistics type
+          Per-channel metric
           <select v-model="metric">
             <option value="channelTriggerCounts">Channel trigger</option>
             <option value="timestampCounts">Timestamp</option>
@@ -109,9 +109,10 @@ const metricLabel = computed(
         </label>
         <label class="switch compact-switch">
           <input v-model="integral" type="checkbox" />
-          <span>Integral</span>
+          <span>Cumulative counts</span>
         </label>
       </div>
+      <p v-else class="statistics-controls-hint">Select a board for per-channel metrics.</p>
     </div>
 
     <div class="statistics-summary" aria-label="Global statistics">

@@ -714,6 +714,29 @@ select:focus {
   color: #aebdd0;
   font-size: 0.75rem;
 }
+.switch input[type='checkbox'] {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  border: 2px solid #71869f;
+  border-radius: 4px;
+  background: #091423;
+}
+.switch input[type='checkbox']:checked {
+  border-color: #3acb9f;
+  background:
+    linear-gradient(135deg, transparent 43%, #062018 43% 56%, transparent 56%) 2px 7px / 6px 6px
+      no-repeat,
+    linear-gradient(45deg, transparent 42%, #062018 42% 57%, transparent 57%) 6px 5px / 8px 8px
+      no-repeat,
+    #3acb9f;
+}
+.switch input[type='checkbox']:focus-visible {
+  outline: 3px solid #f1c66d;
+  outline-offset: 2px;
+}
 .link-button {
   border: 0;
   background: transparent;
@@ -1021,6 +1044,11 @@ textarea {
 }
 .statistics-controls {
   align-items: flex-end;
+}
+.statistics-controls-hint {
+  align-self: center;
+  color: #8194ac;
+  font-size: 0.75rem;
 }
 .statistics-controls label:not(.switch) {
   min-width: 180px;

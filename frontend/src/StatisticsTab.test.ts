@@ -27,9 +27,12 @@ describe('StatisticsTab', () => {
   it('switches between all-board, per-channel, interval, and integral views', async () => {
     const wrapper = mount(StatisticsTab, { props: { statistics: sample(1000n, 10n, 4n) } })
     expect(wrapper.text()).toContain('Trigger ID')
+    expect(wrapper.text()).toContain('Select a board for per-channel metrics.')
+    expect(wrapper.find('select').exists()).toBe(false)
 
     await wrapper.setProps({ statistics: sample(2000n, 15n, 7n) })
     await wrapper.findAll('[role="tab"]')[1].trigger('click')
+    expect(wrapper.text()).toContain('Per-channel metric')
     expect(wrapper.get('[aria-label="Board 0 channel statistics"]').text()).toContain('3.0 Hz')
 
     await wrapper.get('input[type="checkbox"]').setValue(true)
