@@ -265,6 +265,10 @@ Two operational commands are added:
 Rebuild must never delete the active database before its replacement has been
 created and validated.
 
+Operator procedures for consistency checking, stopped-backend atomic rebuild,
+backup, restoration, and failure diagnosis are documented in
+`docs/run-catalog-operations.md`.
+
 ## Backend and API integration
 
 The backend receives an explicit catalog path, with a default adjacent to the

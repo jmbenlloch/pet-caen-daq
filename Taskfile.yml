@@ -64,6 +64,7 @@ tasks:
       - mkdir -p bin
       - go build -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq
       - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
+      - go build -o bin/catalog-ops ./backend/cmd/catalog-ops
       - npm --prefix frontend run build
 
   dev:frontend:
@@ -102,6 +103,33 @@ tasks:
       - mkdir -p bin
       - go build -o bin/pet-caen-daq.exe ./backend/cmd/pet-caen-daq
       - go build -o bin/caen-simulator.exe ./backend/cmd/caen-simulator
+      - go build -o bin/catalog-ops.exe ./backend/cmd/catalog-ops
+
+  catalog:check:
+    desc: Compare the SQLite run catalog with authoritative manifests without repairing it
+    vars:
+      RUNS: '{{default "./runs" .RUNS}}'
+      CATALOG: '{{default (printf "%s/catalog.sqlite3" .RUNS) .CATALOG}}'
+    cmds:
+      - go run ./backend/cmd/catalog-ops check -runs "{{.RUNS}}" -catalog "{{.CATALOG}}"
+
+  catalog:rebuild:
+    desc: Rebuild and atomically replace the SQLite run catalog from authoritative manifests
+    vars:
+      RUNS: '{{default "./runs" .RUNS}}'
+      CATALOG: '{{default (printf "%s/catalog.sqlite3" .RUNS) .CATALOG}}'
+    cmds:
+      - go run ./backend/cmd/catalog-ops rebuild -runs "{{.RUNS}}" -catalog "{{.CATALOG}}"
+
+  catalog:backup:
+    desc: Back up a stopped backend's SQLite run catalog to a new file
+    requires:
+      vars: [DEST]
+    vars:
+      RUNS: '{{default "./runs" .RUNS}}'
+      CATALOG: '{{default (printf "%s/catalog.sqlite3" .RUNS) .CATALOG}}'
+    cmds:
+      - go run ./backend/cmd/catalog-ops backup -catalog "{{.CATALOG}}" -destination "{{.DEST}}"
 
   ci:
     desc: Run the required local equivalent of CI
