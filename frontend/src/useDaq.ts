@@ -43,7 +43,6 @@ export function useDaq(api: DaqApi) {
   function accept(next: TelemetrySnapshot | undefined) {
     if (!next) return
     snapshot.value = next
-    if (!next.currentRun) histogramDatasets.value = []
     if (next.latestCompletedRun) latestCompletedRun.value = next.latestCompletedRun
     connected.value = true
     stale.value = false

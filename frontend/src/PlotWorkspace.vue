@@ -135,7 +135,12 @@ const kindLabel = computed(
       </button>
     </div>
     <p v-if="selectionError" class="field-error" role="alert">{{ selectionError }}</p>
-    <p v-if="!running" class="empty">Start a run to request accumulated histogram data.</p>
+    <p v-if="!running && !datasets.length" class="empty">
+      Start a run to request accumulated histogram data.
+    </p>
+    <p v-else-if="!running" class="empty">
+      Showing the last requested histogram from the completed run.
+    </p>
     <HistogramPlot
       v-if="datasets.length"
       :datasets="datasets"

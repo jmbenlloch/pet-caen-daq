@@ -46,5 +46,9 @@ describe('PlotWorkspace', () => {
     expect(wrapper.get('[aria-label="Histogram datasets"]').text()).toContain('1:3')
     wrapper.get('[aria-label="Live selected-channel histogram plot"]')
     expect(wrapper.get('[aria-label="Populated bin preview"]').text()).toContain('1:3')
+
+    await wrapper.setProps({ running: false })
+    expect(wrapper.text()).toContain('Showing the last requested histogram from the completed run.')
+    wrapper.get('[aria-label="Live selected-channel histogram plot"]')
   })
 })

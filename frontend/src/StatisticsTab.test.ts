@@ -38,4 +38,13 @@ describe('StatisticsTab', () => {
     await wrapper.get('select').setValue('phaCounts')
     expect(wrapper.text()).toContain('PHA integrated count')
   })
+
+  it('keeps the last measured rate when a final snapshot has the same elapsed time', async () => {
+    const wrapper = mount(StatisticsTab, { props: { statistics: sample(1000n, 10n, 4n) } })
+    await wrapper.setProps({ statistics: sample(2000n, 15n, 7n) })
+    expect(wrapper.text()).toContain('5.0 Hz')
+
+    await wrapper.setProps({ statistics: sample(2000n, 15n, 7n) })
+    expect(wrapper.text()).toContain('5.0 Hz')
+  })
 })

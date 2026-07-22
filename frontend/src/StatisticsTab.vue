@@ -23,8 +23,9 @@ const previous = ref<DeepReadonly<StatisticsTelemetry>>()
 watch(
   () => props.statistics,
   (next, old) => {
-    if (next && old && next.elapsedMilliseconds >= old.elapsedMilliseconds) previous.value = old
-    else previous.value = undefined
+    if (next && old && next.elapsedMilliseconds > old.elapsedMilliseconds) previous.value = old
+    else if (!next || !old || next.elapsedMilliseconds < old.elapsedMilliseconds)
+      previous.value = undefined
   },
 )
 

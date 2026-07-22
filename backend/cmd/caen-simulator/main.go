@@ -29,7 +29,11 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	fmt.Printf("CAEN simulator control=%s stream=%s\n", server.ControlAddress(), server.StreamAddress())
+	periodic := "disabled"
+	if *eventInterval > 0 {
+		periodic = eventInterval.String()
+	}
+	fmt.Printf("CAEN simulator control=%s stream=%s event-interval=%s\n", server.ControlAddress(), server.StreamAddress(), periodic)
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
