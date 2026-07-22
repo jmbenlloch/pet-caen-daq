@@ -32,6 +32,12 @@ describe('HistogramPlot', () => {
 
     setData.mockClear()
     await wrapper.get('button').trigger('click')
-    expect(setData).toHaveBeenCalledWith([[0.5, 1.5, 2.5], [0, 3, 1]], true)
+    expect(setData).toHaveBeenCalledWith(
+      [
+        [0.5, 1.5, 2.5],
+        [0, 3, 1],
+      ],
+      true,
+    )
   })
 })

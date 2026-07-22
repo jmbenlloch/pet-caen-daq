@@ -68,8 +68,9 @@ function request() {
   }
   const selections = [...selected.value]
     .map((key) => key.split(':').map(Number))
-    .sort(([chainA, nodeA, channelA], [chainB, nodeB, channelB]) =>
-      chainA - chainB || nodeA - nodeB || channelA - channelB,
+    .sort(
+      ([chainA, nodeA, channelA], [chainB, nodeB, channelB]) =>
+        chainA - chainB || nodeA - nodeB || channelA - channelB,
     )
     .map(([chain, node, channel]) => ({
       $typeName: 'pet.caen.daq.v1.HistogramSelection' as const,
@@ -151,7 +152,9 @@ const kindLabel = computed(
           <strong>Board {{ board.chain }} · node {{ board.node }}</strong>
           <span>
             <button type="button" @click="selectBoard(board.chain, board.node, true)">All</button>
-            <button type="button" @click="selectBoard(board.chain, board.node, false)">Clear</button>
+            <button type="button" @click="selectBoard(board.chain, board.node, false)">
+              Clear
+            </button>
           </span>
         </header>
         <div class="channel-grid histogram-channel-grid">

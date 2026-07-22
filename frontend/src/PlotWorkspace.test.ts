@@ -28,7 +28,9 @@ describe('PlotWorkspace', () => {
     await wrapper.get('[aria-label="Board 1 node 2 channel 8"]').trigger('click')
     await wrapper.get('[aria-label="Board 1 node 2 channel 9"]').trigger('click')
     await wrapper.get('[aria-label="Board 3 node 0 channel 4"]').trigger('click')
-    const requestButton = wrapper.findAll('button').find((button) => button.text() === 'Request data')
+    const requestButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Request data')
     expect(requestButton).toBeDefined()
     await requestButton!.trigger('click')
     const request = wrapper.emitted('request')?.[0]

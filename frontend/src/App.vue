@@ -858,9 +858,7 @@ onMounted(() => daq.connect())
                 configurationErrors.length > 0 ||
                 !!stopPolicyError
               "
-              @click="
-                daq.startRun({ configuration, captureRaw, journalTransport })
-              "
+              @click="daq.startRun({ configuration, captureRaw, journalTransport })"
             >
               Start run
             </button>
