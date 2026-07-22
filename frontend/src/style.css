@@ -1154,13 +1154,14 @@ textarea {
 }
 .histogram-datasets {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px;
   margin-top: 18px;
 }
 .histogram-dataset {
   border: 1px solid #293b52;
   border-radius: 8px;
-  padding: 13px;
+  padding: 11px 13px;
 }
 .histogram-metadata {
   display: flex;
