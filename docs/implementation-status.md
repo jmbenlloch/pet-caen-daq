@@ -202,6 +202,54 @@ reference checks with Python/h5py. Finalization error paths close remaining
 HDF5, raw-capture, journal, and underlying OS file handles while preserving the
 original error and `incomplete` evidence.
 
+The HDF5 run identity is now complete for facts available to the native
+backend. The external manifest, creation-time `/run/metadata_json`, and
+finalized `/run/manifest_json` carry configuration hashes and parser/audit
+versions; discovered board mapping, product ID, firmware, and acquisition
+state; DAQ VCS/dirty/Go build identity; storage writer format/version and
+compression; and queue, backpressure, raw-capture, journal, and histogram
+choices. DT5215 product and firmware values remain explicitly nullable with
+`unknown-not-queried` evidence rather than being inferred.
+
+Effective configuration is available both as a lossless JSON snapshot and as
+fixed-width little-endian query tables under `/configuration/effective`.
+Typed tables cover physical boards, all board channels, Citiroc chip summaries,
+every packed Citiroc stream word, source-ordered FPGA writes, HV plans and
+peripheral transactions, and pedestal plans and per-channel
+calibration/zero-suppression values. The Go and independent h5py validators
+check dataset fields, row cardinalities, duplicate keys, board/channel/chip
+mappings, and the 1,144-bit Citiroc stream layout. The retained 675 MB real run
+converts successfully through this schema and passes both validators.
+
+Measured direct-writer throughput on that retained approximately ten-second
+run is 21,799 events/s uncompressed and 17,343 events/s with Blosc LZ4 level 4
+plus bit-shuffle, compared with an observed input rate of approximately 8,799
+events/s. The compressed output is about 36% of the typed uncompressed HDF5
+size. These storage-only measurements provide 2.48x and 1.97x writer headroom,
+respectively, but are not an end-to-end real-time guarantee.
+
+Remaining HDF5 production-hardening work is:
+
+- add periodic ordered flushes and committed checkpoints during acquisition;
+- recover interrupted files by validating and truncating uncommitted
+  child/parent tails to the last committed index checkpoint without
+  automatically marking the run complete;
+- run paced multi-hour end-to-end soak tests across network ingest, decoding,
+  bounded queues, HDF5, and representative slow-disk conditions, recording CPU,
+  memory, queue growth, flush latency, and sustained/peak rates;
+- persist final pipeline and board counters, warnings, and detailed failure
+  diagnostics, and decide whether bounded online histograms belong in the
+  finalized file;
+- implement and verify native DT5215 identity/version querying;
+- ship a minimal production runtime image containing only the backend and
+  required HDF5/Blosc libraries and plugin;
+- decide whether Blosc is the production default or remains opt-in, and verify
+  required analysis clients beyond h5py;
+- decide whether SWMR live reading and maximum-size file rotation are actual
+  operational requirements; and
+- repeat representative cold/warm analysis-query benchmarks after the typed
+  configuration tables and final compression policy stabilize.
+
 Startup discovery now treats any board carrying the acquisition-running status as interrupted hardware state. Before configuration writes, recovery records `idle -> fault -> recovering`, performs a bounded broadcast stop and drain, attempts a broadcast global reset even when an earlier cleanup step fails, and verifies every discovered board is ready and not running. Success returns to `idle` with a warning diagnostic; failure moves to `disconnected` and joins the original already-running evidence with every stop, drain, reset, verification, and transition error.
 
 A generated ConnectRPC client integration test now exercises the complete simulator-backed service workflow: static validation of the production JANUS document, configuration application on all four boards, run start with raw and journal evidence, live test-pulse telemetry, operator stop/drain, and finalized artifact inspection. It verifies the manifest's requested/effective configuration and audit, JSON Lines event count, raw replay, journal presence, and every returned size/SHA-256 digest against the on-disk bytes.
