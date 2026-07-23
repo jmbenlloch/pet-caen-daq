@@ -76,6 +76,7 @@ tasks:
       - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
       - go build -o bin/catalog-ops ./backend/cmd/catalog-ops
       - go build -tags hdf5 -o bin/jsonl-to-hdf5 ./backend/cmd/jsonl-to-hdf5
+      - go build -tags hdf5 -o bin/hdf5-write-benchmark ./backend/cmd/hdf5-write-benchmark
       - npm --prefix frontend run build
 
   hdf5:convert:
@@ -84,6 +85,13 @@ tasks:
       vars: [SOURCE, OUTPUT]
     cmds:
       - go run -tags hdf5 ./backend/cmd/jsonl-to-hdf5 -source "{{.SOURCE}}" -output "{{.OUTPUT}}"
+
+  hdf5:benchmark:
+    desc: Measure direct HDF5 append rate after preloading decoded events
+    requires:
+      vars: [SOURCE, OUTPUT]
+    cmds:
+      - go run -tags hdf5 ./backend/cmd/hdf5-write-benchmark -source "{{.SOURCE}}" -output "{{.OUTPUT}}"
 
   dev:frontend:
     desc: Start the frontend development server (proxies API to localhost:8080)

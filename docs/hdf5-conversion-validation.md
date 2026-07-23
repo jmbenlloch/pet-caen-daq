@@ -72,3 +72,41 @@ The energy-column sums matched exactly (`16,579,091,493`). This setting saves
 conversion about 60% slower and the full energy-column read about 2.4 times
 slower. It remains opt-in until acquisition-rate and repeated cold/warm query
 benchmarks establish that the write and analysis latency are acceptable.
+
+## Direct writer throughput
+
+`hdf5-write-benchmark` first parses and retains every decoded event in memory,
+then starts the clock and appends those objects directly to the HDF5 writer.
+This excludes JSON parsing and source I/O from the measured append rate.
+Finalization and structural validation have separate timers.
+
+```text
+task hdf5:benchmark \
+  SOURCE=/path/to/run-go-native-detector-hvon-003 \
+  OUTPUT=/path/to/direct-uncompressed.h5
+
+PET_CAEN_HDF5_COMPRESSION=blosc-lz4-level4-bitshuffle \
+task hdf5:benchmark \
+  SOURCE=/path/to/run-go-native-detector-hvon-003 \
+  OUTPUT=/path/to/direct-compressed.h5
+```
+
+The retained run contains 87,989 events acquired over approximately ten
+seconds, for an observed input rate of about 8,799 events/s. Direct-writer
+measurements on 2026-07-23 were:
+
+| Measurement | Uncompressed | LZ4-4 + bit-shuffle |
+| --- | ---: | ---: |
+| Direct append time | 4.036 s | 5.074 s |
+| Direct append rate | 21,799 events/s | 17,343 events/s |
+| Headroom over observed input rate | 2.48x | 1.97x |
+| Finalize time | 0.0046 s | 0.0043 s |
+| Structural validation time | 0.212 s | 0.285 s |
+| Output size | 169,538,064 B | 61,201,253 B |
+| Heap after preload | 93,024,016 B | 93,018,944 B |
+
+This demonstrates that the storage writer alone can exceed the observed rate
+in both modes on the benchmark host. It is not yet an end-to-end real-time
+guarantee: a paced full-pipeline soak test must also include network ingest,
+decode, queue contention, scheduler stalls, periodic flush behavior, and
+representative slow-disk conditions.
