@@ -562,11 +562,14 @@ Readers reconstruct order by walking the index and resolving `(kind, kind_row)`.
    backpressure policy, and histogram settings. These belong in bounded run
    metadata and should also be reflected in the external manifest.
 
-The current manifest already preserves the requested document, effective
-`ConfigurationPlan` values, and audit report. It does not yet contain all of the
-topology and software identity described by the architecture. That gap should
-be closed in the project-owned run metadata before the HDF5 adapter is written,
-so JSON and HDF5 do not develop different notions of a run.
+The manifest and embedded HDF5 snapshots preserve the requested document,
+effective `ConfigurationPlan` values, audit report, configuration hashes,
+discovered board topology/product/firmware evidence, DAQ VCS and Go build
+identity, storage writer identity, and runtime queue, backpressure, raw,
+journal, and histogram choices. DT5215 product and firmware identity are
+explicitly recorded as `unknown-not-queried` because the native client does not
+yet implement and verify the variable `VERS` response; the schema uses nullable
+values rather than inventing an identity.
 
 Storing only the requested JANUS file is insufficient: defaults, overrides,
 firmware-dependent packing, calibration-derived writes, and inactive settings

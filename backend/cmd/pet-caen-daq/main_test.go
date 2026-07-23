@@ -9,6 +9,7 @@ import (
 
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 )
 
 func TestRunRequiresConfigurationBeforeNetworkAccess(t *testing.T) {
@@ -45,6 +46,28 @@ func TestTopologySnapshotIncludesEnabledAndDisabledChains(t *testing.T) {
 	}
 	if snapshot.Chains[1].Enabled || snapshot.Chains[1].Health != daqv1.HealthStatus_HEALTH_STATUS_UNKNOWN {
 		t.Fatalf("disabled chain = %+v", snapshot.Chains[1])
+	}
+}
+
+func TestExecutionIdentityPreservesDiscoveredHardwareEvidence(t *testing.T) {
+	topology := dt5215.Topology{Boards: []dt5215.BoardInfo{{
+		Chain: 3, Node: 1, ProductID: 5202, FirmwareRevision: 0xa1230708, AcquisitionState: 9,
+	}}}
+	identity := executionIdentity(topology, []janusconfig.Connection{{Board: 7, Chain: 3, Node: 1}}, "10.0.0.1:9760", "10.0.0.1:9000")
+	if identity.Topology.Concentrator.ControlAddress != "10.0.0.1:9760" ||
+		identity.Topology.Concentrator.FirmwareRevision != nil ||
+		identity.Topology.Concentrator.FirmwareRevisionEvidence != "unknown-not-queried" ||
+		len(identity.Topology.Boards) != 1 {
+		t.Fatalf("identity = %+v", identity)
+	}
+	board := identity.Topology.Boards[0]
+	if board.Board != 7 || board.Chain != 3 || board.Node != 1 || board.ProductID != 5202 ||
+		board.FirmwareRevision != 0xa1230708 || board.AcquisitionState != 9 ||
+		board.FirmwareEvidence != "hardware-register-read" {
+		t.Fatalf("board identity = %+v", board)
+	}
+	if identity.Software.Revision == "" || identity.Software.GoVersion == "" {
+		t.Fatalf("software identity = %+v", identity.Software)
 	}
 }
 

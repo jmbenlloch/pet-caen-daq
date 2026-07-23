@@ -56,15 +56,18 @@ func CreateRun(parent string, manifest runstore.Manifest) (_ *RunWriter, err err
 		return nil, fmt.Errorf("encode effective configuration: %w", err)
 	}
 	metadataJSON, err := json.Marshal(struct {
-		SchemaVersion    int    `json:"schema_version"`
-		RunID            string `json:"run_id"`
-		RequestedBy      string `json:"requested_by,omitempty"`
-		StartedAt        string `json:"started_at"`
-		CaptureRaw       bool   `json:"capture_raw"`
-		JournalTransport bool   `json:"journal_transport"`
+		SchemaVersion         int                            `json:"schema_version"`
+		RunID                 string                         `json:"run_id"`
+		RequestedBy           string                         `json:"requested_by,omitempty"`
+		StartedAt             string                         `json:"started_at"`
+		CaptureRaw            bool                           `json:"capture_raw"`
+		JournalTransport      bool                           `json:"journal_transport"`
+		ConfigurationIdentity runstore.ConfigurationIdentity `json:"configuration_identity"`
+		ExecutionIdentity     runstore.ExecutionIdentity     `json:"execution_identity"`
 	}{
 		SchemaVersion: runstore.SchemaVersion, RunID: manifest.RunID, RequestedBy: manifest.RequestedBy,
 		StartedAt: manifest.StartedAt, CaptureRaw: manifest.CaptureRaw, JournalTransport: manifest.JournalTransport,
+		ConfigurationIdentity: manifest.ConfigurationIdentity, ExecutionIdentity: manifest.ExecutionIdentity,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode run metadata: %w", err)

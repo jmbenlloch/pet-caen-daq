@@ -43,9 +43,12 @@ func ConvertJSONRun(directory, output string) (err error) {
 		SourceRunID  string `json:"source_run_id"`
 		StartedAt    string `json:"started_at"`
 		CompletedAt  string `json:"completed_at,omitempty"`
+		ConfigurationIdentity runstore.ConfigurationIdentity `json:"configuration_identity"`
+		ExecutionIdentity     runstore.ExecutionIdentity     `json:"execution_identity"`
 	}{
 		SourceFormat: "pet-caen-daq-jsonl", SourceRunID: manifest.RunID,
 		StartedAt: manifest.StartedAt, CompletedAt: manifest.CompletedAt,
+		ConfigurationIdentity: manifest.ConfigurationIdentity, ExecutionIdentity: manifest.ExecutionIdentity,
 	})
 	if err != nil {
 		return err

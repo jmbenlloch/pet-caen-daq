@@ -59,7 +59,7 @@ func BenchmarkJSONRun(directory, output string) (BenchmarkResult, error) {
 
 	writer, err := CreateWithMetadata(output, Metadata{
 		RunID:        "direct-writer-benchmark",
-		MetadataJSON: []byte(`{"purpose":"direct HDF5 writer benchmark"}`),
+		MetadataJSON: []byte(`{"purpose":"direct HDF5 writer benchmark","configuration_identity":{},"execution_identity":{"topology":{},"software":{},"storage":{},"runtime":{}}}`),
 	})
 	if err != nil {
 		return result, err

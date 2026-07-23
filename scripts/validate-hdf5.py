@@ -2,6 +2,8 @@
 """Independent pet-caen-daq HDF5 schema and reference validator."""
 
 import argparse
+import hashlib
+import json
 import sys
 
 import h5py
@@ -99,11 +101,51 @@ def validate_compounds(handle):
         ("configuration/requested_janus", "u", 1),
         ("configuration/audit_json", "u", 1),
         ("configuration/effective_json", "u", 1),
+        ("run/metadata_json", "u", 1),
         ("run/manifest_json", "u", 1),
     ):
         dtype = require_dataset(handle, name).dtype
         if dtype.kind != kind or dtype.itemsize != size or not is_little_endian(dtype):
             fail(f"/{name} has unexpected dtype {dtype}")
+
+
+def decode_json_dataset(handle, name):
+    try:
+        return json.loads(bytes(require_dataset(handle, name)[:]))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        fail(f"/{name} is not valid UTF-8 JSON: {error}")
+
+
+def validate_metadata(handle):
+    metadata = decode_json_dataset(handle, "run/metadata_json")
+    manifest = decode_json_dataset(handle, "run/manifest_json")
+    if manifest.get("run_id") != bytes(handle["run/run_id"][:]).decode("utf-8"):
+        fail("/run/manifest_json run_id does not match /run/run_id")
+    # Creation metadata is produced by the HDF5 adapter and must contain the
+    # identity block. Historical JSON manifests predate this additive schema-v1
+    # metadata, so validate their identity only when it is present.
+    for name, document in (("metadata_json", metadata),):
+        configuration = document.get("configuration_identity")
+        if not isinstance(configuration, dict):
+            fail(f"/run/{name} is missing configuration_identity")
+        execution = document.get("execution_identity")
+        if not isinstance(execution, dict):
+            fail(f"/run/{name} is missing execution_identity")
+        for field in ("topology", "software", "storage", "runtime"):
+            if field not in execution:
+                fail(f"/run/{name} execution_identity is missing {field}")
+        for field, dataset in (
+            ("requested_configuration_sha256", "configuration/requested_janus"),
+            ("effective_configuration_sha256", "configuration/effective_json"),
+            ("configuration_audit_sha256", "configuration/audit_json"),
+        ):
+            recorded = configuration.get(field, "")
+            if recorded and recorded != hashlib.sha256(bytes(handle[dataset][:])).hexdigest():
+                fail(f"/run/{name} {field} does not match /{dataset}")
+    if "execution_identity" in manifest:
+        execution = manifest["execution_identity"]
+        if not isinstance(execution, dict):
+            fail("/run/manifest_json has invalid execution_identity")
 
 
 def validate_compression(handle):
@@ -212,6 +254,7 @@ def validate(path, require_complete):
         if require_complete and complete != 1:
             fail("HDF5 file is incomplete")
         validate_compounds(handle)
+        validate_metadata(handle)
         validate_compression(handle)
         validate_references(handle)
 

@@ -13,6 +13,14 @@ converted count against `manifest.json`. It embeds the source configuration
 and manifest snapshots, finalizes the HDF5 file, and runs the Go structural
 validator. Existing output paths are rejected.
 
+Production manifests and the embedded `/run/manifest_json` snapshot also carry
+configuration SHA-256 identities, discovered board topology and firmware
+evidence, DAQ VCS/dirty/Go identity, storage format/writer/compression identity,
+and acquisition queue, backpressure, raw-capture, journal, and histogram
+settings. `/run/metadata_json` retains the same bounded identity at file
+creation time. Unknown DT5215 product and firmware values are represented as
+nullable values with `unknown-not-queried` evidence.
+
 For independent inspection in the pinned Docker image:
 
 ```text

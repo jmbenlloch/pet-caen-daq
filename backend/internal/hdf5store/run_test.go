@@ -23,6 +23,12 @@ func TestRunWriterFinalizesHDF5ArtifactAndExternalManifest(t *testing.T) {
 	writer, err := CreateRun(parent, runstore.Manifest{
 		RunID: "42", StartedAt: "2026-07-23T10:00:00Z", RequestedBy: "operator",
 		RequestedConfiguration: "AcquisitionMode TEST\r\n",
+		ConfigurationIdentity:  runstore.ConfigurationIdentity{ParserVersion: 1},
+		ExecutionIdentity: runstore.ExecutionIdentity{
+			Topology: runstore.TopologyIdentity{Boards: []runstore.BoardIdentity{{Board: 0, Chain: 1, Node: 2, FirmwareRevision: 0x0708}}},
+			Software: runstore.SoftwareIdentity{Revision: "abc123", GoVersion: "go-test"},
+			Storage:  runstore.StorageIdentity{Format: "hdf5", WriterVersion: 1, Compression: "none"},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -99,6 +105,12 @@ func TestRunWriterFinalizesHDF5ArtifactAndExternalManifest(t *testing.T) {
 	}
 	if snapshot.RunID != "42" || snapshot.EventCount != 1 || len(snapshot.Artifacts) != 0 {
 		t.Fatalf("embedded manifest = %+v", snapshot)
+	}
+	if snapshot.ConfigurationIdentity.ParserVersion != 1 ||
+		snapshot.ExecutionIdentity.Software.Revision != "abc123" ||
+		len(snapshot.ExecutionIdentity.Topology.Boards) != 1 ||
+		snapshot.ExecutionIdentity.Storage.Format != "hdf5" {
+		t.Fatalf("embedded metadata = %+v", snapshot)
 	}
 }
 

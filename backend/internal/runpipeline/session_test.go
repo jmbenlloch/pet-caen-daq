@@ -13,11 +13,18 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 )
 
 func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 	parent := t.TempDir()
-	factory := Factory{Options: Options{Parent: parent, Capacity: 2, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return time.Unix(100, 0) }}}
+	factory := Factory{Options: Options{
+		Parent: parent, Capacity: 2, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return time.Unix(100, 0) },
+		ExecutionIdentity: runstore.ExecutionIdentity{
+			Topology: runstore.TopologyIdentity{Boards: []runstore.BoardIdentity{{Board: 0, Chain: 1, Node: 2, ProductID: 5202, FirmwareRevision: 0x0708}}},
+			Software: runstore.SoftwareIdentity{Revision: "abc123", Modified: true, GoVersion: "go-test"},
+		},
+	}}
 	audit := &configaudit.Report{SchemaVersion: 1, Valid: true}
 	created, err := factory.New("42", acquisition.RunOptions{
 		CaptureRaw: true, JournalTransport: true, RequestedBy: "operator",
@@ -51,18 +58,35 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 	var manifest struct {
-		RequestedBy            string                     `json:"requested_by"`
-		CaptureRaw             bool                       `json:"capture_raw"`
-		JournalTransport       bool                       `json:"journal_transport"`
-		RequestedConfiguration string                     `json:"requested_configuration"`
-		EffectiveConfiguration []dt5202.ConfigurationPlan `json:"effective_configuration"`
-		ConfigurationAudit     *configaudit.Report        `json:"configuration_audit"`
+		RequestedBy            string                         `json:"requested_by"`
+		CaptureRaw             bool                           `json:"capture_raw"`
+		JournalTransport       bool                           `json:"journal_transport"`
+		RequestedConfiguration string                         `json:"requested_configuration"`
+		EffectiveConfiguration []dt5202.ConfigurationPlan     `json:"effective_configuration"`
+		ConfigurationAudit     *configaudit.Report            `json:"configuration_audit"`
+		ConfigurationIdentity  runstore.ConfigurationIdentity `json:"configuration_identity"`
+		ExecutionIdentity      runstore.ExecutionIdentity     `json:"execution_identity"`
 	}
 	if err := json.Unmarshal(manifestData, &manifest); err != nil {
 		t.Fatal(err)
 	}
 	if manifest.RequestedBy != "operator" || !manifest.CaptureRaw || !manifest.JournalTransport || manifest.RequestedConfiguration != "Open 0=0" || len(manifest.EffectiveConfiguration) != 1 || manifest.ConfigurationAudit == nil {
 		t.Fatalf("manifest = %+v", manifest)
+	}
+	if manifest.ConfigurationIdentity.ParserVersion != 1 ||
+		manifest.ConfigurationIdentity.AuditSchemaVersion != 1 ||
+		len(manifest.ConfigurationIdentity.RequestedConfigurationSHA256) != 64 ||
+		len(manifest.ConfigurationIdentity.EffectiveConfigurationSHA256) != 64 ||
+		len(manifest.ConfigurationIdentity.ConfigurationAuditSHA256) != 64 {
+		t.Fatalf("configuration identity = %+v", manifest.ConfigurationIdentity)
+	}
+	identity := manifest.ExecutionIdentity
+	if len(identity.Topology.Boards) != 1 || identity.Topology.Boards[0].FirmwareRevision != 0x0708 ||
+		identity.Software.Revision != "abc123" || !identity.Software.Modified ||
+		identity.Storage.Format != expectedStorageFormat() || identity.Storage.WriterVersion != 1 ||
+		identity.Runtime.PipelineCapacity != 2 || identity.Runtime.BackpressurePolicy != "block" ||
+		!identity.Runtime.CaptureRaw || !identity.Runtime.JournalTransport {
+		t.Fatalf("execution identity = %+v", identity)
 	}
 	if _, err := os.Stat(filepath.Join(session.Directory(), "incomplete")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("incomplete marker remains: %v", err)
