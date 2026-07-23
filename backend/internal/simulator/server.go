@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -43,7 +44,7 @@ func ProductionTopology() Topology {
 		topology.LinkStatuses[chain] = 3
 		topology.Chains[chain] = []Board{{
 			ProductID:        pid,
-			FirmwareRevision: 0x07080000 | uint32(chain),
+			FirmwareRevision: 0xA7070800 | uint32(chain),
 			Status:           1,
 			Registers:        monitorRegisters(),
 			CommonPedestal:   50,
@@ -52,7 +53,10 @@ func ProductionTopology() Topology {
 			topology.Chains[chain][0].Pedestal.LowGain[channel] = 50
 			topology.Chains[chain][0].Pedestal.HighGain[channel] = 50
 		}
-		topology.Chains[chain][0].protectedFlash = map[uint16][]byte{dt5202.PedestalFlashPage: simulatorPedestalPage(&topology.Chains[chain][0])}
+		topology.Chains[chain][0].protectedFlash = map[uint16][]byte{
+			0:                        simulatorBoardInformationPage(&topology.Chains[chain][0]),
+			dt5202.PedestalFlashPage: simulatorPedestalPage(&topology.Chains[chain][0]),
+		}
 	}
 	return topology
 }
@@ -302,6 +306,14 @@ func (s *Server) serveControl(connection net.Conn) {
 			writer = &faultWriter{Conn: connection, fault: fault}
 		}
 		switch string(opcode) {
+		case "VERS":
+			err = s.handleVersion(writer)
+		case "RBIC":
+			err = s.handleBoardInformation(writer)
+		case "CRRG":
+			err = s.handleConcentratorReadRegister(writer)
+		case "CWRG":
+			err = s.handleConcentratorWriteRegister(writer)
 		case "CINF":
 			err = s.handleChainInfo(writer)
 		case "ENUM":
@@ -313,7 +325,7 @@ func (s *Server) serveControl(connection net.Conn) {
 		case "WREG":
 			err = s.handleWriteRegister(writer)
 		case "FCMD", "DCMD":
-			err = s.handleCommand(writer, string(opcode))
+			err = s.handleCommand(writer)
 		case "SNT0":
 			s.mu.Lock()
 			s.synchronized = true
@@ -332,12 +344,58 @@ func (s *Server) serveControl(connection net.Conn) {
 		case "CLRS":
 			err = writeStatus(writer, 0)
 		default:
+			fmt.Fprintf(os.Stderr, "simulator: unsupported control opcode %q\n", opcode)
 			return
 		}
 		if err != nil {
 			return
 		}
 	}
+}
+
+func writeLengthPrefixed(connection io.Writer, payload []byte) error {
+	header := make([]byte, 4)
+	binary.LittleEndian.PutUint32(header, uint32(len(payload)))
+	if err := writeAll(connection, header); err != nil {
+		return err
+	}
+	return writeAll(connection, payload)
+}
+
+// handleVersion implements the two fixed-offset strings and decimal PID read by
+// FERSlib's LLtdl_GetCncInfo. The values are deterministic simulator identity,
+// not claims about a physical concentrator.
+func (s *Server) handleVersion(connection io.Writer) error {
+	payload := make([]byte, 64)
+	copy(payload[0:16], "2026.4.1.1")
+	copy(payload[16:48], "25.11.24.01-2-2")
+	copy(payload[48:64], "66643")
+	return writeLengthPrefixed(connection, payload)
+}
+
+// handleBoardInformation returns the semicolon-delimited fields consumed by
+// FERSlib's LLtdl_GetCncInfo (model, code, PCB revision, link count, and MAC).
+func (s *Server) handleBoardInformation(connection io.Writer) error {
+	payload := []byte("0;DT5215;WDT5215XAAAA;0;1.0;8;0;0;02:00:00:00:00:01\x00")
+	return writeLengthPrefixed(connection, payload)
+}
+
+func (s *Server) handleConcentratorReadRegister(connection net.Conn) error {
+	address := make([]byte, 4)
+	if _, err := io.ReadFull(connection, address); err != nil {
+		return err
+	}
+	// Zero models a master concentrator and is also the safe deterministic
+	// default for the other virtual registers currently queried by JANUS.
+	return writeAll(connection, make([]byte, 8))
+}
+
+func (s *Server) handleConcentratorWriteRegister(connection net.Conn) error {
+	request := make([]byte, 8)
+	if _, err := io.ReadFull(connection, request); err != nil {
+		return err
+	}
+	return writeStatus(connection, 0)
 }
 
 func (s *Server) handleChainControl(connection net.Conn) error {
@@ -482,7 +540,7 @@ func (s *Server) handleWriteRegister(connection net.Conn) error {
 	}
 	return writeStatus(connection, 0)
 }
-func (s *Server) handleCommand(connection net.Conn, operation string) error {
+func (s *Server) handleCommand(connection net.Conn) error {
 	rest := make([]byte, 16)
 	if _, err := io.ReadFull(connection, rest); err != nil {
 		return err
@@ -492,9 +550,6 @@ func (s *Server) handleCommand(connection net.Conn, operation string) error {
 	command := binary.LittleEndian.Uint32(rest[4:])
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if operation == "DCMD" {
-		return writeStatus(connection, 0)
-	}
 	type target struct {
 		chain, node int
 		board       *Board
