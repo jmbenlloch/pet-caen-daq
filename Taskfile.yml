@@ -75,7 +75,15 @@ tasks:
       - go build -tags hdf5 -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq
       - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
       - go build -o bin/catalog-ops ./backend/cmd/catalog-ops
+      - go build -tags hdf5 -o bin/jsonl-to-hdf5 ./backend/cmd/jsonl-to-hdf5
       - npm --prefix frontend run build
+
+  hdf5:convert:
+    desc: Convert one finalized JSON development run to a validated HDF5 file
+    requires:
+      vars: [SOURCE, OUTPUT]
+    cmds:
+      - go run -tags hdf5 ./backend/cmd/jsonl-to-hdf5 -source "{{.SOURCE}}" -output "{{.OUTPUT}}"
 
   dev:frontend:
     desc: Start the frontend development server (proxies API to localhost:8080)

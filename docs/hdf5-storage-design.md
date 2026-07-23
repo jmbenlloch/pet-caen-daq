@@ -17,6 +17,8 @@ an independent Python/h5py validator.
 
 Concrete logical dataset examples are collected in
 [`hdf5-schema-examples.md`](hdf5-schema-examples.md).
+The converter workflow and retained-run measurements are recorded in
+[`hdf5-conversion-validation.md`](hdf5-conversion-validation.md).
 
 ## Problem statement
 

@@ -132,7 +132,11 @@ func Validate(path string, requireComplete bool) error {
 		}
 	}
 
+	var energyCursor, spectroscopyTimingCursor uint64
 	for row, item := range spectroscopy {
+		if item.EnergyOffset != energyCursor || item.TimingOffset != spectroscopyTimingCursor {
+			return fmt.Errorf("spectroscopy row %d has non-contiguous child offsets", row)
+		}
 		if err := validateRange("spectroscopy energies", row, item.EnergyOffset, item.EnergyCount, len(energies)); err != nil {
 			return err
 		}
@@ -145,32 +149,65 @@ func Validate(path string, requireComplete bool) error {
 		if err := validateParents("spectroscopy timings", row, item.TimingOffset, item.TimingCount, spectroscopyTimings, func(v timingRow) uint64 { return v.ParentRow }); err != nil {
 			return err
 		}
+		energyCursor += uint64(item.EnergyCount)
+		spectroscopyTimingCursor += uint64(item.TimingCount)
 	}
+	if energyCursor != uint64(len(energies)) || spectroscopyTimingCursor != uint64(len(spectroscopyTimings)) {
+		return fmt.Errorf("spectroscopy child datasets contain unreferenced rows")
+	}
+	var hitCursor uint64
 	for row, item := range timingEvents {
+		if item.HitOffset != hitCursor {
+			return fmt.Errorf("timing row %d has non-contiguous hit offset", row)
+		}
 		if err := validateRange("timing hits", row, item.HitOffset, item.HitCount, len(timingHits)); err != nil {
 			return err
 		}
 		if err := validateParents("timing hits", row, item.HitOffset, item.HitCount, timingHits, func(v timingRow) uint64 { return v.ParentRow }); err != nil {
 			return err
 		}
+		hitCursor += uint64(item.HitCount)
 	}
+	if hitCursor != uint64(len(timingHits)) {
+		return fmt.Errorf("timing hits contains unreferenced rows")
+	}
+	var countCursor uint64
 	for row, item := range counting {
+		if item.CountOffset != countCursor {
+			return fmt.Errorf("counting row %d has non-contiguous count offset", row)
+		}
 		if err := validateRange("counting counters", row, item.CountOffset, item.CountCount, len(counts)); err != nil {
 			return err
 		}
 		if err := validateParents("counting counters", row, item.CountOffset, item.CountCount, counts, func(v countRow) uint64 { return v.ParentRow }); err != nil {
 			return err
 		}
+		countCursor += uint64(item.CountCount)
 	}
+	if countCursor != uint64(len(counts)) {
+		return fmt.Errorf("counting counters contains unreferenced rows")
+	}
+	var sampleCursor uint64
 	for row, item := range waveform {
+		if item.SampleOffset != sampleCursor {
+			return fmt.Errorf("waveform row %d has non-contiguous sample offset", row)
+		}
 		if err := validateRange("waveform samples", row, item.SampleOffset, item.SampleCount, len(samples)); err != nil {
 			return err
 		}
 		if err := validateParents("waveform samples", row, item.SampleOffset, item.SampleCount, samples, func(v sampleRow) uint64 { return v.ParentRow }); err != nil {
 			return err
 		}
+		sampleCursor += uint64(item.SampleCount)
 	}
+	if sampleCursor != uint64(len(samples)) {
+		return fmt.Errorf("waveform samples contains unreferenced rows")
+	}
+	var counterCursor, unknownCursor uint64
 	for row, item := range service {
+		if item.CounterOffset != counterCursor || item.UnknownOffset != unknownCursor {
+			return fmt.Errorf("service row %d has non-contiguous child offsets", row)
+		}
 		if err := validateRange("service counters", row, item.CounterOffset, item.CounterCount, len(counters)); err != nil {
 			return err
 		}
@@ -180,11 +217,24 @@ func Validate(path string, requireComplete bool) error {
 		if err := validateRange("service unknown payload", row, item.UnknownOffset, item.UnknownCount, unknownLength); err != nil {
 			return err
 		}
+		counterCursor += uint64(item.CounterCount)
+		unknownCursor += uint64(item.UnknownCount)
 	}
+	if counterCursor != uint64(len(counters)) || unknownCursor != uint64(unknownLength) {
+		return fmt.Errorf("service child datasets contain unreferenced rows")
+	}
+	var wordCursor uint64
 	for row, item := range tests {
+		if item.WordOffset != wordCursor {
+			return fmt.Errorf("test row %d has non-contiguous word offset", row)
+		}
 		if err := validateRange("test words", row, item.WordOffset, item.WordCount, wordLength); err != nil {
 			return err
 		}
+		wordCursor += uint64(item.WordCount)
+	}
+	if wordCursor != uint64(wordLength) {
+		return fmt.Errorf("test words contains unreferenced rows")
 	}
 	return nil
 }

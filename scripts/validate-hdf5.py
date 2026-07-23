@@ -113,9 +113,12 @@ def validate_range(name, parents, offset_name, count_name, children):
     if np.any(ends < offsets) or np.any(ends > len(children)):
         fail(f"/{name} contains an out-of-range child reference")
     if "parent_row" in (children.dtype.names or ()):
+        actual = children["parent_row"][:]
+        expected = np.full(len(children), np.iinfo(np.uint64).max, dtype=np.uint64)
         for parent, (offset, end) in enumerate(zip(offsets, ends)):
-            if np.any(children["parent_row"][offset:end] != parent):
-                fail(f"/{name} child range for parent {parent} has wrong parent_row")
+            expected[offset:end] = parent
+        if not np.array_equal(actual, expected):
+            fail(f"/{name} has an orphaned or incorrectly parented child row")
 
 
 def validate_references(handle):
