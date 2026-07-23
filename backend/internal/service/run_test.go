@@ -115,7 +115,7 @@ func TestRunServiceAcceptsExplicitHDF5SegmentSize(t *testing.T) {
 	controller := &fakeRunController{state: acquisition.StateReady}
 	service := newRunService(t, controller)
 	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{
-		RunId: "sized", RequestedBy: "operator", JanusConfiguration: validTopology, Hdf5SegmentSizeMb: 17,
+		RequestedBy: "operator", JanusConfiguration: validTopology, Hdf5SegmentSizeMb: 17,
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -128,7 +128,7 @@ func TestRunServiceAcceptsExplicitHDF5SegmentSize(t *testing.T) {
 func TestRunServiceRejectsOversizedHDF5Segment(t *testing.T) {
 	service := newRunService(t, &fakeRunController{state: acquisition.StateReady})
 	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{
-		RunId: "oversized", RequestedBy: "operator", JanusConfiguration: validTopology,
+		RequestedBy: "operator", JanusConfiguration: validTopology,
 		Hdf5SegmentSizeMb: maxHDF5SegmentSizeMB + 1,
 	}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "INVALID_HDF5_SEGMENT_SIZE") {
