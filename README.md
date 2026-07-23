@@ -43,6 +43,37 @@ The frontend directory is optional. When enabled, the backend validates it at
 startup, serves browser routes through `index.html`, and keeps ConnectRPC on the
 same HTTP origin.
 
+To package the compiled server and frontend in a production runtime image:
+
+```sh
+task container:build IMAGE=pet-caen-daq:latest
+mkdir -p runs
+docker run --rm --network host \
+  -v "$PWD/config.txt:/etc/pet-caen/config.txt:ro" \
+  -v "$PWD/runs:/var/lib/pet-caen/runs" \
+  pet-caen-daq:latest
+```
+
+After authenticating with `docker login`, build all compiled assets and publish
+the complete image to Docker Hub:
+
+```sh
+task container:push
+task container:push TAG=2026.07.23
+```
+
+The first command publishes `nextmgmt/pet-caen-daq:latest`; `TAG` selects an
+explicit version tag.
+
+This example uses the host network so the backend can reach the DT5215 directly
+and publish the UI on port 8080. A routed bridge network with `-p 8080:8080` is
+also suitable when it can reach the hardware subnet. The container runs as the
+unprivileged numeric user `65532`; a bind-mounted runs directory must be
+writable by that user. Additional backend flags can replace the image's default
+command, for example to select different control or stream addresses. The
+safety-sensitive `-authorize-hv-config` flag is deliberately not enabled by the
+image.
+
 The operator dashboard also lists persisted runs from the configured `-runs`
 directory. Artifact downloads are streamed through the generated RunService API
 and are limited to files recorded in each run's manifest.
