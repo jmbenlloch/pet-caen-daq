@@ -193,4 +193,4 @@ tasks:
       - .cache/hdf5-smoke/verify-hdf5 .cache/hdf5-smoke/blosc-round-trip.h5
       - h5dump .cache/hdf5-smoke/blosc-round-trip.h5 >/dev/null
       - rm .cache/hdf5-smoke/blosc-round-trip.h5
-      - go test ./test/hdf5 -v
+      - go test -tags hdf5 ./backend/internal/hdf5store ./test/hdf5 -v

@@ -1,6 +1,16 @@
 # HDF5 run-storage problem statement and proposed organization
 
-Status: proposal for discussion
+Status: accepted design; decoded-event writer implementation in progress
+
+The first implementation slice lives in `backend/internal/hdf5store` behind
+the `hdf5` build tag. It creates the appendable `/events/index` and all six
+kind-specific parent/child layouts described below, committing children before
+the typed parent and run-wide index. It embeds the exact requested
+configuration plus audit, effective-configuration, run-metadata, and finalized
+manifest snapshots. Finalization flushes the file before changing its internal
+`complete` attribute. The adapter is not yet selected by `runpipeline`, so
+normal runs continue to use the JSON development writer during this
+intermediate state.
 
 Concrete logical dataset examples are collected in
 [`hdf5-schema-examples.md`](hdf5-schema-examples.md).

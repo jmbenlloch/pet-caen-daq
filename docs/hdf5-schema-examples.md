@@ -2,10 +2,11 @@
 
 Status: illustrative companion to `hdf5-storage-design.md`
 
-This document shows how the proposed one-dimensional HDF5 compound datasets
-would look as logical tables. It is not a committed binary layout: field
-offsets, enum numbers, chunk sizes, and optional-value bit assignments still
-require implementation tests.
+This document shows the logical tables used by the initial HDF5 writer.
+Dataset names, event-kind enum numbers, fixed-width field types, child ranges,
+and optional-value bit assignments shown here are covered by implementation
+tests. Chunk sizing and compression remain subject to corpus benchmarks before
+production acceptance.
 
 The first spectroscopy values come from
 `run-go-native-detector-hvon-003`. Other event families use the project's
