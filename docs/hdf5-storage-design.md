@@ -327,6 +327,95 @@ The decimal words are `0x11223344` and `0xaabbccdd`. Test events retain up to
 four opaque 32-bit words. They should be stored losslessly without assigning a
 meaning not established by the event producer.
 
+## Field semantics and resulting schema requirements
+
+### Physical source: `chain` and `node`
+
+`chain` is the DT5215 TDlink number, in the protocol range 0--7. `node` is the
+board address within that chain, in the protocol range 0--15. Their pair is the
+protocol-native source address for an event. The present production topology
+has one DT5202 at node 0 on each of chains 0--3. No additional logical-board-ID
+scheme is required for schema version 1; configuration still records the
+observed `(chain,node)` and firmware for each configured board.
+
+### Payload discriminator: `qualifier`
+
+`qualifier` is the original eight-bit DT5202 data qualifier. It determines both
+the broad event kind and the precise packed payload variant:
+
+| Value | Meaning |
+| ---: | --- |
+| `0x01` | spectroscopy |
+| `0x02` | timing/common start |
+| `0x04` | counting |
+| `0x08` | waveform |
+| `0x12` | timing/common stop |
+| `0x22` | timing streaming |
+| `0x2f` | service |
+| `0xff` | test |
+
+Spectroscopy and counting qualifiers also use modifier bits. For example,
+`0x33` is the captured spectroscopy-with-timing form with both gains and its
+leading-edge format modifier; `0x81` adds a relative timestamp to
+spectroscopy; and `0x84` adds one to counting. The HDF5 file stores both a
+query-friendly `kind` and the exact `qualifier`. A reader must not reconstruct
+the latter from the former.
+
+### QD assertion versus a timing hit
+
+The packed spectroscopy energy word contains an explicit QD bit, exposed as
+`energy.discriminator`. There is no equivalent primary TD boolean in the
+decoded spectroscopy format. A row in `spectroscopy/timings` proves that an
+accepted TDC measurement was emitted for that channel; the absence of a row
+does not prove that the analog TD never crossed. A crossing might be masked,
+outside the reference window, suppressed by holdoff/dead time, or omitted by
+the event-building rules. Combined spectroscopy/timing decoding retains the
+first timing measurement per channel.
+
+Analysis may derive `has_timing_hit` by joining an energy row with its event's
+timing child range. It must not store or label that derived value as
+`td_discriminator_asserted`.
+
+### T-OR, Q-OR, and service counters
+
+T-OR is the aggregate logical OR of enabled time-discriminator signals; Q-OR
+is the corresponding aggregate charge-discriminator OR. Their 24-bit counter
+values use reserved wire identifiers 64 and 65. They count aggregate OR
+occurrences, not the number of asserted channels in one event, and they need
+not equal accepted-event or trigger-ID counts.
+
+Service counter child rows with identifiers 0--63 are 24-bit per-channel
+trigger-counter values (`ch_trg_cnt` in FERSlib). They are monitoring values,
+not energy samples. Rates can be derived from differences between consecutive
+service snapshots and their timestamps, with wrap/reset handling. Available
+source evidence does not establish whether every firmware version reports a
+value cumulative since reset or cleared on an interval, nor the precise
+service emission interval. Schema version 1 therefore uses the conservative
+name `counter_value`, records the service timestamp/version/format, and does
+not claim a `total_since_run_start` semantic.
+
+### Waveform samples and probes
+
+Each waveform word contains high-gain bits 0--13, low-gain bits 14--27, and a
+four-bit digital-probe snapshot in bits 28--31. A digital probe is a configured
+internal logic signal such as peak HG/LG, hold, conversion start, data commit,
+data valid, clock, validation window, T-OR, or Q-OR. The four-bit value is
+authoritative; expanded probe booleans are derived conveniences.
+
+The waveform event does not repeat a channel number because waveform capture
+observes configured probe paths rather than carrying an ordinary per-channel
+list. `AnalogProbe0/1`, `ProbeChannel0/1`, `DigitalProbe0/1`, waveform length,
+and any effective waveform-source selection provide the interpretation.
+Probe channel 0 selects channels 0--31 and probe channel 1 selects channels
+32--63 in the current DT5202 configuration model.
+
+Configuration is immutable during a run, so waveform parents do not need a
+per-event configuration ID. The file must instead contain a complete
+per-board `waveform_configuration` table. The mapping of all four packed
+digital bits and the effective `WaveformSource` behavior remain to be verified
+with a real waveform capture. Until then, raw probe bits and configuration are
+preserved without inventing channel or signal identities.
+
 ## Proposed file layout
 
 The decoded artifact is `events.h5`. Dataset names and numeric enum values are
@@ -371,8 +460,12 @@ part of the schema and must be golden-tested.
       boards                 # board/chain/node/firmware identity
       fpga_writes            # board, ordinal, address, value
       citiroc_streams         # board, chip, 36 uint32 words, bit_count=1144
-      citiroc_channels        # optional analysis-friendly expanded fields
-      citiroc_common_json     # versioned lossless common-field snapshot
+      channels                # per-board/per-channel effective settings
+      frontend_boards         # settings exposed at board scope by JANUS
+      citiroc_chips           # actual per-chip common packed-field values
+      board_trigger           # board trigger/validation/veto logic
+      timing_reference        # board Tref window/delay and ToT mode
+      waveform_configuration  # board probe sources/channels and length
       hv_plans               # requested/effective scalar HV values
       hv_transactions        # board, ordinal, register, data_type, data
       pedestal_plans         # per-board scalar plan values
@@ -463,6 +556,90 @@ would be ambiguous. Storing only register writes is also insufficient: it loses
 operator intent, units, inactive requests, and the provenance needed to explain
 why a value was applied. Both views, plus the audit connecting them, are
 required.
+
+### Effective configuration scope
+
+Expanded tables are organized by the scope exposed to the operator and the
+scope actually packed into hardware. This distinction matters because a
+global JANUS value may be overridden per board, while fine discriminator and
+gain values may be overridden per channel.
+
+The discriminator interface and current production planner establish this
+hierarchy:
+
+- `TD_CoarseThreshold`, `QD_CoarseThreshold`, and `FastShaperInput` are global
+  defaults with optional board-indexed overrides. The current planner applies
+  one effective coarse TD and QD value to both Citiroc chips on a board.
+- `TD_FineThreshold` and `QD_FineThreshold` are 64-element per-channel values.
+  A global or board value supplies the default and a channel-indexed assignment
+  can override an individual channel. The JANUS board/channel selectors expose
+  these overrides in groups of eight channels, but grouping in the interface
+  does not make the value group-wide.
+- TD and QD masks are effective 64-bit board masks. They are displayed and
+  packed as chip 0 channels 0--31 and chip 1 channels 32--63. The QD halves are
+  also present in the two packed Citiroc common streams; TD masks are applied
+  through FPGA registers in the current implementation.
+- HG/LG gain, individual HV adjustment, calibration flags, and preamplifier
+  disable are per-channel Citiroc fields.
+- Shaping, power/bias controls, coarse discriminator DAC fields, and some
+  trigger-output controls are physically Citiroc-chip-common. The public
+  configuration may intentionally apply identical values to both chips; the
+  expanded `citiroc_chips` table records the actual value for each chip.
+- Majority logic, bunch source, validation, veto, trigger widths/holdoff, and
+  time-reference selection are FPGA/board-level settings.
+
+For example, a global `TD_CoarseThreshold` of 220 combined with a board-1
+override of 123 gives effective coarse values 220, 123, 220, and 220 for boards
+0--3. The value 123 applies to all 64 channels and both Citiroc chips on board
+1. Each of those channels then retains its separate `TD_FineThreshold`. Coarse
+and fine are separate hardware DAC fields, not values that analysis should
+simply add together.
+
+`configuration/effective/channels` contains query-friendly rows such as:
+
+| board | channel | chip | chip_channel | readout_enabled | qd_enabled | td_enabled | qd_fine | td_fine | hg_gain | lg_gain | hv_adjustment |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0 | 0 | 0 | 1 | 1 | 1 | 0 | 0 | 55 | 55 | 256 |
+| 0 | 31 | 0 | 31 | 1 | 1 | 1 | 0 | 0 | 55 | 55 | 256 |
+| 0 | 32 | 1 | 0 | 1 | 1 | 1 | 0 | 0 | 55 | 55 | 256 |
+
+This records trigger-path participation for each channel without duplicating
+the board trigger algorithm 64 times. `qd_enabled` and `td_enabled` come from
+the effective masks. A separate `trigger_enabled` convenience column may be
+added only after its exact relationship to TD masks and TLOGIC inputs is
+verified; masks and packed writes remain authoritative.
+
+`configuration/effective/frontend_boards` contains settings exposed at board
+scope:
+
+| board | qd_coarse | td_coarse | fast_shaper_input | hold_delay_ns | mux_period_ns | hit_holdoff_ns |
+| ---: | ---: | ---: | --- | ---: | ---: | ---: |
+| 0 | 250 | 181 | `LG-PA` | 300 | 300 | 0 |
+| 1 | 250 | 183 | `LG-PA` | 300 | 300 | 0 |
+
+`configuration/effective/citiroc_chips` contains actual chip-common values,
+including the chip half of the QD mask and every power, shaping, threshold, and
+trigger-output field represented by `CitirocCommon`. A fixed versioned compound
+type is preferable to a JSON-only query path, while `citiroc_streams` remains
+the authoritative packed 1,144-bit evidence.
+
+`configuration/effective/board_trigger` contains:
+
+| board | bunch_source | logic | majority | logic_width_ns | validation_mode | validation_source | veto_source | holdoff_ns |
+| ---: | --- | --- | ---: | ---: | --- | --- | --- | ---: |
+| 0 | `TLOGIC` | `MAJ64` | 4 | 0 | `DISABLED` | `T0-IN` | `DISABLED` | 0 |
+
+`configuration/effective/timing_reference` contains:
+
+| board | source | window_ns | delay_ns | tot_enabled |
+| ---: | --- | ---: | ---: | ---: |
+| 0 | `TLOGIC` | 1000 | -500 | 0 |
+
+`configuration/effective/waveform_configuration` contains at least waveform
+length, effective waveform source when supported, both analog-probe selections
+and channels, both named digital-probe selections, and the verified mapping of
+the four packed digital bits. Unknown mappings are stored as unknown, never
+filled from assumptions.
 
 ## Chunking, compression, and append protocol
 
