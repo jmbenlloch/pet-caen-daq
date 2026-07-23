@@ -6,10 +6,11 @@ FROM debian:bookworm-slim
 
 RUN groupadd --system --gid 65532 pet-caen \
     && useradd --system --uid 65532 --gid pet-caen --home-dir /nonexistent pet-caen \
-    && install -d -o pet-caen -g pet-caen /var/lib/pet-caen/runs
+    && install -d -o pet-caen -g pet-caen /etc/pet-caen /var/lib/pet-caen/runs
 
 COPY --chown=pet-caen:pet-caen bin/pet-caen-daq /usr/local/bin/pet-caen-daq
 COPY --chown=pet-caen:pet-caen frontend/dist /opt/pet-caen/frontend
+COPY --chown=pet-caen:pet-caen test/fixtures/janus/config_same4_v3_good.txt /etc/pet-caen/config.txt
 
 USER pet-caen
 EXPOSE 8080

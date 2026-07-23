@@ -49,9 +49,21 @@ To package the compiled server and frontend in a production runtime image:
 task container:build IMAGE=pet-caen-daq:latest
 mkdir -p runs
 docker run --rm --network host \
-  -v "$PWD/config.txt:/etc/pet-caen/config.txt:ro" \
   -v "$PWD/runs:/var/lib/pet-caen/runs" \
   pet-caen-daq:latest
+```
+
+The image contains the checked-in production sample configuration, so it can
+also be started directly from Docker Desktop without first creating a bind
+mount. Publish container port `8080` as host port `8080`. To use a different
+configuration on Windows, select **Optional settings > Volumes** in Docker
+Desktop and mount the host file at `/etc/pet-caen/config.txt` as read-only, or
+run this from PowerShell:
+
+```powershell
+docker run --rm -p 8080:8080 `
+  --mount "type=bind,source=$((Get-Item .\config.txt).FullName),target=/etc/pet-caen/config.txt,readonly" `
+  nextmgmt/pet-caen-daq:latest
 ```
 
 After authenticating with `docker login`, build all compiled assets and publish
@@ -65,9 +77,10 @@ task container:push TAG=2026.07.23
 The first command publishes `nextmgmt/pet-caen-daq:latest`; `TAG` selects an
 explicit version tag.
 
-This example uses the host network so the backend can reach the DT5215 directly
-and publish the UI on port 8080. A routed bridge network with `-p 8080:8080` is
-also suitable when it can reach the hardware subnet. The container runs as the
+The Linux example uses the host network so the backend can reach the DT5215
+directly and publish the UI on port 8080. Docker Desktop uses its virtualized
+network; ensure the container can route to the hardware subnet and use
+`-p 8080:8080` to publish the UI. The container runs as the
 unprivileged numeric user `65532`; a bind-mounted runs directory must be
 writable by that user. Additional backend flags can replace the image's default
 command, for example to select different control or stream addresses. The

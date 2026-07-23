@@ -211,8 +211,13 @@ func (c *Coordinator) StopWithReason(ctx context.Context, actor, reason string) 
 		return c.finishFault(run, err, actor)
 	}
 	drainCtx, cancel := boundedContext(ctx, c.drainTimeout)
+	// Once a complete batch has been read from the hardware, preserve it even
+	// if the stream-drain deadline expires while the bounded persistence queue
+	// catches up. Pipeline.Close below already waits for accepted storage work,
+	// and pipeline failures independently unblock Submit.
+	deliveryCtx := context.WithoutCancel(ctx)
 	_, drainErr := StopAndDrain(drainCtx, c.hardware, c.expectedChains, func(raw []byte, events []dt5215.StreamEvent) error {
-		return run.pipeline.Submit(drainCtx, PipelineBatch{Raw: raw, Events: events})
+		return run.pipeline.Submit(deliveryCtx, PipelineBatch{Raw: raw, Events: events})
 	})
 	cancel()
 	result := JoinStopError(run.error(), drainErr)
@@ -301,8 +306,9 @@ func (c *Coordinator) watch(run *activeRun) {
 	}
 	_ = c.recordFault(readErr, "backend")
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), c.drainTimeout)
+	deliveryCtx := context.WithoutCancel(cleanupCtx)
 	_, cleanupErr := StopAndDrain(cleanupCtx, c.hardware, c.expectedChains, func(raw []byte, events []dt5215.StreamEvent) error {
-		return run.pipeline.Submit(cleanupCtx, PipelineBatch{Raw: raw, Events: events})
+		return run.pipeline.Submit(deliveryCtx, PipelineBatch{Raw: raw, Events: events})
 	})
 	cancel()
 	err := JoinStopError(readErr, cleanupErr)
