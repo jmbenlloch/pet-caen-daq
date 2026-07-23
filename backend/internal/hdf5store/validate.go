@@ -40,6 +40,17 @@ func Validate(path string, requireComplete bool) error {
 	if requireComplete && complete != 1 {
 		return fmt.Errorf("HDF5 file is incomplete")
 	}
+	var segmentIndex uint32
+	if err := readAttribute(root, "segment_index", &segmentIndex, hdf5.T_STD_U32LE); err != nil {
+		return err
+	}
+	var firstSequence uint64
+	if err := readAttribute(root, "first_event_sequence", &firstSequence, hdf5.T_STD_U64LE); err != nil {
+		return err
+	}
+	if firstSequence == 0 {
+		return fmt.Errorf("invalid first event sequence 0")
+	}
 	if err := validateEffectiveConfiguration(file); err != nil {
 		return err
 	}
@@ -114,7 +125,7 @@ func Validate(path string, requireComplete bool) error {
 		seen[kind] = make([]bool, length)
 	}
 	for row, item := range index {
-		if item.Sequence != uint64(row+1) {
+		if item.Sequence != firstSequence+uint64(row) {
 			return fmt.Errorf("events/index row %d has sequence %d", row, item.Sequence)
 		}
 		length, ok := kindLengths[item.Kind]

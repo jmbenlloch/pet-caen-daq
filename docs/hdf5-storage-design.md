@@ -436,7 +436,13 @@ preserved without inventing channel or signal identities.
 
 ## Proposed file layout
 
-The decoded artifact is `events.h5`. Dataset names and numeric enum values are
+Decoded artifacts are numbered `events.0000.h5`, `events.0001.h5`, and so on.
+The default target is 500 MiB and operators may select a positive per-run
+target. Rotation happens after the complete event that reaches the target, so
+an event and its child rows are never split; one unusually large event may make
+a segment exceed the target. Each file records its zero-based `segment_index`
+and `first_event_sequence`, while `/events/index.sequence` remains globally
+contiguous across ordered segments. Dataset names and numeric enum values are
 part of the schema and must be golden-tested.
 
 ```text

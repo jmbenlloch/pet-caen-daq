@@ -13,7 +13,7 @@ func createRunWriter(parent string, manifest runstore.Manifest) (runWriter, erro
 	return hdf5store.CreateRun(parent, manifest)
 }
 
-func decodedArtifactName() string   { return "events.h5" }
+func decodedArtifactName() string   { return "events.0000.h5" }
 func expectedStorageFormat() string { return "hdf5" }
 
 func storageIdentity() runstore.StorageIdentity {

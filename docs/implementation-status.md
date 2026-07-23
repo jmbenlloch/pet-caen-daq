@@ -186,7 +186,8 @@ When transport journaling is requested, the coordinator attaches the run writer 
 Finalization now calculates exact sizes and SHA-256 digests after closing each stable payload artifact: decoded JSON Lines, optional complete-batch raw capture, and optional transport journal. The manifest persists those records and a successful `StopRun` returns the same artifact metadata in `RunSummary`; the manifest deliberately does not self-hash because embedding its own digest would be circular.
 
 The production HDF5 build now selects a typed run writer behind the same
-pipeline storage boundary. It replaces `events.jsonl` with `events.h5`, stores
+pipeline storage boundary. It replaces `events.jsonl` with numbered
+`events.0000.h5`, `events.0001.h5`, … segments, stores
 all six decoded event families in appendable typed parent/child datasets,
 preserves run-wide order in `/events/index`, embeds requested/audited/effective
 configuration and run metadata, and retains raw capture and transport journals
@@ -201,6 +202,15 @@ identity. The Docker suite independently repeats the physical-layout and
 reference checks with Python/h5py. Finalization error paths close remaining
 HDF5, raw-capture, journal, and underlying OS file handles while preserving the
 original error and `incomplete` evidence.
+
+HDF5 segment rotation is now a per-run API and operator-UI setting. Zero from
+an older client resolves to the 500 MiB server default; the frontend presents
+500 MiB initially and validates a positive bounded integer. Rotation closes,
+marks complete, and validates the current file after the complete event that
+reaches the target, then lazily creates the next numbered file. Segment root
+attributes preserve the zero-based segment index and first global event
+sequence, and every finalized segment is separately sized, hashed, and listed
+as a downloadable `decoded_events` artifact.
 
 The HDF5 run identity is now complete for facts available to the native
 backend. The external manifest, creation-time `/run/metadata_json`, and
@@ -245,8 +255,7 @@ Remaining HDF5 production-hardening work is:
   required HDF5/Blosc libraries and plugin;
 - decide whether Blosc is the production default or remains opt-in, and verify
   required analysis clients beyond h5py;
-- decide whether SWMR live reading and maximum-size file rotation are actual
-  operational requirements; and
+- decide whether SWMR live reading is an actual operational requirement; and
 - repeat representative cold/warm analysis-query benchmarks after the typed
   configuration tables and final compression policy stabilize.
 

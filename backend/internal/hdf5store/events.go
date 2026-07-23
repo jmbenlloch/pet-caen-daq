@@ -71,7 +71,7 @@ type testRow struct {
 
 func (w *Writer) appendIndex(wire dt5215.StreamEvent, kind uint8, row uint64) error {
 	index := indexRow{
-		Sequence: w.index.length + 1, Kind: kind, KindRow: row,
+		Sequence: w.sequenceBase + w.index.length + 1, Kind: kind, KindRow: row,
 		Chain: wire.Chain, Node: wire.Descriptor.Node, Qualifier: wire.Descriptor.Qualifier,
 		TriggerID: wire.Descriptor.TriggerID, Timestamp: wire.Descriptor.Timestamp,
 		PayloadOffsetWords: wire.Descriptor.PayloadOffsetWords,

@@ -101,12 +101,12 @@ Storage is phased behind project-owned interfaces:
 Acquisition completion does not depend on a specific writer. Writers report health/backpressure, finalize or mark incomplete artifacts, and preserve the original failure when shutdown encounters more than one error.
 
 Development run directories contain `events.jsonl`; production HDF5 builds
-replace that decoded artifact with `events.h5`:
+replace that decoded artifact with numbered HDF5 segments:
 
 ```text
 run-<id>/
   manifest.json
-  events.jsonl | events.h5
+  events.jsonl | events.0000.h5, events.0001.h5, ...
   wire.raw          # optional byte-exact capture
   transport.journal # optional pre-framing byte/failure evidence
   incomplete        # present until successful finalization

@@ -34,6 +34,7 @@ type Manifest struct {
 	RawBatchCount          uint64                     `json:"raw_batch_count,string,omitempty"`
 	CaptureRaw             bool                       `json:"capture_raw"`
 	JournalTransport       bool                       `json:"journal_transport"`
+	HDF5SegmentSizeBytes   uint64                     `json:"hdf5_segment_size_bytes,omitempty"`
 	RequestedConfiguration string                     `json:"requested_configuration,omitempty"`
 	EffectiveConfiguration []dt5202.ConfigurationPlan `json:"effective_configuration,omitempty"`
 	ConfigurationAudit     *configaudit.Report        `json:"configuration_audit,omitempty"`
@@ -95,13 +96,14 @@ type StorageIdentity struct {
 }
 
 type RuntimeIdentity struct {
-	PipelineCapacity    int    `json:"pipeline_capacity"`
-	BackpressurePolicy  string `json:"backpressure_policy"`
-	CaptureRaw          bool   `json:"capture_raw"`
-	JournalTransport    bool   `json:"journal_transport"`
-	EnergyHistogramBins int    `json:"energy_histogram_bins"`
-	ToAHistogramBins    int    `json:"toa_histogram_bins"`
-	ToTHistogramBins    int    `json:"tot_histogram_bins"`
+	PipelineCapacity     int    `json:"pipeline_capacity"`
+	BackpressurePolicy   string `json:"backpressure_policy"`
+	CaptureRaw           bool   `json:"capture_raw"`
+	JournalTransport     bool   `json:"journal_transport"`
+	EnergyHistogramBins  int    `json:"energy_histogram_bins"`
+	ToAHistogramBins     int    `json:"toa_histogram_bins"`
+	ToTHistogramBins     int    `json:"tot_histogram_bins"`
+	HDF5SegmentSizeBytes uint64 `json:"hdf5_segment_size_bytes"`
 }
 
 type Artifact struct {

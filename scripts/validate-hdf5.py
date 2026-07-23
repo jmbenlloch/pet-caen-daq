@@ -279,7 +279,12 @@ def validate_range(name, parents, offset_name, count_name, children):
 
 def validate_references(handle):
     index = handle["events/index"][:]
-    expected_sequence = np.arange(1, len(index) + 1, dtype=np.uint64)
+    first_sequence = int(handle.attrs.get("first_event_sequence", 0))
+    if first_sequence < 1:
+        fail("invalid or missing first_event_sequence attribute")
+    expected_sequence = np.arange(
+        first_sequence, first_sequence + len(index), dtype=np.uint64
+    )
     if not np.array_equal(index["sequence"], expected_sequence):
         fail("/events/index sequence is not contiguous from 1")
     for kind, group in KINDS.items():
@@ -338,6 +343,9 @@ def validate(path, require_complete):
             fail("invalid or missing complete attribute")
         if require_complete and complete != 1:
             fail("HDF5 file is incomplete")
+        segment_index = int(handle.attrs.get("segment_index", -1))
+        if segment_index < 0:
+            fail("invalid or missing segment_index attribute")
         validate_compounds(handle)
         validate_metadata(handle)
         validate_configuration_tables(handle)

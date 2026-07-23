@@ -79,6 +79,12 @@ type searchCursor struct {
 
 const catalogTimestampFormat = "2006-01-02T15:04:05.000000000Z07:00"
 
+const (
+	defaultHDF5SegmentSizeMB = 500
+	maxHDF5SegmentSizeMB     = 1 << 20
+	bytesPerMiB              = 1 << 20
+)
+
 func (s *RunService) SearchRuns(ctx context.Context, request *connect.Request[daqv1.SearchRunsRequest]) (*connect.Response[daqv1.SearchRunsResponse], error) {
 	if s.Catalog == nil {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_CATALOG_UNAVAILABLE", fmt.Errorf("run catalog is not configured"))
@@ -336,6 +342,13 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if message.GetRequestedBy() == "" {
 		return nil, serviceError(connect.CodeInvalidArgument, "REQUIRED_IDENTITY", fmt.Errorf("requested_by is required"))
 	}
+	segmentSizeMB := message.GetHdf5SegmentSizeMb()
+	if segmentSizeMB == 0 {
+		segmentSizeMB = defaultHDF5SegmentSizeMB
+	}
+	if segmentSizeMB > maxHDF5SegmentSizeMB {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HDF5_SEGMENT_SIZE", fmt.Errorf("HDF5 segment size %d MiB exceeds maximum %d MiB", segmentSizeMB, maxHDF5SegmentSizeMB))
+	}
 	if s.Controller.ActiveRunID() != "" {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ALREADY_ACTIVE", fmt.Errorf("run %q is already active", s.Controller.ActiveRunID()))
 	}
@@ -384,7 +397,8 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	options := acquisition.RunOptions{
 		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
-		Histograms: histogramOptions,
+		Histograms:           histogramOptions,
+		HDF5SegmentSizeBytes: uint64(segmentSizeMB) * bytesPerMiB,
 	}
 	if err := s.Controller.Start(ctx, runID, message.GetRequestedBy(), options); err != nil {
 		if errors.Is(err, runstore.ErrRunExists) {

@@ -149,6 +149,7 @@ export function useDaq(api: DaqApi) {
     configuration: string
     captureRaw: boolean
     journalTransport: boolean
+    hdf5SegmentSizeMb: number
   }) {
     busy.value = true
     error.value = ''
@@ -162,6 +163,7 @@ export function useDaq(api: DaqApi) {
           janusConfiguration: input.configuration,
           captureRaw: input.captureRaw,
           journalTransport: input.journalTransport,
+          hdf5SegmentSizeMb: input.hdf5SegmentSizeMb,
         }),
       )
       accept(result.snapshot)

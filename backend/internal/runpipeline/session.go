@@ -48,7 +48,8 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 		PipelineCapacity: options.Capacity, BackpressurePolicy: backpressureName(options.Backpressure),
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
 		EnergyHistogramBins: runOptions.Histograms.EnergyBins, ToAHistogramBins: runOptions.Histograms.ToABins,
-		ToTHistogramBins: runOptions.Histograms.ToTBins,
+		ToTHistogramBins:     runOptions.Histograms.ToTBins,
+		HDF5SegmentSizeBytes: runOptions.HDF5SegmentSizeBytes,
 	}
 	configurationIdentity, err := configurationIdentity(runOptions)
 	if err != nil {
@@ -57,6 +58,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	writer, err := createRunWriter(options.Parent, runstore.Manifest{
 		RunID: runID, StartedAt: options.Now().UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
+		HDF5SegmentSizeBytes:   runOptions.HDF5SegmentSizeBytes,
 		RequestedConfiguration: runOptions.RequestedConfiguration, EffectiveConfiguration: runOptions.EffectiveConfiguration,
 		ConfigurationAudit: runOptions.ConfigurationAudit, ConfigurationIdentity: configurationIdentity, ExecutionIdentity: identity,
 	})

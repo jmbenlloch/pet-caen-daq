@@ -95,6 +95,7 @@ type Writer struct {
 	test         table
 	words        table
 	manifestJSON table
+	sequenceBase uint64
 	closed       bool
 }
 
@@ -110,6 +111,8 @@ type Metadata struct {
 	MetadataJSON           []byte
 	EffectiveConfiguration []dt5202.ConfigurationPlan
 	Boards                 []runstore.BoardIdentity
+	SegmentIndex           uint32
+	EventSequenceBase      uint64
 }
 
 func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
@@ -138,6 +141,13 @@ func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
 	if w.complete, err = createUint8Attribute(root, "complete", 0); err != nil {
 		return nil, err
 	}
+	if err := writeUint32Attribute(root, "segment_index", metadata.SegmentIndex); err != nil {
+		return nil, err
+	}
+	if err := writeUint64Attribute(root, "first_event_sequence", metadata.EventSequenceBase+1); err != nil {
+		return nil, err
+	}
+	w.sequenceBase = metadata.EventSequenceBase
 
 	events, err := file.CreateGroup("events")
 	if err != nil {
@@ -443,6 +453,24 @@ func writeUintAttribute(group *hdf5.Group, name string, value int) error {
 	defer attribute.Close()
 	numeric := uint32(value)
 	return attribute.Write(&numeric, hdf5.T_STD_U32LE)
+}
+
+func writeUint32Attribute(group *hdf5.Group, name string, value uint32) error {
+	attribute, err := createUintAttribute(group, name, hdf5.T_STD_U32LE)
+	if err != nil {
+		return err
+	}
+	defer attribute.Close()
+	return attribute.Write(&value, hdf5.T_STD_U32LE)
+}
+
+func writeUint64Attribute(group *hdf5.Group, name string, value uint64) error {
+	attribute, err := createUintAttribute(group, name, hdf5.T_STD_U64LE)
+	if err != nil {
+		return err
+	}
+	defer attribute.Close()
+	return attribute.Write(&value, hdf5.T_STD_U64LE)
 }
 
 func createUint8Attribute(group *hdf5.Group, name string, value uint8) (*hdf5.Attribute, error) {

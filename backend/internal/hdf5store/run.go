@@ -19,10 +19,16 @@ import (
 )
 
 // RunWriter owns the production run directory and its HDF5 decoded artifact.
+const DefaultSegmentSizeBytes uint64 = 500 << 20
+
 type RunWriter struct {
 	dir            string
 	events         *Writer
+	metadata       Metadata
 	manifest       runstore.Manifest
+	segmentSize    uint64
+	segmentIndex   uint32
+	segmentNames   []string
 	raw            *rawcapture.Writer
 	rawFile        *os.File
 	rawEnabled     bool
@@ -37,6 +43,10 @@ func CreateRun(parent string, manifest runstore.Manifest) (_ *RunWriter, err err
 		return nil, errors.New("run ID is required")
 	}
 	manifest.SchemaVersion = runstore.SchemaVersion
+	if manifest.HDF5SegmentSizeBytes == 0 {
+		manifest.HDF5SegmentSizeBytes = DefaultSegmentSizeBytes
+		manifest.ExecutionIdentity.Runtime.HDF5SegmentSizeBytes = DefaultSegmentSizeBytes
+	}
 	dir := filepath.Join(parent, "run-"+manifest.RunID)
 	if err := os.Mkdir(dir, 0o750); err != nil {
 		if errors.Is(err, os.ErrExist) {
@@ -72,15 +82,17 @@ func CreateRun(parent string, manifest runstore.Manifest) (_ *RunWriter, err err
 	if err != nil {
 		return nil, fmt.Errorf("encode run metadata: %w", err)
 	}
-	events, err := CreateWithMetadata(filepath.Join(dir, "events.h5"), Metadata{
+	metadata := Metadata{
 		RunID: manifest.RunID, RequestedConfiguration: []byte(manifest.RequestedConfiguration),
 		AuditJSON: auditJSON, EffectiveJSON: effectiveJSON, MetadataJSON: metadataJSON,
 		EffectiveConfiguration: manifest.EffectiveConfiguration, Boards: manifest.ExecutionIdentity.Topology.Boards,
-	})
-	if err != nil {
+	}
+	writer := &RunWriter{
+		dir: dir, metadata: metadata, manifest: manifest, segmentSize: manifest.HDF5SegmentSizeBytes,
+	}
+	if err := writer.openSegment(); err != nil {
 		return nil, err
 	}
-	writer := &RunWriter{dir: dir, events: events, manifest: manifest}
 	if err := writer.writeManifest(); err != nil {
 		_ = writer.Abort()
 		return nil, err
@@ -156,10 +168,24 @@ func (w *RunWriter) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) err
 	if w.closed {
 		return errors.New("run writer is closed")
 	}
+	if w.events == nil {
+		if err := w.openSegment(); err != nil {
+			return err
+		}
+	}
 	if err := w.events.AppendEvent(wire, event); err != nil {
 		return err
 	}
 	w.manifest.EventCount++
+	info, err := os.Stat(filepath.Join(w.dir, w.currentSegmentName()))
+	if err != nil {
+		return fmt.Errorf("stat HDF5 segment: %w", err)
+	}
+	if uint64(info.Size()) >= w.segmentSize {
+		if err := w.finalizeSegment(); err != nil {
+			return fmt.Errorf("rotate HDF5 segment: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -181,15 +207,10 @@ func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
 	}
 	w.manifest.CompletedAt = completedAt
 	w.manifest.TerminationReason = reason
-	internalManifest, err := json.Marshal(w.manifest)
-	if err != nil {
-		return fmt.Errorf("encode internal manifest: %w", err)
-	}
-	if err := w.events.Finalize(internalManifest); err != nil {
-		return err
-	}
-	if err := Validate(filepath.Join(w.dir, "events.h5"), true); err != nil {
-		return fmt.Errorf("validate finalized HDF5 artifact: %w", err)
+	if w.events != nil {
+		if err := w.finalizeSegment(); err != nil {
+			return err
+		}
 	}
 	w.manifest.Artifacts, err = w.finalizedArtifacts()
 	if err != nil {
@@ -205,7 +226,10 @@ func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
 }
 
 func (w *RunWriter) finalizedArtifacts() ([]runstore.Artifact, error) {
-	names := []struct{ name, kind string }{{"events.h5", "decoded_events"}}
+	names := make([]struct{ name, kind string }, 0, len(w.segmentNames)+2)
+	for _, name := range w.segmentNames {
+		names = append(names, struct{ name, kind string }{name, "decoded_events"})
+	}
 	if w.rawEnabled {
 		names = append(names, struct{ name, kind string }{"wire.raw", "raw_capture"})
 	}
@@ -243,7 +267,53 @@ func (w *RunWriter) Abort() error {
 }
 
 func (w *RunWriter) closeOpenArtifacts() error {
-	return errors.Join(w.events.Close(), w.closeRaw(), w.closeJournal())
+	var eventsErr error
+	if w.events != nil {
+		eventsErr = w.events.Close()
+		w.events = nil
+	}
+	return errors.Join(eventsErr, w.closeRaw(), w.closeJournal())
+}
+
+func (w *RunWriter) currentSegmentName() string {
+	return fmt.Sprintf("events.%04d.h5", w.segmentIndex)
+}
+
+func (w *RunWriter) openSegment() error {
+	if w.events != nil {
+		return errors.New("HDF5 segment is already open")
+	}
+	metadata := w.metadata
+	metadata.SegmentIndex = w.segmentIndex
+	metadata.EventSequenceBase = w.manifest.EventCount
+	events, err := CreateWithMetadata(filepath.Join(w.dir, w.currentSegmentName()), metadata)
+	if err != nil {
+		return fmt.Errorf("create HDF5 segment %04d: %w", w.segmentIndex, err)
+	}
+	w.events = events
+	return nil
+}
+
+func (w *RunWriter) finalizeSegment() error {
+	if w.events == nil {
+		return nil
+	}
+	internalManifest, err := json.Marshal(w.manifest)
+	if err != nil {
+		return fmt.Errorf("encode internal manifest: %w", err)
+	}
+	name := w.currentSegmentName()
+	if err := w.events.Finalize(internalManifest); err != nil {
+		w.events = nil
+		return err
+	}
+	w.events = nil
+	if err := Validate(filepath.Join(w.dir, name), true); err != nil {
+		return fmt.Errorf("validate finalized HDF5 segment %s: %w", name, err)
+	}
+	w.segmentNames = append(w.segmentNames, name)
+	w.segmentIndex++
+	return nil
 }
 
 func (w *RunWriter) closeRaw() error {

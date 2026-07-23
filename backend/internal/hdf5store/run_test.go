@@ -5,6 +5,7 @@ package hdf5store
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -53,10 +54,10 @@ func TestRunWriterFinalizesHDF5ArtifactAndExternalManifest(t *testing.T) {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	artifact := manifest.Artifacts[0]
-	if artifact.Name != "events.h5" || artifact.Kind != "decoded_events" || artifact.SizeBytes == 0 || len(artifact.SHA256) != 64 {
+	if artifact.Name != "events.0000.h5" || artifact.Kind != "decoded_events" || artifact.SizeBytes == 0 || len(artifact.SHA256) != 64 {
 		t.Fatalf("artifact = %+v", artifact)
 	}
-	opened, _, err := runstore.OpenArtifact(parent, "42", "events.h5")
+	opened, _, err := runstore.OpenArtifact(parent, "42", "events.0000.h5")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,16 +68,16 @@ func TestRunWriterFinalizesHDF5ArtifactAndExternalManifest(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(writer.Directory(), "incomplete")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("incomplete marker remains: %v", err)
 	}
-	if err := Validate(filepath.Join(writer.Directory(), "events.h5"), true); err != nil {
+	if err := Validate(filepath.Join(writer.Directory(), "events.0000.h5"), true); err != nil {
 		t.Fatal(err)
 	}
 	_, source, _, _ := runtime.Caller(0)
 	script := filepath.Join(filepath.Dir(source), "..", "..", "..", "scripts", "validate-hdf5.py")
-	command := exec.Command("python3", script, filepath.Join(writer.Directory(), "events.h5"))
+	command := exec.Command("python3", script, filepath.Join(writer.Directory(), "events.0000.h5"))
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("independent h5py validation: %v\n%s", err, output)
 	}
-	file, err := hdf5.OpenFile(filepath.Join(writer.Directory(), "events.h5"), hdf5.F_ACC_RDONLY)
+	file, err := hdf5.OpenFile(filepath.Join(writer.Directory(), "events.0000.h5"), hdf5.F_ACC_RDONLY)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +126,7 @@ func TestRunWriterAbortRetainsIncompleteHDF5(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(writer.Directory(), "incomplete")); err != nil {
 		t.Fatal(err)
 	}
-	file, err := hdf5.OpenFile(filepath.Join(writer.Directory(), "events.h5"), hdf5.F_ACC_RDONLY)
+	file, err := hdf5.OpenFile(filepath.Join(writer.Directory(), "events.0000.h5"), hdf5.F_ACC_RDONLY)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,10 +148,10 @@ func TestRunWriterAbortRetainsIncompleteHDF5(t *testing.T) {
 	if complete != 0 {
 		t.Fatalf("complete = %d", complete)
 	}
-	if err := Validate(filepath.Join(writer.Directory(), "events.h5"), false); err != nil {
+	if err := Validate(filepath.Join(writer.Directory(), "events.0000.h5"), false); err != nil {
 		t.Fatal(err)
 	}
-	if err := Validate(filepath.Join(writer.Directory(), "events.h5"), true); err == nil {
+	if err := Validate(filepath.Join(writer.Directory(), "events.0000.h5"), true); err == nil {
 		t.Fatal("expected incomplete validation failure")
 	}
 }
@@ -170,7 +171,7 @@ func TestRunWriterFinalizationFailureClosesHDF5AndRetainsIncomplete(t *testing.T
 	if _, statErr := os.Stat(filepath.Join(writer.Directory(), "incomplete")); statErr != nil {
 		t.Fatalf("incomplete marker missing after %v: %v", err, statErr)
 	}
-	file, openErr := hdf5.OpenFile(filepath.Join(writer.Directory(), "events.h5"), hdf5.F_ACC_RDONLY)
+	file, openErr := hdf5.OpenFile(filepath.Join(writer.Directory(), "events.0000.h5"), hdf5.F_ACC_RDONLY)
 	if openErr != nil {
 		t.Fatalf("reopen failed artifact after %v: %v", err, openErr)
 	}
@@ -179,5 +180,57 @@ func TestRunWriterFinalizationFailureClosesHDF5AndRetainsIncomplete(t *testing.T
 	}
 	if abortErr := writer.Abort(); abortErr != nil {
 		t.Fatalf("abort after failed finalization: %v", abortErr)
+	}
+}
+
+func TestRunWriterRotatesNumberedSegmentsAndPreservesGlobalSequence(t *testing.T) {
+	writer, err := CreateRun(t.TempDir(), runstore.Manifest{
+		RunID: "rotation", StartedAt: "now", HDF5SegmentSizeBytes: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := uint64(1); index <= 2; index++ {
+		wire := dt5215.StreamEvent{Descriptor: dt5215.Descriptor{
+			Qualifier: dt5202.QualifierTest, TriggerID: index, Timestamp: index + 10,
+		}}
+		event := dt5202.Event{Kind: dt5202.EventTest, Test: &dt5202.TestEvent{
+			TriggerID: index, Timestamp: index + 10, Words: []uint32{uint32(index)},
+		}}
+		if err := writer.AppendEvent(wire, event); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Finalize("later", "operator_stop"); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := runstore.ReadManifest(writer.Directory(), "rotation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.EventCount != 2 || manifest.HDF5SegmentSizeBytes != 1 || len(manifest.Artifacts) != 2 {
+		t.Fatalf("manifest = %+v", manifest)
+	}
+	for index, artifact := range manifest.Artifacts {
+		wantName := fmt.Sprintf("events.%04d.h5", index)
+		if artifact.Name != wantName || artifact.Kind != "decoded_events" {
+			t.Fatalf("artifact %d = %+v", index, artifact)
+		}
+		path := filepath.Join(writer.Directory(), wantName)
+		if err := Validate(path, true); err != nil {
+			t.Fatal(err)
+		}
+		file, err := hdf5.OpenFile(path, hdf5.F_ACC_RDONLY)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rows, err := readRows[indexRow](file, "events/index")
+		closeErr := file.Close()
+		if err != nil || closeErr != nil {
+			t.Fatalf("read %s: %v; close: %v", wantName, err, closeErr)
+		}
+		if len(rows) != 1 || rows[0].Sequence != uint64(index+1) {
+			t.Fatalf("%s index = %+v", wantName, rows)
+		}
 	}
 }

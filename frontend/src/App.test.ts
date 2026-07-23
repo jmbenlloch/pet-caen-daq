@@ -208,6 +208,9 @@ describe('operator dashboard', () => {
     ).toBe(true)
     await wrapper.get('input[id^="PresetTime"]').setValue('30')
     await wrapper.get('input[id^="PresetTime"]').trigger('change')
+    const segmentSize = wrapper.get('input[aria-label="HDF5 file size in MiB"]')
+    expect(segmentSize.element).toHaveProperty('value', '500')
+    await segmentSize.setValue('128')
     await wrapper.get('button.primary').trigger('click')
     await flushPromises()
 
@@ -218,6 +221,7 @@ describe('operator dashboard', () => {
         requestedBy: 'operator',
         captureRaw: false,
         journalTransport: false,
+        hdf5SegmentSizeMb: 128,
       }),
     )
     expect(wrapper.get('#system-heading').text()).toBe('Running')

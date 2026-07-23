@@ -921,8 +921,10 @@ type StartRunRequest struct {
 	CaptureRaw         bool                   `protobuf:"varint,3,opt,name=capture_raw,json=captureRaw,proto3" json:"capture_raw,omitempty"`
 	JournalTransport   bool                   `protobuf:"varint,4,opt,name=journal_transport,json=journalTransport,proto3" json:"journal_transport,omitempty"`
 	RequestedBy        string                 `protobuf:"bytes,5,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Zero selects the server default of 500 MiB.
+	Hdf5SegmentSizeMb uint32 `protobuf:"varint,6,opt,name=hdf5_segment_size_mb,json=hdf5SegmentSizeMb,proto3" json:"hdf5_segment_size_mb,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *StartRunRequest) Reset() {
@@ -981,6 +983,13 @@ func (x *StartRunRequest) GetRequestedBy() string {
 		return x.RequestedBy
 	}
 	return ""
+}
+
+func (x *StartRunRequest) GetHdf5SegmentSizeMb() uint32 {
+	if x != nil {
+		return x.Hdf5SegmentSizeMb
+	}
+	return 0
 }
 
 type StartRunResponse struct {
@@ -3203,13 +3212,14 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x12!\n" +
 	"\frequested_by\x18\x03 \x01(\tR\vrequestedBy\"X\n" +
 	"\x16SetHighVoltageResponse\x12>\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xc1\x01\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xf2\x01\n" +
 	"\x0fStartRunRequest\x12/\n" +
 	"\x13janus_configuration\x18\x02 \x01(\tR\x12janusConfiguration\x12\x1f\n" +
 	"\vcapture_raw\x18\x03 \x01(\bR\n" +
 	"captureRaw\x12+\n" +
 	"\x11journal_transport\x18\x04 \x01(\bR\x10journalTransport\x12!\n" +
-	"\frequested_by\x18\x05 \x01(\tR\vrequestedByJ\x04\b\x01\x10\x02R\x06run_id\"\x81\x01\n" +
+	"\frequested_by\x18\x05 \x01(\tR\vrequestedBy\x12/\n" +
+	"\x14hdf5_segment_size_mb\x18\x06 \x01(\rR\x11hdf5SegmentSizeMbJ\x04\b\x01\x10\x02R\x06run_id\"\x81\x01\n" +
 	"\x10StartRunResponse\x12-\n" +
 	"\x03run\x18\x01 \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x03run\x12>\n" +
 	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"J\n" +
