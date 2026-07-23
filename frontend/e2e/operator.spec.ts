@@ -23,9 +23,12 @@ test('operator completes a simulated run and downloads its persisted artifact', 
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
+  await page.getByRole('tab', { name: /Hardware/ }).click()
   await expect(page.getByText('DT5202 · node 0')).toHaveCount(4)
   await expect(page.getByText('Live telemetry')).toBeVisible()
+  await page.getByRole('tab', { name: /Acquisition/ }).click()
   await expect(page.getByLabel('Configuration parameters')).toBeVisible()
+  await page.getByRole('tab', { name: 'All', exact: true }).click()
   await page.getByLabel('Find a parameter').fill('PresetTime')
   await page.getByRole('spinbutton', { name: 'PresetTime', exact: true }).fill('30')
 
@@ -35,6 +38,7 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await expect(activeRunId).toHaveText(/^\d+$/)
   const runId = (await activeRunId.textContent())!
   await expect(page.getByText(runId, { exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: /Monitoring/ }).click()
   const statistics = page.getByRole('region', { name: 'Statistics' })
   await expect(statistics.getByRole('tab', { name: 'Board 0' })).toBeVisible()
   await statistics.getByRole('tab', { name: 'Board 0' }).click()
@@ -55,8 +59,10 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await plots.getByLabel('Log Y').check()
   await expect(histogramPlot.locator('canvas').first()).toBeVisible()
 
+  await page.getByRole('tab', { name: /Acquisition/ }).click()
   await page.getByRole('button', { name: 'Stop and drain' }).click()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
+  await page.getByRole('tab', { name: /Runs/ }).click()
   await expect(page.getByRole('heading', { name: runId })).toBeVisible()
   const storedRun = page
     .getByLabel('Stored runs')
@@ -72,6 +78,7 @@ test('operator completes a simulated run and downloads its persisted artifact', 
 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
+  await page.getByRole('tab', { name: /Runs/ }).click()
   await expect(page.getByLabel('Stored runs').getByText(runId, { exact: true })).toBeVisible()
 })
 
@@ -80,7 +87,7 @@ test('operator receives structured validation feedback before hardware mutation'
 }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
-  await page.getByRole('button', { name: 'Edit source' }).click()
+  await page.getByRole('button', { name: 'View raw configuration' }).click()
   await page.getByLabel('JANUS configuration source').fill('Open TDlink 0 0')
   await page.getByRole('button', { name: 'Validate' }).click()
   await expect(page.getByLabel('Validation issues')).toBeVisible()
@@ -99,14 +106,17 @@ test('backend automatically stops runs at time and event presets while manual st
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop and drain' })).toBeEnabled()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('tab', { name: /Runs/ }).click()
   const timedRun = (await page.locator('#completed-heading').textContent())!
   expect(timedRun).toMatch(/^\d+$/)
   await expect(page.getByRole('heading', { name: timedRun })).toBeVisible()
   await expect(page.getByText('preset_time', { exact: true })).toBeVisible()
 
+  await page.getByRole('tab', { name: /Acquisition/ }).click()
   await page.getByLabel('Run stop').selectOption('PRESET_COUNTS')
   await page.getByLabel('Preset event count').fill('3')
   await page.getByRole('button', { name: 'Start run' }).click()
+  await page.getByRole('tab', { name: /Runs/ }).click()
   const completedHeading = page.locator('#completed-heading')
   await expect(completedHeading).not.toHaveText(timedRun, { timeout: 10_000 })
   const countedRun = (await completedHeading.textContent())!
@@ -205,7 +215,7 @@ test('operator configures bounded values and channel masks without editing text'
   await page.getByLabel('Find a parameter').fill('TempSensType')
   await page.getByLabel('TempSensType', { exact: true }).fill('1 2 3')
 
-  await page.getByRole('button', { name: 'Edit source' }).click()
+  await page.getByRole('button', { name: 'View raw configuration' }).click()
   await expect(page.getByLabel('JANUS configuration source')).toHaveValue(
     /ChEnableMask0\[2\]\s+0xFFFFFFFE/,
   )
@@ -225,6 +235,7 @@ test('operator monitors and safely switches high voltage while ready', async ({ 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
 
+  await page.getByRole('tab', { name: /Hardware/ }).click()
   const board0 = page.locator('.board-card').filter({ hasText: 'Chain 0' })
   await expect(board0.getByText('HV off')).toBeVisible()
   await expect(board0).toContainText('Vmon0.00 V')
