@@ -95,6 +95,8 @@ message StartRunRequest {
   bool capture_raw = 3;
   bool journal_transport = 4;
   string requested_by = 5;
+  // Zero selects the server default of 500 MiB.
+  uint32 hdf5_segment_size_mb = 6;
 }
 
 message StartRunResponse {

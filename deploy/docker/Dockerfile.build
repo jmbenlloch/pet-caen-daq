@@ -1,0 +1,127 @@
+# syntax=docker/dockerfile:1
+
+ARG GO_VERSION=1.25.0
+ARG NODE_VERSION=24.13.0
+
+FROM node:${NODE_VERSION}-bookworm-slim AS node
+FROM golang:${GO_VERSION}-bookworm AS build
+
+ARG TARGETARCH
+ARG HDF5_VERSION=1.14.6
+ARG HDF5_BLOSC_VERSION=1.0.1
+ARG C_BLOSC_VERSION=1.21.6
+ARG TASK_VERSION=3.48.0
+ARG BUF_VERSION=1.65.0
+ARG PROTOC_VERSION=29.3
+ARG PROTOC_GEN_GO_VERSION=1.36.11
+ARG PROTOC_GEN_CONNECT_GO_VERSION=1.19.1
+ARG PROTOC_GEN_ES_VERSION=2.10.0
+ARG PROTOC_GEN_CONNECT_ES_VERSION=1.7.0
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# Network diagnostics and capture tools are useful when developing the native
+# DT5215 protocol. The remaining packages build HDF5 and its Blosc filter.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash-completion \
+        build-essential \
+        ca-certificates \
+        cmake \
+        curl \
+        git \
+        inetutils-ping \
+        iproute2 \
+        jq \
+        libpcap0.8 \
+        libpcap0.8-dev \
+        net-tools \
+        ninja-build \
+        pkg-config \
+        python3-h5py \
+        sqlite3 \
+        tcpdump \
+        unzip \
+        wget \
+        xz-utils \
+        zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Use the official, pinned Node image instead of a mutable apt repository.
+COPY --from=node /usr/local/ /usr/local/
+
+RUN case "${TARGETARCH}" in \
+        amd64) tool_arch=x86_64; protoc_arch=x86_64 ;; \
+        arm64) tool_arch=aarch64; protoc_arch=aarch_64 ;; \
+        *) echo "unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSLo /tmp/task.tar.gz \
+        "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_${TARGETARCH}.tar.gz" \
+    && tar -xzf /tmp/task.tar.gz -C /usr/local/bin task \
+    && curl -fsSLo /usr/local/bin/buf \
+        "https://github.com/bufbuild/buf/releases/download/v${BUF_VERSION}/buf-Linux-${tool_arch}" \
+    && chmod +x /usr/local/bin/buf \
+    && curl -fsSLo /tmp/protoc.zip \
+        "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-${protoc_arch}.zip" \
+    && unzip -q /tmp/protoc.zip -d /usr/local \
+    && rm /tmp/task.tar.gz /tmp/protoc.zip
+
+ENV GOBIN=/usr/local/bin
+RUN go install "google.golang.org/protobuf/cmd/protoc-gen-go@v${PROTOC_GEN_GO_VERSION}" \
+    && go install "connectrpc.com/connect/cmd/protoc-gen-connect-go@v${PROTOC_GEN_CONNECT_GO_VERSION}" \
+    && npm install --global \
+        "@bufbuild/protoc-gen-es@${PROTOC_GEN_ES_VERSION}" \
+        "@connectrpc/protoc-gen-connect-es@${PROTOC_GEN_CONNECT_ES_VERSION}" \
+    && go clean -cache -modcache \
+    && npm cache clean --force
+
+# Keep the supported 1.14 HDF5 line used by the original project image.
+# Thread safety is enabled because the DAQ is concurrent; the unsupported flag
+# is required by HDF5 when combining thread safety with the high-level library.
+RUN curl -fsSLo /tmp/hdf5.tar.gz \
+        "https://github.com/HDFGroup/hdf5/releases/download/hdf5_${HDF5_VERSION}/hdf5-${HDF5_VERSION}.tar.gz" \
+    && mkdir /tmp/hdf5-source \
+    && tar -xzf /tmp/hdf5.tar.gz -C /tmp/hdf5-source --strip-components=2 \
+    && cd /tmp/hdf5-source \
+    && ./configure \
+        --prefix=/usr/local/hdf5 \
+        --disable-tests \
+        --enable-hl \
+        --enable-shared \
+        --enable-threadsafe \
+        --enable-unsupported \
+        --with-zlib \
+    && make -j"$(nproc)" \
+    && make install \
+    && rm -rf /tmp/hdf5.tar.gz /tmp/hdf5-source
+
+# hdf5-blosc 1.0.1 otherwise follows c-blosc's moving main branch. Rewrite its
+# ExternalProject tag so every nested source dependency is version-pinned.
+RUN curl -fsSLo /tmp/hdf5-blosc.tar.gz \
+        "https://github.com/Blosc/hdf5-blosc/archive/refs/tags/v${HDF5_BLOSC_VERSION}.tar.gz" \
+    && mkdir /tmp/hdf5-blosc-source \
+    && tar -xzf /tmp/hdf5-blosc.tar.gz -C /tmp/hdf5-blosc-source --strip-components=1 \
+    && sed -i "s/GIT_TAG main/GIT_TAG v${C_BLOSC_VERSION}/" /tmp/hdf5-blosc-source/CMakeLists.txt \
+    && cmake -S /tmp/hdf5-blosc-source -B /tmp/hdf5-blosc-build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr/local/hdf5-blosc \
+        -DPLUGIN_INSTALL_PATH=/usr/local/hdf5/lib/plugin \
+        -DHDF5_ROOT=/usr/local/hdf5 \
+        -DBUILD_TESTS=ON \
+    && cmake --build /tmp/hdf5-blosc-build --parallel \
+    && ctest --test-dir /tmp/hdf5-blosc-build --output-on-failure \
+    && cmake --install /tmp/hdf5-blosc-build \
+    && cp -a /tmp/hdf5-blosc-build/blosc/include/. /usr/local/hdf5-blosc/include/ \
+    && cp -a /tmp/hdf5-blosc-build/blosc/lib/. /usr/local/hdf5-blosc/lib/ \
+    && rm -rf /tmp/hdf5-blosc.tar.gz /tmp/hdf5-blosc-source /tmp/hdf5-blosc-build
+
+ENV PATH="/usr/local/hdf5/bin:${PATH}" \
+    CGO_ENABLED="1" \
+    LD_LIBRARY_PATH="/usr/local/hdf5/lib:/usr/local/hdf5-blosc/lib" \
+    HDF5_PLUGIN_PATH="/usr/local/hdf5/lib/plugin" \
+    PKG_CONFIG_PATH="/usr/local/hdf5/lib/pkgconfig" \
+    CGO_CFLAGS="-I/usr/local/hdf5/include -I/usr/local/hdf5-blosc/include" \
+    CGO_LDFLAGS="-L/usr/local/hdf5/lib -L/usr/local/hdf5-blosc/lib"
+
+WORKDIR /workspace
+CMD ["/bin/bash"]

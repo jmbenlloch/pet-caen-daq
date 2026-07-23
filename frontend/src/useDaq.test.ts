@@ -89,6 +89,7 @@ describe('useDaq', () => {
       configuration: 'invalid',
       captureRaw: true,
       journalTransport: true,
+      hdf5SegmentSizeMb: 500,
     })
 
     expect(api.validate).toHaveBeenCalledWith('invalid')

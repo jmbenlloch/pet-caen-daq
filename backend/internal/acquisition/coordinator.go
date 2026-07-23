@@ -34,6 +34,7 @@ type RunOptions struct {
 	EffectiveConfiguration []dt5202.ConfigurationPlan
 	ConfigurationAudit     *configaudit.Report
 	Histograms             HistogramOptions
+	HDF5SegmentSizeBytes   uint64
 }
 
 type HistogramOptions struct {

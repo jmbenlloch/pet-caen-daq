@@ -95,7 +95,8 @@ func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
 	if start.Msg.Snapshot.State != daqv1.SystemState_SYSTEM_STATE_RUNNING || start.Msg.Snapshot.CurrentRun.GetRunId() != "42" || !start.Msg.Run.Incomplete {
 		t.Fatalf("start response = %+v", start.Msg)
 	}
-	if !controller.options.CaptureRaw || !controller.options.JournalTransport || controller.options.RequestedConfiguration != validTopology || controller.options.ConfigurationAudit == nil {
+	if !controller.options.CaptureRaw || !controller.options.JournalTransport || controller.options.RequestedConfiguration != validTopology || controller.options.ConfigurationAudit == nil ||
+		controller.options.HDF5SegmentSizeBytes != 500*bytesPerMiB {
 		t.Fatalf("run options = %+v", controller.options)
 	}
 	stop, err := service.StopRun(context.Background(), connect.NewRequest(&daqv1.StopRunRequest{RunId: "42", RequestedBy: "operator"}))
@@ -107,6 +108,31 @@ func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
 	}
 	if len(stop.Msg.Run.Artifacts) != 1 || stop.Msg.Run.Artifacts[0].GetName() != "events.jsonl" || stop.Msg.Run.Artifacts[0].GetSizeBytes() != 123 || stop.Msg.Run.Artifacts[0].GetSha256() != "abc" {
 		t.Fatalf("artifacts = %+v", stop.Msg.Run.Artifacts)
+	}
+}
+
+func TestRunServiceAcceptsExplicitHDF5SegmentSize(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady}
+	service := newRunService(t, controller)
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{
+		RequestedBy: "operator", JanusConfiguration: validTopology, Hdf5SegmentSizeMb: 17,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controller.options.HDF5SegmentSizeBytes != 17*bytesPerMiB {
+		t.Fatalf("segment size = %d", controller.options.HDF5SegmentSizeBytes)
+	}
+}
+
+func TestRunServiceRejectsOversizedHDF5Segment(t *testing.T) {
+	service := newRunService(t, &fakeRunController{state: acquisition.StateReady})
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{
+		RequestedBy: "operator", JanusConfiguration: validTopology,
+		Hdf5SegmentSizeMb: maxHDF5SegmentSizeMB + 1,
+	}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "INVALID_HDF5_SEGMENT_SIZE") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

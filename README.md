@@ -13,6 +13,8 @@ The planned system has:
 The first protocol vertical slice is implemented: the backend parses the production JANUS configuration, connects to the DT5215 control and data ports, discovers and validates the provisioned four-link topology, and reads board identity/status registers. A deterministic TCP simulator exercises the same native binary protocol in integration tests.
 
 Project workflows use [Task](https://taskfile.dev/docs/installation) through the root `Taskfile.yml`.
+The reproducible Docker build environment, including HDF5 and Blosc, is
+documented in [Docker development workflow](docs/docker-development.md).
 
 ```sh
 task generate

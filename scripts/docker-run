@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+image="${PET_CAEN_BUILD_IMAGE:-pet-caen-daq-build:latest}"
+mkdir -p .cache/go-build .cache/go/pkg/mod .cache/npm
+
+if (($# == 0)); then
+    set -- bash
+fi
+
+tty=()
+if [[ -t 0 && -t 1 ]]; then
+    tty=(-it)
+fi
+
+exec docker run --rm "${tty[@]}" \
+    --user "$(id -u):$(id -g)" \
+    --env HOME=/tmp/pet-caen-home \
+    --env GOCACHE=/workspace/.cache/go-build \
+    --env GOPATH=/workspace/.cache/go \
+    --env GOMODCACHE=/workspace/.cache/go/pkg/mod \
+    --env npm_config_cache=/workspace/.cache/npm \
+    --mount "type=bind,src=$PWD,dst=/workspace" \
+    --workdir /workspace \
+    "$image" "$@"

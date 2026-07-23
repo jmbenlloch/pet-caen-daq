@@ -3,6 +3,8 @@ package runpipeline
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -20,10 +22,11 @@ import (
 )
 
 type Options struct {
-	Parent       string
-	Capacity     int
-	Backpressure acquisition.BackpressurePolicy
-	Now          func() time.Time
+	Parent            string
+	Capacity          int
+	Backpressure      acquisition.BackpressurePolicy
+	ExecutionIdentity runstore.ExecutionIdentity
+	Now               func() time.Time
 }
 
 type Factory struct{ Options Options }
@@ -39,11 +42,25 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	writer, err := runstore.Create(options.Parent, runstore.Manifest{
+	identity := options.ExecutionIdentity
+	identity.Storage = storageIdentity()
+	identity.Runtime = runstore.RuntimeIdentity{
+		PipelineCapacity: options.Capacity, BackpressurePolicy: backpressureName(options.Backpressure),
+		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
+		EnergyHistogramBins: runOptions.Histograms.EnergyBins, ToAHistogramBins: runOptions.Histograms.ToABins,
+		ToTHistogramBins:     runOptions.Histograms.ToTBins,
+		HDF5SegmentSizeBytes: runOptions.HDF5SegmentSizeBytes,
+	}
+	configurationIdentity, err := configurationIdentity(runOptions)
+	if err != nil {
+		return nil, err
+	}
+	writer, err := createRunWriter(options.Parent, runstore.Manifest{
 		RunID: runID, StartedAt: options.Now().UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
+		HDF5SegmentSizeBytes:   runOptions.HDF5SegmentSizeBytes,
 		RequestedConfiguration: runOptions.RequestedConfiguration, EffectiveConfiguration: runOptions.EffectiveConfiguration,
-		ConfigurationAudit: runOptions.ConfigurationAudit,
+		ConfigurationAudit: runOptions.ConfigurationAudit, ConfigurationIdentity: configurationIdentity, ExecutionIdentity: identity,
 	})
 	if err != nil {
 		return nil, err
@@ -69,9 +86,40 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	return &Session{pipeline: pipeline, writer: writer, sink: sink}, nil
 }
 
+func configurationIdentity(options acquisition.RunOptions) (runstore.ConfigurationIdentity, error) {
+	effective, err := json.Marshal(options.EffectiveConfiguration)
+	if err != nil {
+		return runstore.ConfigurationIdentity{}, fmt.Errorf("encode effective configuration identity: %w", err)
+	}
+	audit, err := json.Marshal(options.ConfigurationAudit)
+	if err != nil {
+		return runstore.ConfigurationIdentity{}, fmt.Errorf("encode configuration audit identity: %w", err)
+	}
+	requestedHash := sha256.Sum256([]byte(options.RequestedConfiguration))
+	effectiveHash := sha256.Sum256(effective)
+	auditHash := sha256.Sum256(audit)
+	auditVersion := 0
+	if options.ConfigurationAudit != nil {
+		auditVersion = options.ConfigurationAudit.SchemaVersion
+	}
+	return runstore.ConfigurationIdentity{
+		ParserVersion: 1, AuditSchemaVersion: auditVersion,
+		RequestedConfigurationSHA256: fmt.Sprintf("%x", requestedHash),
+		EffectiveConfigurationSHA256: fmt.Sprintf("%x", effectiveHash),
+		ConfigurationAuditSHA256:     fmt.Sprintf("%x", auditHash),
+	}, nil
+}
+
+func backpressureName(policy acquisition.BackpressurePolicy) string {
+	if policy == acquisition.BackpressureReject {
+		return "reject"
+	}
+	return "block"
+}
+
 type Session struct {
 	pipeline  *acquisition.Pipeline
-	writer    *runstore.Writer
+	writer    runWriter
 	sink      *sink
 	mu        sync.Mutex
 	lastErr   error
@@ -160,7 +208,7 @@ func (s *Session) recordError(err error) {
 }
 
 type sink struct {
-	writer           *runstore.Writer
+	writer           runWriter
 	captureRaw       bool
 	events           atomic.Uint64
 	rawBatches       atomic.Uint64

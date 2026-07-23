@@ -34,10 +34,76 @@ type Manifest struct {
 	RawBatchCount          uint64                     `json:"raw_batch_count,string,omitempty"`
 	CaptureRaw             bool                       `json:"capture_raw"`
 	JournalTransport       bool                       `json:"journal_transport"`
+	HDF5SegmentSizeBytes   uint64                     `json:"hdf5_segment_size_bytes,omitempty"`
 	RequestedConfiguration string                     `json:"requested_configuration,omitempty"`
 	EffectiveConfiguration []dt5202.ConfigurationPlan `json:"effective_configuration,omitempty"`
 	ConfigurationAudit     *configaudit.Report        `json:"configuration_audit,omitempty"`
+	ConfigurationIdentity  ConfigurationIdentity      `json:"configuration_identity"`
+	ExecutionIdentity      ExecutionIdentity          `json:"execution_identity"`
 	Artifacts              []Artifact                 `json:"artifacts,omitempty"`
+}
+
+type ConfigurationIdentity struct {
+	ParserVersion                int    `json:"parser_version"`
+	AuditSchemaVersion           int    `json:"audit_schema_version"`
+	RequestedConfigurationSHA256 string `json:"requested_configuration_sha256"`
+	EffectiveConfigurationSHA256 string `json:"effective_configuration_sha256"`
+	ConfigurationAuditSHA256     string `json:"configuration_audit_sha256"`
+}
+
+type ExecutionIdentity struct {
+	Topology TopologyIdentity `json:"topology"`
+	Software SoftwareIdentity `json:"software"`
+	Storage  StorageIdentity  `json:"storage"`
+	Runtime  RuntimeIdentity  `json:"runtime"`
+}
+
+type TopologyIdentity struct {
+	Concentrator ConcentratorIdentity `json:"concentrator"`
+	Boards       []BoardIdentity      `json:"boards,omitempty"`
+}
+
+type ConcentratorIdentity struct {
+	ControlAddress           string  `json:"control_address,omitempty"`
+	StreamAddress            string  `json:"stream_address,omitempty"`
+	ProductID                *uint32 `json:"product_id"`
+	FirmwareRevision         *uint32 `json:"firmware_revision"`
+	IdentityEvidence         string  `json:"identity_evidence"`
+	FirmwareRevisionEvidence string  `json:"firmware_revision_evidence"`
+}
+
+type BoardIdentity struct {
+	Board            int    `json:"board"`
+	Chain            uint16 `json:"chain"`
+	Node             uint16 `json:"node"`
+	ProductID        uint32 `json:"product_id"`
+	FirmwareRevision uint32 `json:"firmware_revision"`
+	AcquisitionState uint32 `json:"acquisition_state"`
+	IdentityEvidence string `json:"identity_evidence"`
+	FirmwareEvidence string `json:"firmware_evidence"`
+}
+
+type SoftwareIdentity struct {
+	Revision  string `json:"revision"`
+	Modified  bool   `json:"modified"`
+	GoVersion string `json:"go_version"`
+}
+
+type StorageIdentity struct {
+	Format        string `json:"format"`
+	WriterVersion int    `json:"writer_version"`
+	Compression   string `json:"compression"`
+}
+
+type RuntimeIdentity struct {
+	PipelineCapacity     int    `json:"pipeline_capacity"`
+	BackpressurePolicy   string `json:"backpressure_policy"`
+	CaptureRaw           bool   `json:"capture_raw"`
+	JournalTransport     bool   `json:"journal_transport"`
+	EnergyHistogramBins  int    `json:"energy_histogram_bins"`
+	ToAHistogramBins     int    `json:"toa_histogram_bins"`
+	ToTHistogramBins     int    `json:"tot_histogram_bins"`
+	HDF5SegmentSizeBytes uint64 `json:"hdf5_segment_size_bytes"`
 }
 
 type Artifact struct {

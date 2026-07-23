@@ -51,6 +51,7 @@ const configuration = computed({
 })
 const captureRaw = ref(false)
 const journalTransport = ref(false)
+const hdf5SegmentSizeMb = ref(500)
 const configFile = ref<HTMLInputElement>()
 type WorkspaceTab = 'acquisition' | 'monitoring' | 'hardware' | 'runs'
 const workspaceTabs: { id: WorkspaceTab; label: string; description: string }[] = [
@@ -891,6 +892,18 @@ onMounted(() => daq.connect())
               ><input v-model="journalTransport" type="checkbox" /> Journal socket evidence</label
             >
           </div>
+          <label class="field">
+            <span>HDF5 file size (MiB)</span>
+            <input
+              v-model.number="hdf5SegmentSizeMb"
+              aria-label="HDF5 file size in MiB"
+              type="number"
+              min="1"
+              max="1048576"
+              step="1"
+            />
+            <small>Files rotate as run_&lt;run-id&gt;.0000.h5, .0001.h5, and so on.</small>
+          </label>
 
           <p class="stop-policy-summary" role="status">{{ configuredStopPolicy }}</p>
 
@@ -915,9 +928,19 @@ onMounted(() => daq.connect())
                 !daq.canStart.value ||
                 !configuration ||
                 configurationErrors.length > 0 ||
-                !!stopPolicyError
+                !!stopPolicyError ||
+                !Number.isInteger(hdf5SegmentSizeMb) ||
+                hdf5SegmentSizeMb < 1 ||
+                hdf5SegmentSizeMb > 1048576
               "
-              @click="daq.startRun({ configuration, captureRaw, journalTransport })"
+              @click="
+                daq.startRun({
+                  configuration,
+                  captureRaw,
+                  journalTransport,
+                  hdf5SegmentSizeMb,
+                })
+              "
             >
               Start run
             </button>

@@ -6,6 +6,7 @@ env:
 
 vars:
   GO_PACKAGES: ./backend/...
+  BUILD_IMAGE: '{{default "pet-caen-daq-build:latest" .PET_CAEN_BUILD_IMAGE}}'
 
 tasks:
   default:
@@ -66,6 +67,31 @@ tasks:
       - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
       - go build -o bin/catalog-ops ./backend/cmd/catalog-ops
       - npm --prefix frontend run build
+
+  build:hdf5:
+    desc: Build the production backend with HDF5 storage in the pinned toolchain
+    cmds:
+      - mkdir -p bin
+      - go build -tags hdf5 -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq
+      - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
+      - go build -o bin/catalog-ops ./backend/cmd/catalog-ops
+      - go build -tags hdf5 -o bin/jsonl-to-hdf5 ./backend/cmd/jsonl-to-hdf5
+      - go build -tags hdf5 -o bin/hdf5-write-benchmark ./backend/cmd/hdf5-write-benchmark
+      - npm --prefix frontend run build
+
+  hdf5:convert:
+    desc: Convert one finalized JSON development run to a validated HDF5 file
+    requires:
+      vars: [SOURCE, OUTPUT]
+    cmds:
+      - go run -tags hdf5 ./backend/cmd/jsonl-to-hdf5 -source "{{.SOURCE}}" -output "{{.OUTPUT}}"
+
+  hdf5:benchmark:
+    desc: Measure direct HDF5 append rate after preloading decoded events
+    requires:
+      vars: [SOURCE, OUTPUT]
+    cmds:
+      - go run -tags hdf5 ./backend/cmd/hdf5-write-benchmark -source "{{.SOURCE}}" -output "{{.OUTPUT}}"
 
   dev:frontend:
     desc: Start the frontend development server (proxies API to localhost:8080)
@@ -134,3 +160,62 @@ tasks:
   ci:
     desc: Run the required local equivalent of CI
     deps: [lint, test, build]
+
+  docker:image:
+    desc: Build the pinned Go, Node, HDF5, Blosc, Buf, and ConnectRPC toolchain image
+    cmds:
+      - docker build -t "{{.BUILD_IMAGE}}" -f deploy/docker/Dockerfile.build .
+
+  docker:run:
+    desc: Run an arbitrary command in the build image (pass it after --)
+    requires:
+      vars: [CLI_ARGS]
+    cmds:
+      - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" ./scripts/docker-run {{.CLI_ARGS}}
+
+  docker:shell:
+    desc: Open an interactive shell in the mounted source tree
+    cmds:
+      - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" ./scripts/docker-run bash
+
+  docker:hdf5:
+    desc: Compile and run the HDF5 and Blosc native smoke test in the build image
+    cmds:
+      - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" ./scripts/docker-run task hdf5:verify
+
+  docker:deps:
+    desc: Install pinned frontend dependencies in the mounted source tree
+    cmds:
+      - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" ./scripts/docker-run npm --prefix frontend ci
+
+  docker:build:
+    desc: Compile the backend, simulator, tools, and frontend in the build image
+    deps: [docker:deps]
+    cmds:
+      - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" ./scripts/docker-run task build:hdf5
+
+  docker:test:
+    desc: Run backend and frontend tests in the build image
+    deps: [docker:deps]
+    cmds:
+      - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" ./scripts/docker-run task test
+
+  docker:ci:
+    desc: Run formatting, linting, tests, and builds in the build image
+    deps: [docker:deps]
+    cmds:
+      - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" ./scripts/docker-run task ci
+
+  docker:verify:
+    desc: Verify HDF5/Blosc and compile the complete project in the build image
+    deps: [docker:hdf5, docker:build]
+
+  hdf5:verify:
+    desc: Compile and run a native HDF5 dataset round trip using the Blosc filter
+    cmds:
+      - mkdir -p .cache/hdf5-smoke
+      - cd .cache/hdf5-smoke && h5cc -Wall -Wextra -Werror -I/usr/local/hdf5-blosc/include ../../scripts/verify-hdf5.c -L/usr/local/hdf5-blosc/lib -lblosc_filter -lblosc -o verify-hdf5
+      - .cache/hdf5-smoke/verify-hdf5 .cache/hdf5-smoke/blosc-round-trip.h5
+      - h5dump .cache/hdf5-smoke/blosc-round-trip.h5 >/dev/null
+      - rm .cache/hdf5-smoke/blosc-round-trip.h5
+      - go test -tags hdf5 ./backend/internal/hdf5store ./backend/internal/runpipeline ./test/hdf5 -v

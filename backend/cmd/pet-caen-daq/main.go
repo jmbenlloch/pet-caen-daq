@@ -138,6 +138,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	states, _ := acquisition.NewStateMachine(acquisition.StateIdle, nil)
 	factory := runpipeline.Factory{Options: runpipeline.Options{
 		Parent: *runParent, Capacity: *pipelineCapacity, Backpressure: acquisition.BackpressureBlock,
+		ExecutionIdentity: executionIdentity(topology, connections, *controlAddress, *streamAddress),
 	}}
 	coordinator, err := acquisition.NewCoordinator(states, client, factory.New, 4, *drainTimeout)
 	if err != nil {
@@ -250,6 +251,31 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	stopServer()
 	<-shutdownDone
 	return err
+}
+
+func executionIdentity(topology dt5215.Topology, connections []janusconfig.Connection, controlAddress, streamAddress string) runstore.ExecutionIdentity {
+	boardNumbers := make(map[[2]uint16]int, len(connections))
+	for _, connection := range connections {
+		boardNumbers[[2]uint16{uint16(connection.Chain), uint16(connection.Node)}] = connection.Board
+	}
+	boards := make([]runstore.BoardIdentity, 0, len(topology.Boards))
+	for _, board := range topology.Boards {
+		boards = append(boards, runstore.BoardIdentity{
+			Board: boardNumbers[[2]uint16{board.Chain, board.Node}], Chain: board.Chain, Node: board.Node, ProductID: board.ProductID,
+			FirmwareRevision: board.FirmwareRevision, AcquisitionState: board.AcquisitionState,
+			IdentityEvidence: "hardware-register-read", FirmwareEvidence: "hardware-register-read",
+		})
+	}
+	return runstore.ExecutionIdentity{
+		Topology: runstore.TopologyIdentity{
+			Concentrator: runstore.ConcentratorIdentity{
+				ControlAddress: controlAddress, StreamAddress: streamAddress,
+				IdentityEvidence: "unknown-not-queried", FirmwareRevisionEvidence: "unknown-not-queried",
+			},
+			Boards: boards,
+		},
+		Software: runstore.CurrentSoftwareIdentity(),
+	}
 }
 
 func printDiscoveredDevices(output io.Writer, topology dt5215.Topology) {

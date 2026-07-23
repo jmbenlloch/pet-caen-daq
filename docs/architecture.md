@@ -94,17 +94,19 @@ Stores immutable run identity and snapshot metadata: requested/effective configu
 Storage is phased behind project-owned interfaces:
 
 - During development, each run has a bounded JSON manifest, an append-only JSON Lines decoded-event stream, and an optional byte-exact raw capture.
-- The first production version adds an HDF5 writer as the primary analysis file.
+- Production builds select the HDF5 writer as the primary decoded analysis
+  artifact with the `hdf5` build tag.
 - Offline conversion/replay reads the development/raw representation and can produce HDF5 without hardware.
 
 Acquisition completion does not depend on a specific writer. Writers report health/backpressure, finalize or mark incomplete artifacts, and preserve the original failure when shutdown encounters more than one error.
 
-The initial run directory is expected to resemble:
+Development run directories contain `events.jsonl`; production HDF5 builds
+replace that decoded artifact with numbered HDF5 segments:
 
 ```text
 run-<id>/
   manifest.json
-  events.jsonl
+  events.jsonl | run_<run-id>.0000.h5, run_<run-id>.0001.h5, ...
   wire.raw          # optional byte-exact capture
   transport.journal # optional pre-framing byte/failure evidence
   incomplete        # present until successful finalization

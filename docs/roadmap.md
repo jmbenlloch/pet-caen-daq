@@ -90,6 +90,15 @@ Exit criterion: acceptance criteria on the real system pass with retained eviden
 
 Exit criterion: production acceptance runs produce validated HDF5 artifacts suitable for downstream analysis.
 
+Progress as of 2026-07-23: production builds select the typed HDF5 writer; all
+six event families, external manifest integration, incomplete-run behavior,
+Go and independent h5py structural validation, and streaming JSONL conversion
+are implemented. The retained 675 MB spectroscopy run converts to a validated
+170 MB HDF5 file with matching event/child counts. Compression/chunk tuning,
+peak-memory and query benchmarks, typed effective-configuration tables,
+minimal runtime packaging, and real-board acceptance for the five event
+families absent from the retained corpus remain.
+
 ## Deferred questions
 
 - Which HDF5 dataset organization, chunking, compression, and analysis compatibility requirements apply?
