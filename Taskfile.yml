@@ -93,6 +93,25 @@ tasks:
     cmds:
       - go run -tags hdf5 ./backend/cmd/hdf5-write-benchmark -source "{{.SOURCE}}" -output "{{.OUTPUT}}"
 
+  container:build:
+    desc: Package the compiled server and frontend in a runtime container
+    deps: [build]
+    vars:
+      IMAGE: '{{default "pet-caen-daq:latest" .IMAGE}}'
+    cmds:
+      - docker build -f deploy/server/Dockerfile -t "{{.IMAGE}}" .
+
+  container:push:
+    desc: Build and push the complete server image to Docker Hub
+    vars:
+      TAG: '{{default "latest" .TAG}}'
+      IMAGE: 'nextmgmt/pet-caen-daq:{{.TAG}}'
+    cmds:
+      - task: container:build
+        vars:
+          IMAGE: "{{.IMAGE}}"
+      - docker push "{{.IMAGE}}"
+
   dev:frontend:
     desc: Start the frontend development server (proxies API to localhost:8080)
     cmds:
