@@ -75,4 +75,26 @@ func TestBloscRoundTrip(t *testing.T) {
 	if err := file.Close(); err != nil {
 		t.Fatalf("close file: %v", err)
 	}
+
+	file, err = hdf5.OpenFile(path, hdf5.F_ACC_RDONLY)
+	if err != nil {
+		t.Fatalf("reopen HDF5 file: %v", err)
+	}
+	dataset, err = file.OpenDataset("fibonacci")
+	if err != nil {
+		t.Fatalf("reopen dataset: %v", err)
+	}
+	reopened := make([]uint32, len(expected))
+	if err := dataset.Read(&reopened[0]); err != nil {
+		t.Fatalf("read reopened dataset: %v", err)
+	}
+	if !slices.Equal(reopened, expected) {
+		t.Fatalf("reopened round trip mismatch: got %v, want %v", reopened, expected)
+	}
+	if err := dataset.Close(); err != nil {
+		t.Fatalf("close reopened dataset: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close reopened file: %v", err)
+	}
 }

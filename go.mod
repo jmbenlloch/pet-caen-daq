@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	connectrpc.com/connect v1.20.0
-	github.com/next-exp/hdf5-go v0.0.0-20250408164249-b468a9f82d4b
+	github.com/next-exp/hdf5-go v0.0.0-20260723090539-dff7958c5eb5
 	google.golang.org/protobuf v1.36.11
 )
 

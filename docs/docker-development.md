@@ -76,14 +76,13 @@ lives under `test/hdf5`, outside `backend`, so ordinary protocol, simulator, and
 backend unit tests do not acquire the native dependency. HDF5 adapter tests
 must run through `task docker:hdf5` or a broader Docker target.
 
-The pinned fork is suitable for the create/append writer path used by the
-muon-veto DAQ. Its current `OpenDataset` path constructs a dataset without the
-internal datatype that `Close` expects, so a reopened dataset can panic during
-close. This is tracked upstream as
-[`next-exp/hdf5-go#1`](https://github.com/next-exp/hdf5-go/issues/1). Do not base
-the production reader on that path without fixing or upgrading the binding.
-Independent readers (`h5dump`, h5py, and the future schema validator) remain
-part of acceptance.
+The initially evaluated fork revision constructed values returned by
+`OpenDataset` without the internal datatype that `Close` expected, causing a
+panic during close. This was reported and fixed in
+[`next-exp/hdf5-go#1`](https://github.com/next-exp/hdf5-go/issues/1). The pinned
+revision includes that fix, and the container smoke test covers create, write,
+close, reopen, read, and close. Independent readers (`h5dump`, h5py, and the
+future schema validator) still remain part of production acceptance.
 
 ## Current boundary and packaging
 
