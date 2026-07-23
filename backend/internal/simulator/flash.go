@@ -82,3 +82,19 @@ func simulatorPedestalPage(board *Board) []byte {
 	}
 	return page
 }
+
+// simulatorBoardInformationPage matches the 46-byte BIC layout consumed by
+// FERSlib's FERS_ReadBoardInfo. It is synthetic simulator identity data.
+func simulatorBoardInformationPage(board *Board) []byte {
+	page := make([]byte, dt5202.PedestalFlashPageBytes)
+	page[0], page[1] = 'B', 0
+	binary.LittleEndian.PutUint32(page[2:], board.ProductID)
+	binary.LittleEndian.PutUint16(page[6:], 5202)
+	page[8] = 1
+	copy(page[9:25], "WA5202XAAAAA")
+	copy(page[25:41], "A5202")
+	page[41] = 1
+	binary.LittleEndian.PutUint16(page[42:], dt5202.ChannelCount)
+	binary.LittleEndian.PutUint16(page[44:], dt5202.PedestalFlashPage)
+	return page
+}
