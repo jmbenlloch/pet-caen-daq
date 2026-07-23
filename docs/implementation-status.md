@@ -194,6 +194,13 @@ as separate evidence artifacts. Finalization flushes the internal manifest
 snapshot, marks the HDF5 file complete, closes and hashes every artifact,
 atomically updates the external manifest, and only then removes `incomplete`.
 Aborted runs retain both the marker and an internally incomplete HDF5 file.
+Finalized files are rejected before manifest publication unless a read-only Go
+validator confirms the schema version, completion marker, contiguous event
+sequence, one-to-one kind routing, bounded child ranges, and child parent-row
+identity. The Docker suite independently repeats the physical-layout and
+reference checks with Python/h5py. Finalization error paths close remaining
+HDF5, raw-capture, journal, and underlying OS file handles while preserving the
+original error and `incomplete` evidence.
 
 Startup discovery now treats any board carrying the acquisition-running status as interrupted hardware state. Before configuration writes, recovery records `idle -> fault -> recovering`, performs a bounded broadcast stop and drain, attempts a broadcast global reset even when an earlier cleanup step fails, and verifies every discovered board is ready and not running. Success returns to `idle` with a warning diagnostic; failure moves to `disconnected` and joins the original already-running evidence with every stop, drain, reset, verification, and transition error.
 

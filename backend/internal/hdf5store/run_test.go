@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	hdf5 "github.com/next-exp/hdf5-go"
@@ -58,6 +60,15 @@ func TestRunWriterFinalizesHDF5ArtifactAndExternalManifest(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(writer.Directory(), "incomplete")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("incomplete marker remains: %v", err)
+	}
+	if err := Validate(filepath.Join(writer.Directory(), "events.h5"), true); err != nil {
+		t.Fatal(err)
+	}
+	_, source, _, _ := runtime.Caller(0)
+	script := filepath.Join(filepath.Dir(source), "..", "..", "..", "scripts", "validate-hdf5.py")
+	command := exec.Command("python3", script, filepath.Join(writer.Directory(), "events.h5"))
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("independent h5py validation: %v\n%s", err, output)
 	}
 	file, err := hdf5.OpenFile(filepath.Join(writer.Directory(), "events.h5"), hdf5.F_ACC_RDONLY)
 	if err != nil {
@@ -123,5 +134,38 @@ func TestRunWriterAbortRetainsIncompleteHDF5(t *testing.T) {
 	}
 	if complete != 0 {
 		t.Fatalf("complete = %d", complete)
+	}
+	if err := Validate(filepath.Join(writer.Directory(), "events.h5"), false); err != nil {
+		t.Fatal(err)
+	}
+	if err := Validate(filepath.Join(writer.Directory(), "events.h5"), true); err == nil {
+		t.Fatal("expected incomplete validation failure")
+	}
+}
+
+func TestRunWriterFinalizationFailureClosesHDF5AndRetainsIncomplete(t *testing.T) {
+	writer, err := CreateRun(t.TempDir(), runstore.Manifest{RunID: "finalize-failure", StartedAt: "now"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.events.manifestJSON.dataset.Close(); err != nil {
+		t.Fatal(err)
+	}
+	err = writer.Finalize("later", "operator_stop")
+	if err == nil {
+		t.Fatal("expected finalization failure")
+	}
+	if _, statErr := os.Stat(filepath.Join(writer.Directory(), "incomplete")); statErr != nil {
+		t.Fatalf("incomplete marker missing after %v: %v", err, statErr)
+	}
+	file, openErr := hdf5.OpenFile(filepath.Join(writer.Directory(), "events.h5"), hdf5.F_ACC_RDONLY)
+	if openErr != nil {
+		t.Fatalf("reopen failed artifact after %v: %v", err, openErr)
+	}
+	if closeErr := file.Close(); closeErr != nil {
+		t.Fatal(closeErr)
+	}
+	if abortErr := writer.Abort(); abortErr != nil {
+		t.Fatalf("abort after failed finalization: %v", abortErr)
 	}
 }

@@ -100,6 +100,10 @@ func (w *Writer) appendTiming(wire dt5215.StreamEvent, event dt5202.Event) error
 		return err
 	}
 	parent := w.timingEvents.length
+	hitCount, err := uint32Count("timing hits", len(value.Hits))
+	if err != nil {
+		return err
+	}
 	hits := make([]timingRow, len(value.Hits))
 	for i, hit := range value.Hits {
 		hits[i] = timingRow{ParentRow: parent, Channel: hit.Channel, ToA: hit.ToA, ToT: hit.ToT}
@@ -108,7 +112,7 @@ func (w *Writer) appendTiming(wire dt5215.StreamEvent, event dt5202.Event) error
 	if err := appendRows(&w.timingHits, hits); err != nil {
 		return fmt.Errorf("append timing hits: %w", err)
 	}
-	row := timingEventRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, TimeReference: value.TimeReference, HitOffset: offset, HitCount: uint32(len(hits))}
+	row := timingEventRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, TimeReference: value.TimeReference, HitOffset: offset, HitCount: hitCount}
 	if err := appendRows(&w.timingEvents, []timingEventRow{row}); err != nil {
 		return fmt.Errorf("append timing event: %w", err)
 	}
@@ -124,6 +128,10 @@ func (w *Writer) appendCounting(wire dt5215.StreamEvent, event dt5202.Event) err
 		return err
 	}
 	parent, offset := w.counting.length, w.counts.length
+	countCount, err := uint32Count("counting counters", len(value.Counts))
+	if err != nil {
+		return err
+	}
 	children := make([]countRow, len(value.Counts))
 	for i, count := range value.Counts {
 		children[i] = countRow{ParentRow: parent, Channel: count.Channel, CounterValue: count.Value}
@@ -131,7 +139,7 @@ func (w *Writer) appendCounting(wire dt5215.StreamEvent, event dt5202.Event) err
 	if err := appendRows(&w.counts, children); err != nil {
 		return fmt.Errorf("append counting counters: %w", err)
 	}
-	row := countingRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, ChannelMask: value.ChannelMask, CountOffset: offset, CountCount: uint32(len(children)), TORCount: value.TORCount, QORCount: value.QORCount}
+	row := countingRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, ChannelMask: value.ChannelMask, CountOffset: offset, CountCount: countCount, TORCount: value.TORCount, QORCount: value.QORCount}
 	if value.RelativeTimestampClock != nil {
 		row.Validity = 1
 		row.RelativeTimestampClock = *value.RelativeTimestampClock
@@ -151,6 +159,10 @@ func (w *Writer) appendWaveform(wire dt5215.StreamEvent, event dt5202.Event) err
 		return err
 	}
 	parent, offset := w.waveform.length, w.samples.length
+	sampleCount, err := uint32Count("waveform samples", len(value.Samples))
+	if err != nil {
+		return err
+	}
 	children := make([]sampleRow, len(value.Samples))
 	for i, sample := range value.Samples {
 		children[i] = sampleRow{ParentRow: parent, SampleIndex: uint32(i), HighGain: sample.HighGain, LowGain: sample.LowGain, DigitalProbes: sample.DigitalProbes}
@@ -158,7 +170,7 @@ func (w *Writer) appendWaveform(wire dt5215.StreamEvent, event dt5202.Event) err
 	if err := appendRows(&w.samples, children); err != nil {
 		return fmt.Errorf("append waveform samples: %w", err)
 	}
-	row := waveformRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, SampleOffset: offset, SampleCount: uint32(len(children))}
+	row := waveformRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, SampleOffset: offset, SampleCount: sampleCount}
 	if err := appendRows(&w.waveform, []waveformRow{row}); err != nil {
 		return fmt.Errorf("append waveform event: %w", err)
 	}
@@ -174,6 +186,14 @@ func (w *Writer) appendService(wire dt5215.StreamEvent, event dt5202.Event) erro
 		return errors.New("typed service timestamp does not match DT5215 descriptor")
 	}
 	parent, counterOffset, unknownOffset := w.service.length, w.counters.length, w.unknown.length
+	counterCount, err := uint32Count("service counters", len(value.Counters))
+	if err != nil {
+		return err
+	}
+	unknownCount, err := uint32Count("service unknown payload", len(value.UnknownPayload))
+	if err != nil {
+		return err
+	}
 	counters := make([]counterRow, len(value.Counters))
 	for i, counter := range value.Counters {
 		counters[i] = counterRow{ParentRow: parent, Channel: counter.Channel, CounterValue: counter.Value}
@@ -187,8 +207,8 @@ func (w *Writer) appendService(wire dt5215.StreamEvent, event dt5202.Event) erro
 	row := serviceRow{
 		Timestamp: value.Timestamp, Version: value.Version, Format: value.Format,
 		HVOn: boolean(value.HVOn), HVRamping: boolean(value.HVRamping), HVOverCurrent: boolean(value.HVOverCurrent), HVOverVoltage: boolean(value.HVOverVoltage),
-		CounterOffset: counterOffset, CounterCount: uint32(len(counters)), TORCount: value.TORCount, QORCount: value.QORCount,
-		UnknownOffset: unknownOffset, UnknownCount: uint32(len(value.UnknownPayload)),
+		CounterOffset: counterOffset, CounterCount: counterCount, TORCount: value.TORCount, QORCount: value.QORCount,
+		UnknownOffset: unknownOffset, UnknownCount: unknownCount,
 	}
 	setOptionalFloat(&row.Validity, 0, value.FPGATemperature, &row.FPGATemperature)
 	setOptionalFloat(&row.Validity, 1, value.BoardTemperature, &row.BoardTemperature)
@@ -222,14 +242,25 @@ func (w *Writer) appendTest(wire dt5215.StreamEvent, event dt5202.Event) error {
 		return err
 	}
 	parent, offset := w.test.length, w.words.length
+	wordCount, err := uint32Count("test words", len(value.Words))
+	if err != nil {
+		return err
+	}
 	if err := appendRows(&w.words, value.Words); err != nil {
 		return fmt.Errorf("append test words: %w", err)
 	}
-	row := testRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, WordOffset: offset, WordCount: uint32(len(value.Words))}
+	row := testRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, WordOffset: offset, WordCount: wordCount}
 	if err := appendRows(&w.test, []testRow{row}); err != nil {
 		return fmt.Errorf("append test event: %w", err)
 	}
 	return w.appendIndex(wire, KindTest, parent)
+}
+
+func uint32Count(name string, count int) (uint32, error) {
+	if uint64(count) > uint64(^uint32(0)) {
+		return 0, fmt.Errorf("%s count %d exceeds uint32", name, count)
+	}
+	return uint32(count), nil
 }
 
 func compoundTimingEvent() *hdf5.CompoundType {

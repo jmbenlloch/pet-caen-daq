@@ -20,12 +20,16 @@ import (
 
 // RunWriter owns the production run directory and its HDF5 decoded artifact.
 type RunWriter struct {
-	dir      string
-	events   *Writer
-	manifest runstore.Manifest
-	raw      *rawcapture.Writer
-	journal  *transportjournal.Writer
-	closed   bool
+	dir            string
+	events         *Writer
+	manifest       runstore.Manifest
+	raw            *rawcapture.Writer
+	rawFile        *os.File
+	rawEnabled     bool
+	journal        *transportjournal.Writer
+	journalFile    *os.File
+	journalEnabled bool
+	closed         bool
 }
 
 func CreateRun(parent string, manifest runstore.Manifest) (_ *RunWriter, err error) {
@@ -100,6 +104,9 @@ func (w *RunWriter) EnableRawCapture() error {
 	w.raw, err = rawcapture.NewWriter(file)
 	if err != nil {
 		file.Close()
+	} else {
+		w.rawFile = file
+		w.rawEnabled = true
 	}
 	return err
 }
@@ -132,6 +139,9 @@ func (w *RunWriter) EnableTransportJournal() error {
 	w.journal, err = transportjournal.NewWriter(file)
 	if err != nil {
 		file.Close()
+	} else {
+		w.journalFile = file
+		w.journalEnabled = true
 	}
 	return err
 }
@@ -149,20 +159,21 @@ func (w *RunWriter) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) err
 	return nil
 }
 
-func (w *RunWriter) Finalize(completedAt, reason string) error {
+func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
 	if w.closed {
 		return errors.New("run writer is closed")
 	}
 	w.closed = true
-	if w.raw != nil {
-		if err := w.raw.Close(); err != nil {
-			return err
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, w.closeOpenArtifacts())
 		}
+	}()
+	if err = w.closeRaw(); err != nil {
+		return err
 	}
-	if w.journal != nil {
-		if err := w.journal.Close(); err != nil {
-			return err
-		}
+	if err = w.closeJournal(); err != nil {
+		return err
 	}
 	w.manifest.CompletedAt = completedAt
 	w.manifest.TerminationReason = reason
@@ -172,6 +183,9 @@ func (w *RunWriter) Finalize(completedAt, reason string) error {
 	}
 	if err := w.events.Finalize(internalManifest); err != nil {
 		return err
+	}
+	if err := Validate(filepath.Join(w.dir, "events.h5"), true); err != nil {
+		return fmt.Errorf("validate finalized HDF5 artifact: %w", err)
 	}
 	w.manifest.Artifacts, err = w.finalizedArtifacts()
 	if err != nil {
@@ -188,10 +202,10 @@ func (w *RunWriter) Finalize(completedAt, reason string) error {
 
 func (w *RunWriter) finalizedArtifacts() ([]runstore.Artifact, error) {
 	names := []struct{ name, kind string }{{"events.h5", "decoded_events"}}
-	if w.raw != nil {
+	if w.rawEnabled {
 		names = append(names, struct{ name, kind string }{"wire.raw", "raw_capture"})
 	}
-	if w.journal != nil {
+	if w.journalEnabled {
 		names = append(names, struct{ name, kind string }{"transport.journal", "transport_journal"})
 	}
 	artifacts := make([]runstore.Artifact, 0, len(names))
@@ -221,14 +235,50 @@ func (w *RunWriter) Abort() error {
 		return nil
 	}
 	w.closed = true
-	var rawErr, journalErr error
+	return w.closeOpenArtifacts()
+}
+
+func (w *RunWriter) closeOpenArtifacts() error {
+	return errors.Join(w.events.Close(), w.closeRaw(), w.closeJournal())
+}
+
+func (w *RunWriter) closeRaw() error {
+	if w.raw == nil && w.rawFile == nil {
+		return nil
+	}
+	var writerErr error
 	if w.raw != nil {
-		rawErr = w.raw.Close()
+		writerErr = w.raw.Close()
+		w.raw = nil
 	}
+	fileErr := closeOSFile(w.rawFile)
+	w.rawFile = nil
+	return errors.Join(writerErr, fileErr)
+}
+
+func (w *RunWriter) closeJournal() error {
+	if w.journal == nil && w.journalFile == nil {
+		return nil
+	}
+	var writerErr error
 	if w.journal != nil {
-		journalErr = w.journal.Close()
+		writerErr = w.journal.Close()
+		w.journal = nil
 	}
-	return errors.Join(w.events.Close(), rawErr, journalErr)
+	fileErr := closeOSFile(w.journalFile)
+	w.journalFile = nil
+	return errors.Join(writerErr, fileErr)
+}
+
+func closeOSFile(file *os.File) error {
+	if file == nil {
+		return nil
+	}
+	err := file.Close()
+	if errors.Is(err, os.ErrClosed) {
+		return nil
+	}
+	return err
 }
 
 func (w *RunWriter) writeManifest() error {

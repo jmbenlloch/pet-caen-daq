@@ -8,9 +8,12 @@ kind-specific parent/child layouts described below, committing children before
 the typed parent and run-wide index. It embeds the exact requested
 configuration plus audit, effective-configuration, run-metadata, and finalized
 manifest snapshots. Finalization flushes the file before changing its internal
-`complete` attribute. The adapter is not yet selected by `runpipeline`, so
-normal runs continue to use the JSON development writer during this
-intermediate state.
+`complete` attribute. Production builds select this adapter in `runpipeline`
+with the `hdf5` build tag; ordinary development builds retain the JSON writer.
+Before external manifest publication, the Go validator checks schema identity,
+completion, run-wide sequence and kind routing, every parent/child range, and
+every child back-reference. Docker verification also reads the result through
+an independent Python/h5py validator.
 
 Concrete logical dataset examples are collected in
 [`hdf5-schema-examples.md`](hdf5-schema-examples.md).

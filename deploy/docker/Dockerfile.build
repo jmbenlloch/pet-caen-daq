@@ -38,6 +38,7 @@ RUN apt-get update \
         net-tools \
         ninja-build \
         pkg-config \
+        python3-h5py \
         sqlite3 \
         tcpdump \
         unzip \

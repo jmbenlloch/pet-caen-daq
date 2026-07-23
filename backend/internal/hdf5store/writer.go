@@ -278,6 +278,14 @@ func (w *Writer) appendSpectroscopy(wire dt5215.StreamEvent, event dt5202.Event)
 		return errors.New("typed spectroscopy identity does not match DT5215 descriptor")
 	}
 	parent := w.spectroscopy.length
+	energyCount, err := uint32Count("spectroscopy energies", len(value.Energies))
+	if err != nil {
+		return err
+	}
+	timingCount, err := uint32Count("spectroscopy timings", len(value.Timings))
+	if err != nil {
+		return err
+	}
 	energies := make([]energyRow, len(value.Energies))
 	for i, item := range value.Energies {
 		energies[i] = energyRow{
@@ -298,8 +306,8 @@ func (w *Writer) appendSpectroscopy(wire dt5215.StreamEvent, event dt5202.Event)
 	}
 	row := spectroscopyRow{
 		TriggerID: value.TriggerID, Timestamp: value.Timestamp, ChannelMask: value.ChannelMask,
-		EnergyOffset: w.energies.length - uint64(len(energies)), EnergyCount: uint32(len(energies)),
-		TimingOffset: w.timings.length - uint64(len(timings)), TimingCount: uint32(len(timings)),
+		EnergyOffset: w.energies.length - uint64(len(energies)), EnergyCount: energyCount,
+		TimingOffset: w.timings.length - uint64(len(timings)), TimingCount: timingCount,
 	}
 	if value.RelativeTimestampClock != nil {
 		row.Validity |= 1
@@ -342,21 +350,26 @@ func (w *Writer) Close() error {
 	)
 }
 
-func (w *Writer) Finalize(manifestJSON []byte) error {
+func (w *Writer) Finalize(manifestJSON []byte) (err error) {
 	if w.closed {
 		return errors.New("HDF5 writer is closed")
 	}
-	if err := appendRows(&w.manifestJSON, manifestJSON); err != nil {
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, w.Close())
+		}
+	}()
+	if err = appendRows(&w.manifestJSON, manifestJSON); err != nil {
 		return fmt.Errorf("write finalized manifest snapshot: %w", err)
 	}
-	if err := w.file.Flush(hdf5.F_SCOPE_GLOBAL); err != nil {
+	if err = w.file.Flush(hdf5.F_SCOPE_GLOBAL); err != nil {
 		return fmt.Errorf("flush HDF5 file: %w", err)
 	}
 	complete := uint8(1)
-	if err := w.complete.Write(&complete, hdf5.T_STD_U8LE); err != nil {
+	if err = w.complete.Write(&complete, hdf5.T_STD_U8LE); err != nil {
 		return fmt.Errorf("mark HDF5 file complete: %w", err)
 	}
-	if err := w.file.Flush(hdf5.F_SCOPE_GLOBAL); err != nil {
+	if err = w.file.Flush(hdf5.F_SCOPE_GLOBAL); err != nil {
 		return fmt.Errorf("flush completed HDF5 file: %w", err)
 	}
 	return w.Close()
@@ -469,8 +482,15 @@ func appendRows[T any](target *table, rows []T) error {
 	if len(rows) == 0 {
 		return nil
 	}
+	if uint64(len(rows)) > ^uint64(0)-target.length {
+		return errors.New("dataset extent overflows uint64")
+	}
 	old := target.length
 	target.length += uint64(len(rows))
+	if uint64(uint(target.length)) != target.length || uint64(uint(old)) != old {
+		target.length = old
+		return errors.New("dataset extent exceeds platform address space")
+	}
 	if err := setExtent(target.dataset, target.length); err != nil {
 		target.length = old
 		return err

@@ -75,6 +75,10 @@ The Go integration follows the working muon-veto DAQ precedent and pins
 lives under `test/hdf5`, outside `backend`, so ordinary protocol, simulator, and
 backend unit tests do not acquire the native dependency. HDF5 adapter and
 pipeline tests must run through `task docker:hdf5` or a broader Docker target.
+The image includes distro-packaged Python, NumPy, and h5py; the tagged run
+writer test invokes `scripts/validate-hdf5.py` against its finalized artifact
+to verify physical types and cross-dataset references independently of the Go
+binding.
 `task build:hdf5` builds the backend with production HDF5 run storage, and
 `task docker:build` selects that target. The ordinary `task build` retains JSON
 development storage and does not require native HDF5.
