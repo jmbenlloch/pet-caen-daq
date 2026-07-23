@@ -110,6 +110,10 @@ type Metadata struct {
 }
 
 func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
+	compression, err := compressionName()
+	if err != nil {
+		return nil, err
+	}
 	file, err := hdf5.CreateFile(path, hdf5.F_ACC_EXCL)
 	if err != nil {
 		return nil, fmt.Errorf("create HDF5 file: %w", err)
@@ -239,6 +243,9 @@ func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
 		return nil, err
 	}
 	if err := createBytes(run, "metadata_json", metadata.MetadataJSON); err != nil {
+		return nil, err
+	}
+	if err := createBytes(run, "compression", []byte(compression)); err != nil {
 		return nil, err
 	}
 	if w.manifestJSON.dataset, err = createPrimitive(run, "manifest_json", hdf5.T_STD_U8LE); err != nil {
@@ -391,6 +398,9 @@ func createPrimitive(location interface {
 	if err := properties.SetChunk([]uint{16384}); err != nil {
 		return nil, err
 	}
+	if err := configureCompression(properties); err != nil {
+		return nil, err
+	}
 	dataset, err := location.CreateDatasetWith(name, datatype, space, properties)
 	if err != nil {
 		return nil, fmt.Errorf("create dataset %s: %w", name, err)
@@ -469,6 +479,9 @@ func createTable(location interface {
 	}
 	defer properties.Close()
 	if err := properties.SetChunk([]uint{16384}); err != nil {
+		return nil, err
+	}
+	if err := configureCompression(properties); err != nil {
 		return nil, err
 	}
 	dataset, err := location.CreateDatasetWith(name, &datatype.Datatype, space, properties)

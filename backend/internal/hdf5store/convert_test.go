@@ -57,3 +57,33 @@ func TestConvertJSONRunStreamsTypedEventsToHDF5(t *testing.T) {
 		t.Fatalf("converted index = %+v", rows[0])
 	}
 }
+
+func TestConvertJSONRunWithBloscLZ4Level4BitShuffle(t *testing.T) {
+	t.Setenv(CompressionEnvironment, CompressionBloscLZ4)
+	parent := t.TempDir()
+	source, err := runstore.Create(parent, runstore.Manifest{RunID: "compressed", StartedAt: "now"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	event := dt5202.Event{Kind: dt5202.EventTest, Qualifier: dt5202.QualifierTest, Test: &dt5202.TestEvent{
+		TriggerID: 1, Timestamp: 2, Words: []uint32{1, 2, 3, 4},
+	}}
+	wire := dt5215.StreamEvent{Descriptor: dt5215.Descriptor{
+		Qualifier: dt5202.QualifierTest, TriggerID: 1, Timestamp: 2,
+	}}
+	for range 100 {
+		if err := source.AppendEvent(wire, event); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := source.Finalize("later", "test"); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(parent, "compressed.h5")
+	if err := ConvertJSONRun(source.Directory(), output); err != nil {
+		t.Fatal(err)
+	}
+	if err := Validate(output, true); err != nil {
+		t.Fatal(err)
+	}
+}

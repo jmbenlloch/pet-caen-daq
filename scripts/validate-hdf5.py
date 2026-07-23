@@ -106,6 +106,35 @@ def validate_compounds(handle):
             fail(f"/{name} has unexpected dtype {dtype}")
 
 
+def validate_compression(handle):
+    name = bytes(handle["run/compression"][:]).decode("ascii")
+    if name == "none":
+        return
+    if name != "blosc-lz4-level4-bitshuffle":
+        fail(f"unsupported recorded compression {name!r}")
+    # h5py's high-level compression property is None for third-party filters.
+    # Inspect the HDF5 creation property list directly.
+    checked = 0
+    def check(_, item):
+        nonlocal checked
+        if not isinstance(item, h5py.Dataset) or item.chunks is None:
+            return
+        filters = [
+            item.id.get_create_plist().get_filter(index)
+            for index in range(item.id.get_create_plist().get_nfilters())
+        ]
+        matches = [entry for entry in filters if entry[0] == 32001]
+        if len(matches) != 1:
+            fail(f"{item.name} does not have exactly one Blosc filter")
+        values = matches[0][2]
+        if len(values) < 7 or values[4:7] != (4, 2, 1):
+            fail(f"{item.name} Blosc parameters {values}, want level=4 bitshuffle lz4")
+        checked += 1
+    handle["events"].visititems(check)
+    if checked == 0:
+        fail("compressed file has no filtered event datasets")
+
+
 def validate_range(name, parents, offset_name, count_name, children):
     offsets = parents[offset_name].astype(np.uint64)
     counts = parents[count_name].astype(np.uint64)
@@ -183,6 +212,7 @@ def validate(path, require_complete):
         if require_complete and complete != 1:
             fail("HDF5 file is incomplete")
         validate_compounds(handle)
+        validate_compression(handle)
         validate_references(handle)
 
 

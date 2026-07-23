@@ -44,3 +44,31 @@ smaller file is due to typed binary representation; production datasets do not
 yet enable compression. Peak memory, direct prebuilt-binary throughput,
 representative analysis-query latency, and compressed alternatives still need
 controlled benchmarks before choosing final chunk/compression defaults.
+
+## Blosc LZ4 level 4 with bit-shuffle trial
+
+The pictured configuration is available experimentally by setting:
+
+```text
+PET_CAEN_HDF5_COMPRESSION=blosc-lz4-level4-bitshuffle
+```
+
+It applies HDF5 filter 32001 to every chunked event dataset with Blosc
+parameters `clevel=4`, `shuffle=bit-shuffle`, and `compressor=lz4`. The file
+records that choice in `/run/compression`; the independent validator checks
+the low-level filter tuple.
+
+| Measurement | Uncompressed | LZ4-4 + bit-shuffle |
+| --- | ---: | ---: |
+| HDF5 size | 169,966,297 B | 61,493,351 B |
+| Fraction of JSONL source | 25.15% | 9.10% |
+| Fraction of uncompressed HDF5 | 100% | 36.18% |
+| Conversion wall time, including `go run` | 23.22 s | 37.09 s |
+| Independent full validation | 0.39 s | 0.68 s |
+| Read all 5,605,003 `high_gain` values | 0.067 s | 0.161 s |
+
+The energy-column sums matched exactly (`16,579,091,493`). This setting saves
+63.82% relative to typed uncompressed HDF5, while this first measurement made
+conversion about 60% slower and the full energy-column read about 2.4 times
+slower. It remains opt-in until acquisition-rate and repeated cold/warm query
+benchmarks establish that the write and analysis latency are acceptable.
