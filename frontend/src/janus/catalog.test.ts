@@ -3,8 +3,8 @@ import { janusParameterCatalog, janusParameters } from './catalog'
 
 describe('JANUS 5202 5.0.0 parameter catalog', () => {
   it('accounts for every upstream parameter and monitor', () => {
-    expect(janusParameters).toHaveLength(90)
-    expect(new Set(janusParameters.map((parameter) => parameter.name)).size).toBe(90)
+    expect(janusParameters).toHaveLength(73)
+    expect(new Set(janusParameters.map((parameter) => parameter.name)).size).toBe(73)
     for (const name of [
       'EventBuildingMode',
       'TstampCoincWindow',
@@ -12,6 +12,23 @@ describe('JANUS 5202 5.0.0 parameter catalog', () => {
       'JobLastRun',
       'RunSleep',
       'EnableJobs',
+      'DataAnalysis',
+      'DataFilePath',
+      'OF_OutFileUnit',
+      'OF_EnMaxSize',
+      'OF_MaxSize',
+      'OF_RawData',
+      'OF_ListBin',
+      'OF_ListAscii',
+      'OF_ListCSV',
+      'OF_Sync',
+      'OF_ServiceInfo',
+      'OF_RunInfo',
+      'OF_SpectHisto',
+      'OF_ToAHisto',
+      'OF_ToTHisto',
+      'OF_MCS',
+      'OF_Staircase',
     ]) {
       expect(janusParameterCatalog.has(name)).toBe(false)
     }
