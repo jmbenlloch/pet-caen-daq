@@ -84,3 +84,6 @@ For a control/configuration smoke test without generated events:
 The synthetic `VERS`, `RBIC`, board BIC, and firmware identities exist only to
 satisfy the source-confirmed fields consumed by FERSlib. They are simulator
 identity and must not be treated as hardware observations.
+
+The full four-board capture comparison with the native Go service is recorded
+in [janus-go-simulator-comparison.md](janus-go-simulator-comparison.md).

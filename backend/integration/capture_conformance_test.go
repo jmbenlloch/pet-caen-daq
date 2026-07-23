@@ -92,7 +92,11 @@ func TestJANUSDataTakingCaptureConformance(t *testing.T) {
 	if path == "" {
 		path = defaultJANUSDataTakingPCAP
 	}
-	flows, err := extractServerTCPStreams(path, "172.16.0.11", 9000)
+	sourceIP := os.Getenv("JANUS_DATA_TAKING_SOURCE_IP")
+	if sourceIP == "" {
+		sourceIP = "172.16.0.11"
+	}
+	flows, err := extractServerTCPStreams(path, sourceIP, 9000)
 	if errors.Is(err, os.ErrNotExist) {
 		t.Skipf("external capture not found at %s", path)
 	}
