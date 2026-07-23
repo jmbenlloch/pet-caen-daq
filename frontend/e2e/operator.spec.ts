@@ -35,9 +35,9 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   const activeRunId = page.locator('.run-now strong')
+  await expect(activeRunId).toBeVisible()
   await expect(activeRunId).toHaveText(/^\d+$/)
   const runId = (await activeRunId.textContent())!
-  await expect(page.getByText(runId, { exact: true })).toBeVisible()
   await page.getByRole('tab', { name: /Monitoring/ }).click()
   const statistics = page.getByRole('region', { name: 'Statistics' })
   await expect(statistics.getByRole('tab', { name: 'Board 0' })).toBeVisible()
