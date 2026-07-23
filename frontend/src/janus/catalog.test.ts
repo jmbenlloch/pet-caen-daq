@@ -3,8 +3,18 @@ import { janusParameterCatalog, janusParameters } from './catalog'
 
 describe('JANUS 5202 5.0.0 parameter catalog', () => {
   it('accounts for every upstream parameter and monitor', () => {
-    expect(janusParameters).toHaveLength(96)
-    expect(new Set(janusParameters.map((parameter) => parameter.name)).size).toBe(96)
+    expect(janusParameters).toHaveLength(90)
+    expect(new Set(janusParameters.map((parameter) => parameter.name)).size).toBe(90)
+    for (const name of [
+      'EventBuildingMode',
+      'TstampCoincWindow',
+      'JobFirstRun',
+      'JobLastRun',
+      'RunSleep',
+      'EnableJobs',
+    ]) {
+      expect(janusParameterCatalog.has(name)).toBe(false)
+    }
   })
 
   it('preserves scopes, widgets, options, constraints, and dependencies', () => {

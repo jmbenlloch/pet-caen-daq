@@ -16,7 +16,12 @@ const source = [
   '# ------------------------------------------------------------------------------------------',
   'AcquisitionMode SPECT_TIMING # Acquisition mode. Options: SPECTROSCOPY, SPECT_TIMING, COUNTING',
   'EnableToT 0 # Enable ToT',
+  'EventBuildingMode DISABLED # Event building mode',
   'TstampCoincWindow 0 # Coincidence window',
+  'JobFirstRun 1 # First run',
+  'JobLastRun 5 # Last run',
+  'RunSleep 10 s # Delay between runs',
+  'EnableJobs 1 # Enable jobs',
   'HV_Adjust_Range 4.5 # Options: 4.5, 2.5, DISABLED',
   'TD_CoarseThreshold[2] 179 # board override',
 ].join('\n')
@@ -24,7 +29,7 @@ const source = [
 describe('JANUS configuration editor', () => {
   it('discovers sections, choices, switches, and board overrides', () => {
     const document = parseConfiguration(source)
-    expect(document.fields).toHaveLength(5)
+    expect(document.fields).toHaveLength(4)
     expect(document.fields[0]).toMatchObject({
       name: 'AcquisitionMode',
       section: 'AcqMode',
@@ -38,14 +43,24 @@ describe('JANUS configuration editor', () => {
       ],
     })
     expect(isBooleanField(document.fields[1])).toBe(true)
-    expect(isBooleanField(document.fields[2])).toBe(false)
-    expect(document.fields[3].options).toEqual(['4.5', '2.5', 'DISABLED'])
-    expect(document.fields[4]).toMatchObject({ name: 'TD_CoarseThreshold', index: '2' })
+    expect(document.fields[2].options).toEqual(['4.5', '2.5', 'DISABLED'])
+    expect(document.fields[3]).toMatchObject({ name: 'TD_CoarseThreshold', index: '2' })
+    for (const name of [
+      'EventBuildingMode',
+      'TstampCoincWindow',
+      'JobFirstRun',
+      'JobLastRun',
+      'RunSleep',
+      'EnableJobs',
+    ]) {
+      expect(document.fields.some((field) => field.name === name)).toBe(false)
+      expect(document.source).toContain(name)
+    }
   })
 
   it('changes only the selected assignment and preserves comments', () => {
     const document = parseConfiguration(source)
-    const changed = updateConfiguration(document, document.fields[4], '181')
+    const changed = updateConfiguration(document, document.fields[3], '181')
     expect(changed.source).toContain('TD_CoarseThreshold[2] 181 # board override')
     expect(changed.source).toContain('AcquisitionMode SPECT_TIMING # Acquisition mode')
   })

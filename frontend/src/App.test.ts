@@ -202,7 +202,7 @@ describe('operator dashboard', () => {
       .find((tab) => tab.text() === 'All')!
       .trigger('click')
     expect(wrapper.text()).toContain('PresetTime')
-    expect(wrapper.text()).toContain('EnableJobs')
+    expect(wrapper.text()).not.toContain('EnableJobs')
     expect(
       wrapper.findAll('button').some((button) => button.text().includes('Configure channels')),
     ).toBe(true)
