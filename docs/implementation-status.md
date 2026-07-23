@@ -187,7 +187,7 @@ Finalization now calculates exact sizes and SHA-256 digests after closing each s
 
 The production HDF5 build now selects a typed run writer behind the same
 pipeline storage boundary. It replaces `events.jsonl` with numbered
-`events.0000.h5`, `events.0001.h5`, … segments, stores
+`run_<run-id>.0000.h5`, `run_<run-id>.0001.h5`, … segments, stores
 all six decoded event families in appendable typed parent/child datasets,
 preserves run-wide order in `/events/index`, embeds requested/audited/effective
 configuration and run metadata, and retains raw capture and transport journals

@@ -48,7 +48,7 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 	if stats.Directory != session.Directory() || stats.BytesWritten == 0 || stats.EventCount != 1 || stats.RawBatches != 1 || !stats.Finalized || stats.LastError != "" {
 		t.Fatalf("storage stats = %+v", stats)
 	}
-	for _, name := range []string{"manifest.json", decodedArtifactName(), "wire.raw", "transport.journal"} {
+	for _, name := range []string{"manifest.json", decodedArtifactName("42"), "wire.raw", "transport.journal"} {
 		if _, err := os.Stat(filepath.Join(session.Directory(), name)); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
 		}

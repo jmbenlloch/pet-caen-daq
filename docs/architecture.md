@@ -106,7 +106,7 @@ replace that decoded artifact with numbered HDF5 segments:
 ```text
 run-<id>/
   manifest.json
-  events.jsonl | events.0000.h5, events.0001.h5, ...
+  events.jsonl | run_<run-id>.0000.h5, run_<run-id>.0001.h5, ...
   wire.raw          # optional byte-exact capture
   transport.journal # optional pre-framing byte/failure evidence
   incomplete        # present until successful finalization

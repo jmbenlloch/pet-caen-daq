@@ -902,7 +902,7 @@ onMounted(() => daq.connect())
               max="1048576"
               step="1"
             />
-            <small>Files rotate as events.0000.h5, events.0001.h5, and so on.</small>
+            <small>Files rotate as run_&lt;run-id&gt;.0000.h5, .0001.h5, and so on.</small>
           </label>
 
           <p class="stop-policy-summary" role="status">{{ configuredStopPolicy }}</p>

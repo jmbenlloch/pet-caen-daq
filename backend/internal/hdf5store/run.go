@@ -276,7 +276,7 @@ func (w *RunWriter) closeOpenArtifacts() error {
 }
 
 func (w *RunWriter) currentSegmentName() string {
-	return fmt.Sprintf("events.%04d.h5", w.segmentIndex)
+	return fmt.Sprintf("run_%s.%04d.h5", w.manifest.RunID, w.segmentIndex)
 }
 
 func (w *RunWriter) openSegment() error {

@@ -436,7 +436,7 @@ preserved without inventing channel or signal identities.
 
 ## Proposed file layout
 
-Decoded artifacts are numbered `events.0000.h5`, `events.0001.h5`, and so on.
+Decoded artifacts are numbered `run_<run-id>.0000.h5`, `run_<run-id>.0001.h5`, and so on.
 The default target is 500 MiB and operators may select a positive per-run
 target. Rotation happens after the complete event that reaches the target, so
 an event and its child rows are never split; one unusually large event may make
