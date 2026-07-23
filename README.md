@@ -43,7 +43,8 @@ The frontend directory is optional. When enabled, the backend validates it at
 startup, serves browser routes through `index.html`, and keeps ConnectRPC on the
 same HTTP origin.
 
-To package the compiled server and frontend in a production runtime image:
+To compile the HDF5-enabled server in the pinned toolchain and package it with
+the frontend and native runtime libraries:
 
 ```sh
 task container:build IMAGE=pet-caen-daq:latest
@@ -53,7 +54,8 @@ docker run --rm --network host \
   pet-caen-daq:latest
 ```
 
-The image contains the checked-in production sample configuration, so it can
+Production images write numbered `run_<run-id>.0000.h5` decoded-event segments
+instead of `events.jsonl`. The image contains the checked-in production sample configuration, so it can
 also be started directly from Docker Desktop without first creating a bind
 mount. Publish container port `8080` as host port `8080`. To use a different
 configuration on Windows, select **Optional settings > Volumes** in Docker
