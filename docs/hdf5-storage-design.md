@@ -2,6 +2,9 @@
 
 Status: proposal for discussion
 
+Concrete logical dataset examples are collected in
+[`hdf5-schema-examples.md`](hdf5-schema-examples.md).
+
 ## Problem statement
 
 The production storage format must preserve every project-owned decoded DT5202
