@@ -73,8 +73,11 @@ The Go integration follows the working muon-veto DAQ precedent and pins
 `github.com/next-exp/hdf5-go`. That fork exposes `RegisterBlosc` and
 `ConfigureBloscFilter` and links `libblosc_filter` through cgo. Its smoke test
 lives under `test/hdf5`, outside `backend`, so ordinary protocol, simulator, and
-backend unit tests do not acquire the native dependency. HDF5 adapter tests
-must run through `task docker:hdf5` or a broader Docker target.
+backend unit tests do not acquire the native dependency. HDF5 adapter and
+pipeline tests must run through `task docker:hdf5` or a broader Docker target.
+`task build:hdf5` builds the backend with production HDF5 run storage, and
+`task docker:build` selects that target. The ordinary `task build` retains JSON
+development storage and does not require native HDF5.
 
 The initially evaluated fork revision constructed values returned by
 `OpenDataset` without the internal datatype that `Close` expected, causing a

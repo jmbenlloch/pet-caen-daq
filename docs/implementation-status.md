@@ -185,6 +185,16 @@ When transport journaling is requested, the coordinator attaches the run writer 
 
 Finalization now calculates exact sizes and SHA-256 digests after closing each stable payload artifact: decoded JSON Lines, optional complete-batch raw capture, and optional transport journal. The manifest persists those records and a successful `StopRun` returns the same artifact metadata in `RunSummary`; the manifest deliberately does not self-hash because embedding its own digest would be circular.
 
+The production HDF5 build now selects a typed run writer behind the same
+pipeline storage boundary. It replaces `events.jsonl` with `events.h5`, stores
+all six decoded event families in appendable typed parent/child datasets,
+preserves run-wide order in `/events/index`, embeds requested/audited/effective
+configuration and run metadata, and retains raw capture and transport journals
+as separate evidence artifacts. Finalization flushes the internal manifest
+snapshot, marks the HDF5 file complete, closes and hashes every artifact,
+atomically updates the external manifest, and only then removes `incomplete`.
+Aborted runs retain both the marker and an internally incomplete HDF5 file.
+
 Startup discovery now treats any board carrying the acquisition-running status as interrupted hardware state. Before configuration writes, recovery records `idle -> fault -> recovering`, performs a bounded broadcast stop and drain, attempts a broadcast global reset even when an earlier cleanup step fails, and verifies every discovered board is ready and not running. Success returns to `idle` with a warning diagnostic; failure moves to `disconnected` and joins the original already-running evidence with every stop, drain, reset, verification, and transition error.
 
 A generated ConnectRPC client integration test now exercises the complete simulator-backed service workflow: static validation of the production JANUS document, configuration application on all four boards, run start with raw and journal evidence, live test-pulse telemetry, operator stop/drain, and finalized artifact inspection. It verifies the manifest's requested/effective configuration and audit, JSON Lines event count, raw replay, journal presence, and every returned size/SHA-256 digest against the on-disk bytes.

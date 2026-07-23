@@ -41,7 +41,7 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 	if stats.Directory != session.Directory() || stats.BytesWritten == 0 || stats.EventCount != 1 || stats.RawBatches != 1 || !stats.Finalized || stats.LastError != "" {
 		t.Fatalf("storage stats = %+v", stats)
 	}
-	for _, name := range []string{"manifest.json", "events.jsonl", "wire.raw", "transport.journal"} {
+	for _, name := range []string{"manifest.json", decodedArtifactName(), "wire.raw", "transport.journal"} {
 		if _, err := os.Stat(filepath.Join(session.Directory(), name)); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
 		}
@@ -131,10 +131,11 @@ func TestSessionAccumulatesBoardAndChannelStatistics(t *testing.T) {
 		t.Fatal(err)
 	}
 	session := created.(*Session)
-	event := dt5202.Event{Kind: dt5202.EventSpectroscopy, Spectroscopy: &dt5202.SpectroscopyEvent{Energies: []dt5202.Energy{{Channel: 3, Discriminator: true}, {Channel: 7}}}}
+	event := dt5202.Event{Kind: dt5202.EventSpectroscopy, Spectroscopy: &dt5202.SpectroscopyEvent{TriggerID: 10, Timestamp: 1000, Energies: []dt5202.Energy{{Channel: 3, Discriminator: true}, {Channel: 7}}}}
 	if err := session.sink.AppendEvent(dt5215.StreamEvent{Chain: 1, Descriptor: dt5215.Descriptor{Node: 2, TriggerID: 10, Timestamp: 1000}, Payload: make([]byte, 24)}, event); err != nil {
 		t.Fatal(err)
 	}
+	event.Spectroscopy.TriggerID, event.Spectroscopy.Timestamp = 13, 1100
 	if err := session.sink.AppendEvent(dt5215.StreamEvent{Chain: 1, Descriptor: dt5215.Descriptor{Node: 2, TriggerID: 13, Timestamp: 1100}, Payload: make([]byte, 16)}, event); err != nil {
 		t.Fatal(err)
 	}

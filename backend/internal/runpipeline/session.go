@@ -39,7 +39,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	if options.Now == nil {
 		options.Now = time.Now
 	}
-	writer, err := runstore.Create(options.Parent, runstore.Manifest{
+	writer, err := createRunWriter(options.Parent, runstore.Manifest{
 		RunID: runID, StartedAt: options.Now().UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
 		RequestedConfiguration: runOptions.RequestedConfiguration, EffectiveConfiguration: runOptions.EffectiveConfiguration,
@@ -71,7 +71,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 
 type Session struct {
 	pipeline  *acquisition.Pipeline
-	writer    *runstore.Writer
+	writer    runWriter
 	sink      *sink
 	mu        sync.Mutex
 	lastErr   error
@@ -160,7 +160,7 @@ func (s *Session) recordError(err error) {
 }
 
 type sink struct {
-	writer           *runstore.Writer
+	writer           runWriter
 	captureRaw       bool
 	events           atomic.Uint64
 	rawBatches       atomic.Uint64
