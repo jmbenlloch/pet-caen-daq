@@ -12,6 +12,7 @@ import (
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 )
 
 const (
@@ -107,6 +108,8 @@ type Metadata struct {
 	AuditJSON              []byte
 	EffectiveJSON          []byte
 	MetadataJSON           []byte
+	EffectiveConfiguration []dt5202.ConfigurationPlan
+	Boards                 []runstore.BoardIdentity
 }
 
 func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
@@ -234,6 +237,9 @@ func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
 		return nil, err
 	}
 	if err := createBytes(configuration, "effective_json", metadata.EffectiveJSON); err != nil {
+		return nil, err
+	}
+	if err := writeEffectiveConfiguration(configuration, metadata); err != nil {
 		return nil, err
 	}
 	if err := createBytes(run, "format", []byte("pet-caen-daq-hdf5")); err != nil {

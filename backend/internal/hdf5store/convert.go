@@ -39,10 +39,10 @@ func ConvertJSONRun(directory, output string) (err error) {
 		return fmt.Errorf("encode effective configuration: %w", err)
 	}
 	metadataJSON, err := json.Marshal(struct {
-		SourceFormat string `json:"source_format"`
-		SourceRunID  string `json:"source_run_id"`
-		StartedAt    string `json:"started_at"`
-		CompletedAt  string `json:"completed_at,omitempty"`
+		SourceFormat          string                         `json:"source_format"`
+		SourceRunID           string                         `json:"source_run_id"`
+		StartedAt             string                         `json:"started_at"`
+		CompletedAt           string                         `json:"completed_at,omitempty"`
 		ConfigurationIdentity runstore.ConfigurationIdentity `json:"configuration_identity"`
 		ExecutionIdentity     runstore.ExecutionIdentity     `json:"execution_identity"`
 	}{
@@ -56,6 +56,7 @@ func ConvertJSONRun(directory, output string) (err error) {
 	writer, err := CreateWithMetadata(output, Metadata{
 		RunID: manifest.RunID, RequestedConfiguration: []byte(manifest.RequestedConfiguration),
 		AuditJSON: auditJSON, EffectiveJSON: effectiveJSON, MetadataJSON: metadataJSON,
+		EffectiveConfiguration: manifest.EffectiveConfiguration, Boards: manifest.ExecutionIdentity.Topology.Boards,
 	})
 	if err != nil {
 		return err

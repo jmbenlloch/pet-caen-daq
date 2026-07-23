@@ -336,21 +336,30 @@ The board trigger algorithm is stored once per board rather than duplicated in
 
 The public planner currently applies the same coarse thresholds to both chips
 on a board. Repeating them here records the actual chip-common packed values.
-The complete table must include all power, bias, shaping, threshold, and
-trigger-output fields, not only this shortened analysis view.
+The typed table exposes the commonly queried masks, thresholds, shaping codes,
+input selection, and output/trigger controls. The packed stream and lossless
+effective JSON retain every remaining power and bias bit without requiring
+dozens of sparse convenience columns.
 
 ### Packed Citiroc streams
 
-`/configuration/effective/citiroc_streams`, with a fixed `words[36]` field:
+`/configuration/effective/citiroc_stream_words` uses one row per packed word
+so column-oriented readers do not require compound array-field support:
 
-| board | chip | bit_count | words[0] | words[1] | … | words[35] |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0 | 0 | 1144 | `0x00000000` | `0x00000000` | … | `0x0012ab34` |
-| 0 | 1 | 1144 | `0x00000000` | `0x00000000` | … | `0x0012ab34` |
-| 1 | 0 | 1144 | `0x00000000` | `0x00000000` | … | `0x0012ab34` |
+| board | chip | word_index | bit_count | word |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 0 | 0 | 1144 | `0x00000000` |
+| 0 | 0 | 1 | 1144 | `0x00000000` |
+| 0 | 0 | 35 | 1144 | `0x0012ab34` |
 
 The word values are illustrative. The complete 1,144-bit stream is
 authoritative hardware-facing evidence.
+
+The implemented fixed-width typed view also contains `boards`, `channels`,
+`citiroc_chips`, `fpga_writes`, `hv_plans`, `hv_transactions`,
+`pedestal_plans`, and `pedestal_channels`. The lossless `effective_json`
+snapshot remains authoritative for textual provenance and heterogeneous
+inactive or deferred settings.
 
 ### Ordered FPGA writes
 

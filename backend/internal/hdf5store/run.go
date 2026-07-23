@@ -75,6 +75,7 @@ func CreateRun(parent string, manifest runstore.Manifest) (_ *RunWriter, err err
 	events, err := CreateWithMetadata(filepath.Join(dir, "events.h5"), Metadata{
 		RunID: manifest.RunID, RequestedConfiguration: []byte(manifest.RequestedConfiguration),
 		AuditJSON: auditJSON, EffectiveJSON: effectiveJSON, MetadataJSON: metadataJSON,
+		EffectiveConfiguration: manifest.EffectiveConfiguration, Boards: manifest.ExecutionIdentity.Topology.Boards,
 	})
 	if err != nil {
 		return nil, err

@@ -20,6 +20,48 @@ KINDS = {
 }
 
 REQUIRED_FIELDS = {
+    "configuration/effective/boards": (
+        "board", "chain", "node", "product_id", "firmware_revision",
+        "acquisition_state",
+    ),
+    "configuration/effective/channels": (
+        "board", "channel", "chip", "chip_channel", "readout_enabled",
+        "qd_enabled", "td_enabled", "qd_fine", "td_fine", "high_gain",
+        "low_gain", "hv_adjustment", "calibrate_high_gain",
+        "calibrate_low_gain", "preamplifier_disabled",
+    ),
+    "configuration/effective/citiroc_chips": (
+        "board", "chip", "discriminator_mask", "charge_coarse_threshold",
+        "time_coarse_threshold", "low_shaping_time_code",
+        "high_shaping_time_code", "fast_shaper_on_low_gain",
+        "enable_input_dac", "input_dac_reference_45v",
+        "enable_digital_output", "enable_or32", "enable_open_collector_or32",
+        "negative_trigger_polarity", "enable_open_collector_time_or",
+        "enable_channel_triggers",
+    ),
+    "configuration/effective/citiroc_stream_words": (
+        "board", "chip", "word_index", "bit_count", "word",
+    ),
+    "configuration/effective/fpga_writes": (
+        "board", "ordinal", "address", "value",
+    ),
+    "configuration/effective/hv_plans": (
+        "board", "voltage_v", "current_limit_ma", "temperature_feedback",
+        "feedback_mv_per_c", "coefficient_0", "coefficient_1",
+        "coefficient_2",
+    ),
+    "configuration/effective/hv_transactions": (
+        "board", "ordinal", "register", "data_type", "data",
+    ),
+    "configuration/effective/pedestal_plans": (
+        "board", "common", "acquisition_mode", "zero_suppress_low_gain",
+        "zero_suppress_high_gain", "per_channel", "calibration_present",
+    ),
+    "configuration/effective/pedestal_channels": (
+        "board", "channel", "zero_suppress_low_gain",
+        "zero_suppress_high_gain", "calibration_present",
+        "low_gain_pedestal", "high_gain_pedestal",
+    ),
     "events/index": (
         "sequence", "kind", "chain", "node", "qualifier", "kind_row",
         "trigger_id", "timestamp", "payload_offset_words",
@@ -148,6 +190,49 @@ def validate_metadata(handle):
             fail("/run/manifest_json has invalid execution_identity")
 
 
+def validate_configuration_tables(handle):
+    effective = decode_json_dataset(handle, "configuration/effective_json")
+    plans = effective if isinstance(effective, list) else []
+    metadata = decode_json_dataset(handle, "run/metadata_json")
+    boards = (
+        metadata.get("execution_identity", {})
+        .get("topology", {})
+        .get("boards", [])
+    )
+    expected = {
+        "boards": len(boards),
+        "channels": len(plans) * 64,
+        "citiroc_chips": len(plans) * 2,
+        "citiroc_stream_words": len(plans) * 2 * 36,
+        "fpga_writes": sum(len(plan.get("Writes", [])) for plan in plans),
+        "hv_plans": len(plans),
+        "hv_transactions": sum(
+            len(plan.get("HV", {}).get("Transactions", [])) for plan in plans
+        ),
+        "pedestal_plans": len(plans),
+        "pedestal_channels": len(plans) * 64,
+    }
+    for name, count in expected.items():
+        actual = len(handle[f"configuration/effective/{name}"])
+        if actual != count:
+            fail(
+                f"/configuration/effective/{name} has {actual} rows, "
+                f"effective plan requires {count}"
+            )
+    channels = handle["configuration/effective/channels"][:]
+    if len(channels):
+        if np.any(channels["channel"] > 63):
+            fail("/configuration/effective/channels has channel outside [0,63]")
+        if np.any(channels["chip"] != channels["channel"] // 32):
+            fail("/configuration/effective/channels has incorrect chip mapping")
+        if np.any(channels["chip_channel"] != channels["channel"] % 32):
+            fail("/configuration/effective/channels has incorrect chip-channel mapping")
+    streams = handle["configuration/effective/citiroc_stream_words"][:]
+    if len(streams):
+        if np.any(streams["word_index"] > 35) or np.any(streams["bit_count"] != 1144):
+            fail("/configuration/effective/citiroc_stream_words has invalid layout")
+
+
 def validate_compression(handle):
     name = bytes(handle["run/compression"][:]).decode("ascii")
     if name == "none":
@@ -255,6 +340,7 @@ def validate(path, require_complete):
             fail("HDF5 file is incomplete")
         validate_compounds(handle)
         validate_metadata(handle)
+        validate_configuration_tables(handle)
         validate_compression(handle)
         validate_references(handle)
 

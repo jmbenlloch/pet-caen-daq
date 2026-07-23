@@ -21,6 +21,11 @@ settings. `/run/metadata_json` retains the same bounded identity at file
 creation time. Unknown DT5215 product and firmware values are represented as
 nullable values with `unknown-not-queried` evidence.
 
+Effective plans are also expanded under `/configuration/effective` into typed
+board, channel, Citiroc chip/stream-word, ordered FPGA-write, HV
+plan/transaction, and pedestal plan/channel tables. Both validators require
+these datasets and check their cardinality and board/channel/chip mappings.
+
 For independent inspection in the pinned Docker image:
 
 ```text

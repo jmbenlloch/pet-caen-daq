@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	hdf5 "github.com/next-exp/hdf5-go"
+
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 )
 
 // Validate checks schema identity, completion state, run-wide ordering, and
@@ -37,6 +39,9 @@ func Validate(path string, requireComplete bool) error {
 	}
 	if requireComplete && complete != 1 {
 		return fmt.Errorf("HDF5 file is incomplete")
+	}
+	if err := validateEffectiveConfiguration(file); err != nil {
+		return err
 	}
 
 	index, err := readRows[indexRow](file, "events/index")
@@ -235,6 +240,74 @@ func Validate(path string, requireComplete bool) error {
 	}
 	if wordCursor != uint64(wordLength) {
 		return fmt.Errorf("test words contains unreferenced rows")
+	}
+	return nil
+}
+
+func validateEffectiveConfiguration(file *hdf5.File) error {
+	boards, err := readRows[configurationBoardRow](file, "configuration/effective/boards")
+	if err != nil {
+		return err
+	}
+	channels, err := readRows[configurationChannelRow](file, "configuration/effective/channels")
+	if err != nil {
+		return err
+	}
+	chips, err := readRows[configurationChipRow](file, "configuration/effective/citiroc_chips")
+	if err != nil {
+		return err
+	}
+	streams, err := readRows[configurationStreamWordRow](file, "configuration/effective/citiroc_stream_words")
+	if err != nil {
+		return err
+	}
+	for _, name := range []string{"fpga_writes", "hv_plans", "hv_transactions", "pedestal_plans", "pedestal_channels"} {
+		if _, err := datasetLength(file, "configuration/effective/"+name); err != nil {
+			return err
+		}
+	}
+	boardSeen := make(map[uint32]bool, len(boards))
+	for row, board := range boards {
+		if boardSeen[board.Board] {
+			return fmt.Errorf("configuration/effective/boards row %d repeats board %d", row, board.Board)
+		}
+		boardSeen[board.Board] = true
+	}
+	channelSeen := make(map[[2]uint32]bool, len(channels))
+	for row, channel := range channels {
+		if channel.Channel >= dt5202.ChannelCount || channel.Chip != channel.Channel/32 || channel.ChipChannel != channel.Channel%32 {
+			return fmt.Errorf("configuration/effective/channels row %d has invalid board/channel mapping", row)
+		}
+		key := [2]uint32{channel.Board, uint32(channel.Channel)}
+		if channelSeen[key] {
+			return fmt.Errorf("configuration/effective/channels row %d repeats board %d channel %d", row, channel.Board, channel.Channel)
+		}
+		channelSeen[key] = true
+	}
+	chipSeen := make(map[[2]uint32]bool, len(chips))
+	for row, chip := range chips {
+		if chip.Chip > 1 {
+			return fmt.Errorf("configuration/effective/citiroc_chips row %d has invalid chip %d", row, chip.Chip)
+		}
+		key := [2]uint32{chip.Board, uint32(chip.Chip)}
+		if chipSeen[key] {
+			return fmt.Errorf("configuration/effective/citiroc_chips row %d repeats board %d chip %d", row, chip.Board, chip.Chip)
+		}
+		chipSeen[key] = true
+	}
+	streamSeen := make(map[[3]uint32]bool, len(streams))
+	for row, stream := range streams {
+		if stream.Chip > 1 || stream.WordIndex >= dt5202.CitirocWordCount || stream.BitCount != dt5202.CitirocBitCount {
+			return fmt.Errorf("configuration/effective/citiroc_stream_words row %d has invalid layout", row)
+		}
+		key := [3]uint32{stream.Board, uint32(stream.Chip), uint32(stream.WordIndex)}
+		if streamSeen[key] {
+			return fmt.Errorf("configuration/effective/citiroc_stream_words row %d repeats a stream word", row)
+		}
+		streamSeen[key] = true
+	}
+	if len(channels) != len(chips)*32 || len(streams) != len(chips)*dt5202.CitirocWordCount {
+		return fmt.Errorf("effective Citiroc table cardinalities are inconsistent")
 	}
 	return nil
 }
