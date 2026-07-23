@@ -89,6 +89,85 @@ function dashboardApi(): DaqApi {
 }
 
 describe('operator dashboard', () => {
+  it('separates operator tasks into keyboard-accessible workspace tabs', async () => {
+    const wrapper = mount(App, { attachTo: document.body, props: { api: dashboardApi() } })
+    await flushPromises()
+
+    const acquisition = wrapper.get('#workspace-tab-acquisition')
+    const monitoring = wrapper.get('#workspace-tab-monitoring')
+    expect(acquisition.attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('#workspace-panel-acquisition').isVisible()).toBe(true)
+    expect(wrapper.get('#workspace-panel-monitoring').isVisible()).toBe(false)
+
+    await acquisition.trigger('keydown', { key: 'ArrowRight' })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(monitoring.attributes('aria-selected')).toBe('true')
+    expect((wrapper.get('#workspace-panel-acquisition').element as HTMLElement).style.display).toBe(
+      'none',
+    )
+    expect(
+      (wrapper.get('#workspace-panel-monitoring').element as HTMLElement).style.display,
+    ).not.toBe('none')
+    expect(document.activeElement).toBe(monitoring.element)
+
+    await monitoring.trigger('keydown', { key: 'End' })
+    await new Promise((resolve) => requestAnimationFrame(resolve))
+    expect(wrapper.get('#workspace-tab-runs').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('#workspace-panel-runs').isVisible()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('keeps the raw configuration hidden until explicitly requested', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    expect(wrapper.find('[aria-label="JANUS configuration source"]').exists()).toBe(false)
+    expect(wrapper.get('[aria-label="Configuration parameters"]').isVisible()).toBe(true)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'View raw configuration')!
+      .trigger('click')
+
+    expect(wrapper.get('[aria-label="JANUS configuration source"]').isVisible()).toBe(true)
+    expect(wrapper.find('[aria-label="Configuration parameters"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('keeps optional evidence capture disabled by default', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    const options = wrapper.findAll('.options input[type="checkbox"]')
+    expect(options).toHaveLength(2)
+    expect(options.every((option) => !(option.element as HTMLInputElement).checked)).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('opens configuration on Connect and only offers search from All parameters', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    expect(wrapper.get('.section-tabs [role="tab"][aria-selected="true"]').text()).toBe('Connect')
+    expect(wrapper.find('.parameter-toolbar input[type="search"]').exists()).toBe(false)
+    const connectionFields = wrapper.findAll('.parameter-list input[id^="Open["]')
+    expect(connectionFields).toHaveLength(4)
+    expect(connectionFields.map((field) => (field.element as HTMLInputElement).value)).toEqual([
+      'usb:172.16.0.11:tdl:0:0',
+      'usb:172.16.0.11:tdl:1:0',
+      'usb:172.16.0.11:tdl:2:0',
+      'usb:172.16.0.11:tdl:3:0',
+    ])
+    expect(wrapper.text()).not.toContain('No parameters match this filter.')
+
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'All')!
+      .trigger('click')
+    expect(wrapper.get('.parameter-toolbar input[type="search"]').isVisible()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('switches and persists the operator color theme', async () => {
     localStorage.removeItem('pet-caen-theme')
     const wrapper = mount(App, { props: { api: dashboardApi() } })
@@ -118,6 +197,10 @@ describe('operator dashboard', () => {
 
     expect(wrapper.text()).not.toContain('Requested by')
     expect(wrapper.text()).not.toContain('Run ID')
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'All')!
+      .trigger('click')
     expect(wrapper.text()).toContain('PresetTime')
     expect(wrapper.text()).toContain('EnableJobs')
     expect(
@@ -133,8 +216,8 @@ describe('operator dashboard', () => {
     expect(api.start).toHaveBeenCalledWith(
       expect.objectContaining({
         requestedBy: 'operator',
-        captureRaw: true,
-        journalTransport: true,
+        captureRaw: false,
+        journalTransport: false,
       }),
     )
     expect(wrapper.get('#system-heading').text()).toBe('Running')

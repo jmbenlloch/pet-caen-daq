@@ -49,10 +49,18 @@ const configuration = computed({
   get: () => configurationDocument.value.source,
   set: (source: string) => (configurationDocument.value = parseConfiguration(source)),
 })
-const captureRaw = ref(true)
-const journalTransport = ref(true)
+const captureRaw = ref(false)
+const journalTransport = ref(false)
 const configFile = ref<HTMLInputElement>()
-const selectedSection = ref('All')
+type WorkspaceTab = 'acquisition' | 'monitoring' | 'hardware' | 'runs'
+const workspaceTabs: { id: WorkspaceTab; label: string; description: string }[] = [
+  { id: 'acquisition', label: 'Acquisition', description: 'Configure and control runs' },
+  { id: 'monitoring', label: 'Monitoring', description: 'Statistics and plots' },
+  { id: 'hardware', label: 'Hardware', description: 'Boards and high voltage' },
+  { id: 'runs', label: 'Runs', description: 'History and artifacts' },
+]
+const activeWorkspaceTab = ref<WorkspaceTab>('acquisition')
+const selectedSection = ref('Connect')
 const parameterSearch = ref('')
 const showRawConfiguration = ref(false)
 const activeMask = ref<{ low: ConfigurationField; high: ConfigurationField }>()
@@ -217,11 +225,20 @@ const sections = computed(() => [
   ...new Set(configurationDocument.value.fields.map((field) => field.section)),
 ])
 const visibleFields = computed(() => {
-  const query = parameterSearch.value.trim().toLowerCase()
+  const query = selectedSection.value === 'All' ? parameterSearch.value.trim().toLowerCase() : ''
   return configurationDocument.value.fields.filter(
     (field) =>
       !(isMaskField(field) && (field.name.endsWith('1') || field.index !== undefined)) &&
-      !(parameterScope(field) === 'board' && field.index !== undefined) &&
+      !(
+        parameterScope(field) === 'board' &&
+        field.index !== undefined &&
+        configurationDocument.value.fields.some(
+          (candidate) =>
+            candidate.name === field.name &&
+            candidate.index === undefined &&
+            candidate.channel === undefined,
+        )
+      ) &&
       field.channel === undefined &&
       (selectedSection.value === 'All' || field.section === selectedSection.value) &&
       (!query ||
@@ -481,6 +498,24 @@ function loadBackendConfiguration() {
   if (daq.configurationTemplate.value) configuration.value = daq.configurationTemplate.value
 }
 
+function selectAdjacentWorkspaceTab(event: KeyboardEvent, index: number) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+  const last = workspaceTabs.length - 1
+  const nextIndex =
+    event.key === 'Home'
+      ? 0
+      : event.key === 'End'
+        ? last
+        : event.key === 'ArrowRight'
+          ? (index + 1) % workspaceTabs.length
+          : (index - 1 + workspaceTabs.length) % workspaceTabs.length
+  activeWorkspaceTab.value = workspaceTabs[nextIndex].id
+  requestAnimationFrame(() => {
+    document.getElementById(`workspace-tab-${workspaceTabs[nextIndex].id}`)?.focus()
+  })
+}
+
 onMounted(() => daq.connect())
 </script>
 
@@ -545,7 +580,31 @@ onMounted(() => daq.connect())
         </span>
       </div>
 
-      <section class="workspace">
+      <nav class="workspace-tabs" role="tablist" aria-label="Operator workspace">
+        <button
+          v-for="(tab, index) in workspaceTabs"
+          :id="`workspace-tab-${tab.id}`"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :aria-controls="`workspace-panel-${tab.id}`"
+          :aria-selected="activeWorkspaceTab === tab.id"
+          :tabindex="activeWorkspaceTab === tab.id ? 0 : -1"
+          @click="activeWorkspaceTab = tab.id"
+          @keydown="selectAdjacentWorkspaceTab($event, index)"
+        >
+          <span>{{ tab.label }}</span>
+          <small>{{ tab.description }}</small>
+        </button>
+      </nav>
+
+      <section
+        v-show="activeWorkspaceTab === 'acquisition'"
+        id="workspace-panel-acquisition"
+        class="workspace"
+        role="tabpanel"
+        aria-labelledby="workspace-tab-acquisition"
+      >
         <div class="panel control-panel">
           <div class="section-title">
             <div>
@@ -614,7 +673,7 @@ onMounted(() => daq.connect())
                 type="button"
                 @click="showRawConfiguration = !showRawConfiguration"
               >
-                {{ showRawConfiguration ? 'Use parameter editor' : 'Edit source' }}
+                {{ showRawConfiguration ? 'Use parameter editor' : 'View raw configuration' }}
               </button>
               <button class="link-button" type="button" @click="configFile?.click()">
                 Import file
@@ -633,17 +692,6 @@ onMounted(() => daq.connect())
             class="parameter-editor"
             aria-label="Configuration parameters"
           >
-            <div class="parameter-toolbar">
-              <label>
-                Find a parameter
-                <input
-                  v-model="parameterSearch"
-                  type="search"
-                  placeholder="Threshold, trigger, gain…"
-                />
-              </label>
-              <span>{{ visibleFields.length }} shown</span>
-            </div>
             <div class="section-tabs" role="tablist" aria-label="Parameter categories">
               <button
                 v-for="section in sections"
@@ -656,6 +704,17 @@ onMounted(() => daq.connect())
               >
                 {{ section }}
               </button>
+            </div>
+            <div v-if="selectedSection === 'All'" class="parameter-toolbar">
+              <label>
+                Find a parameter
+                <input
+                  v-model="parameterSearch"
+                  type="search"
+                  placeholder="Threshold, trigger, gain…"
+                />
+              </label>
+              <span>{{ visibleFields.length }} shown</span>
             </div>
             <div class="parameter-list">
               <article
@@ -800,7 +859,7 @@ onMounted(() => daq.connect())
             >
           </div>
           <textarea
-            v-else
+            v-if="showRawConfiguration"
             id="configuration"
             v-model="configuration"
             aria-label="JANUS configuration source"
@@ -922,6 +981,7 @@ onMounted(() => daq.connect())
 
       <section
         v-if="daq.latestCompletedRun.value"
+        v-show="activeWorkspaceTab === 'runs'"
         class="completed panel"
         aria-labelledby="completed-heading"
       >
@@ -966,7 +1026,13 @@ onMounted(() => daq.connect())
         </div>
       </section>
 
-      <section class="completed panel" aria-labelledby="history-heading">
+      <section
+        v-show="activeWorkspaceTab === 'runs'"
+        id="workspace-panel-runs"
+        class="completed panel"
+        role="tabpanel"
+        aria-labelledby="workspace-tab-runs"
+      >
         <div class="section-title">
           <div>
             <p class="eyebrow">Persistent storage</p>
@@ -1173,22 +1239,35 @@ onMounted(() => daq.connect())
         </div>
       </section>
 
-      <StatisticsTab
-        :statistics="daq.snapshot.value?.statistics"
-        :pipeline="daq.snapshot.value?.pipeline"
-        :storage="daq.snapshot.value?.storage"
-      />
+      <div
+        v-show="activeWorkspaceTab === 'monitoring'"
+        id="workspace-panel-monitoring"
+        role="tabpanel"
+        aria-labelledby="workspace-tab-monitoring"
+      >
+        <StatisticsTab
+          :statistics="daq.snapshot.value?.statistics"
+          :pipeline="daq.snapshot.value?.pipeline"
+          :storage="daq.snapshot.value?.storage"
+        />
 
-      <PlotWorkspace
-        :boards="boards"
-        :running="daq.snapshot.value?.state === SystemState.RUNNING"
-        :loading="daq.histogramsLoading.value"
-        :datasets="daq.histogramDatasets.value"
-        :theme="theme"
-        @request="daq.loadHistograms"
-      />
+        <PlotWorkspace
+          :boards="boards"
+          :running="daq.snapshot.value?.state === SystemState.RUNNING"
+          :loading="daq.histogramsLoading.value"
+          :datasets="daq.histogramDatasets.value"
+          :theme="theme"
+          @request="daq.loadHistograms"
+        />
+      </div>
 
-      <section class="boards-section" aria-labelledby="boards-heading">
+      <section
+        v-show="activeWorkspaceTab === 'hardware'"
+        id="workspace-panel-hardware"
+        class="boards-section"
+        role="tabpanel"
+        aria-labelledby="workspace-tab-hardware"
+      >
         <div class="section-title">
           <div>
             <p class="eyebrow">Four-link topology</p>
