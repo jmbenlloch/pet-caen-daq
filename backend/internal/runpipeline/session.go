@@ -242,7 +242,7 @@ type BoardStats struct {
 	TriggerID           uint64
 	TriggerCount        uint64
 	LostTriggerCount    uint64
-	EventBuildCount     uint64
+	TORCount            uint64
 	DataBytes           uint64
 	ChannelTriggerCount [dt5202.ChannelCount]uint64
 	TimestampCount      [dt5202.ChannelCount]uint64
@@ -270,7 +270,6 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 	board.Chain, board.Node, board.EventCount = key.chain, key.node, board.EventCount+1
 	board.DataBytes += uint64(len(wire.Payload))
 	if event.Kind != dt5202.EventService {
-		board.EventBuildCount++
 		board.TriggerCount++
 		if board.TriggerCount > 1 && wire.Descriptor.TriggerID > board.TriggerID+1 {
 			board.LostTriggerCount += wire.Descriptor.TriggerID - board.TriggerID - 1
@@ -320,10 +319,12 @@ func accumulateChannels(board *BoardStats, event dt5202.Event) {
 		for _, count := range event.Counting.Counts {
 			board.ChannelTriggerCount[count.Channel] += uint64(count.Value)
 		}
+		board.TORCount += uint64(event.Counting.TORCount)
 	case dt5202.EventService:
 		for _, counter := range event.Service.Counters {
 			board.ChannelTriggerCount[counter.Channel] += uint64(counter.Value)
 		}
+		board.TORCount += uint64(event.Service.TORCount)
 	}
 }
 

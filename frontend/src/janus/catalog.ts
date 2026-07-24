@@ -28,13 +28,8 @@ const constraints: Record<string, Pick<JanusParameter, 'min' | 'max' | 'step' | 
   HV_Imax: { min: 0, step: 0.1, units: ['mA', 'uA', 'A'] },
   HV_IndivAdj: { min: 0, max: 255, step: 1 },
   TempFeedbackCoeff: { step: 0.1, units: ['mV/degC'] },
-  TstampCoincWindow: { min: 0, step: 1, units: ['ns', 'us', 'ms', 's'] },
   PresetTime: { min: 0, step: 1, units: ['s', 'ms', 'us', 'ns'] },
   PresetCounts: { min: 0, step: 1 },
-  JobFirstRun: { min: 0, step: 1 },
-  JobLastRun: { min: 0, step: 1 },
-  RunSleep: { min: 0, step: 1, units: ['s', 'ms', 'us', 'ns'] },
-  OF_MaxSize: { min: 1, step: 1, units: ['MB', 'GB'] },
   ChTrg_Width: { min: 8, max: 2032, step: 8, units: ['ns', 'us'] },
   Tlogic_Width: { min: 0, step: 8, units: ['ns', 'us'] },
   MajorityLevel: { min: 1, max: 64, step: 1 },
@@ -63,16 +58,8 @@ const constraints: Record<string, Pick<JanusParameter, 'min' | 'max' | 'step' | 
 const dependencies: Record<string, JanusDependency> = {
   ExtRunSource: { parameter: 'StartRunMode', values: ['TDL_EXTRUN'] },
   GPSTimeUTC: { parameter: 'StartRunMode', values: ['TDL_GPS'] },
-  TstampCoincWindow: {
-    parameter: 'EventBuildingMode',
-    values: ['TRGTIME_SORTING', 'TRGID_SORTING'],
-  },
   PresetTime: { parameter: 'StopRunMode', values: ['PRESET_TIME'] },
   PresetCounts: { parameter: 'StopRunMode', values: ['PRESET_COUNTS'] },
-  JobFirstRun: { parameter: 'EnableJobs', values: ['1'] },
-  JobLastRun: { parameter: 'EnableJobs', values: ['1'] },
-  RunSleep: { parameter: 'EnableJobs', values: ['1'] },
-  OF_MaxSize: { parameter: 'OF_EnMaxSize', values: ['1'] },
   ChTrg_Width: { parameter: 'CountingMode', values: ['PAIRED_AND'] },
   MajorityLevel: { parameter: 'TriggerLogic', values: ['MAJ64', 'MAJ32_AND2'] },
   TestPulseAmplitude: {
@@ -140,7 +127,35 @@ function parseDefinitions(source: string): JanusParameter[] {
   return result
 }
 
-export const janusParameters = parseDefinitions(definitions)
+export const excludedJanusParameters = new Set([
+  'EventBuildingMode',
+  'TstampCoincWindow',
+  'JobFirstRun',
+  'JobLastRun',
+  'RunSleep',
+  'EnableJobs',
+  'DataAnalysis',
+  'DataFilePath',
+  'OF_OutFileUnit',
+  'OF_EnMaxSize',
+  'OF_MaxSize',
+  'OF_RawData',
+  'OF_ListBin',
+  'OF_ListAscii',
+  'OF_ListCSV',
+  'OF_Sync',
+  'OF_ServiceInfo',
+  'OF_RunInfo',
+  'OF_SpectHisto',
+  'OF_ToAHisto',
+  'OF_ToTHisto',
+  'OF_MCS',
+  'OF_Staircase',
+])
+
+export const janusParameters = parseDefinitions(definitions).filter(
+  (parameter) => !excludedJanusParameters.has(parameter.name),
+)
 export const janusParameterCatalog = new Map(
   janusParameters.map((parameter) => [parameter.name, parameter]),
 )

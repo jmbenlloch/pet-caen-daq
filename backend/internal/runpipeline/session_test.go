@@ -165,7 +165,7 @@ func TestSessionAccumulatesBoardAndChannelStatistics(t *testing.T) {
 	}
 	now = now.Add(2 * time.Second)
 	stats := session.BoardStats()[0]
-	if stats.TriggerCount != 2 || stats.LostTriggerCount != 2 || stats.EventBuildCount != 2 || stats.TriggerID != 13 || stats.Timestamp != 1100 || stats.DataBytes != 40 {
+	if stats.TriggerCount != 2 || stats.LostTriggerCount != 2 || stats.TriggerID != 13 || stats.Timestamp != 1100 || stats.DataBytes != 40 {
 		t.Fatalf("board statistics = %+v", stats)
 	}
 	if stats.ChannelTriggerCount[3] != 2 || stats.TimestampCount[3] != 2 || stats.PHACount[3] != 2 || stats.PHACount[7] != 2 {
@@ -176,6 +176,29 @@ func TestSessionAccumulatesBoardAndChannelStatistics(t *testing.T) {
 	}
 	if err := session.Close(); err != nil {
 		t.Fatal(err)
+	}
+	if err := session.Abort(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSessionAccumulatesTORCounters(t *testing.T) {
+	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock, Now: time.Now}}
+	created, err := factory.New("t-or-statistics", acquisition.RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := created.(*Session)
+	counting := dt5202.Event{Kind: dt5202.EventCounting, Counting: &dt5202.CountingEvent{TORCount: 17}}
+	if err := session.sink.AppendEvent(dt5215.StreamEvent{Descriptor: dt5215.Descriptor{TriggerID: 1}, Payload: make([]byte, 4)}, counting); err != nil {
+		t.Fatal(err)
+	}
+	service := dt5202.Event{Kind: dt5202.EventService, Service: &dt5202.ServiceEvent{TORCount: 23}}
+	if err := session.sink.AppendEvent(dt5215.StreamEvent{Payload: make([]byte, 4)}, service); err != nil {
+		t.Fatal(err)
+	}
+	if stats := session.BoardStats()[0]; stats.TORCount != 40 {
+		t.Fatalf("T-OR count = %d, want 40", stats.TORCount)
 	}
 	if err := session.Abort(); err != nil {
 		t.Fatal(err)

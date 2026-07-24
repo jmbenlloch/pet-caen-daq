@@ -42,6 +42,7 @@ export function parseConfiguration(source: string): ConfigurationDocument {
     if (heading && !heading.startsWith('params File')) section = heading
     const match = line.match(assignment)
     if (!match || line.trimStart().startsWith('#')) continue
+    if (excludedJanusParameters.has(match[2])) continue
     const catalog = janusParameterCatalog.get(match[2])
     const commentHelp = (match[8] ?? '').replace(/^#\s*/, '').trim()
     const help = catalog?.description || commentHelp
@@ -209,4 +210,4 @@ export function masksFromBits(bits: boolean[]): [string, string] {
     string,
   ]
 }
-import { janusParameterCatalog } from './janus/catalog'
+import { excludedJanusParameters, janusParameterCatalog } from './janus/catalog'

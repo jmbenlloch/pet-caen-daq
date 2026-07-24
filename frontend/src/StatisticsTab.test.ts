@@ -10,10 +10,11 @@ function sample(elapsed: bigint, triggerCount: bigint, channelCount: bigint) {
     boards: [
       {
         chain: 0,
-        timestamp: 123n,
+        timestamp: 125_000_000n,
         triggerId: 9n,
         triggerCount,
-        eventBuildCount: triggerCount,
+        lostTriggerCount: 2n,
+        tOrCount: triggerCount * 2n,
         dataBytes: triggerCount * 100n,
         channelTriggerCounts: [channelCount, ...Array(63).fill(0n)],
         timestampCounts: Array(64).fill(2n),
@@ -27,10 +28,15 @@ describe('StatisticsTab', () => {
   it('switches between all-board, per-channel, interval, and integral views', async () => {
     const wrapper = mount(StatisticsTab, { props: { statistics: sample(1000n, 10n, 4n) } })
     expect(wrapper.text()).toContain('Trigger ID')
+    expect(wrapper.text()).toContain('1.000 s')
+    expect(wrapper.text()).toContain('Estimated lost triggers')
+    expect(wrapper.text()).toContain('T-OR rate')
+    expect(wrapper.text()).not.toContain('Event build')
     expect(wrapper.text()).toContain('Select a board for per-channel metrics.')
     expect(wrapper.find('select').exists()).toBe(false)
 
     await wrapper.setProps({ statistics: sample(2000n, 15n, 7n) })
+    expect(wrapper.text()).toContain('10.0 Hz')
     await wrapper.findAll('[role="tab"]')[1].trigger('click')
     expect(wrapper.text()).toContain('Per-channel metric')
     expect(wrapper.text()).toContain('timestamp-bearing event rate')

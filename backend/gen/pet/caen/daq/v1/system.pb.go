@@ -2385,20 +2385,25 @@ func (x *StatisticsTelemetry) GetBoards() []*BoardStatistics {
 }
 
 type BoardStatistics struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	Chain                uint32                 `protobuf:"varint,1,opt,name=chain,proto3" json:"chain,omitempty"`
-	Node                 uint32                 `protobuf:"varint,2,opt,name=node,proto3" json:"node,omitempty"`
-	Timestamp            uint64                 `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
-	TriggerId            uint64                 `protobuf:"varint,4,opt,name=trigger_id,json=triggerId,proto3" json:"trigger_id,omitempty"`
-	TriggerCount         uint64                 `protobuf:"varint,5,opt,name=trigger_count,json=triggerCount,proto3" json:"trigger_count,omitempty"`
-	LostTriggerCount     uint64                 `protobuf:"varint,6,opt,name=lost_trigger_count,json=lostTriggerCount,proto3" json:"lost_trigger_count,omitempty"`
-	EventBuildCount      uint64                 `protobuf:"varint,7,opt,name=event_build_count,json=eventBuildCount,proto3" json:"event_build_count,omitempty"`
-	DataBytes            uint64                 `protobuf:"varint,8,opt,name=data_bytes,json=dataBytes,proto3" json:"data_bytes,omitempty"`
-	ChannelTriggerCounts []uint64               `protobuf:"varint,9,rep,packed,name=channel_trigger_counts,json=channelTriggerCounts,proto3" json:"channel_trigger_counts,omitempty"`
-	TimestampCounts      []uint64               `protobuf:"varint,10,rep,packed,name=timestamp_counts,json=timestampCounts,proto3" json:"timestamp_counts,omitempty"`
-	PhaCounts            []uint64               `protobuf:"varint,11,rep,packed,name=pha_counts,json=phaCounts,proto3" json:"pha_counts,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Chain uint32                 `protobuf:"varint,1,opt,name=chain,proto3" json:"chain,omitempty"`
+	Node  uint32                 `protobuf:"varint,2,opt,name=node,proto3" json:"node,omitempty"`
+	// DT5202 event timestamp in source-confirmed 8 ns clock ticks.
+	Timestamp uint64 `protobuf:"varint,3,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	TriggerId uint64 `protobuf:"varint,4,opt,name=trigger_id,json=triggerId,proto3" json:"trigger_id,omitempty"`
+	// Number of received, decoded non-service events.
+	TriggerCount uint64 `protobuf:"varint,5,opt,name=trigger_count,json=triggerCount,proto3" json:"trigger_count,omitempty"`
+	// Estimate derived from forward gaps in event trigger IDs.
+	LostTriggerCount uint64 `protobuf:"varint,6,opt,name=lost_trigger_count,json=lostTriggerCount,proto3" json:"lost_trigger_count,omitempty"`
+	// Decoded event payload bytes, excluding transport and descriptor overhead.
+	DataBytes            uint64   `protobuf:"varint,8,opt,name=data_bytes,json=dataBytes,proto3" json:"data_bytes,omitempty"`
+	ChannelTriggerCounts []uint64 `protobuf:"varint,9,rep,packed,name=channel_trigger_counts,json=channelTriggerCounts,proto3" json:"channel_trigger_counts,omitempty"`
+	TimestampCounts      []uint64 `protobuf:"varint,10,rep,packed,name=timestamp_counts,json=timestampCounts,proto3" json:"timestamp_counts,omitempty"`
+	PhaCounts            []uint64 `protobuf:"varint,11,rep,packed,name=pha_counts,json=phaCounts,proto3" json:"pha_counts,omitempty"`
+	// Sum of T-OR interval counters reported by counting and service events.
+	TOrCount      uint64 `protobuf:"varint,12,opt,name=t_or_count,json=tOrCount,proto3" json:"t_or_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BoardStatistics) Reset() {
@@ -2473,13 +2478,6 @@ func (x *BoardStatistics) GetLostTriggerCount() uint64 {
 	return 0
 }
 
-func (x *BoardStatistics) GetEventBuildCount() uint64 {
-	if x != nil {
-		return x.EventBuildCount
-	}
-	return 0
-}
-
 func (x *BoardStatistics) GetDataBytes() uint64 {
 	if x != nil {
 		return x.DataBytes
@@ -2506,6 +2504,13 @@ func (x *BoardStatistics) GetPhaCounts() []uint64 {
 		return x.PhaCounts
 	}
 	return nil
+}
+
+func (x *BoardStatistics) GetTOrCount() uint64 {
+	if x != nil {
+		return x.TOrCount
+	}
+	return 0
 }
 
 type RunSummary struct {
@@ -3331,7 +3336,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x14latest_completed_run\x18\v \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x12latestCompletedRun\"\x82\x01\n" +
 	"\x13StatisticsTelemetry\x121\n" +
 	"\x14elapsed_milliseconds\x18\x01 \x01(\x04R\x13elapsedMilliseconds\x128\n" +
-	"\x06boards\x18\x02 \x03(\v2 .pet.caen.daq.v1.BoardStatisticsR\x06boards\"\x96\x03\n" +
+	"\x06boards\x18\x02 \x03(\v2 .pet.caen.daq.v1.BoardStatisticsR\x06boards\"\xa1\x03\n" +
 	"\x0fBoardStatistics\x12\x14\n" +
 	"\x05chain\x18\x01 \x01(\rR\x05chain\x12\x12\n" +
 	"\x04node\x18\x02 \x01(\rR\x04node\x12\x1c\n" +
@@ -3339,15 +3344,16 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\n" +
 	"trigger_id\x18\x04 \x01(\x04R\ttriggerId\x12#\n" +
 	"\rtrigger_count\x18\x05 \x01(\x04R\ftriggerCount\x12,\n" +
-	"\x12lost_trigger_count\x18\x06 \x01(\x04R\x10lostTriggerCount\x12*\n" +
-	"\x11event_build_count\x18\a \x01(\x04R\x0feventBuildCount\x12\x1d\n" +
+	"\x12lost_trigger_count\x18\x06 \x01(\x04R\x10lostTriggerCount\x12\x1d\n" +
 	"\n" +
 	"data_bytes\x18\b \x01(\x04R\tdataBytes\x124\n" +
 	"\x16channel_trigger_counts\x18\t \x03(\x04R\x14channelTriggerCounts\x12)\n" +
 	"\x10timestamp_counts\x18\n" +
 	" \x03(\x04R\x0ftimestampCounts\x12\x1d\n" +
 	"\n" +
-	"pha_counts\x18\v \x03(\x04R\tphaCounts\"\xf3\x03\n" +
+	"pha_counts\x18\v \x03(\x04R\tphaCounts\x12\x1c\n" +
+	"\n" +
+	"t_or_count\x18\f \x01(\x04R\btOrCountJ\x04\b\a\x10\bR\x11event_build_count\"\xf3\x03\n" +
 	"\n" +
 	"RunSummary\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x129\n" +

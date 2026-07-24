@@ -3,8 +3,35 @@ import { janusParameterCatalog, janusParameters } from './catalog'
 
 describe('JANUS 5202 5.0.0 parameter catalog', () => {
   it('accounts for every upstream parameter and monitor', () => {
-    expect(janusParameters).toHaveLength(96)
-    expect(new Set(janusParameters.map((parameter) => parameter.name)).size).toBe(96)
+    expect(janusParameters).toHaveLength(73)
+    expect(new Set(janusParameters.map((parameter) => parameter.name)).size).toBe(73)
+    for (const name of [
+      'EventBuildingMode',
+      'TstampCoincWindow',
+      'JobFirstRun',
+      'JobLastRun',
+      'RunSleep',
+      'EnableJobs',
+      'DataAnalysis',
+      'DataFilePath',
+      'OF_OutFileUnit',
+      'OF_EnMaxSize',
+      'OF_MaxSize',
+      'OF_RawData',
+      'OF_ListBin',
+      'OF_ListAscii',
+      'OF_ListCSV',
+      'OF_Sync',
+      'OF_ServiceInfo',
+      'OF_RunInfo',
+      'OF_SpectHisto',
+      'OF_ToAHisto',
+      'OF_ToTHisto',
+      'OF_MCS',
+      'OF_Staircase',
+    ]) {
+      expect(janusParameterCatalog.has(name)).toBe(false)
+    }
   })
 
   it('preserves scopes, widgets, options, constraints, and dependencies', () => {
@@ -28,6 +55,9 @@ describe('JANUS 5202 5.0.0 parameter catalog', () => {
       'COUNTING',
       'WAVEFORM',
     ])
+    expect(janusParameterCatalog.get('EHistoNbin')?.description).toBe(
+      'Online PHA histogram bins only. Rebins the live plot; does not change hardware, decoded energy values, or stored event data',
+    )
     expect(janusParameterCatalog.get('PresetTime')?.activeWhen).toEqual({
       parameter: 'StopRunMode',
       values: ['PRESET_TIME'],

@@ -31,7 +31,7 @@ func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 	source := &mutableRunHealth{
 		pipeline: acquisition.PipelineStats{Capacity: 8, QueueDepth: 2, AcceptedBatches: 3},
 		storage:  runpipeline.StorageStats{Directory: "/runs/run-42", BytesWritten: 100, EventCount: 2, RawBatches: 1},
-		boards:   []runpipeline.BoardStats{{Chain: 0, Node: 0, EventCount: 2, TriggerCount: 2, TriggerID: 9, DataBytes: 64, FPGATemperature: &temperature, HVVoltage: &voltage, HVCurrent: &current, HVOn: true, TelemetryObservedAt: &boardObservedAt}},
+		boards:   []runpipeline.BoardStats{{Chain: 0, Node: 0, EventCount: 2, TriggerCount: 2, TriggerID: 9, TORCount: 37, DataBytes: 64, FPGATemperature: &temperature, HVVoltage: &voltage, HVCurrent: &current, HVOn: true, TelemetryObservedAt: &boardObservedAt}},
 		elapsed:  2 * time.Second,
 	}
 	ticks := make(chan time.Time)
@@ -50,7 +50,7 @@ func TestHealthMonitorPublishesImmediateAndTickSnapshots(t *testing.T) {
 	if first.Pipeline.GetQueueDepth() != 2 || first.Storage.GetBytesWritten() != 100 || first.CurrentRun.GetEventCount() != 2 || first.Chains[0].Boards[0].GetFpgaTemperatureC() != temperature || !first.Chains[0].Boards[0].GetHvOn() {
 		t.Fatalf("immediate snapshot = %+v", first)
 	}
-	if first.Statistics.GetElapsedMilliseconds() != 2000 || first.Statistics.Boards[0].GetTriggerId() != 9 || first.Statistics.Boards[0].GetDataBytes() != 64 {
+	if first.Statistics.GetElapsedMilliseconds() != 2000 || first.Statistics.Boards[0].GetTriggerId() != 9 || first.Statistics.Boards[0].GetTOrCount() != 37 || first.Statistics.Boards[0].GetDataBytes() != 64 {
 		t.Fatalf("statistics = %+v", first.Statistics)
 	}
 	if first.Chains[0].Boards[0].GetTelemetryObservedAt().AsTime() != boardObservedAt {

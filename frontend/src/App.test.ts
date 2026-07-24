@@ -29,7 +29,7 @@ function dashboardApi(): DaqApi {
               chain: 0,
               triggerId: 12n,
               triggerCount: 10n,
-              eventBuildCount: 10n,
+              tOrCount: 20n,
               dataBytes: 2048n,
               channelTriggerCounts: Array(64).fill(3n),
               timestampCounts: Array(64).fill(2n),
@@ -202,7 +202,7 @@ describe('operator dashboard', () => {
       .find((tab) => tab.text() === 'All')!
       .trigger('click')
     expect(wrapper.text()).toContain('PresetTime')
-    expect(wrapper.text()).toContain('EnableJobs')
+    expect(wrapper.text()).not.toContain('EnableJobs')
     expect(
       wrapper.findAll('button').some((button) => button.text().includes('Configure channels')),
     ).toBe(true)
