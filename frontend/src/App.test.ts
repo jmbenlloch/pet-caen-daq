@@ -407,6 +407,10 @@ describe('operator dashboard', () => {
     expect(wrapper.find('[aria-label="Search stored runs"]').exists()).toBe(false)
     await searchToggle.trigger('click')
     expect(searchToggle.attributes('aria-expanded')).toBe('true')
+    expect(wrapper.get('button.search-filter-button.secondary').text()).toBe('Add filter')
+    await wrapper.get('button.search-filter-button.secondary').trigger('click')
+    expect(wrapper.get('button.remove-filter.danger').text()).toBe('Remove')
+    await wrapper.findAll('button.remove-filter').at(-1)!.trigger('click')
     await wrapper.get('[aria-label="Parameter 1"]').trigger('click')
     const parameterOptions = wrapper.get('[aria-label="Parameters 1"]')
     expect(parameterOptions.text()).toContain('TestPulsePreamp')
@@ -579,6 +583,52 @@ describe('operator dashboard', () => {
     expect(wrapper.get('[aria-label="Value 1"]').element.parentElement?.textContent).toContain(
       'Minimum',
     )
+    wrapper.unmount()
+  })
+
+  it('supports open-ended numeric ranges', async () => {
+    const api = dashboardApi()
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    await wrapper.get('[aria-controls="run-search-form"]').trigger('click')
+    await wrapper.get('[aria-label="Parameter 1"]').setValue('HV_Vbias')
+    await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
+    await wrapper.get('[aria-label="Match 1"]').setValue('range')
+
+    await wrapper.get('[aria-label="Value 1"]').setValue('20')
+    await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
+    await flushPromises()
+    let predicate = vi.mocked(api.searchRuns).mock.calls.at(-1)![0].configuration[0]
+    expect(predicate.comparison).toEqual(
+      expect.objectContaining({
+        case: 'real',
+        value: expect.objectContaining({ minimum: 20 }),
+      }),
+    )
+    if (predicate.comparison.case === 'real')
+      expect(predicate.comparison.value.maximum).toBeUndefined()
+
+    await wrapper.get('[aria-label="Value 1"]').setValue('')
+    await wrapper.get('[aria-label="Maximum 1"]').setValue('50')
+    await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
+    await flushPromises()
+    predicate = vi.mocked(api.searchRuns).mock.calls.at(-1)![0].configuration[0]
+    expect(predicate.comparison).toEqual(
+      expect.objectContaining({
+        case: 'real',
+        value: expect.objectContaining({ maximum: 50 }),
+      }),
+    )
+    if (predicate.comparison.case === 'real')
+      expect(predicate.comparison.value.minimum).toBeUndefined()
+
+    await wrapper.get('[aria-label="Maximum 1"]').setValue('')
+    await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
+    expect(wrapper.get('.field-error').text()).toBe(
+      'Range filters need a minimum, a maximum, or both.',
+    )
+    expect(api.searchRuns).toHaveBeenCalledTimes(2)
     wrapper.unmount()
   })
 })
