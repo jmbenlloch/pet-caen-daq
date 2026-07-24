@@ -116,7 +116,7 @@ func (w *RunWriter) SaveHistograms(histograms []runstore.HistogramDataset) error
 	}
 	name := fmt.Sprintf("run_%s.histograms.h5", w.manifest.RunID)
 	temporary := filepath.Join(w.dir, name+".tmp")
-	if err := SaveHistograms(temporary, w.manifest.RunID, histograms); err != nil {
+	if err := saveHistograms(temporary, w.manifest.RunID, histograms, w.manifest.ExecutionIdentity.Storage.Compression); err != nil {
 		_ = os.Remove(temporary)
 		return err
 	}
@@ -324,6 +324,7 @@ func (w *RunWriter) openSegment() error {
 	metadata := w.metadata
 	metadata.SegmentIndex = w.segmentIndex
 	metadata.EventSequenceBase = w.manifest.EventCount
+	metadata.Compression = w.manifest.ExecutionIdentity.Storage.Compression
 	events, err := CreateWithMetadata(filepath.Join(w.dir, w.currentSegmentName()), metadata)
 	if err != nil {
 		return fmt.Errorf("create HDF5 segment %04d: %w", w.segmentIndex, err)

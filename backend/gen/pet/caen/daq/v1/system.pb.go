@@ -1214,8 +1214,11 @@ type StartRunRequest struct {
 	Hdf5SegmentSizeMb uint32 `protobuf:"varint,6,opt,name=hdf5_segment_size_mb,json=hdf5SegmentSizeMb,proto3" json:"hdf5_segment_size_mb,omitempty"`
 	// Write a standalone run-wide HDF5 histogram artifact after draining.
 	PersistHistograms bool `protobuf:"varint,7,opt,name=persist_histograms,json=persistHistograms,proto3" json:"persist_histograms,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Compression applied to HDF5 event segments and histogram artifacts.
+	// Empty selects blosc-lz4-level4-bitshuffle.
+	Hdf5Compression string `protobuf:"bytes,8,opt,name=hdf5_compression,json=hdf5Compression,proto3" json:"hdf5_compression,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *StartRunRequest) Reset() {
@@ -1288,6 +1291,13 @@ func (x *StartRunRequest) GetPersistHistograms() bool {
 		return x.PersistHistograms
 	}
 	return false
+}
+
+func (x *StartRunRequest) GetHdf5Compression() string {
+	if x != nil {
+		return x.Hdf5Compression
+	}
+	return ""
 }
 
 type StartRunResponse struct {
@@ -4526,7 +4536,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x12!\n" +
 	"\frequested_by\x18\x03 \x01(\tR\vrequestedBy\"X\n" +
 	"\x16SetHighVoltageResponse\x12>\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xa1\x02\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xcc\x02\n" +
 	"\x0fStartRunRequest\x12/\n" +
 	"\x13janus_configuration\x18\x02 \x01(\tR\x12janusConfiguration\x12\x1f\n" +
 	"\vcapture_raw\x18\x03 \x01(\bR\n" +
@@ -4534,7 +4544,8 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x11journal_transport\x18\x04 \x01(\bR\x10journalTransport\x12!\n" +
 	"\frequested_by\x18\x05 \x01(\tR\vrequestedBy\x12/\n" +
 	"\x14hdf5_segment_size_mb\x18\x06 \x01(\rR\x11hdf5SegmentSizeMb\x12-\n" +
-	"\x12persist_histograms\x18\a \x01(\bR\x11persistHistogramsJ\x04\b\x01\x10\x02R\x06run_id\"\x81\x01\n" +
+	"\x12persist_histograms\x18\a \x01(\bR\x11persistHistograms\x12)\n" +
+	"\x10hdf5_compression\x18\b \x01(\tR\x0fhdf5CompressionJ\x04\b\x01\x10\x02R\x06run_id\"\x81\x01\n" +
 	"\x10StartRunResponse\x12-\n" +
 	"\x03run\x18\x01 \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x03run\x12>\n" +
 	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"J\n" +

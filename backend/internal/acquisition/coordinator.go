@@ -37,6 +37,7 @@ type RunOptions struct {
 	Histograms             HistogramOptions
 	PersistHistograms      bool
 	HDF5SegmentSizeBytes   uint64
+	HDF5Compression        string
 }
 
 type HistogramOptions struct {

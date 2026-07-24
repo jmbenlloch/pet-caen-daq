@@ -43,7 +43,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 		options.Now = time.Now
 	}
 	identity := options.ExecutionIdentity
-	identity.Storage = storageIdentity()
+	identity.Storage = storageIdentity(runOptions)
 	identity.Runtime = runstore.RuntimeIdentity{
 		PipelineCapacity: options.Capacity, BackpressurePolicy: backpressureName(options.Backpressure),
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,

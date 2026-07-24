@@ -102,7 +102,8 @@ func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
 		t.Fatalf("start response = %+v", start.Msg)
 	}
 	if !controller.options.CaptureRaw || !controller.options.JournalTransport || !controller.options.PersistHistograms || controller.options.RequestedConfiguration != validTopology || controller.options.ConfigurationAudit == nil ||
-		controller.options.HDF5SegmentSizeBytes != 500*bytesPerMiB {
+		controller.options.HDF5SegmentSizeBytes != 500*bytesPerMiB ||
+		controller.options.HDF5Compression != runstore.HDF5CompressionBloscLZ4 {
 		t.Fatalf("run options = %+v", controller.options)
 	}
 	stop, err := service.StopRun(context.Background(), connect.NewRequest(&daqv1.StopRunRequest{RunId: "42", RequestedBy: "operator"}))
@@ -143,6 +144,31 @@ func TestRunServiceRejectsOversizedHDF5Segment(t *testing.T) {
 		Hdf5SegmentSizeMb: maxHDF5SegmentSizeMB + 1,
 	}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "INVALID_HDF5_SEGMENT_SIZE") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestRunServiceAcceptsExplicitHDF5Compression(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady}
+	service := newRunService(t, controller)
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{
+		RequestedBy: "operator", JanusConfiguration: validTopology,
+		Hdf5Compression: runstore.HDF5CompressionNone,
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controller.options.HDF5Compression != runstore.HDF5CompressionNone {
+		t.Fatalf("compression = %q", controller.options.HDF5Compression)
+	}
+}
+
+func TestRunServiceRejectsUnsupportedHDF5Compression(t *testing.T) {
+	service := newRunService(t, &fakeRunController{state: acquisition.StateReady})
+	_, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{
+		RequestedBy: "operator", JanusConfiguration: validTopology, Hdf5Compression: "gzip",
+	}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument || !strings.Contains(err.Error(), "INVALID_HDF5_COMPRESSION") {
 		t.Fatalf("error = %v", err)
 	}
 }

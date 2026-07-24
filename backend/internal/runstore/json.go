@@ -55,6 +55,11 @@ type ConfigurationIdentity struct {
 	ConfigurationAuditSHA256     string `json:"configuration_audit_sha256"`
 }
 
+const (
+	HDF5CompressionNone     = "none"
+	HDF5CompressionBloscLZ4 = "blosc-lz4-level4-bitshuffle"
+)
+
 type ExecutionIdentity struct {
 	Topology TopologyIdentity `json:"topology"`
 	Software SoftwareIdentity `json:"software"`
