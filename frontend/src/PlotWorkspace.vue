@@ -31,6 +31,7 @@ const logarithmic = ref(false)
 const selectionError = ref('')
 const selectionLimit = 64
 let timer: number | undefined
+let lastAutomaticRequest = ''
 
 const persistedRuns = computed(() =>
   props.runs.filter(
@@ -42,7 +43,12 @@ const persistedRuns = computed(() =>
 
 watch(
   [() => props.activeRunId, persistedRuns],
-  ([activeRunId, runs]) => {
+  ([activeRunId, runs], previousValues) => {
+    const previousActiveRunId = previousValues?.[0]
+    if (activeRunId && activeRunId !== previousActiveRunId) {
+      selectedRunId.value = activeRunId
+      return
+    }
     const available = new Set(runs.map((run) => run.runId))
     if (activeRunId) available.add(activeRunId)
     if (!available.has(selectedRunId.value))
@@ -123,6 +129,18 @@ function request() {
   selectionError.value = ''
   emit('request', selectedRunId.value, kind.value, selections)
 }
+
+watch(
+  [selectedRunId, kind, selected, persistedRuns],
+  ([runId, histogramKind, selections, runs]) => {
+    if (!runId || !selections.size || !runs.some((run) => run.runId === runId)) return
+    const requestKey = `${runId}:${histogramKind}`
+    if (requestKey === lastAutomaticRequest) return
+    lastAutomaticRequest = requestKey
+    request()
+  },
+  { immediate: true },
+)
 
 function populatedBins(dataset: DeepReadonly<HistogramDataset>) {
   return dataset.bins.reduce((count, value) => count + (value > 0 ? 1 : 0), 0)
