@@ -521,87 +521,88 @@ onMounted(() => daq.connect())
 
 <template>
   <div class="shell">
-    <header class="masthead">
-      <div>
-        <p class="eyebrow">PET detector control</p>
-        <h1>CAEN acquisition</h1>
-      </div>
-      <div class="masthead-actions">
-        <div class="connection" role="status" aria-live="polite">
-          <span
-            class="status-dot"
-            :class="{ live: daq.connected.value && !daq.stale.value }"
-            aria-hidden="true"
-          />
-          <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
-          <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
-        </div>
-        <button
-          type="button"
-          class="theme-toggle"
-          :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
-          :title="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
-          @click="toggleTheme"
-        >
-          <span aria-hidden="true">{{ theme === 'dark' ? '☀' : '☾' }}</span>
-          {{ theme === 'dark' ? 'Light' : 'Dark' }}
-        </button>
-      </div>
-    </header>
-
     <main>
       <section class="hero panel" aria-labelledby="system-heading">
-        <div>
-          <p class="eyebrow">System state</p>
-          <h2 id="system-heading">{{ state }}</h2>
-          <p class="muted">
-            Sequence {{ compact(daq.snapshot.value?.sequence) }} ·
-            {{ enabledLinkLabel }}
-          </p>
+        <div class="hero-overview">
+          <div class="product-identity">
+            <p class="eyebrow">PET detector control</p>
+            <h1>CAEN acquisition</h1>
+            <button
+              type="button"
+              class="theme-toggle"
+              :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
+              :title="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
+              @click="toggleTheme"
+            >
+              <span aria-hidden="true">{{ theme === 'dark' ? '☀' : '☾' }}</span>
+              {{ theme === 'dark' ? 'Light' : 'Dark' }}
+            </button>
+          </div>
+          <div class="state-summary">
+            <p class="eyebrow">System state</p>
+            <h2 id="system-heading">{{ state }}</h2>
+            <p class="muted">
+              Sequence {{ compact(daq.snapshot.value?.sequence) }} ·
+              {{ enabledLinkLabel }}
+            </p>
+          </div>
         </div>
         <div class="hero-control">
-          <div v-if="daq.snapshot.value?.currentRun" class="run-now">
-            <span>Active run</span>
-            <strong>{{ daq.snapshot.value.currentRun.runId }}</strong>
-            <span>{{ compact(daq.snapshot.value.currentRun.eventCount) }} events</span>
-            <small>{{ activeStopPolicy() }}</small>
+          <div class="system-utilities">
+            <div class="connection" role="status" aria-live="polite">
+              <span
+                class="status-dot"
+                :class="{ live: daq.connected.value && !daq.stale.value }"
+                aria-hidden="true"
+              />
+              <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
+              <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
+            </div>
           </div>
-          <div v-else class="run-now quiet" role="status">
-            <span>No active run</span>
-            <small>{{ configuredStopPolicy }}</small>
-          </div>
-          <div class="actions hero-actions">
-            <button
-              class="primary"
-              type="button"
-              :disabled="
-                !daq.canStart.value ||
-                !configuration ||
-                configurationErrors.length > 0 ||
-                !!stopPolicyError ||
-                !Number.isInteger(hdf5SegmentSizeMb) ||
-                hdf5SegmentSizeMb < 1 ||
-                hdf5SegmentSizeMb > 1048576
-              "
-              @click="
-                daq.startRun({
-                  configuration,
-                  captureRaw,
-                  journalTransport,
-                  hdf5SegmentSizeMb,
-                })
-              "
-            >
-              Start run
-            </button>
-            <button
-              class="danger"
-              type="button"
-              :disabled="!daq.canStop.value"
-              @click="daq.stopRun()"
-            >
-              Stop and drain
-            </button>
+          <div class="run-control">
+            <div v-if="daq.snapshot.value?.currentRun" class="run-now">
+              <span>Active run</span>
+              <strong>{{ daq.snapshot.value.currentRun.runId }}</strong>
+              <span>{{ compact(daq.snapshot.value.currentRun.eventCount) }} events</span>
+              <small>{{ activeStopPolicy() }}</small>
+            </div>
+            <div v-else class="run-now quiet" role="status">
+              <span>No active run</span>
+              <small>{{ configuredStopPolicy }}</small>
+            </div>
+            <div class="actions hero-actions">
+              <button
+                class="primary"
+                type="button"
+                :disabled="
+                  !daq.canStart.value ||
+                  !configuration ||
+                  configurationErrors.length > 0 ||
+                  !!stopPolicyError ||
+                  !Number.isInteger(hdf5SegmentSizeMb) ||
+                  hdf5SegmentSizeMb < 1 ||
+                  hdf5SegmentSizeMb > 1048576
+                "
+                @click="
+                  daq.startRun({
+                    configuration,
+                    captureRaw,
+                    journalTransport,
+                    hdf5SegmentSizeMb,
+                  })
+                "
+              >
+                Start run
+              </button>
+              <button
+                class="danger"
+                type="button"
+                :disabled="!daq.canStop.value"
+                @click="daq.stopRun()"
+              >
+                Stop and drain
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -755,7 +756,7 @@ onMounted(() => daq.connect())
                     >
                       <strong>B{{ summary.board }}</strong>
                       <code>{{ summary.low }} · {{ summary.high }}</code>
-                      <span v-if="summary.inherited">global</span>
+                      <span>{{ summary.inherited ? 'inherited' : 'override' }}</span>
                     </div>
                   </div>
                   <button type="button" class="secondary" @click="openMask(field)">
@@ -836,7 +837,7 @@ onMounted(() => daq.connect())
                 >
                   <span v-for="item in boardValues(field)" :key="item.board">
                     <strong>B{{ item.board }}</strong> {{ item.value }}
-                    <small v-if="item.inherited">global</small>
+                    <small>{{ item.inherited ? 'inherited' : 'override' }}</small>
                   </span>
                   <button
                     type="button"
