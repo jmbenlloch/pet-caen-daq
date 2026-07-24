@@ -97,7 +97,7 @@ future schema validator) still remain part of production acceptance.
 
 ## Current boundary and packaging
 
-This image is intentionally broad and retains compilers and test tools. When
-the HDF5 writer is ready to ship, add a separate multi-stage production
-Dockerfile that copies only application binaries and required shared libraries
-and plugins. Do not deploy this build image as the DAQ runtime.
+This image is intentionally broad and retains compilers and test tools. The
+multi-stage production Dockerfile under `deploy/server` uses it only as a source
+for the required HDF5 and Blosc shared libraries and plugin; the final DAQ
+runtime remains based on `debian:bookworm-slim`.

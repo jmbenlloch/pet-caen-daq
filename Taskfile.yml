@@ -94,12 +94,12 @@ tasks:
       - go run -tags hdf5 ./backend/cmd/hdf5-write-benchmark -source "{{.SOURCE}}" -output "{{.OUTPUT}}"
 
   container:build:
-    desc: Package the compiled server and frontend in a runtime container
-    deps: [build]
+    desc: Build and package the production HDF5 server and frontend
+    deps: [docker:build]
     vars:
       IMAGE: '{{default "pet-caen-daq:latest" .IMAGE}}'
     cmds:
-      - docker build -f deploy/server/Dockerfile -t "{{.IMAGE}}" .
+      - docker build --build-arg BUILD_IMAGE="{{.BUILD_IMAGE}}" -f deploy/server/Dockerfile -t "{{.IMAGE}}" .
 
   container:push:
     desc: Build and push the complete server image to Docker Hub
@@ -204,6 +204,7 @@ tasks:
 
   docker:deps:
     desc: Install pinned frontend dependencies in the mounted source tree
+    deps: [docker:image]
     cmds:
       - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" ./scripts/docker-run npm --prefix frontend ci
 

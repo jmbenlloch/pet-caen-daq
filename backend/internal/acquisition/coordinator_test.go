@@ -70,12 +70,13 @@ func (h *coordinatorHardware) ReadRawStreamBatch(ctx context.Context) ([]byte, [
 }
 
 type coordinatorPipeline struct {
-	mu        sync.Mutex
-	batches   []PipelineBatch
-	closed    bool
-	finalized bool
-	aborted   bool
-	journal   transportjournal.Sink
+	mu          sync.Mutex
+	batches     []PipelineBatch
+	submitDelay time.Duration
+	closed      bool
+	finalized   bool
+	aborted     bool
+	journal     transportjournal.Sink
 }
 
 func (p *coordinatorPipeline) TransportJournal() transportjournal.Sink { return p.journal }
@@ -84,7 +85,16 @@ type coordinatorJournal struct{}
 
 func (*coordinatorJournal) AppendRecord(transportjournal.Record) error { return nil }
 
-func (p *coordinatorPipeline) Submit(_ context.Context, batch PipelineBatch) error {
+func (p *coordinatorPipeline) Submit(ctx context.Context, batch PipelineBatch) error {
+	if p.submitDelay > 0 {
+		timer := time.NewTimer(p.submitDelay)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.batches = append(p.batches, batch)
@@ -159,6 +169,32 @@ func TestCoordinatorStartsReadsAndDrainsToReady(t *testing.T) {
 	pipeline.mu.Lock()
 	defer pipeline.mu.Unlock()
 	if !pipeline.closed || !pipeline.finalized || pipeline.aborted || len(pipeline.batches) != 1 || string(pipeline.batches[0].Raw) != "complete" {
+		t.Fatalf("pipeline=%+v", pipeline)
+	}
+}
+
+func TestCoordinatorPreservesDrainedBatchWhilePersistenceCatchesUp(t *testing.T) {
+	hardware := &coordinatorHardware{}
+	states, _ := NewStateMachine(StateReady, nil)
+	pipeline := &coordinatorPipeline{submitDelay: 25 * time.Millisecond}
+	coordinator, err := NewCoordinator(states, hardware, func(string, RunOptions) (RunPipeline, error) {
+		return pipeline, nil
+	}, 1, 10*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Stop(context.Background(), "operator"); err != nil {
+		t.Fatal(err)
+	}
+	if states.Snapshot().State != StateReady {
+		t.Fatalf("state=%s error=%v", states.Snapshot().State, coordinator.LastError())
+	}
+	pipeline.mu.Lock()
+	defer pipeline.mu.Unlock()
+	if len(pipeline.batches) != 1 || string(pipeline.batches[0].Raw) != "complete" || !pipeline.finalized || pipeline.aborted {
 		t.Fatalf("pipeline=%+v", pipeline)
 	}
 }
