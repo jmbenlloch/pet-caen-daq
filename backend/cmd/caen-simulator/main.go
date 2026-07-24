@@ -15,9 +15,16 @@ func main() {
 	controlAddress := flag.String("control", "127.0.0.1:9760", "control listen address")
 	streamAddress := flag.String("stream", "127.0.0.1:9000", "stream listen address")
 	eventInterval := flag.Duration("event-interval", 100*time.Millisecond, "period between simulated acquisition events (zero disables periodic events)")
+	hvRampDuration := flag.Duration("hv-ramp-duration", simulator.DefaultHVRampDuration, "simulated HV ramp-up and ramp-down duration")
 	flag.Parse()
 
-	server, err := simulator.Start(*controlAddress, *streamAddress, simulator.ProductionTopology())
+	if *hvRampDuration < 0 {
+		fmt.Fprintln(os.Stderr, "error: HV ramp duration must not be negative")
+		os.Exit(2)
+	}
+	topology := simulator.ProductionTopology()
+	topology.HVRampDuration = *hvRampDuration
+	server, err := simulator.Start(*controlAddress, *streamAddress, topology)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
@@ -33,7 +40,7 @@ func main() {
 	if *eventInterval > 0 {
 		periodic = eventInterval.String()
 	}
-	fmt.Printf("CAEN simulator control=%s stream=%s event-interval=%s\n", server.ControlAddress(), server.StreamAddress(), periodic)
+	fmt.Printf("CAEN simulator control=%s stream=%s event-interval=%s hv-ramp-duration=%s\n", server.ControlAddress(), server.StreamAddress(), periodic, hvRampDuration.String())
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
