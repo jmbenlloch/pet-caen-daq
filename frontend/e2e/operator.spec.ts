@@ -106,11 +106,15 @@ test('backend automatically stops runs at time and event presets while manual st
   await expect(page.getByRole('button', { name: 'Stop and drain' })).toBeEnabled()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
   await page.getByRole('tab', { name: /Runs/ }).click()
-  const timedRun = (await page.locator('#completed-heading').textContent())!
+  const latestRunRow = page
+    .getByRole('table', { name: 'Stored runs' })
+    .locator('tbody .run-row')
+    .first()
+  await expect(latestRunRow).toBeVisible()
+  const latestRunLink = latestRunRow.getByRole('button')
+  const timedRun = (await latestRunLink.textContent())!
   expect(timedRun).toMatch(/^\d+$/)
-  const timedRunSummary = page.getByRole('region', { name: timedRun })
-  await expect(timedRunSummary).toBeVisible()
-  await expect(timedRunSummary.getByText('preset_time', { exact: true })).toBeVisible()
+  await expect(latestRunRow.getByText('preset_time', { exact: true })).toBeVisible()
 
   await page.getByRole('tab', { name: /Acquisition/ }).click()
   await page
@@ -119,14 +123,11 @@ test('backend automatically stops runs at time and event presets while manual st
   await page.getByRole('spinbutton', { name: 'PresetCounts', exact: true }).fill('3')
   await page.getByRole('button', { name: 'Start run' }).click()
   await page.getByRole('tab', { name: /Runs/ }).click()
-  const completedHeading = page.locator('#completed-heading')
-  await expect(completedHeading).not.toHaveText(timedRun, { timeout: 10_000 })
-  const countedRun = (await completedHeading.textContent())!
+  await expect(latestRunLink).not.toHaveText(timedRun, { timeout: 10_000 })
+  const countedRun = (await latestRunLink.textContent())!
   expect(countedRun).toMatch(/^\d+$/)
   expect(Number(countedRun)).toBeGreaterThan(Number(timedRun))
-  const countedRunSummary = page.getByRole('region', { name: countedRun })
-  await expect(countedRunSummary).toBeVisible()
-  await expect(countedRunSummary.getByText('preset_counts', { exact: true })).toBeVisible()
+  await expect(latestRunRow.getByText('preset_counts', { exact: true })).toBeVisible()
 })
 
 test('operator configures bounded values and channel masks without editing text', async ({

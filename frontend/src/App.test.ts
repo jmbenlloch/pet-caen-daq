@@ -397,6 +397,11 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
 
+    const searchToggle = wrapper.get('[aria-controls="run-search-form"]')
+    expect(searchToggle.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('[aria-label="Search stored runs"]').exists()).toBe(false)
+    await searchToggle.trigger('click')
+    expect(searchToggle.attributes('aria-expanded')).toBe('true')
     await wrapper.get('[aria-label="Parameter 1"]').trigger('click')
     const parameterOptions = wrapper.get('[aria-label="Parameters 1"]')
     expect(parameterOptions.text()).toContain('TestPulsePreamp')
@@ -462,6 +467,7 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api: dashboardApi() } })
     await flushPromises()
 
+    await wrapper.get('[aria-controls="run-search-form"]').trigger('click')
     expect(wrapper.find('[aria-label="Layer 1"]').exists()).toBe(false)
     expect(wrapper.find('[aria-label="Type 1"]').exists()).toBe(false)
     await wrapper.get('[aria-label="Parameter 1"]').setValue('StopRunMode')
@@ -478,6 +484,7 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
 
+    await wrapper.get('[aria-controls="run-search-form"]').trigger('click')
     await wrapper.get('[aria-label="Parameter 1"]').setValue('HG_Gain')
     await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
     expect((wrapper.get('[aria-label="Board 1"]').element as HTMLSelectElement).value).toBe('')
@@ -507,6 +514,7 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api: dashboardApi() } })
     await flushPromises()
 
+    await wrapper.get('[aria-controls="run-search-form"]').trigger('click')
     await wrapper.get('[aria-label="Parameter 1"]').setValue('ZS_Threshold_HG')
     await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
 
@@ -521,6 +529,7 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
 
+    await wrapper.get('[aria-controls="run-search-form"]').trigger('click')
     await wrapper.get('[aria-label="Parameter 1"]').setValue('HV_Vbias')
     await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
     expect((wrapper.get('[aria-label="Match 1"]').element as HTMLSelectElement).value).toBe('exact')

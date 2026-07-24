@@ -1101,72 +1101,6 @@ textarea {
   margin-top: 20px;
   padding: 24px;
 }
-.completed-summary {
-  display: flex;
-  justify-content: space-between;
-  gap: 24px;
-}
-.completed-counts {
-  display: flex;
-  gap: 28px;
-  margin: 0;
-}
-.completed-counts div {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.completed-counts dt,
-.artifact span {
-  color: #8192a9;
-  font-size: 0.7rem;
-}
-.completed-counts dd {
-  margin: 0;
-  font:
-    700 0.82rem ui-monospace,
-    monospace;
-}
-.incomplete {
-  margin-top: 18px;
-  border-left: 2px solid #ef596f;
-  background: #351923;
-  color: #ffc1c1;
-  padding: 11px 13px;
-  font-size: 0.8rem;
-}
-.artifacts {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-top: 20px;
-}
-.artifact {
-  min-width: 0;
-  border: 1px solid #293b52;
-  border-radius: 8px;
-  padding: 12px;
-  background: #0a1524;
-}
-.artifact div {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-.artifact strong {
-  overflow-wrap: anywhere;
-  font-size: 0.78rem;
-}
-.artifact code {
-  display: block;
-  overflow: hidden;
-  margin-top: 9px;
-  color: #6f839d;
-  font-size: 0.62rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .history-run {
   align-items: flex-start;
   flex-direction: column;
@@ -1477,12 +1411,39 @@ textarea {
 }
 
 .run-search {
-  display: grid;
-  gap: 14px;
   margin: 20px 0;
-  padding: 18px;
   border: 1px solid #263449;
   border-radius: 12px;
+}
+.search-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 0;
+  padding: 18px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.search-toggle div {
+  display: grid;
+  gap: 5px;
+}
+.search-toggle span {
+  color: #9dafc4;
+  font-size: 0.8rem;
+}
+.search-toggle > span {
+  color: #5b718d;
+  font-weight: 700;
+}
+.search-form {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #263449;
+  padding: 18px;
 }
 .search-heading,
 .search-metadata {
@@ -2398,16 +2359,6 @@ textarea {
   }
   .danger {
     margin-left: 0;
-  }
-  .completed-summary,
-  .completed-counts {
-    flex-direction: column;
-  }
-  .completed-counts {
-    gap: 12px;
-  }
-  .artifacts {
-    grid-template-columns: 1fr;
   }
   .config-heading,
   .parameter-toolbar {
