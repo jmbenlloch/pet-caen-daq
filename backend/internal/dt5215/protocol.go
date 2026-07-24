@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -68,6 +70,37 @@ type BoardInfo struct {
 	HVModuleFirmwareVersion   float32
 	HVModuleFirmwareAvailable bool
 	AcquisitionState          uint32
+}
+
+type ConcentratorInfo struct {
+	SoftwareRevision string `json:"software_revision"`
+	FPGARevision     string `json:"fpga_revision"`
+	ProductID        uint32 `json:"product_id"`
+}
+
+func DecodeConcentratorVersionResponse(response []byte) (ConcentratorInfo, error) {
+	if len(response) != 68 {
+		return ConcentratorInfo{}, fmt.Errorf("VERS response length = %d, want 68", len(response))
+	}
+	if size := littleEndian.Uint32(response[:4]); size != 64 {
+		return ConcentratorInfo{}, fmt.Errorf("VERS payload length = %d, want 64", size)
+	}
+	payload := response[4:]
+	trim := func(value []byte) string { return strings.TrimRight(string(value), "\x00 ") }
+	productText := trim(payload[48:64])
+	productID, err := strconv.ParseUint(productText, 10, 32)
+	if err != nil {
+		return ConcentratorInfo{}, fmt.Errorf("VERS product ID %q: %w", productText, err)
+	}
+	info := ConcentratorInfo{
+		SoftwareRevision: trim(payload[0:16]),
+		FPGARevision:     trim(payload[16:48]),
+		ProductID:        uint32(productID),
+	}
+	if info.SoftwareRevision == "" || info.FPGARevision == "" {
+		return ConcentratorInfo{}, errors.New("VERS response contains an empty revision")
+	}
+	return info, nil
 }
 
 func EncodeChainInfoRequest(chain uint16) ([]byte, error) {

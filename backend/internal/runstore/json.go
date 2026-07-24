@@ -40,6 +40,7 @@ type Manifest struct {
 	ConfigurationAudit     *configaudit.Report        `json:"configuration_audit,omitempty"`
 	ConfigurationIdentity  ConfigurationIdentity      `json:"configuration_identity"`
 	ExecutionIdentity      ExecutionIdentity          `json:"execution_identity"`
+	Concentrator           *dt5215.ConcentratorInfo   `json:"concentrator,omitempty"`
 	Artifacts              []Artifact                 `json:"artifacts,omitempty"`
 }
 

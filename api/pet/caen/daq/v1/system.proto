@@ -247,6 +247,13 @@ message TelemetrySnapshot {
   repeated Diagnostic diagnostics = 9;
   StatisticsTelemetry statistics = 10;
   RunSummary latest_completed_run = 11;
+  Concentrator concentrator = 12;
+}
+
+message Concentrator {
+  string software_revision = 1;
+  string fpga_revision = 2;
+  uint32 product_id = 3;
 }
 
 message StatisticsTelemetry {

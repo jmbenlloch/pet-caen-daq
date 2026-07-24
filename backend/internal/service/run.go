@@ -21,6 +21,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1/daqv1connect"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
@@ -55,6 +56,7 @@ type RunService struct {
 	Now              func() time.Time
 	Configure        ConfigurationApplier
 	Boards           []configaudit.BoardEvidence
+	Concentrator     *dt5215.ConcentratorInfo
 	HealthInterval   time.Duration
 	RunParent        string
 	ReconcileCatalog func(context.Context, string) error
@@ -399,6 +401,7 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
 		Histograms:           histogramOptions,
 		HDF5SegmentSizeBytes: uint64(segmentSizeMB) * bytesPerMiB,
+		Concentrator:         s.Concentrator,
 	}
 	if err := s.Controller.Start(ctx, runID, message.GetRequestedBy(), options); err != nil {
 		if errors.Is(err, runstore.ErrRunExists) {

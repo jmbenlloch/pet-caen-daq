@@ -212,7 +212,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		})
 	}
 	runService := &service.RunService{
-		Controller: coordinator, Telemetry: publisher, Boards: boards,
+		Controller: coordinator, Telemetry: publisher, Boards: boards, Concentrator: &topology.Concentrator,
 		RunParent: *runParent,
 		Configure: func(configureCtx context.Context, runDocument *janusconfig.Document, actor string) (acquisition.ConfigurationResult, error) {
 			return configurator.Configure(configureCtx, runDocument, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: *authorizeHV})
@@ -290,6 +290,8 @@ func executionIdentity(topology dt5215.Topology, connections []janusconfig.Conne
 }
 
 func printDiscoveredDevices(output io.Writer, topology dt5215.Topology) {
+	fmt.Fprintf(output, "concentrator product_id=%d software_revision=%s fpga_revision=%s\n",
+		topology.Concentrator.ProductID, topology.Concentrator.SoftwareRevision, topology.Concentrator.FPGARevision)
 	fmt.Fprintf(output, "devices found=%d\n", len(topology.Boards))
 	for _, board := range topology.Boards {
 		hvFirmware := "unavailable"
@@ -328,7 +330,14 @@ func listenHTTP(address string) (net.Listener, error) {
 }
 
 func topologySnapshot(topology dt5215.Topology) *daqv1.TelemetrySnapshot {
-	snapshot := &daqv1.TelemetrySnapshot{State: daqv1.SystemState_SYSTEM_STATE_IDLE}
+	snapshot := &daqv1.TelemetrySnapshot{
+		State: daqv1.SystemState_SYSTEM_STATE_IDLE,
+		Concentrator: &daqv1.Concentrator{
+			SoftwareRevision: topology.Concentrator.SoftwareRevision,
+			FpgaRevision:     topology.Concentrator.FPGARevision,
+			ProductId:        topology.Concentrator.ProductID,
+		},
+	}
 	boards := make(map[uint16][]*daqv1.Board)
 	for _, board := range topology.Boards {
 		boards[board.Chain] = append(boards[board.Chain], &daqv1.Board{

@@ -5,9 +5,9 @@
 Started on 2026-07-21:
 
 - `task hardware:inspect` validates an already-ready four-link topology and
-  reads board product, FPGA firmware, and acquisition-status registers without
-  any hardware write, reset, enumeration, synchronization, API bind, or run
-  storage mutation;
+  reads DT5215 software/FPGA/PID identity plus board product, FPGA firmware,
+  and acquisition-status registers without any hardware write, reset,
+  enumeration, synchronization, API bind, or run storage mutation;
 - pre-enumeration links cause the read-only check to fail with an explicit
   diagnostic instead of silently crossing into runtime initialization; and
 - the hardware operations guide records provisioning, bounded acquisition,

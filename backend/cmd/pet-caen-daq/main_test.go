@@ -36,7 +36,9 @@ func TestListenHTTPExplainsHowToSelectAnotherPort(t *testing.T) {
 }
 
 func TestTopologySnapshotIncludesEnabledAndDisabledChains(t *testing.T) {
-	var topology dt5215.Topology
+	topology := dt5215.Topology{Concentrator: dt5215.ConcentratorInfo{
+		SoftwareRevision: "2026.4.1.1", FPGARevision: "25.11.24.01-2-2", ProductID: 66643,
+	}}
 	topology.Chains[0] = dt5215.ChainInfo{Status: 3, BoardCount: 1}
 	topology.Boards = []dt5215.BoardInfo{{
 		Chain: 0, Node: 0, ProductID: 5202, FirmwareRevision: 0x050100,
@@ -45,6 +47,9 @@ func TestTopologySnapshotIncludesEnabledAndDisabledChains(t *testing.T) {
 	snapshot := topologySnapshot(topology)
 	if snapshot.State != daqv1.SystemState_SYSTEM_STATE_IDLE || len(snapshot.Chains) != dt5215.MaxChains {
 		t.Fatalf("snapshot = %+v", snapshot)
+	}
+	if snapshot.Concentrator.GetSoftwareRevision() != "2026.4.1.1" || snapshot.Concentrator.GetFpgaRevision() != "25.11.24.01-2-2" || snapshot.Concentrator.GetProductId() != 66643 {
+		t.Fatalf("concentrator = %+v", snapshot.Concentrator)
 	}
 	if !snapshot.Chains[0].Enabled || snapshot.Chains[0].Health != daqv1.HealthStatus_HEALTH_STATUS_OK || len(snapshot.Chains[0].Boards) != 1 {
 		t.Fatalf("enabled chain = %+v", snapshot.Chains[0])
@@ -81,13 +86,16 @@ func TestExecutionIdentityPreservesDiscoveredHardwareEvidence(t *testing.T) {
 }
 
 func TestPrintDiscoveredDevices(t *testing.T) {
-	topology := dt5215.Topology{Boards: []dt5215.BoardInfo{
+	topology := dt5215.Topology{Concentrator: dt5215.ConcentratorInfo{
+		SoftwareRevision: "2026.4.1.1", FPGARevision: "25.11.24.01-2-2", ProductID: 66643,
+	}, Boards: []dt5215.BoardInfo{
 		{Chain: 0, Node: 0, ProductID: 64883, FirmwareRevision: 0x0800a707, HVModuleFirmwareRaw: 0x3f99999a, HVModuleFirmwareVersion: 1.2, HVModuleFirmwareAvailable: true, AcquisitionState: 9},
 		{Chain: 3, Node: 0, ProductID: 64884, FirmwareRevision: 0x0800a707, AcquisitionState: 1},
 	}}
 	var output bytes.Buffer
 	printDiscoveredDevices(&output, topology)
-	want := "devices found=2\n" +
+	want := "concentrator product_id=66643 software_revision=2026.4.1.1 fpga_revision=25.11.24.01-2-2\n" +
+		"devices found=2\n" +
 		"device chain=0 node=0 product_id=64883 fpga_firmware=0x0800a707 hv_module_firmware=1.2 hv_module_firmware_raw=0x3f99999a acquisition_status=0x00000009\n" +
 		"device chain=3 node=0 product_id=64884 fpga_firmware=0x0800a707 hv_module_firmware=unavailable hv_module_firmware_raw=0x00000000 acquisition_status=0x00000001\n"
 	if output.String() != want {

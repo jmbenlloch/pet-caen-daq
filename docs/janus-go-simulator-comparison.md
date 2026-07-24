@@ -38,6 +38,9 @@ The comparison supports these conclusions:
   selector `0x000103fc`, interprets its raw IEEE-754 bits as a version number,
   prints it during connection, and records it in JANUS run information. The
   native backend previously recorded only DT5202 FPGA firmware.
+- JANUS obtains DT5215 software revision, FPGA revision, and PID from `VERS`.
+  Native discovery now decodes the same fixed fields and preserves them in
+  startup logs, system telemetry, and every run manifest.
 - The complete configuration transcripts are **not byte-identical**. JANUS
   issued 1,900 `WREG` requests in the selected configuration cycle and Go
   issued 2,398. JANUS uses `CitirocSlowControl`; Go performs the
