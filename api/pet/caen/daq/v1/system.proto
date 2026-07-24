@@ -25,6 +25,7 @@ service RunService {
   rpc StopRun(StopRunRequest) returns (StopRunResponse) {}
   rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {}
   rpc SearchRuns(SearchRunsRequest) returns (SearchRunsResponse) {}
+  rpc GetRunConfiguration(GetRunConfigurationRequest) returns (GetRunConfigurationResponse) {}
   rpc DownloadArtifact(DownloadArtifactRequest) returns (stream DownloadArtifactResponse) {}
   rpc GetHistograms(GetHistogramsRequest) returns (GetHistogramsResponse) {}
 }
@@ -157,6 +158,15 @@ message SearchRunsRequest {
 message SearchRunsResponse {
   repeated RunSummary runs = 1;
   string next_page_token = 2;
+}
+
+message GetRunConfigurationRequest {
+  string run_id = 1;
+}
+
+message GetRunConfigurationResponse {
+  // Exact JANUS configuration submitted for this run.
+  string janus_configuration = 1;
 }
 
 enum ConfigurationLayer {

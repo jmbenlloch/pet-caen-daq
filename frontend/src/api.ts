@@ -31,6 +31,7 @@ export interface DaqApi {
   ): Promise<TelemetrySnapshot>
   listRuns(limit?: number): Promise<RunSummary[]>
   searchRuns(request: SearchRunsRequest): Promise<SearchRunsResponse>
+  runConfiguration(runId: string): Promise<string>
   downloadArtifact(runId: string, artifactName: string): Promise<Blob>
   histograms(
     runId: string,
@@ -93,6 +94,9 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     },
     async searchRuns(request) {
       return await runs.searchRuns(request)
+    },
+    async runConfiguration(runId) {
+      return (await runs.getRunConfiguration({ runId })).janusConfiguration
     },
     async downloadArtifact(runId, artifactName) {
       const chunks: Uint8Array[] = []
