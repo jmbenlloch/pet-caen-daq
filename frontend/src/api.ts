@@ -49,7 +49,12 @@ export interface DaqApi {
   startStaircase(request: StartStaircaseRequest): Promise<StaircaseScan | undefined>
   startHoldDelay(request: StartHoldDelayScanRequest): Promise<HoldDelayScan | undefined>
   cancelScan(scanId: string, requestedBy: string): Promise<StaircaseScan | undefined>
-  listScans(limit?: number, offset?: number, board?: number, scanType?: ScanType): Promise<ScanHistoryPage>
+  listScans(
+    limit?: number,
+    offset?: number,
+    board?: number,
+    scanType?: ScanType,
+  ): Promise<ScanHistoryPage>
   staircase(scanId: string): Promise<StaircaseScan | undefined>
   holdDelay(scanId: string): Promise<HoldDelayScan | undefined>
 }

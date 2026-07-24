@@ -24,6 +24,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelaystore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
@@ -100,10 +101,11 @@ const (
 
 func (s *RunService) SearchRuns(ctx context.Context, request *connect.Request[daqv1.SearchRunsRequest]) (*connect.Response[daqv1.SearchRunsResponse], error) {
 	runType := request.Msg.GetRunType()
-	if runType != daqv1.RunType_RUN_TYPE_UNSPECIFIED && runType != daqv1.RunType_RUN_TYPE_DATA && runType != daqv1.RunType_RUN_TYPE_STAIRCASE {
+	if runType != daqv1.RunType_RUN_TYPE_UNSPECIFIED && runType != daqv1.RunType_RUN_TYPE_DATA &&
+		runType != daqv1.RunType_RUN_TYPE_STAIRCASE && runType != daqv1.RunType_RUN_TYPE_HOLD_DELAY_SCAN {
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_TYPE", fmt.Errorf("run_type is invalid"))
 	}
-	if s.Catalog == nil && runType != daqv1.RunType_RUN_TYPE_STAIRCASE {
+	if s.Catalog == nil && runType != daqv1.RunType_RUN_TYPE_STAIRCASE && runType != daqv1.RunType_RUN_TYPE_HOLD_DELAY_SCAN {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_CATALOG_UNAVAILABLE", fmt.Errorf("run catalog is not configured"))
 	}
 	message := request.Msg
@@ -172,7 +174,7 @@ func (s *RunService) SearchRuns(ctx context.Context, request *connect.Request[da
 		query.Configuration = append(query.Configuration, converted)
 	}
 	response := &daqv1.SearchRunsResponse{}
-	if runType != daqv1.RunType_RUN_TYPE_STAIRCASE {
+	if runType != daqv1.RunType_RUN_TYPE_STAIRCASE && runType != daqv1.RunType_RUN_TYPE_HOLD_DELAY_SCAN {
 		runs, err := s.Catalog.List(ctx, query)
 		if err != nil {
 			return nil, serviceError(connect.CodeInternal, "RUN_SEARCH_FAILED", err)
@@ -186,13 +188,26 @@ func (s *RunService) SearchRuns(ctx context.Context, request *connect.Request[da
 		}
 	}
 	if runType != daqv1.RunType_RUN_TYPE_DATA && scanCompatibleSearch(message) {
-		manifests, err := staircasestore.List(s.RunParent, 0)
-		if err != nil {
-			return nil, serviceError(connect.CodeInternal, "RUN_SEARCH_INSPECTION_FAILED", err)
+		if runType != daqv1.RunType_RUN_TYPE_HOLD_DELAY_SCAN {
+			manifests, err := staircasestore.List(s.RunParent, 0)
+			if err != nil {
+				return nil, serviceError(connect.CodeInternal, "RUN_SEARCH_INSPECTION_FAILED", err)
+			}
+			for _, manifest := range manifests {
+				if scanMatchesQuery(manifest.StartedAt, manifest.ScanID, manifest.TerminationReason, query) {
+					response.Runs = append(response.Runs, staircaseRunSummary(manifest))
+				}
+			}
 		}
-		for _, manifest := range manifests {
-			if scanMatchesQuery(manifest, query) {
-				response.Runs = append(response.Runs, staircaseRunSummary(manifest))
+		if runType != daqv1.RunType_RUN_TYPE_STAIRCASE {
+			manifests, err := holddelaystore.List(s.RunParent, 0)
+			if err != nil {
+				return nil, serviceError(connect.CodeInternal, "RUN_SEARCH_INSPECTION_FAILED", err)
+			}
+			for _, manifest := range manifests {
+				if scanMatchesQuery(manifest.StartedAt, manifest.ScanID, manifest.TerminationReason, query) {
+					response.Runs = append(response.Runs, holdDelayRunSummary(manifest))
+				}
 			}
 		}
 	}
@@ -351,6 +366,16 @@ func (s *RunService) ListRuns(_ context.Context, request *connect.Request[daqv1.
 			response.Runs = append(response.Runs, summary)
 		}
 	}
+	holdScans, err := holddelaystore.List(s.RunParent, 0)
+	if err != nil {
+		return nil, serviceError(connect.CodeInternal, "RUN_HISTORY_INSPECTION_FAILED", err)
+	}
+	for _, scan := range holdScans {
+		summary := holdDelayRunSummary(scan)
+		if summaryIsBeforeCursor(summary, cursor) {
+			response.Runs = append(response.Runs, summary)
+		}
+	}
 	sort.Slice(response.Runs, func(i, j int) bool {
 		left, right := summaryStartedAt(response.Runs[i]), summaryStartedAt(response.Runs[j])
 		return left > right || left == right && response.Runs[i].GetRunId() > response.Runs[j].GetRunId()
@@ -406,7 +431,10 @@ func (s *RunService) DownloadArtifact(_ context.Context, request *connect.Reques
 	if errors.Is(err, runstore.ErrRunNotFound) || errors.Is(err, runstore.ErrArtifactNotFound) {
 		file, err = staircasestore.OpenArtifact(s.RunParent, runID, name)
 		if errors.Is(err, os.ErrNotExist) {
-			return serviceError(connect.CodeNotFound, "ARTIFACT_NOT_FOUND", err)
+			file, err = holddelaystore.OpenArtifact(s.RunParent, runID, name)
+			if errors.Is(err, os.ErrNotExist) {
+				return serviceError(connect.CodeNotFound, "ARTIFACT_NOT_FOUND", err)
+			}
 		}
 	}
 	if err != nil {
@@ -496,24 +524,44 @@ func staircaseRunSummary(manifest staircasestore.Manifest) *daqv1.RunSummary {
 	return run
 }
 
+func holdDelayRunSummary(manifest holddelaystore.Manifest) *daqv1.RunSummary {
+	run := &daqv1.RunSummary{
+		RunId: manifest.ScanID, RunType: daqv1.RunType_RUN_TYPE_HOLD_DELAY_SCAN,
+		TerminationReason: manifest.TerminationReason,
+		Incomplete:        manifest.CompletedAt == "" || manifest.State == "running",
+	}
+	if value, err := time.Parse(time.RFC3339Nano, manifest.StartedAt); err == nil {
+		run.StartedAt = timestamppb.New(value)
+	}
+	if value, err := time.Parse(time.RFC3339Nano, manifest.CompletedAt); err == nil {
+		run.CompletedAt = timestamppb.New(value)
+	}
+	if artifact := manifest.Artifact; artifact != nil {
+		run.Artifacts = append(run.Artifacts, &daqv1.Artifact{
+			Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256,
+		})
+	}
+	return run
+}
+
 func scanCompatibleSearch(message *daqv1.SearchRunsRequest) bool {
 	return len(message.GetConfiguration()) == 0 && message.RunNumber == nil &&
 		message.MaximumRunNumber == nil && message.GetMinimumEventCount() == 0
 }
 
-func scanMatchesQuery(manifest staircasestore.Manifest, query runcatalog.Query) bool {
-	if query.TerminationReason != "" && manifest.TerminationReason != query.TerminationReason {
+func scanMatchesQuery(startedAt, scanID, terminationReason string, query runcatalog.Query) bool {
+	if query.TerminationReason != "" && terminationReason != query.TerminationReason {
 		return false
 	}
-	if query.StartedAfter != "" && manifest.StartedAt < query.StartedAfter {
+	if query.StartedAfter != "" && startedAt < query.StartedAfter {
 		return false
 	}
-	if query.StartedBefore != "" && manifest.StartedAt > query.StartedBefore {
+	if query.StartedBefore != "" && startedAt > query.StartedBefore {
 		return false
 	}
 	if query.BeforeStartedAt != "" &&
-		(manifest.StartedAt > query.BeforeStartedAt ||
-			manifest.StartedAt == query.BeforeStartedAt && manifest.ScanID >= query.BeforeRunID) {
+		(startedAt > query.BeforeStartedAt ||
+			startedAt == query.BeforeStartedAt && scanID >= query.BeforeRunID) {
 		return false
 	}
 	return true

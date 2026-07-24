@@ -14,17 +14,17 @@ const host = ref<HTMLElement>()
 let plot: uPlot | undefined
 let resizeObserver: ResizeObserver | undefined
 
-function points() {
+function orderedPoints() {
   return [...props.points].sort((a, b) => a.effectiveDelayNs - b.effectiveDelayNs)
 }
 
 function data(): AlignedData {
-  const ordered = points()
+  const ordered = orderedPoints()
   return [ordered.map((point) => point.effectiveDelayNs), ordered.map(() => 0)]
 }
 
 function drawHeatmap(u: uPlot) {
-  const ordered = points()
+  const ordered = orderedPoints()
   if (!ordered.length) return
   const histograms = ordered.map(
     (point) => point.channels.find((item) => item.channel === props.channel)?.highGainBins ?? [],

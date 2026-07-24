@@ -10,6 +10,8 @@ import (
 	"connectrpc.com/connect"
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelaystore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircase"
@@ -129,6 +131,36 @@ func TestRunHistoryIncludesAndFiltersStaircaseScans(t *testing.T) {
 	}
 	found, err := service.SearchRuns(context.Background(), connect.NewRequest(&daqv1.SearchRunsRequest{RunType: daqv1.RunType_RUN_TYPE_STAIRCASE}))
 	if err != nil || len(found.Msg.Runs) != 1 || found.Msg.Runs[0].GetRunType() != daqv1.RunType_RUN_TYPE_STAIRCASE {
+		t.Fatalf("search=%+v error=%v", found, err)
+	}
+}
+
+func TestRunHistoryIncludesAndFiltersHoldDelayScans(t *testing.T) {
+	parent := t.TempDir()
+	request := holddelay.Request{
+		Board: 2, MinimumDelayNS: 0, MaximumDelayNS: 8, StepNS: 8,
+		EventsPerDelay: 10, PointTimeout: time.Second,
+	}
+	writer, err := holddelaystore.Create(parent, holddelaystore.NewManifest("73", 2, "operator", request, time.Date(2026, 7, 24, 13, 0, 0, 0, time.UTC)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Append(holddelay.Point{DelayNS: 8, EffectiveDelay: 8, EventsCollected: 10}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Finalize("2026-07-24T13:00:01Z", "completed", "completed", true); err != nil {
+		t.Fatal(err)
+	}
+	service := &RunService{RunParent: parent}
+	listed, err := service.ListRuns(context.Background(), connect.NewRequest(&daqv1.ListRunsRequest{}))
+	if err != nil || len(listed.Msg.Runs) != 1 ||
+		listed.Msg.Runs[0].GetRunType() != daqv1.RunType_RUN_TYPE_HOLD_DELAY_SCAN {
+		t.Fatalf("runs=%+v error=%v", listed, err)
+	}
+	found, err := service.SearchRuns(context.Background(), connect.NewRequest(
+		&daqv1.SearchRunsRequest{RunType: daqv1.RunType_RUN_TYPE_HOLD_DELAY_SCAN},
+	))
+	if err != nil || len(found.Msg.Runs) != 1 || found.Msg.Runs[0].GetRunId() != "73" {
 		t.Fatalf("search=%+v error=%v", found, err)
 	}
 }

@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { create } from '@bufbuild/protobuf'
-import { computed, ref, type DeepReadonly } from 'vue'
+import { computed, onMounted, ref, watch, type DeepReadonly } from 'vue'
 import type { DaqApi } from './api'
 import HoldDelayPlot from './HoldDelayPlot.vue'
 import {
+  ScanType,
   ScanState,
   StartHoldDelayScanRequestSchema,
   SystemState,
   type HoldDelayScan,
+  type ScanSummary,
 } from './gen/pet/caen/daq/v1/system_pb'
+import { localDateTime } from './presentation'
 
 const props = defineProps<{
   api: DaqApi
@@ -24,12 +27,15 @@ const events = ref(100)
 const timeout = ref(30)
 const channel = ref(0)
 const started = ref<HoldDelayScan>()
+const history = ref<ScanSummary[]>([])
 const busy = ref(false)
 const error = ref('')
 const displayed = computed(() => props.live ?? started.value)
 const running = computed(() => {
   const state = props.live?.summary?.state
-  return state === ScanState.PREPARING || state === ScanState.RUNNING || state === ScanState.RESTORING
+  return (
+    state === ScanState.PREPARING || state === ScanState.RUNNING || state === ScanState.RESTORING
+  )
 })
 
 async function start() {
@@ -59,6 +65,34 @@ async function cancel() {
   if (!id) return
   await props.api.cancelScan(id, 'operator')
 }
+
+async function refresh() {
+  try {
+    history.value = (await props.api.listScans(12, 0, undefined, ScanType.HOLD_DELAY)).scans
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : String(reason)
+  }
+}
+
+async function load(scanId: string) {
+  busy.value = true
+  error.value = ''
+  try {
+    started.value = await props.api.holdDelay(scanId)
+  } catch (reason) {
+    error.value = reason instanceof Error ? reason.message : String(reason)
+  } finally {
+    busy.value = false
+  }
+}
+
+watch(
+  () => props.systemState,
+  (next, previous) => {
+    if (previous === SystemState.SCANNING && next !== SystemState.SCANNING) void refresh()
+  },
+)
+onMounted(refresh)
 </script>
 
 <template>
@@ -78,7 +112,12 @@ async function cancel() {
       <label>Events / delay<input v-model.number="events" type="number" min="10" /></label>
       <label>Timeout (s)<input v-model.number="timeout" type="number" min="1" /></label>
       <div class="actions staircase-actions">
-        <button type="button" class="primary" :disabled="systemState !== SystemState.READY || busy" @click="start">
+        <button
+          type="button"
+          class="primary"
+          :disabled="systemState !== SystemState.READY || busy"
+          @click="start"
+        >
           Start scan
         </button>
         <button v-if="running" type="button" class="danger" @click="cancel">Cancel</button>
@@ -90,13 +129,21 @@ async function cancel() {
     <p v-if="error" class="field-error" role="alert">{{ error }}</p>
     <div v-if="displayed" class="staircase-status">
       <strong>Run {{ displayed.summary?.scanId }}</strong>
-      <span>{{ displayed.summary?.completedPoints }} / {{ displayed.summary?.totalPoints }} points</span>
-      <progress :value="displayed.summary?.completedPoints" :max="displayed.summary?.totalPoints || 1" />
+      <span
+        >{{ displayed.summary?.completedPoints }} /
+        {{ displayed.summary?.totalPoints }} points</span
+      >
+      <progress
+        :value="displayed.summary?.completedPoints"
+        :max="displayed.summary?.totalPoints || 1"
+      />
     </div>
     <label class="staircase-series">
       Channel
       <select v-model.number="channel">
-        <option v-for="number in 64" :key="number - 1" :value="number - 1">Channel {{ number - 1 }}</option>
+        <option v-for="number in 64" :key="number - 1" :value="number - 1">
+          Channel {{ number - 1 }}
+        </option>
       </select>
     </label>
     <HoldDelayPlot
@@ -105,5 +152,31 @@ async function cancel() {
       :channel="channel"
       :theme="theme"
     />
+    <p v-else class="empty">Start a scan or select a finalized scan to plot its spectra.</p>
+    <div class="section-title scan-history-title">
+      <div>
+        <p class="eyebrow">Stored scan datasets</p>
+        <h3>Finalized hold-delay scans</h3>
+      </div>
+      <button type="button" class="link-button" :disabled="busy" @click="refresh">Refresh</button>
+    </div>
+    <div class="scan-history">
+      <div v-if="history.length" class="scan-history-header" aria-hidden="true">
+        <span>Run</span><span>Started</span><span>Board</span><span>Points</span><span>Status</span>
+      </div>
+      <button
+        v-for="scan in history"
+        :key="scan.scanId"
+        type="button"
+        class="secondary"
+        @click="load(scan.scanId)"
+      >
+        <strong data-label="Run">Run {{ scan.scanId }}</strong>
+        <span data-label="Started">{{ localDateTime(scan.startedAt) }}</span>
+        <span data-label="Board">{{ scan.board }}</span>
+        <span data-label="Points">{{ scan.completedPoints }} / {{ scan.totalPoints }}</span>
+        <span data-label="Status" class="scan-history-state">{{ ScanState[scan.state] }}</span>
+      </button>
+    </div>
   </section>
 </template>

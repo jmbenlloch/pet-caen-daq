@@ -41,16 +41,20 @@ func (s *ScanService) StartHoldDelayScan(ctx context.Context, request *connect.R
 		now = s.Now
 	}
 	scanID, err := s.AllocateRunID(ctx)
-	if err != nil || !validRunID.MatchString(scanID) {
+	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("allocate hold-delay scan run number: %w", err))
 	}
-	writer, err := holddelaystore.Create(s.ScanParent, holddelaystore.NewManifest(scanID, domain.Board, actor, domain, now()))
+	if !validRunID.MatchString(scanID) {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("allocated hold-delay scan run number is invalid"))
+	}
+	startedAt := now()
+	writer, err := holddelaystore.Create(s.ScanParent, holddelaystore.NewManifest(scanID, domain.Board, actor, domain, startedAt))
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	scan := &daqv1.HoldDelayScan{
 		Summary: &daqv1.ScanSummary{
-			ScanId: scanID, Board: domain.Board, StartedAt: timestamppb.New(now()),
+			ScanId: scanID, Board: domain.Board, StartedAt: timestamppb.New(startedAt),
 			State: daqv1.ScanState_SCAN_STATE_PREPARING, TotalPoints: domain.PointCount(),
 			ScanType: daqv1.ScanType_SCAN_TYPE_HOLD_DELAY,
 		},
@@ -94,10 +98,16 @@ func (s *ScanService) runHoldDelay(ctx context.Context, actor string, request ho
 	}
 	completedAt := time.Now().UTC()
 	manifestState := strings.ToLower(strings.TrimPrefix(state.String(), "SCAN_STATE_"))
+	finalErr := runErr
 	if err := writer.Finalize(completedAt.Format(time.RFC3339Nano), manifestState, reason, restored); err != nil {
-		state, reason = daqv1.ScanState_SCAN_STATE_FAILED, errors.Join(runErr, err).Error()
+		finalErr = errors.Join(runErr, err)
+		state, reason = daqv1.ScanState_SCAN_STATE_FAILED, finalErr.Error()
 	}
 	s.mu.Lock()
+	if s.active == nil || s.active.holdDelay == nil {
+		s.mu.Unlock()
+		return
+	}
 	scan := s.active.holdDelay
 	scan.Summary.State, scan.Summary.TerminationReason = state, reason
 	scan.Summary.CompletedAt = timestamppb.New(completedAt)
@@ -108,11 +118,18 @@ func (s *ScanService) runHoldDelay(ctx context.Context, actor string, request ho
 	final := cloneHoldDelayScan(scan)
 	s.active = nil
 	s.mu.Unlock()
-	s.publishHoldDelay(nil, stateAfterScan(runErr), final.Summary)
+	s.publishHoldDelay(nil, stateAfterScan(finalErr), final.Summary)
 }
 
 func (s *ScanService) GetHoldDelayScan(_ context.Context, request *connect.Request[daqv1.GetHoldDelayScanRequest]) (*connect.Response[daqv1.GetHoldDelayScanResponse], error) {
-	manifest, points, err := holddelaystore.Read(s.ScanParent, request.Msg.GetScanId())
+	scanID := request.Msg.GetScanId()
+	if s.ScanParent == "" {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("scan history is unavailable"))
+	}
+	if !validRunID.MatchString(scanID) {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("a valid scan_id is required"))
+	}
+	manifest, points, err := holddelaystore.Read(s.ScanParent, scanID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, err)
 	}
