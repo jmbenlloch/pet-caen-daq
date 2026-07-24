@@ -95,6 +95,39 @@ h2 {
   grid-column: 2;
   font-weight: 500;
 }
+.hardware-connection-action {
+  min-width: 168px;
+  border: 1px solid #51647d;
+  border-radius: 8px;
+  padding: 9px 15px;
+  color: #eef4fb;
+  background: #1a293c;
+  box-shadow: 0 3px 10px #02081335;
+  font-size: 0.8rem;
+  font-weight: 800;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    transform 120ms ease;
+}
+.hardware-connection-action.connect {
+  border-color: #2bb48c;
+  color: #041b14;
+  background: #38c99e;
+}
+.hardware-connection-action.disconnect {
+  border-color: #754153;
+  color: #ffd4dc;
+  background: #3a1d28;
+}
+.hardware-connection-action:not(:disabled):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+.hardware-connection-action:focus-visible {
+  outline: 3px solid #68b9ff70;
+  outline-offset: 2px;
+}
 .status-dot,
 .health-dot {
   width: 9px;
@@ -1492,6 +1525,16 @@ textarea {
 [data-theme='light'] .parameter-copy label,
 [data-theme='light'] .statistics-summary strong {
   color: #17243a;
+}
+[data-theme='light'] .hardware-connection-action.connect {
+  border-color: #168f70;
+  color: #063e2f;
+  background: #a9ead6;
+}
+[data-theme='light'] .hardware-connection-action.disconnect {
+  border-color: #d19aa6;
+  color: #8e293c;
+  background: #fde8ec;
 }
 [data-theme='light'] .fields label,
 [data-theme='light'] .config-heading label,

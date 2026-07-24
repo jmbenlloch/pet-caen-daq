@@ -15,13 +15,13 @@ async function* pendingTelemetry() {
   await new Promise(() => undefined)
 }
 
-function dashboardApi(): DaqApi {
+function dashboardApi(state = SystemState.READY): DaqApi {
   return {
     snapshot: vi.fn().mockResolvedValue(
       create(TelemetrySnapshotSchema, {
         instanceId: 'backend-test',
         sequence: 7n,
-        state: SystemState.READY,
+        state,
         statistics: {
           elapsedMilliseconds: 2000n,
           boards: [
@@ -96,6 +96,34 @@ function dashboardApi(): DaqApi {
 }
 
 describe('operator dashboard', () => {
+  it('shows one hardware action matching the current connection state', async () => {
+    const connectedApi = dashboardApi(SystemState.READY)
+    const connected = mount(App, { props: { api: connectedApi } })
+    await flushPromises()
+
+    const disconnect = connected.get('.hardware-connection-action')
+    expect(connected.findAll('.hardware-connection-action')).toHaveLength(1)
+    expect(disconnect.text()).toBe('Disconnect hardware')
+    expect(disconnect.classes()).toContain('disconnect')
+    await disconnect.trigger('click')
+    expect(connectedApi.disconnectHardware).toHaveBeenCalledWith('operator')
+    expect(connectedApi.connectHardware).not.toHaveBeenCalled()
+    connected.unmount()
+
+    const disconnectedApi = dashboardApi(SystemState.DISCONNECTED)
+    const disconnected = mount(App, { props: { api: disconnectedApi } })
+    await flushPromises()
+
+    const connect = disconnected.get('.hardware-connection-action')
+    expect(disconnected.findAll('.hardware-connection-action')).toHaveLength(1)
+    expect(connect.text()).toBe('Connect hardware')
+    expect(connect.classes()).toContain('connect')
+    await connect.trigger('click')
+    expect(disconnectedApi.connectHardware).toHaveBeenCalledWith('operator')
+    expect(disconnectedApi.disconnectHardware).not.toHaveBeenCalled()
+    disconnected.unmount()
+  })
+
   it('separates operator tasks into keyboard-accessible workspace tabs', async () => {
     const wrapper = mount(App, { attachTo: document.body, props: { api: dashboardApi() } })
     await flushPromises()
