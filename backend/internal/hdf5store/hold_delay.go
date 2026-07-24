@@ -29,6 +29,10 @@ type holdDelayMissingRow struct {
 }
 
 func WriteHoldDelay(path string, metadata []byte, points []holddelay.Point) (err error) {
+	compression, err := histogramCompressionName()
+	if err != nil {
+		return err
+	}
 	file, err := hdf5.CreateFile(path, hdf5.F_ACC_EXCL)
 	if err != nil {
 		return fmt.Errorf("create hold-delay HDF5: %w", err)
@@ -50,17 +54,17 @@ func WriteHoldDelay(path string, metadata []byte, points []holddelay.Point) (err
 	if err := createBytes(group, "metadata_json", metadata); err != nil {
 		return err
 	}
-	pointDataset, err := createTable(group, "points", compoundHoldDelayPoint())
+	pointDataset, err := createTable(group, "points", compoundHoldDelayPoint(), compression)
 	if err != nil {
 		return err
 	}
 	defer pointDataset.Close()
-	binDataset, err := createTable(group, "nonzero_hg_bins", compoundHoldDelayBin())
+	binDataset, err := createTable(group, "nonzero_hg_bins", compoundHoldDelayBin(), compression)
 	if err != nil {
 		return err
 	}
 	defer binDataset.Close()
-	missingDataset, err := createTable(group, "missing_channels", compoundHoldDelayMissing())
+	missingDataset, err := createTable(group, "missing_channels", compoundHoldDelayMissing(), compression)
 	if err != nil {
 		return err
 	}
