@@ -21,7 +21,7 @@ const props = defineProps<{
 }>()
 const board = ref(0)
 const minimum = ref(0)
-const maximum = ref(300)
+const maximum = ref(256)
 const step = ref(8)
 const events = ref(100)
 const timeout = ref(30)
@@ -92,6 +92,13 @@ watch(
     if (previous === SystemState.SCANNING && next !== SystemState.SCANNING) void refresh()
   },
 )
+watch(
+  () => props.live,
+  (next) => {
+    if (next) started.value = next as HoldDelayScan
+  },
+  { deep: true },
+)
 onMounted(refresh)
 </script>
 
@@ -124,7 +131,7 @@ onMounted(refresh)
       </div>
     </div>
     <p class="muted">
-      JANUS recommends 0–300 ns in 8 ns increments. Color intensity is logarithmic event count.
+      JANUS defaults to 0–256 ns in 8 ns increments. Color intensity is logarithmic event count.
     </p>
     <p v-if="error" class="field-error" role="alert">{{ error }}</p>
     <div v-if="displayed" class="staircase-status">

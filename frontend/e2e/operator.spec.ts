@@ -107,6 +107,31 @@ test('start reports structured validation feedback before hardware mutation', as
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
 })
 
+test('hold-delay scan plots spectra produced by the simulator', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
+  await page.getByRole('tab', { name: /Scans/ }).click()
+
+  const scan = page.getByRole('region', { name: 'Hold delay scan' })
+  await expect(scan.getByRole('spinbutton', { name: 'Maximum (ns)' })).toHaveValue('256')
+  await scan.getByRole('spinbutton', { name: 'Maximum (ns)' }).fill('8')
+  await scan.getByRole('spinbutton', { name: 'Events / delay' }).fill('10')
+  await scan.getByRole('button', { name: 'Start scan' }).click()
+  const runLabel = scan.locator('.staircase-status strong')
+  await expect(runLabel).toHaveText(/^Run \d+$/)
+  const runName = (await runLabel.textContent())!
+
+  await expect(scan.getByRole('img', { name: 'Hold delay heatmap for channel 0' })).toBeVisible({
+    timeout: 10_000,
+  })
+  await expect(scan.getByRole('progressbar')).toHaveAttribute('value', '2', { timeout: 10_000 })
+  await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
+  await expect(scan.getByRole('img', { name: 'Hold delay heatmap for channel 0' })).toBeVisible()
+  await expect(scan.locator('canvas').first()).toBeVisible()
+  const storedScan = scan.locator('.scan-history > button').filter({ hasText: runName })
+  await expect(storedScan).toContainText('COMPLETED')
+})
+
 test('backend automatically stops runs at time and event presets while manual stop remains available', async ({
   page,
 }) => {

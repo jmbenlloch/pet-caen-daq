@@ -49,7 +49,7 @@ func (c *HoldDelayCoordinator) Run(ctx context.Context, request holddelay.Reques
 	if !ok {
 		return false, fmt.Errorf("board %d is not configured", request.Board)
 	}
-	if target.Plan.Pedestal.AcquisitionMode != 1 {
+	if !hasSpectroscopy(target.Plan.Pedestal.AcquisitionMode) {
 		return false, fmt.Errorf("hold-delay scan requires SPECTROSCOPY acquisition mode")
 	}
 	if _, err = c.states.Move(StateScanning, actor); err != nil {
@@ -85,4 +85,8 @@ func (c *HoldDelayCoordinator) Run(ctx context.Context, request holddelay.Reques
 	range14 := acquisitionControl&(1<<21) != 0
 	err = holddelay.Run(ctx, c.hardware, target.Chain, target.Node, request, range14, observe)
 	return restored, err
+}
+
+func hasSpectroscopy(acquisitionMode uint32) bool {
+	return acquisitionMode&1 != 0
 }
