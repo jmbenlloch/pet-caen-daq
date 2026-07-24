@@ -128,6 +128,19 @@ func (w *RunWriter) SaveHistograms(histograms []runstore.HistogramDataset) error
 	return nil
 }
 
+func (w *RunWriter) SaveStatistics(statistics runstore.RunStatistics) error {
+	if w.closed {
+		return errors.New("run writer is closed")
+	}
+	if w.manifest.Statistics != nil {
+		return errors.New("run statistics are already saved")
+	}
+	copy := statistics
+	copy.Boards = append([]runstore.BoardStatistics(nil), statistics.Boards...)
+	w.manifest.Statistics = &copy
+	return nil
+}
+
 func (w *RunWriter) EnableRawCapture() error {
 	if w.closed {
 		return errors.New("run writer is closed")

@@ -8,6 +8,7 @@ import (
 
 	"connectrpc.com/connect"
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 )
@@ -25,6 +26,15 @@ func TestRunHistory(t *testing.T) {
 	if err := writer.Append(runstore.Envelope{Kind: "test", Payload: []byte(`{"value":54}`)}); err != nil {
 		t.Fatal(err)
 	}
+	statistics := runstore.RunStatistics{
+		ElapsedMilliseconds: 60_000,
+		Boards: []runstore.BoardStatistics{{
+			Chain: 1, Node: 2, TriggerCount: 17, LostTriggerCount: 3,
+		}},
+	}
+	if err := writer.SaveStatistics(statistics); err != nil {
+		t.Fatal(err)
+	}
 	if err := writer.Finalize("2026-07-21T10:01:00Z", "operator_stop"); err != nil {
 		t.Fatal(err)
 	}
@@ -36,6 +46,13 @@ func TestRunHistory(t *testing.T) {
 	}
 	if len(listed.Msg.Runs) != 1 || listed.Msg.Runs[0].GetRunId() != "54" || listed.Msg.Runs[0].GetEventCount() != 1 || listed.Msg.Runs[0].GetIncomplete() {
 		t.Fatalf("runs = %+v", listed.Msg.Runs)
+	}
+	final := listed.Msg.Runs[0].GetFinalStatistics()
+	if final.GetElapsedMilliseconds() != 60_000 || len(final.GetBoards()) != 1 ||
+		final.GetBoards()[0].GetChain() != 1 || final.GetBoards()[0].GetNode() != 2 ||
+		final.GetBoards()[0].GetTriggerCount() != 17 || final.GetBoards()[0].GetLostTriggerCount() != 3 ||
+		len(final.GetBoards()[0].GetChannelTriggerCounts()) != dt5202.ChannelCount {
+		t.Fatalf("final statistics = %+v", final)
 	}
 	configuration, err := service.GetRunConfiguration(context.Background(), connect.NewRequest(&daqv1.GetRunConfigurationRequest{RunId: "54"}))
 	if err != nil || configuration.Msg.GetJanusConfiguration() != "HV_Vbias 55.0\nStopRunMode MANUAL\n" {

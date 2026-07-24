@@ -84,11 +84,17 @@ inspection skips it because the peripheral read requires selector writes.
 
 The Statistics tab now consumes cumulative run evidence published with each
 complete telemetry snapshot. It provides JANUS-equivalent all-board timestamp,
-trigger ID/rate, lost-trigger percentage, event-build percentage, and data-rate
-columns; per-board 64-channel trigger, timestamp, and PHA views; and an Integral
-switch between cumulative counts and latest-interval rates. Typed global cards
-show pipeline, persistence, and elapsed-run statistics without resetting or
-commanding the active acquisition when the display mode changes.
+trigger ID/rate, lost-trigger percentage, T-OR rate, and data-rate columns;
+per-board 64-channel trigger, timestamp, and PHA views; and an Integral switch
+between cumulative counts and latest-interval rates. Successful finalization
+stores the drained cumulative snapshot in the authoritative run manifest for
+both JSON and HDF5 event storage. `RunSummary` exposes those final values, and
+the Statistics tab can switch between live telemetry and any completed run
+that contains a snapshot. Historical board rates are full-run averages and
+are shown beside their totals; historical channel values switch between final
+cumulative counts and full-run average rates. Typed global cards show pipeline,
+persistence, and elapsed-run statistics without resetting or commanding the
+active acquisition when the display mode changes.
 
 Run stop policy is now enforced by the backend from the submitted JANUS
 `StopRunMode`, `PresetTime`, and `PresetCounts` settings. Positive unit-aware

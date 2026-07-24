@@ -61,8 +61,9 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	if runOptions.PersistHistograms && !histogramPersistenceSupported() {
 		return nil, fmt.Errorf("histogram persistence requires an HDF5-enabled build")
 	}
+	startedAt := options.Now()
 	writer, err := createRunWriter(options.Parent, runstore.Manifest{
-		RunID: runID, StartedAt: options.Now().UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
+		RunID: runID, StartedAt: startedAt.UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
 		PersistHistograms:      runOptions.PersistHistograms,
 		HDF5SegmentSizeBytes:   runOptions.HDF5SegmentSizeBytes,
@@ -85,7 +86,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 			return nil, err
 		}
 	}
-	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, persistHistograms: runOptions.PersistHistograms, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: options.Now(), histogramOptions: runOptions.Histograms, histograms: make(map[histogramKey]*histogramAccumulator)}
+	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, persistHistograms: runOptions.PersistHistograms, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: startedAt, histogramOptions: runOptions.Histograms, histograms: make(map[histogramKey]*histogramAccumulator)}
 	pipeline, err := acquisition.NewPipeline(options.Capacity, options.Backpressure, sink)
 	if err != nil {
 		_ = writer.Abort()
@@ -126,12 +127,13 @@ func backpressureName(policy acquisition.BackpressurePolicy) string {
 }
 
 type Session struct {
-	pipeline  *acquisition.Pipeline
-	writer    runWriter
-	sink      *sink
-	mu        sync.Mutex
-	lastErr   error
-	finalized bool
+	pipeline   *acquisition.Pipeline
+	writer     runWriter
+	sink       *sink
+	mu         sync.Mutex
+	lastErr    error
+	finalized  bool
+	statistics *runstore.RunStatistics
 }
 
 type StorageStats struct {
@@ -158,13 +160,27 @@ func (s *Session) Close() error {
 }
 
 func (s *Session) Finalize(completedAt, reason string) error {
+	completed, err := time.Parse(time.RFC3339Nano, completedAt)
+	if err != nil {
+		err = fmt.Errorf("parse run completion time: %w", err)
+		s.recordError(err)
+		return err
+	}
+	statistics := s.FinalStatisticsAt(completed)
+	if err := s.writer.SaveStatistics(statistics); err != nil {
+		s.recordError(err)
+		return err
+	}
+	s.mu.Lock()
+	s.statistics = cloneRunStatistics(statistics)
+	s.mu.Unlock()
 	if s.sink.persistHistograms {
 		if err := s.writer.SaveHistograms(s.sink.HistogramSnapshot()); err != nil {
 			s.recordError(err)
 			return err
 		}
 	}
-	err := s.writer.Finalize(completedAt, reason)
+	err = s.writer.Finalize(completedAt, reason)
 	s.mu.Lock()
 	if err != nil {
 		s.lastErr = err
@@ -345,6 +361,48 @@ func accumulateChannels(board *BoardStats, event dt5202.Event) {
 
 func (s *Session) StatisticsElapsed() time.Duration {
 	return s.sink.now().Sub(s.sink.startedAt)
+}
+
+func (s *Session) FinalStatistics() runstore.RunStatistics {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.statistics != nil {
+		return *cloneRunStatistics(*s.statistics)
+	}
+	return s.FinalStatisticsAt(s.sink.now())
+}
+
+func (s *Session) FinalStatisticsAt(completedAt time.Time) runstore.RunStatistics {
+	elapsed := completedAt.Sub(s.sink.startedAt).Milliseconds()
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	boards := s.sink.BoardStats()
+	result := runstore.RunStatistics{
+		ElapsedMilliseconds: uint64(elapsed),
+		Boards:              make([]runstore.BoardStatistics, 0, len(boards)),
+	}
+	for _, board := range boards {
+		persisted := runstore.BoardStatistics{
+			Chain: board.Chain, Node: board.Node, Timestamp: board.Timestamp,
+			TriggerID: board.TriggerID, TriggerCount: board.TriggerCount,
+			LostTriggerCount: board.LostTriggerCount, DataBytes: board.DataBytes,
+			TORCount: board.TORCount,
+		}
+		for channel := range dt5202.ChannelCount {
+			persisted.ChannelTriggerCounts[channel] = runstore.JSONUint64(board.ChannelTriggerCount[channel])
+			persisted.TimestampCounts[channel] = runstore.JSONUint64(board.TimestampCount[channel])
+			persisted.PHACounts[channel] = runstore.JSONUint64(board.PHACount[channel])
+		}
+		result.Boards = append(result.Boards, persisted)
+	}
+	return result
+}
+
+func cloneRunStatistics(statistics runstore.RunStatistics) *runstore.RunStatistics {
+	copy := statistics
+	copy.Boards = append([]runstore.BoardStatistics(nil), statistics.Boards...)
+	return &copy
 }
 
 func (s *sink) BoardStats() []BoardStats {

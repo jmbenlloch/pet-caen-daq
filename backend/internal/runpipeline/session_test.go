@@ -183,8 +183,22 @@ func TestSessionAccumulatesBoardAndChannelStatistics(t *testing.T) {
 	if err := session.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.Abort(); err != nil {
+	if err := session.Finalize(time.Unix(102, 0).UTC().Format(time.RFC3339Nano), "operator_stop"); err != nil {
 		t.Fatal(err)
+	}
+	manifest, err := runstore.ReadManifest(session.Directory(), "statistics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Statistics == nil || manifest.Statistics.ElapsedMilliseconds != 2000 || len(manifest.Statistics.Boards) != 1 {
+		t.Fatalf("persisted statistics = %+v", manifest.Statistics)
+	}
+	persisted := manifest.Statistics.Boards[0]
+	if persisted.Chain != 1 || persisted.Node != 2 || persisted.TriggerCount != 2 ||
+		persisted.LostTriggerCount != 2 || persisted.TriggerID != 13 || persisted.Timestamp != 1100 ||
+		persisted.DataBytes != 40 || persisted.ChannelTriggerCounts[3] != 2 ||
+		persisted.TimestampCounts[3] != 2 || persisted.PHACounts[7] != 2 {
+		t.Fatalf("persisted board statistics = %+v", persisted)
 	}
 }
 

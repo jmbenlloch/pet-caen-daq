@@ -1,7 +1,7 @@
 import { create } from '@bufbuild/protobuf'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import { StatisticsTelemetrySchema } from './gen/pet/caen/daq/v1/system_pb'
+import { RunSummarySchema, StatisticsTelemetrySchema } from './gen/pet/caen/daq/v1/system_pb'
 import StatisticsTab from './StatisticsTab.vue'
 
 function sample(elapsed: bigint, triggerCount: bigint, channelCount: bigint, chain = 0) {
@@ -33,7 +33,7 @@ describe('StatisticsTab', () => {
     expect(wrapper.text()).toContain('T-OR rate')
     expect(wrapper.text()).not.toContain('Event build')
     expect(wrapper.text()).toContain('Select a board for per-channel metrics.')
-    expect(wrapper.find('select').exists()).toBe(false)
+    expect(wrapper.find('.statistics-channel-toolbar select').exists()).toBe(false)
 
     await wrapper.setProps({ statistics: sample(2000n, 15n, 7n) })
     expect(wrapper.text()).toContain('10.0 Hz')
@@ -46,7 +46,7 @@ describe('StatisticsTab', () => {
     await wrapper.get('input[type="checkbox"]').setValue(true)
     expect(wrapper.get('.channel-statistic').text()).toBe('CH 07')
 
-    await wrapper.get('select').setValue('phaCounts')
+    await wrapper.get('.statistics-channel-toolbar select').setValue('phaCounts')
     expect(wrapper.text()).toContain('PHA integrated count')
   })
 
@@ -69,5 +69,42 @@ describe('StatisticsTab', () => {
     expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('All boards')
     expect(wrapper.text()).toContain('B1')
     expect(wrapper.find('.channel-statistics').exists()).toBe(false)
+  })
+
+  it('selects a completed run and presents its fixed final statistics', async () => {
+    const historical = sample(10_000n, 40n, 12n)
+    const wrapper = mount(StatisticsTab, {
+      props: {
+        statistics: sample(2_000n, 15n, 7n),
+        liveRunId: '43',
+        runs: [
+          create(RunSummarySchema, {
+            runId: '42',
+            eventCount: 40n,
+            finalStatistics: historical,
+          }),
+          create(RunSummarySchema, { runId: 'legacy' }),
+        ],
+      },
+    })
+
+    const source = wrapper.get('#statistics-run')
+    expect(source.findAll('option')).toHaveLength(2)
+    expect(source.text()).toContain('Live · Run 43')
+    expect(source.text()).toContain('Run 42 · final')
+
+    await source.setValue('42')
+    expect(wrapper.text()).toContain('Final run snapshot')
+    expect(wrapper.text()).toContain('40 decoded events')
+    expect(wrapper.text()).toContain('4.0 Hz')
+    expect(wrapper.text()).toContain('40 total')
+
+    await wrapper.findAll('[role="tab"]')[1].trigger('click')
+    expect(wrapper.get('.channel-statistic').text()).toBe('CH 01.2 Hz')
+    expect(wrapper.text()).toContain('average rate over the completed run')
+
+    await wrapper.get('input[type="checkbox"]').setValue(true)
+    expect(wrapper.get('.channel-statistic').text()).toBe('CH 012')
+    expect(wrapper.text()).toContain('integrated count')
   })
 })

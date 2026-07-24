@@ -3,6 +3,7 @@ import { computed, ref, watch, type DeepReadonly } from 'vue'
 import type {
   BoardStatistics,
   PipelineTelemetry,
+  RunSummary,
   StatisticsTelemetry,
   StorageTelemetry,
 } from './gen/pet/caen/daq/v1/system_pb'
@@ -12,24 +13,43 @@ const props = defineProps<{
   statistics?: DeepReadonly<StatisticsTelemetry>
   pipeline?: DeepReadonly<PipelineTelemetry>
   storage?: DeepReadonly<StorageTelemetry>
+  runs?: readonly DeepReadonly<RunSummary>[]
+  liveRunId?: string
 }>()
 
 type Metric = 'channelTriggerCounts' | 'timestampCounts' | 'phaCounts'
 const metric = ref<Metric>('channelTriggerCounts')
 const integral = ref(false)
 const selectedBoard = ref<number | 'all'>('all')
+const selectedRunId = ref('live')
 const previous = ref<DeepReadonly<StatisticsTelemetry>>()
-
-watch(
-  () => props.statistics,
-  (next, old) => {
-    if (next && old && next.elapsedMilliseconds > old.elapsedMilliseconds) previous.value = old
-    else if (!next || !old || next.elapsedMilliseconds < old.elapsedMilliseconds)
-      previous.value = undefined
-  },
+const historicalRuns = computed(() => props.runs?.filter((run) => run.finalStatistics) ?? [])
+const selectedRun = computed(() =>
+  selectedRunId.value === 'live'
+    ? undefined
+    : historicalRuns.value.find((run) => run.runId === selectedRunId.value),
+)
+const viewingHistorical = computed(() => selectedRunId.value !== 'live')
+const displayedStatistics = computed(() =>
+  viewingHistorical.value ? selectedRun.value?.finalStatistics : props.statistics,
 )
 
-const boards = computed(() => props.statistics?.boards ?? [])
+watch(displayedStatistics, (next, old) => {
+  if (!viewingHistorical.value && next && old && next.elapsedMilliseconds > old.elapsedMilliseconds)
+    previous.value = old
+  else if (!next || !old || next.elapsedMilliseconds < old.elapsedMilliseconds)
+    previous.value = undefined
+})
+
+watch(historicalRuns, (runs) => {
+  if (
+    selectedRunId.value !== 'live' &&
+    !runs.some((candidate) => candidate.runId === selectedRunId.value)
+  )
+    selectedRunId.value = 'live'
+})
+
+const boards = computed(() => displayedStatistics.value?.boards ?? [])
 const active = computed(() =>
   selectedBoard.value === 'all'
     ? undefined
@@ -51,13 +71,16 @@ function prior(board: DeepReadonly<BoardStatistics>) {
 }
 
 function elapsedSeconds() {
-  const current = Number(props.statistics?.elapsedMilliseconds ?? 0n)
-  const baseline = integral.value ? 0 : Number(previous.value?.elapsedMilliseconds ?? current)
+  const current = Number(displayedStatistics.value?.elapsedMilliseconds ?? 0n)
+  const baseline =
+    integral.value || viewingHistorical.value
+      ? 0
+      : Number(previous.value?.elapsedMilliseconds ?? current)
   return Math.max((current - baseline) / 1000, 0)
 }
 
 function difference(value: bigint, before: bigint | undefined) {
-  if (integral.value) return value
+  if (integral.value || viewingHistorical.value) return value
   return value >= (before ?? value) ? value - (before ?? value) : value
 }
 
@@ -83,7 +106,11 @@ function boardRate(
   const seconds = elapsedSeconds()
   if (seconds <= 0) return '—'
   const value = difference(board[field], prior(board)?.[field])
-  return field === 'dataBytes' ? `${bytes(value)}/s` : `${(Number(value) / seconds).toFixed(1)} Hz`
+  const rate =
+    field === 'dataBytes' ? `${bytes(value)}/s` : `${(Number(value) / seconds).toFixed(1)} Hz`
+  if (!viewingHistorical.value) return rate
+  const total = field === 'dataBytes' ? bytes(value) : compact(value)
+  return `${rate} · ${total} total`
 }
 
 function timestampSeconds(timestamp: bigint) {
@@ -129,20 +156,29 @@ const metricDescription = computed(
   <section class="statistics panel" aria-labelledby="statistics-heading">
     <div class="section-title statistics-title">
       <div>
-        <p class="eyebrow">Live runtime view</p>
+        <p class="eyebrow">{{ viewingHistorical ? 'Final run snapshot' : 'Live runtime view' }}</p>
         <h2 id="statistics-heading">Statistics</h2>
       </div>
-      <p class="statistics-controls-hint">
-        {{
-          selectedBoard === 'all'
-            ? 'Select a board for per-channel metrics.'
-            : `Viewing Board ${selectedBoard} channels`
-        }}
-      </p>
+      <div class="statistics-source">
+        <label for="statistics-run">Data source</label>
+        <select id="statistics-run" v-model="selectedRunId">
+          <option value="live">Live{{ liveRunId ? ` · Run ${liveRunId}` : '' }}</option>
+          <option v-for="run in historicalRuns" :key="run.runId" :value="run.runId">
+            Run {{ run.runId }} · final
+          </option>
+        </select>
+      </div>
     </div>
+    <p class="statistics-controls-hint">
+      {{
+        selectedBoard === 'all'
+          ? 'Select a board for per-channel metrics.'
+          : `Viewing Board ${selectedBoard} channels`
+      }}
+    </p>
 
     <div class="statistics-overview-row">
-      <div class="statistics-summary" aria-label="Global statistics">
+      <div v-if="!viewingHistorical" class="statistics-summary" aria-label="Global statistics">
         <span
           ><strong>{{ compact(pipeline?.decodedEvents) }}</strong> decoded events</span
         >
@@ -157,9 +193,29 @@ const metricDescription = computed(
         >
         <span
           ><strong
-            >{{ (Number(statistics?.elapsedMilliseconds ?? 0n) / 1000).toFixed(1) }} s</strong
+            >{{
+              (Number(displayedStatistics?.elapsedMilliseconds ?? 0n) / 1000).toFixed(1)
+            }}
+            s</strong
           >
           elapsed</span
+        >
+      </div>
+      <div v-else class="statistics-summary" aria-label="Historical run statistics">
+        <span
+          ><strong>{{ compact(selectedRun?.eventCount) }}</strong> decoded events</span
+        >
+        <span
+          ><strong
+            >{{
+              (Number(displayedStatistics?.elapsedMilliseconds ?? 0n) / 1000).toFixed(1)
+            }}
+            s</strong
+          >
+          elapsed</span
+        >
+        <span
+          ><strong>Run {{ selectedRun?.runId }}</strong> finalized snapshot</span
         >
       </div>
 
@@ -228,7 +284,13 @@ const metricDescription = computed(
             <td>{{ boardRate(board, 'dataBytes') }}</td>
           </tr>
           <tr v-if="!boards.length">
-            <td colspan="7" class="empty">Statistics become available while a run is active.</td>
+            <td colspan="7" class="empty">
+              {{
+                viewingHistorical
+                  ? 'No final statistics are available for this run.'
+                  : 'Statistics become available while a run is active.'
+              }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -245,7 +307,13 @@ const metricDescription = computed(
       </div>
       <p class="statistics-caption">
         {{ metricLabel }}
-        {{ integral ? 'integrated count' : 'rate over the latest telemetry interval' }}
+        {{
+          integral
+            ? 'integrated count'
+            : viewingHistorical
+              ? 'average rate over the completed run'
+              : 'rate over the latest telemetry interval'
+        }}
       </p>
     </div>
 
@@ -274,12 +342,16 @@ const metricDescription = computed(
         <div>
           <dt>Interval mode</dt>
           <dd>
-            The default view shows rates calculated between the two latest telemetry snapshots.
+            Live data shows rates calculated between the two latest telemetry snapshots. Historical
+            board-level rates are averages over the completed run.
           </dd>
         </div>
         <div>
           <dt>Cumulative counts</dt>
-          <dd>Shows totals accumulated since the current run started instead of live rates.</dd>
+          <dd>
+            Shows totals accumulated since the selected run started. Turn it off to show historical
+            channel averages over the completed run.
+          </dd>
         </div>
       </dl>
     </details>

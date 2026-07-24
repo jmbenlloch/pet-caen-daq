@@ -1406,6 +1406,8 @@ onMounted(() => daq.connect())
           :statistics="daq.snapshot.value?.statistics"
           :pipeline="daq.snapshot.value?.pipeline"
           :storage="daq.snapshot.value?.storage"
+          :runs="daq.runHistory.value"
+          :live-run-id="daq.snapshot.value?.currentRun?.runId"
         />
       </div>
 

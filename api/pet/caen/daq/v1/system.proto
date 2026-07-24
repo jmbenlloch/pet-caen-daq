@@ -345,6 +345,9 @@ message RunSummary {
   string stop_mode = 9;
   uint64 preset_time_milliseconds = 10;
   uint64 preset_event_count = 11;
+  // Final cumulative statistics for a completed run. Absent for active,
+  // incomplete, and legacy runs that predate statistics persistence.
+  StatisticsTelemetry final_statistics = 12;
 }
 
 message Artifact {
