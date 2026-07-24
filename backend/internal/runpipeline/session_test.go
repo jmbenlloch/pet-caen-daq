@@ -195,7 +195,7 @@ func TestSessionAccumulatesTORCounters(t *testing.T) {
 		t.Fatal(err)
 	}
 	session := created.(*Session)
-	counting := dt5202.Event{Kind: dt5202.EventCounting, Counting: &dt5202.CountingEvent{TORCount: 17}}
+	counting := dt5202.Event{Kind: dt5202.EventCounting, Counting: &dt5202.CountingEvent{TriggerID: 1, TORCount: 17}}
 	if err := session.sink.AppendEvent(dt5215.StreamEvent{Descriptor: dt5215.Descriptor{TriggerID: 1}, Payload: make([]byte, 4)}, counting); err != nil {
 		t.Fatal(err)
 	}
