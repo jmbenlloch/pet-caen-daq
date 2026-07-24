@@ -15,6 +15,7 @@ const (
 	ChannelCount  = 64
 	BinCount      = 512
 	MaxPointCount = 64
+	stopSettle    = 100 * time.Millisecond
 )
 
 type Hardware interface {
@@ -122,15 +123,28 @@ func scanPoint(ctx context.Context, hardware Hardware, chain, node uint16, reque
 	if readback != registerValue {
 		return point, fmt.Errorf("delay %d ns readback %d does not match %d", delay, readback, registerValue)
 	}
-	if err := hardware.SendCommand(ctx, chain, node, dt5215.CommandAcquisitionStart, 0); err != nil {
+	if err := hardware.SendCommand(ctx, chain, node, dt5215.CommandAcquisitionStart, dt5215.TDLCommandDelay); err != nil {
 		return point, fmt.Errorf("delay %d ns start acquisition: %w", delay, err)
 	}
 	defer func() {
 		stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 		defer cancel()
-		stopErr := hardware.SendCommand(stopCtx, chain, node, dt5215.CommandAcquisitionStop, 0)
+		stopErr := hardware.SendCommand(stopCtx, chain, node, dt5215.CommandAcquisitionStop, dt5215.TDLCommandDelay)
 		if stopErr != nil {
 			stopErr = fmt.Errorf("delay %d ns stop acquisition: %w", delay, stopErr)
+		} else {
+			timer := time.NewTimer(stopSettle)
+			select {
+			case <-stopCtx.Done():
+				stopErr = stopCtx.Err()
+			case <-timer.C:
+			}
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
 		}
 		err = errors.Join(err, stopErr)
 	}()

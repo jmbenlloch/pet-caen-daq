@@ -6,11 +6,13 @@ import (
 	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 )
 
 type fakeHardware struct {
 	writes   []dt5202.RegisterWrite
 	commands []uint32
+	delays   []uint32
 }
 
 func (f *fakeHardware) WriteRegister(_ context.Context, _, _ uint16, address, value uint32) error {
@@ -26,8 +28,9 @@ func (f *fakeHardware) ReadRegister(_ context.Context, _, _ uint16, address uint
 	}
 	return 5, nil
 }
-func (f *fakeHardware) SendCommand(_ context.Context, _, _ uint16, command, _ uint32) error {
+func (f *fakeHardware) SendCommand(_ context.Context, _, _ uint16, command, delay uint32) error {
 	f.commands = append(f.commands, command)
+	f.delays = append(f.delays, delay)
 	return nil
 }
 
@@ -63,5 +66,10 @@ func TestRunScansDescendingAndReportsRates(t *testing.T) {
 		hardware.commands[1] != uint32(dt5202.CommandConfigureASIC) ||
 		hardware.commands[2] != uint32(dt5202.CommandResetPeriodicTrigger) {
 		t.Fatalf("commands = %#v", hardware.commands)
+	}
+	for index, delay := range hardware.delays {
+		if delay != dt5215.TDLCommandDelay {
+			t.Fatalf("command %d delay = %d, want %d", index, delay, dt5215.TDLCommandDelay)
+		}
 	}
 }
