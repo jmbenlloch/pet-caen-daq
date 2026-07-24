@@ -21,6 +21,7 @@ type Hardware interface {
 	WriteRegister(context.Context, uint16, uint16, uint32, uint32) error
 	ReadRegister(context.Context, uint16, uint16, uint32) (uint32, error)
 	SendCommand(context.Context, uint16, uint16, uint32, uint32) error
+	Synchronize(context.Context) error
 	ReadRawStreamBatch(context.Context) ([]byte, []dt5215.StreamEvent, error)
 	ClearStream(context.Context) error
 }
@@ -87,6 +88,9 @@ func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Req
 	}
 	if err := request.Validate(); err != nil {
 		return err
+	}
+	if err := hardware.Synchronize(ctx); err != nil {
+		return fmt.Errorf("synchronize before hold-delay scan: %w", err)
 	}
 	for delay := request.MinimumDelayNS; delay <= request.MaximumDelayNS; delay += request.StepNS {
 		point, pointErr := scanPoint(ctx, hardware, chain, node, request, delay, range14)

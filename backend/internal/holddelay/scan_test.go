@@ -11,9 +11,10 @@ import (
 )
 
 type fakeHardware struct {
-	registers map[uint32]uint32
-	events    []dt5215.StreamEvent
-	commands  []uint32
+	registers    map[uint32]uint32
+	events       []dt5215.StreamEvent
+	commands     []uint32
+	synchronized bool
 }
 
 func (f *fakeHardware) WriteRegister(_ context.Context, _, _ uint16, address, value uint32) error {
@@ -25,6 +26,10 @@ func (f *fakeHardware) ReadRegister(_ context.Context, _, _ uint16, address uint
 }
 func (f *fakeHardware) SendCommand(_ context.Context, _, _ uint16, command, _ uint32) error {
 	f.commands = append(f.commands, command)
+	return nil
+}
+func (f *fakeHardware) Synchronize(context.Context) error {
+	f.synchronized = true
 	return nil
 }
 func (*fakeHardware) ClearStream(context.Context) error { return nil }
@@ -77,5 +82,8 @@ func TestRunCollectsHighGainDistributionsAtEveryDelay(t *testing.T) {
 	}
 	if len(hardware.commands) != 4 || hardware.commands[0] != dt5215.CommandAcquisitionStart || hardware.commands[1] != dt5215.CommandAcquisitionStop {
 		t.Fatalf("commands = %v", hardware.commands)
+	}
+	if !hardware.synchronized {
+		t.Fatal("hold-delay scan did not synchronize before acquisition")
 	}
 }
