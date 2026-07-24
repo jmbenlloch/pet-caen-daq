@@ -892,19 +892,6 @@ onMounted(() => daq.connect())
 
           <div class="actions">
             <button
-              class="secondary"
-              type="button"
-              :disabled="
-                daq.busy.value ||
-                !configuration ||
-                configurationErrors.length > 0 ||
-                !!stopPolicyError
-              "
-              @click="daq.validate(configuration)"
-            >
-              Validate
-            </button>
-            <button
               class="primary"
               type="button"
               :disabled="

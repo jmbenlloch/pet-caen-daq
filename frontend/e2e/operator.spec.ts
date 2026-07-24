@@ -82,14 +82,12 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await expect(page.getByLabel('Stored runs').getByText(runId, { exact: true })).toBeVisible()
 })
 
-test('operator receives structured validation feedback before hardware mutation', async ({
-  page,
-}) => {
+test('start reports structured validation feedback before hardware mutation', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await page.getByRole('button', { name: 'View raw configuration' }).click()
   await page.getByLabel('JANUS configuration source').fill('Open TDlink 0 0')
-  await page.getByRole('button', { name: 'Validate' }).click()
+  await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByLabel('Validation issues')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
 })

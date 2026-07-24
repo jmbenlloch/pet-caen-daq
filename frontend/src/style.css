@@ -802,12 +802,9 @@ select:focus {
 }
 .switch input[type='checkbox']:checked {
   border-color: #3acb9f;
-  background:
-    linear-gradient(135deg, transparent 43%, #062018 43% 56%, transparent 56%) 2px 7px / 6px 6px
-      no-repeat,
-    linear-gradient(45deg, transparent 42%, #062018 42% 57%, transparent 57%) 6px 5px / 8px 8px
-      no-repeat,
-    #3acb9f;
+  background: #3acb9f
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23062018' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.25' d='m3.25 8.25 3 3 6.5-6.5'/%3E%3C/svg%3E")
+    center / 13px 13px no-repeat;
 }
 .switch input[type='checkbox']:focus-visible {
   outline: 3px solid #f1c66d;
@@ -1385,12 +1382,9 @@ textarea {
 }
 [data-theme='light'] .switch input[type='checkbox']:checked {
   border-color: #168f70;
-  background:
-    linear-gradient(135deg, transparent 43%, #ffffff 43% 56%, transparent 56%) 2px 7px / 6px 6px
-      no-repeat,
-    linear-gradient(45deg, transparent 42%, #ffffff 42% 57%, transparent 57%) 6px 5px / 8px 8px
-      no-repeat,
-    #168f70;
+  background: #168f70
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.25' d='m3.25 8.25 3 3 6.5-6.5'/%3E%3C/svg%3E")
+    center / 13px 13px no-repeat;
 }
 [data-theme='light'] .field-range,
 [data-theme='light'] .unit {
