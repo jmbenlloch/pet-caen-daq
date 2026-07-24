@@ -54,6 +54,20 @@ docker run --rm --network host \
   pet-caen-daq:latest
 ```
 
+To build and start the complete local test system (simulator, backend, and
+frontend development server) in Docker:
+
+```sh
+task docker:local:up
+task docker:local:logs
+```
+
+Open `http://localhost:5173`. This workflow runs Vite's development server with
+source hot reload and proxies its API requests to the backend container on port
+8080. Run artifacts persist in the Compose-managed volume across restarts. Use
+`task docker:local:status` to inspect the services and
+`task docker:local:down` to stop them without deleting run data.
+
 Production images write numbered `run_<run-id>.0000.h5` decoded-event segments
 instead of `events.jsonl`. The image contains the checked-in production sample configuration, so it can
 also be started directly from Docker Desktop without first creating a bind

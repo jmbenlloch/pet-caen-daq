@@ -112,6 +112,32 @@ tasks:
           IMAGE: "{{.IMAGE}}"
       - docker push "{{.IMAGE}}"
 
+  docker:local:up:
+    desc: Build and start the simulator, backend, and frontend dev server on localhost:5173
+    vars:
+      IMAGE: '{{default "pet-caen-daq:latest" .IMAGE}}'
+    cmds:
+      - task: container:build
+        vars:
+          IMAGE: "{{.IMAGE}}"
+      - PET_CAEN_BUILD_IMAGE="{{.BUILD_IMAGE}}" PET_CAEN_RUNTIME_IMAGE="{{.IMAGE}}" PET_CAEN_UID="$(id -u)" PET_CAEN_GID="$(id -g)" docker compose -f deploy/local/compose.yml up --detach
+      - echo "PET CAEN test system is starting at http://localhost:5173"
+
+  docker:local:down:
+    desc: Stop the local simulator-backed system while preserving run data
+    cmds:
+      - docker compose -f deploy/local/compose.yml down
+
+  docker:local:logs:
+    desc: Follow simulator and backend logs for the local test system
+    cmds:
+      - docker compose -f deploy/local/compose.yml logs --follow
+
+  docker:local:status:
+    desc: Show the local simulator-backed containers
+    cmds:
+      - docker compose -f deploy/local/compose.yml ps
+
   dev:frontend:
     desc: Start the frontend development server (proxies API to localhost:8080)
     cmds:

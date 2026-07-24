@@ -52,6 +52,11 @@ function dashboardApi(): DaqApi {
               },
             ],
           },
+          {
+            index: 1,
+            enabled: false,
+            health: HealthStatus.UNKNOWN,
+          },
         ],
       }),
     ),
@@ -187,6 +192,8 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     expect(wrapper.get('#system-heading').text()).toBe('Ready')
+    expect(wrapper.text()).toContain('1 enabled link')
+    expect(wrapper.text()).not.toContain('2 enabled links')
     expect(wrapper.text()).toContain('DT5202 · node 0')
     expect(wrapper.text()).toContain('24.5 °C')
     expect(wrapper.get('#history-heading').text()).toBe('Run history')

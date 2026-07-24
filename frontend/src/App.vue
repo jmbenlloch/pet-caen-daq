@@ -273,6 +273,12 @@ const configuredStopPolicy = computed(() => {
 })
 
 const state = computed(() => stateLabel[daq.snapshot.value?.state ?? 0])
+const enabledLinkCount = computed(
+  () => daq.snapshot.value?.chains.filter((chain) => chain.enabled).length ?? 0,
+)
+const enabledLinkLabel = computed(
+  () => `${enabledLinkCount.value} enabled link${enabledLinkCount.value === 1 ? '' : 's'}`,
+)
 const boards = computed(() =>
   (daq.snapshot.value?.chains ?? []).flatMap((chain) =>
     chain.boards.map((board) => ({ chain: chain.index, ...board })),
@@ -557,7 +563,7 @@ onMounted(() => daq.connect())
           <h2 id="system-heading">{{ state }}</h2>
           <p class="muted">
             Sequence {{ compact(daq.snapshot.value?.sequence) }} ·
-            {{ daq.snapshot.value?.chains.length ?? 0 }} provisioned links
+            {{ enabledLinkLabel }}
           </p>
         </div>
         <div v-if="daq.snapshot.value?.currentRun" class="run-now">
@@ -892,7 +898,7 @@ onMounted(() => daq.connect())
               ><input v-model="journalTransport" type="checkbox" /> Journal socket evidence</label
             >
           </div>
-          <label class="field">
+          <label class="field run-storage-field">
             <span>HDF5 file size (MiB)</span>
             <input
               v-model.number="hdf5SegmentSizeMb"
