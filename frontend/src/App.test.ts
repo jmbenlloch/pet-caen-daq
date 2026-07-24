@@ -83,14 +83,17 @@ function dashboardApi(state = SystemState.READY): DaqApi {
     setHighVoltage: vi
       .fn()
       .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.READY })),
-    listRuns: vi.fn().mockResolvedValue([
-      create(RunSummarySchema, {
-        runId: 'run-54',
-        eventCount: 256n,
-        terminationReason: 'operator_stop',
-        artifacts: [{ kind: 'decoded_events', name: 'events.jsonl', sizeBytes: 4096n }],
-      }),
-    ]),
+    listRuns: vi.fn().mockResolvedValue({
+      runs: [
+        create(RunSummarySchema, {
+          runId: 'run-54',
+          eventCount: 256n,
+          terminationReason: 'operator_stop',
+          artifacts: [{ kind: 'decoded_events', name: 'events.jsonl', sizeBytes: 4096n }],
+        }),
+      ],
+      nextPageToken: '',
+    }),
     searchRuns: vi.fn().mockResolvedValue({ runs: [], nextPageToken: '' }),
     runConfiguration: vi.fn().mockResolvedValue('HV_Vbias 55.0\nStopRunMode MANUAL'),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),

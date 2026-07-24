@@ -1425,6 +1425,15 @@ onMounted(() => daq.connect())
           :configuration="api.runConfiguration"
           :download-artifact="daq.downloadArtifact"
         />
+        <button
+          v-if="!daq.searchPerformed.value && daq.runHistoryNextPageToken.value"
+          class="link-button load-more"
+          type="button"
+          :disabled="daq.runHistoryLoading.value"
+          @click="daq.loadMoreHistory"
+        >
+          {{ daq.runHistoryLoading.value ? 'Loading…' : 'Load more' }}
+        </button>
       </section>
 
       <div

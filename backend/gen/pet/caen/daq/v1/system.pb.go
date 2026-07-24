@@ -1449,7 +1449,9 @@ func (x *StopRunResponse) GetSnapshot() *TelemetrySnapshot {
 type ListRunsRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Zero uses the server default. Servers may enforce a lower maximum.
-	Limit         uint32 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	Limit uint32 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	// Opaque cursor returned by the preceding response.
+	PageToken     string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1491,10 +1493,19 @@ func (x *ListRunsRequest) GetLimit() uint32 {
 	return 0
 }
 
+func (x *ListRunsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
 type ListRunsResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Runs are ordered newest first using completion time, then start time and ID.
-	Runs          []*RunSummary `protobuf:"bytes,1,rep,name=runs,proto3" json:"runs,omitempty"`
+	// Runs are ordered newest first using start time, then ID.
+	Runs []*RunSummary `protobuf:"bytes,1,rep,name=runs,proto3" json:"runs,omitempty"`
+	// Empty when there are no more runs.
+	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1534,6 +1545,13 @@ func (x *ListRunsResponse) GetRuns() []*RunSummary {
 		return x.Runs
 	}
 	return nil
+}
+
+func (x *ListRunsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
 }
 
 type SearchRunsRequest struct {
@@ -4525,11 +4543,14 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\frequested_by\x18\x02 \x01(\tR\vrequestedBy\"\x80\x01\n" +
 	"\x0fStopRunResponse\x12-\n" +
 	"\x03run\x18\x01 \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x03run\x12>\n" +
-	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"'\n" +
+	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"F\n" +
 	"\x0fListRunsRequest\x12\x14\n" +
-	"\x05limit\x18\x01 \x01(\rR\x05limit\"C\n" +
+	"\x05limit\x18\x01 \x01(\rR\x05limit\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tR\tpageToken\"k\n" +
 	"\x10ListRunsResponse\x12/\n" +
-	"\x04runs\x18\x01 \x03(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x04runs\"\xac\x04\n" +
+	"\x04runs\x18\x01 \x03(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x04runs\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xac\x04\n" +
 	"\x11SearchRunsRequest\x12M\n" +
 	"\rconfiguration\x18\x01 \x03(\v2'.pet.caen.daq.v1.ConfigurationPredicateR\rconfiguration\x12?\n" +
 	"\rstarted_after\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\fstartedAfter\x12A\n" +

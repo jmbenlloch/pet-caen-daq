@@ -24,22 +24,16 @@ const props = withDefaults(
     runs: readonly RunRecord[]
     configuration: (runId: string) => Promise<string>
     downloadArtifact: (runId: string, artifactName: string) => Promise<void>
-    pageSize?: number
     label?: string
   }>(),
-  { pageSize: 10, label: 'Stored runs' },
+  { label: 'Stored runs' },
 )
 
-const page = ref(1)
 const selectedRunId = ref('')
 const configurations = ref<Record<string, string>>({})
 const configurationLoading = ref('')
 const configurationErrors = ref<Record<string, string>>({})
-const pageCount = computed(() => Math.max(1, Math.ceil(props.runs.length / props.pageSize)))
-const visibleRuns = computed(() => {
-  const start = (page.value - 1) * props.pageSize
-  return props.runs.slice(start, start + props.pageSize)
-})
+const visibleRuns = computed(() => props.runs)
 const configurationSections = computed(() => {
   const source = configurations.value[selectedRunId.value]
   if (!source) return []
@@ -55,7 +49,6 @@ const configurationSections = computed(() => {
 watch(
   () => props.runs,
   () => {
-    if (page.value > pageCount.value) page.value = pageCount.value
     if (selectedRunId.value && !props.runs.some((run) => run.runId === selectedRunId.value))
       selectedRunId.value = ''
   },
@@ -345,10 +338,5 @@ function maskChannels(field: ConfigurationField) {
       </table>
     </div>
     <p v-else class="empty">No stored runs found.</p>
-    <nav v-if="pageCount > 1" class="run-pagination" aria-label="Run history pages">
-      <button type="button" :disabled="page === 1" @click="page--">Previous</button>
-      <span>Page {{ page }} of {{ pageCount }} · {{ runs.length }} runs</span>
-      <button type="button" :disabled="page === pageCount" @click="page++">Next</button>
-    </nav>
   </div>
 </template>
