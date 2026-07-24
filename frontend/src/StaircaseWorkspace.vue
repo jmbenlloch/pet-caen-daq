@@ -10,10 +10,12 @@ import {
   type StaircaseScan,
 } from './gen/pet/caen/daq/v1/system_pb'
 import { localDateTime } from './presentation'
+import StaircasePlot from './StaircasePlot.vue'
 
 const props = defineProps<{
   api: DaqApi
   systemState: SystemState
+  theme: 'dark' | 'light'
   live?: DeepReadonly<StaircaseScan>
 }>()
 
@@ -118,32 +120,6 @@ watch(
   },
 )
 onMounted(refresh)
-
-const plot = computed(() => {
-  const points = [...(displayed.value?.points ?? [])].sort((a, b) => a.threshold - b.threshold)
-  const values = points.map((point) => {
-    if (selectedSeries.value === 'tor') return point.tOrRateCps
-    if (selectedSeries.value === 'qor') return point.qOrRateCps
-    const channel = Number(selectedSeries.value.split(':')[1])
-    return point.channelRatesCps[channel] ?? 0
-  })
-  if (!points.length)
-    return { polyline: '', labels: [] as { x: number; text: string }[], maximum: 1 }
-  const minX = points[0].threshold
-  const maxX = points.at(-1)?.threshold ?? minX
-  const maximumValue = Math.max(1, ...values)
-  const x = (value: number) => 45 + ((value - minX) / Math.max(1, maxX - minX)) * 710
-  const y = (value: number) => 270 - (value / maximumValue) * 235
-  return {
-    polyline: points.map((point, index) => `${x(point.threshold)},${y(values[index])}`).join(' '),
-    labels: [
-      { x: 45, text: String(minX) },
-      { x: 400, text: String(Math.round((minX + maxX) / 2)) },
-      { x: 755, text: String(maxX) },
-    ],
-    maximum: maximumValue,
-  }
-})
 </script>
 
 <template>
@@ -213,23 +189,12 @@ const plot = computed(() => {
         <option value="qor">Q-OR</option>
       </select>
     </label>
-    <svg
+    <StaircasePlot
       v-if="displayed?.points.length"
-      class="staircase-plot"
-      viewBox="0 0 800 320"
-      role="img"
-      aria-label="Trigger rate by coarse threshold"
-    >
-      <line x1="45" y1="270" x2="755" y2="270" />
-      <line x1="45" y1="35" x2="45" y2="270" />
-      <polyline :points="plot.polyline" />
-      <text x="10" y="40">{{ plot.maximum.toPrecision(4) }} cps</text>
-      <text x="10" y="274">0</text>
-      <text v-for="label in plot.labels" :key="label.x" :x="label.x" y="295" text-anchor="middle">
-        {{ label.text }}
-      </text>
-      <text x="400" y="315" text-anchor="middle">Coarse threshold (DAC)</text>
-    </svg>
+      :points="displayed.points"
+      :series-key="selectedSeries"
+      :theme="theme"
+    />
     <p v-else class="empty">Start a scan or select a finalized scan to plot its measured rates.</p>
 
     <div class="section-title scan-history-title">

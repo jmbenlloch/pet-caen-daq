@@ -1452,6 +1452,7 @@ onMounted(() => daq.connect())
         <StaircaseWorkspace
           :api="api"
           :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
+          :theme="theme"
           :live="daq.snapshot.value?.currentStaircase"
         />
       </div>

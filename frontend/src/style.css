@@ -43,28 +43,25 @@
   gap: 0.75rem;
 }
 
+.staircase-plot-shell,
 .staircase-plot {
-  width: 100%;
-  min-height: 18rem;
-  border: 1px solid #34465f;
-  border-radius: 0.75rem;
-  background: #0d1929;
+  min-width: 0;
 }
 
-.staircase-plot line {
-  stroke: #60728b;
+.staircase-plot {
+  overflow-x: auto;
 }
 
-.staircase-plot polyline {
-  fill: none;
-  stroke: #4fb3ff;
-  stroke-width: 2.5;
-  vector-effect: non-scaling-stroke;
+.staircase-plot .uplot {
+  font-family: inherit;
 }
 
-.staircase-plot text {
-  fill: #a8b8ca;
-  font-size: 12px;
+.staircase-plot .u-title {
+  color: #d9e4f2;
+}
+
+.staircase-plot .u-legend {
+  color: #a9bad0;
 }
 
 .scan-history-title {
@@ -147,21 +144,9 @@
   background: #2a1d43;
 }
 
-[data-theme='light'] .staircase-plot {
-  border-color: #bac8d8;
-  background: #fff;
-}
-
-[data-theme='light'] .staircase-plot line {
-  stroke: #718096;
-}
-
-[data-theme='light'] .staircase-plot polyline {
-  stroke: #006dc2;
-}
-
-[data-theme='light'] .staircase-plot text {
-  fill: #40536b;
+[data-theme='light'] .staircase-plot .u-title,
+[data-theme='light'] .staircase-plot .u-legend {
+  color: #344c66;
 }
 
 [data-theme='light'] .scan-history {

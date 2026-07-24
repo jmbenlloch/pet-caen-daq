@@ -11,6 +11,15 @@ import {
 } from './gen/pet/caen/daq/v1/system_pb'
 import { localDateTime } from './presentation'
 
+vi.mock('uplot', () => {
+  class MockPlot {
+    setData = vi.fn()
+    setSize = vi.fn()
+    destroy = vi.fn()
+  }
+  return { default: MockPlot }
+})
+
 const stored = create(StaircaseScanSchema, {
   summary: {
     scanId: '42',
@@ -38,7 +47,7 @@ function api(): DaqApi {
 describe('StaircaseWorkspace', () => {
   it('uses the standard plots panel treatment and primary scan action', () => {
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: api(), systemState: SystemState.READY },
+      props: { api: api(), systemState: SystemState.READY, theme: 'dark' },
     })
 
     expect(wrapper.get('section').classes()).toEqual(
@@ -52,14 +61,16 @@ describe('StaircaseWorkspace', () => {
   it('loads and plots a finalized scan', async () => {
     const client = api()
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: client, systemState: SystemState.READY },
+      props: { api: client, systemState: SystemState.READY, theme: 'dark' },
     })
     await flushPromises()
     await wrapper.get('.scan-history button').trigger('click')
     await flushPromises()
     expect(client.listScans).toHaveBeenCalledWith(100)
     expect(client.staircase).toHaveBeenCalledWith('42')
-    expect(wrapper.get('.staircase-plot polyline').attributes('points')).toContain(',')
+    expect(wrapper.get('.staircase-plot').attributes('aria-label')).toContain(
+      'trigger rate by coarse threshold',
+    )
     expect(wrapper.text()).toContain('Run 42')
     expect(wrapper.text()).toContain(localDateTime(stored.summary?.startedAt))
     expect(wrapper.get('.scan-history-header').text()).toContain('Started')
@@ -79,7 +90,7 @@ describe('StaircaseWorkspace', () => {
       ),
     )
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: client, systemState: SystemState.READY },
+      props: { api: client, systemState: SystemState.READY, theme: 'dark' },
     })
     await flushPromises()
 
@@ -96,7 +107,7 @@ describe('StaircaseWorkspace', () => {
       points: [{ threshold: 250, channelRatesCps: [42] }],
     })
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: api(), systemState: SystemState.SCANNING, live },
+      props: { api: api(), systemState: SystemState.SCANNING, theme: 'dark', live },
     })
     expect(wrapper.find('.staircase-plot').exists()).toBe(true)
     expect(wrapper.text()).toContain('1 / 10 points')
