@@ -26,8 +26,11 @@ const step = ref(5)
 const dwellMilliseconds = ref(500)
 const selectedSeries = ref('channel:0')
 const history = ref<ScanSummary[]>([])
+const historyBoard = ref('any')
 const historyPage = ref(1)
 const historyPageSize = 8
+const historyTotal = ref(0)
+const scanBoards = [0, 1, 2, 3]
 const finalized = ref<StaircaseScan>()
 const busy = ref(false)
 const error = ref('')
@@ -41,20 +44,36 @@ const running = computed(
     props.live?.summary?.state === ScanState.RESTORING,
 )
 const historyPageCount = computed(() =>
-  Math.max(1, Math.ceil(history.value.length / historyPageSize)),
+  Math.max(1, Math.ceil(historyTotal.value / historyPageSize)),
 )
-const visibleHistory = computed(() => {
-  const start = (historyPage.value - 1) * historyPageSize
-  return history.value.slice(start, start + historyPageSize)
-})
+let historyRequest = 0
 
 async function refresh() {
+  const request = ++historyRequest
   try {
-    history.value = await props.api.listScans(100)
-    historyPage.value = 1
+    const boardFilter = historyBoard.value === 'any' ? undefined : Number(historyBoard.value)
+    const response = await props.api.listScans(
+      historyPageSize,
+      (historyPage.value - 1) * historyPageSize,
+      boardFilter,
+    )
+    if (request !== historyRequest) return
+    history.value = response.scans
+    historyTotal.value = response.totalCount
+    const lastPage = Math.max(1, Math.ceil(response.totalCount / historyPageSize))
+    if (historyPage.value > lastPage) {
+      historyPage.value = lastPage
+      await refresh()
+    }
   } catch (reason) {
+    if (request !== historyRequest) return
     error.value = reason instanceof Error ? reason.message : String(reason)
   }
+}
+
+function selectHistoryPage(page: number) {
+  historyPage.value = page
+  void refresh()
 }
 
 function scanRunLabel(scanId: string) {
@@ -116,9 +135,16 @@ async function load(scanId: string) {
 watch(
   () => props.systemState,
   (next, previous) => {
-    if (previous === SystemState.SCANNING && next !== SystemState.SCANNING) void refresh()
+    if (previous === SystemState.SCANNING && next !== SystemState.SCANNING) {
+      historyPage.value = 1
+      void refresh()
+    }
   },
 )
+watch(historyBoard, () => {
+  historyPage.value = 1
+  void refresh()
+})
 onMounted(refresh)
 </script>
 
@@ -202,10 +228,25 @@ onMounted(refresh)
         <p class="eyebrow">Stored scan datasets</p>
         <h3>Finalized staircases</h3>
       </div>
-      <button type="button" class="link-button" :disabled="busy" @click="refresh">Refresh</button>
+      <div class="scan-history-tools">
+        <label>
+          Board
+          <select v-model="historyBoard" aria-label="Filter scans by board">
+            <option value="any">Any board</option>
+            <option
+              v-for="boardNumber in scanBoards"
+              :key="boardNumber"
+              :value="String(boardNumber)"
+            >
+              Board {{ boardNumber }}
+            </option>
+          </select>
+        </label>
+        <button type="button" class="link-button" :disabled="busy" @click="refresh">Refresh</button>
+      </div>
     </div>
     <div class="scan-history">
-      <div v-if="visibleHistory.length" class="scan-history-header" aria-hidden="true">
+      <div v-if="history.length" class="scan-history-header" aria-hidden="true">
         <span>Run</span>
         <span>Started</span>
         <span>Board</span>
@@ -213,7 +254,7 @@ onMounted(refresh)
         <span>Status</span>
       </div>
       <button
-        v-for="scan in visibleHistory"
+        v-for="scan in history"
         :key="scan.scanId"
         type="button"
         class="secondary"
@@ -227,9 +268,19 @@ onMounted(refresh)
       </button>
     </div>
     <nav v-if="historyPageCount > 1" class="run-pagination" aria-label="Scan history pages">
-      <button type="button" :disabled="historyPage === 1" @click="historyPage--">Previous</button>
+      <button
+        type="button"
+        :disabled="historyPage === 1"
+        @click="selectHistoryPage(historyPage - 1)"
+      >
+        Previous
+      </button>
       <span>Page {{ historyPage }} of {{ historyPageCount }}</span>
-      <button type="button" :disabled="historyPage === historyPageCount" @click="historyPage++">
+      <button
+        type="button"
+        :disabled="historyPage === historyPageCount"
+        @click="selectHistoryPage(historyPage + 1)"
+      >
         Next
       </button>
     </nav>

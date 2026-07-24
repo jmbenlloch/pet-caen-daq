@@ -37,7 +37,7 @@ const stored = create(StaircaseScanSchema, {
 
 function api(): DaqApi {
   return {
-    listScans: vi.fn().mockResolvedValue([stored.summary]),
+    listScans: vi.fn().mockResolvedValue({ scans: [stored.summary], totalCount: 1 }),
     staircase: vi.fn().mockResolvedValue(stored),
     startStaircase: vi.fn().mockResolvedValue(undefined),
     cancelScan: vi.fn().mockResolvedValue(undefined),
@@ -66,7 +66,7 @@ describe('StaircaseWorkspace', () => {
     await flushPromises()
     await wrapper.get('.scan-history button').trigger('click')
     await flushPromises()
-    expect(client.listScans).toHaveBeenCalledWith(100)
+    expect(client.listScans).toHaveBeenCalledWith(8, 0, undefined)
     expect(client.staircase).toHaveBeenCalledWith('42')
     expect(wrapper.get('.staircase-plot').attributes('aria-label')).toContain(
       'trigger rate by coarse threshold',
@@ -81,14 +81,16 @@ describe('StaircaseWorkspace', () => {
 
   it('paginates finalized scans eight at a time', async () => {
     const client = api()
-    vi.mocked(client.listScans).mockResolvedValue(
-      Array.from({ length: 9 }, (_, index) =>
-        create(ScanSummarySchema, {
-          scanId: String(100 - index),
-          startedAt: { seconds: BigInt(1_784_741_400 - index), nanos: 0 },
-        }),
-      ),
+    const scans = Array.from({ length: 9 }, (_, index) =>
+      create(ScanSummarySchema, {
+        scanId: String(100 - index),
+        startedAt: { seconds: BigInt(1_784_741_400 - index), nanos: 0 },
+      }),
     )
+    vi.mocked(client.listScans).mockImplementation(async (limit = 8, offset = 0) => ({
+      scans: scans.slice(offset, offset + limit),
+      totalCount: scans.length,
+    }))
     const wrapper = mount(StaircaseWorkspace, {
       props: { api: client, systemState: SystemState.READY, theme: 'dark' },
     })
@@ -97,8 +99,44 @@ describe('StaircaseWorkspace', () => {
     expect(wrapper.findAll('.scan-history > button')).toHaveLength(8)
     expect(wrapper.text()).toContain('Page 1 of 2')
     await wrapper.get('[aria-label="Scan history pages"] button:last-child').trigger('click')
+    await flushPromises()
+    expect(client.listScans).toHaveBeenLastCalledWith(8, 8, undefined)
     expect(wrapper.findAll('.scan-history > button')).toHaveLength(1)
     expect(wrapper.text()).toContain('Run 92')
+  })
+
+  it('filters scan history by board before pagination', async () => {
+    const client = api()
+    const scans = [
+      create(ScanSummarySchema, { scanId: '12', board: 0 }),
+      create(ScanSummarySchema, { scanId: '11', board: 2 }),
+      create(ScanSummarySchema, { scanId: '10', board: 2 }),
+    ]
+    vi.mocked(client.listScans).mockImplementation(async (_limit, _offset, boardFilter) => {
+      const matching =
+        boardFilter === undefined ? scans : scans.filter((scan) => scan.board === boardFilter)
+      return { scans: matching, totalCount: matching.length }
+    })
+    const wrapper = mount(StaircaseWorkspace, {
+      props: { api: client, systemState: SystemState.READY, theme: 'dark' },
+    })
+    await flushPromises()
+
+    const filter = wrapper.get('[aria-label="Filter scans by board"]')
+    expect(filter.findAll('option').map((option) => option.text())).toEqual([
+      'Any board',
+      'Board 0',
+      'Board 1',
+      'Board 2',
+      'Board 3',
+    ])
+    await filter.setValue('2')
+    await flushPromises()
+    expect(client.listScans).toHaveBeenLastCalledWith(8, 0, 2)
+    expect(wrapper.findAll('.scan-history > button')).toHaveLength(2)
+    expect(wrapper.text()).toContain('Run 11')
+    expect(wrapper.text()).toContain('Run 10')
+    expect(wrapper.text()).not.toContain('Run 12')
   })
 
   it('plots live telemetry points', () => {

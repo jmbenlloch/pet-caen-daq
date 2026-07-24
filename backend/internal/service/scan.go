@@ -167,11 +167,17 @@ func (s *ScanService) ListScans(_ context.Context, request *connect.Request[daqv
 	if limit < 1 || limit > 100 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("limit must be between 1 and 100"))
 	}
-	manifests, err := staircasestore.List(s.ScanParent, limit)
+	offset := int(request.Msg.GetOffset())
+	var board *uint32
+	if request.Msg.Board != nil {
+		value := request.Msg.GetBoard()
+		board = &value
+	}
+	manifests, total, err := staircasestore.ListPage(s.ScanParent, limit, offset, board)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	response := &daqv1.ListScansResponse{}
+	response := &daqv1.ListScansResponse{TotalCount: uint32(total)}
 	for _, manifest := range manifests {
 		response.Scans = append(response.Scans, protoSummary(manifest))
 	}
