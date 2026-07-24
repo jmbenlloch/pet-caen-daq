@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { maskBits, masksFromBits } from './configuration'
+import { useEscapeClose } from './useEscapeClose'
 
 export interface MaskVariant {
   target: string
@@ -18,6 +19,8 @@ const selected = computed(
 const bits = ref(maskBits(selected.value.low, selected.value.high))
 watch(target, () => (bits.value = maskBits(selected.value.low, selected.value.high)))
 const enabled = computed(() => bits.value.filter(Boolean).length)
+
+useEscapeClose(() => emit('close'))
 
 function setAll(value: boolean) {
   bits.value = Array.from({ length: 64 }, () => value)

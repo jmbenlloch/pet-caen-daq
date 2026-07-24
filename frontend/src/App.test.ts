@@ -99,23 +99,24 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     const acquisition = wrapper.get('#workspace-tab-acquisition')
-    const monitoring = wrapper.get('#workspace-tab-monitoring')
+    const statistics = wrapper.get('#workspace-tab-statistics')
     expect(acquisition.attributes('aria-selected')).toBe('true')
     expect(wrapper.get('#workspace-panel-acquisition').isVisible()).toBe(true)
-    expect(wrapper.get('#workspace-panel-monitoring').isVisible()).toBe(false)
+    expect(wrapper.get('#workspace-panel-statistics').isVisible()).toBe(false)
+    expect(wrapper.get('#workspace-panel-plots').isVisible()).toBe(false)
 
     await acquisition.trigger('keydown', { key: 'ArrowRight' })
     await new Promise((resolve) => requestAnimationFrame(resolve))
-    expect(monitoring.attributes('aria-selected')).toBe('true')
+    expect(statistics.attributes('aria-selected')).toBe('true')
     expect((wrapper.get('#workspace-panel-acquisition').element as HTMLElement).style.display).toBe(
       'none',
     )
     expect(
-      (wrapper.get('#workspace-panel-monitoring').element as HTMLElement).style.display,
+      (wrapper.get('#workspace-panel-statistics').element as HTMLElement).style.display,
     ).not.toBe('none')
-    expect(document.activeElement).toBe(monitoring.element)
+    expect(document.activeElement).toBe(statistics.element)
 
-    await monitoring.trigger('keydown', { key: 'End' })
+    await statistics.trigger('keydown', { key: 'End' })
     await new Promise((resolve) => requestAnimationFrame(resolve))
     expect(wrapper.get('#workspace-tab-runs').attributes('aria-selected')).toBe('true')
     expect(wrapper.get('#workspace-panel-runs').isVisible()).toBe(true)
@@ -143,9 +144,14 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api: dashboardApi() } })
     await flushPromises()
 
-    const options = wrapper.findAll('.options input[type="checkbox"]')
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'RunCtrl')!
+      .trigger('click')
+    const options = [wrapper.get('#capture-raw'), wrapper.get('#journal-transport')]
     expect(options).toHaveLength(2)
     expect(options.every((option) => !(option.element as HTMLInputElement).checked)).toBe(true)
+    expect(wrapper.get('input[aria-label="HDF5 file size in MiB"]').isVisible()).toBe(true)
     wrapper.unmount()
   })
 
@@ -170,6 +176,42 @@ describe('operator dashboard', () => {
       .find((tab) => tab.text() === 'All')!
       .trigger('click')
     expect(wrapper.get('.parameter-toolbar input[type="search"]').isVisible()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('closes every configuration dialog with Escape', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'HV_bias')!
+      .trigger('click')
+    await wrapper.get('.board-overrides-button').trigger('click')
+    expect(wrapper.get('.board-dialog').isVisible()).toBe(true)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.board-dialog').exists()).toBe(false)
+
+    await wrapper.get('.channel-overrides-button').trigger('click')
+    expect(wrapper.get('.channel-dialog').isVisible()).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.channel-dialog').exists()).toBe(false)
+
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'All')!
+      .trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Configure channels')!
+      .trigger('click')
+    expect(wrapper.get('.mask-dialog').isVisible()).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.mask-dialog').exists()).toBe(false)
     wrapper.unmount()
   })
 
@@ -215,6 +257,10 @@ describe('operator dashboard', () => {
     ).toBe(true)
     await wrapper.get('input[id^="PresetTime"]').setValue('30')
     await wrapper.get('input[id^="PresetTime"]').trigger('change')
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'RunCtrl')!
+      .trigger('click')
     const segmentSize = wrapper.get('input[aria-label="HDF5 file size in MiB"]')
     expect(segmentSize.element).toHaveProperty('value', '500')
     await segmentSize.setValue('128')
@@ -240,8 +286,12 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
 
-    await wrapper.get('select').setValue('PRESET_COUNTS')
-    const presetCounts = wrapper.get('input[type="number"][min="1"]')
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'RunCtrl')!
+      .trigger('click')
+    await wrapper.get('select[id^="StopRunMode"]').setValue('PRESET_COUNTS')
+    const presetCounts = wrapper.get('input[id^="PresetCounts"]')
     const presetCountsInput = presetCounts.element as HTMLInputElement
     presetCountsInput.value = '3'
     await presetCounts.trigger('input')

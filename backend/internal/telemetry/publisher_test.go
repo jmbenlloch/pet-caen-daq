@@ -66,6 +66,28 @@ func TestSlowSubscriberReceivesNewestSnapshot(t *testing.T) {
 	}
 }
 
+func TestAtomicUpdatesPreserveFieldsOwnedByConcurrentProducers(t *testing.T) {
+	publisher, _ := NewPublisher("instance-a", &daqv1.TelemetrySnapshot{
+		Chains: []*daqv1.Chain{{Index: 0, Boards: []*daqv1.Board{{Node: 0}}}},
+	}, nil)
+
+	stale := publisher.Snapshot()
+	publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		snapshot.Pipeline = &daqv1.PipelineTelemetry{DecodedEvents: 42}
+	})
+	publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		snapshot.Chains[0].Boards[0].HvVoltageV = 45.4
+	})
+
+	got := publisher.Snapshot()
+	if got.Pipeline.GetDecodedEvents() != 42 || got.Chains[0].Boards[0].GetHvVoltageV() != 45.4 {
+		t.Fatalf("atomic updates lost fields: %+v", got)
+	}
+	if stale.Pipeline != nil || stale.Chains[0].Boards[0].GetHvVoltageV() != 0 {
+		t.Fatalf("previous snapshot was mutated: %+v", stale)
+	}
+}
+
 func TestIsStale(t *testing.T) {
 	now := time.Date(2026, 7, 21, 14, 0, 10, 0, time.UTC)
 	publisher, _ := NewPublisher("instance-a", nil, func() time.Time { return now.Add(-5 * time.Second) })

@@ -53,10 +53,11 @@ const captureRaw = ref(false)
 const journalTransport = ref(false)
 const hdf5SegmentSizeMb = ref(500)
 const configFile = ref<HTMLInputElement>()
-type WorkspaceTab = 'acquisition' | 'monitoring' | 'hardware' | 'runs'
+type WorkspaceTab = 'acquisition' | 'statistics' | 'plots' | 'hardware' | 'runs'
 const workspaceTabs: { id: WorkspaceTab; label: string; description: string }[] = [
   { id: 'acquisition', label: 'Acquisition', description: 'Configure and control runs' },
-  { id: 'monitoring', label: 'Monitoring', description: 'Statistics and plots' },
+  { id: 'statistics', label: 'Statistics', description: 'Live rates and counters' },
+  { id: 'plots', label: 'Plots', description: 'Histograms and channels' },
   { id: 'hardware', label: 'Hardware', description: 'Boards and high voltage' },
   { id: 'runs', label: 'Runs', description: 'History and artifacts' },
 ]
@@ -299,13 +300,6 @@ function setField(field: ConfigurationField, value: string) {
   configurationDocument.value = updateConfiguration(configurationDocument.value, field, value)
 }
 
-function setGlobalField(name: string, value: string) {
-  const field = configurationDocument.value.fields.find(
-    (candidate) => candidate.name === name && candidate.index === undefined,
-  )
-  if (field) setField(field, value)
-}
-
 function openMask(field: ConfigurationField) {
   const highName = field.name.replace(/0$/, '1')
   const high = configurationDocument.value.fields.find(
@@ -528,51 +522,90 @@ onMounted(() => daq.connect())
 
 <template>
   <div class="shell">
-    <header class="masthead">
-      <div>
-        <p class="eyebrow">PET detector control</p>
-        <h1>CAEN acquisition</h1>
-      </div>
-      <div class="masthead-actions">
-        <div class="connection" role="status" aria-live="polite">
-          <span
-            class="status-dot"
-            :class="{ live: daq.connected.value && !daq.stale.value }"
-            aria-hidden="true"
-          />
-          <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
-          <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
-        </div>
-        <button
-          type="button"
-          class="theme-toggle"
-          :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
-          :title="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
-          @click="toggleTheme"
-        >
-          <span aria-hidden="true">{{ theme === 'dark' ? '☀' : '☾' }}</span>
-          {{ theme === 'dark' ? 'Light' : 'Dark' }}
-        </button>
-      </div>
-    </header>
-
     <main>
       <section class="hero panel" aria-labelledby="system-heading">
-        <div>
-          <p class="eyebrow">System state</p>
-          <h2 id="system-heading">{{ state }}</h2>
-          <p class="muted">
-            Sequence {{ compact(daq.snapshot.value?.sequence) }} ·
-            {{ enabledLinkLabel }}
-          </p>
+        <div class="hero-overview">
+          <div class="product-identity">
+            <p class="eyebrow">PET detector control</p>
+            <h1>CAEN acquisition</h1>
+            <button
+              type="button"
+              class="theme-toggle"
+              :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
+              :title="`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`"
+              @click="toggleTheme"
+            >
+              <span aria-hidden="true">{{ theme === 'dark' ? '☀' : '☾' }}</span>
+              {{ theme === 'dark' ? 'Light' : 'Dark' }}
+            </button>
+          </div>
+          <div class="state-summary">
+            <p class="eyebrow">System state</p>
+            <h2 id="system-heading">{{ state }}</h2>
+            <p class="muted">
+              Sequence {{ compact(daq.snapshot.value?.sequence) }} ·
+              {{ enabledLinkLabel }}
+            </p>
+          </div>
         </div>
-        <div v-if="daq.snapshot.value?.currentRun" class="run-now">
-          <span>Active run</span>
-          <strong>{{ daq.snapshot.value.currentRun.runId }}</strong>
-          <span>{{ compact(daq.snapshot.value.currentRun.eventCount) }} events</span>
-          <small>{{ activeStopPolicy() }}</small>
+        <div class="hero-control">
+          <div class="system-utilities">
+            <div class="connection" role="status" aria-live="polite">
+              <span
+                class="status-dot"
+                :class="{ live: daq.connected.value && !daq.stale.value }"
+                aria-hidden="true"
+              />
+              <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
+              <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
+            </div>
+          </div>
+          <div class="run-control">
+            <div v-if="daq.snapshot.value?.currentRun" class="run-now">
+              <span>Active run</span>
+              <strong>{{ daq.snapshot.value.currentRun.runId }}</strong>
+              <span>{{ compact(daq.snapshot.value.currentRun.eventCount) }} events</span>
+              <small>{{ activeStopPolicy() }}</small>
+            </div>
+            <div v-else class="run-now quiet" role="status">
+              <span>No active run</span>
+              <small>{{ configuredStopPolicy }}</small>
+            </div>
+            <div class="actions hero-actions">
+              <button
+                class="primary"
+                type="button"
+                :disabled="
+                  !daq.canStart.value ||
+                  !configuration ||
+                  configurationErrors.length > 0 ||
+                  !!stopPolicyError ||
+                  !Number.isInteger(hdf5SegmentSizeMb) ||
+                  hdf5SegmentSizeMb < 1 ||
+                  hdf5SegmentSizeMb > 1048576
+                "
+                @click="
+                  daq.startRun({
+                    configuration,
+                    captureRaw,
+                    journalTransport,
+                    hdf5SegmentSizeMb,
+                  })
+                "
+              >
+                Start run
+              </button>
+              <button
+                class="danger"
+                type="button"
+                :disabled="!daq.canStop.value"
+                @click="daq.stopRun()"
+              >
+                Stop and drain
+              </button>
+            </div>
+          </div>
         </div>
-        <div v-else class="run-now quiet"><span>No active run</span></div>
       </section>
 
       <div v-if="daq.error.value" class="alert error" role="alert">
@@ -620,41 +653,6 @@ onMounted(() => daq.connect())
             </div>
             <span class="safety">Configuration is validated before start</span>
           </div>
-
-          <div class="fields">
-            <label>
-              Run stop
-              <select
-                :value="stopMode"
-                @change="setGlobalField('StopRunMode', ($event.target as HTMLSelectElement).value)"
-              >
-                <option value="MANUAL">Manual only</option>
-                <option value="PRESET_TIME">After elapsed time</option>
-                <option value="PRESET_COUNTS">After event count</option>
-              </select>
-            </label>
-            <label v-if="stopMode === 'PRESET_TIME'">
-              Preset time (seconds)
-              <input
-                :value="Number.parseFloat(presetTime)"
-                type="number"
-                min="0.001"
-                step="1"
-                @input="setGlobalField('PresetTime', ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-            <label v-if="stopMode === 'PRESET_COUNTS'">
-              Preset event count
-              <input
-                :value="presetCounts"
-                type="number"
-                min="1"
-                step="1"
-                @input="setGlobalField('PresetCounts', ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-          </div>
-          <p v-if="stopPolicyError" class="field-error" role="alert">{{ stopPolicyError }}</p>
 
           <div class="config-heading">
             <div>
@@ -759,7 +757,7 @@ onMounted(() => daq.connect())
                     >
                       <strong>B{{ summary.board }}</strong>
                       <code>{{ summary.low }} · {{ summary.high }}</code>
-                      <span v-if="summary.inherited">global</span>
+                      <span>{{ summary.inherited ? 'inherited' : 'override' }}</span>
                     </div>
                   </div>
                   <button type="button" class="secondary" @click="openMask(field)">
@@ -840,7 +838,7 @@ onMounted(() => daq.connect())
                 >
                   <span v-for="item in boardValues(field)" :key="item.board">
                     <strong>B{{ item.board }}</strong> {{ item.value }}
-                    <small v-if="item.inherited">global</small>
+                    <small>{{ item.inherited ? 'inherited' : 'override' }}</small>
                   </span>
                   <button
                     type="button"
@@ -851,6 +849,46 @@ onMounted(() => daq.connect())
                   </button>
                 </div>
               </article>
+              <template v-if="selectedSection === 'RunCtrl'">
+                <article class="parameter-row">
+                  <div class="parameter-copy">
+                    <label for="capture-raw">Preserve complete raw batches</label>
+                    <p>Application output setting. Keep complete raw batches from the backend.</p>
+                  </div>
+                  <label class="switch">
+                    <input id="capture-raw" v-model="captureRaw" type="checkbox" />
+                    <span>{{ captureRaw ? 'Enabled' : 'Disabled' }}</span>
+                  </label>
+                </article>
+                <article class="parameter-row">
+                  <div class="parameter-copy">
+                    <label for="journal-transport">Journal socket evidence</label>
+                    <p>Application output setting. Record socket traffic for diagnostics.</p>
+                  </div>
+                  <label class="switch">
+                    <input id="journal-transport" v-model="journalTransport" type="checkbox" />
+                    <span>{{ journalTransport ? 'Enabled' : 'Disabled' }}</span>
+                  </label>
+                </article>
+                <article class="parameter-row">
+                  <div class="parameter-copy">
+                    <label for="hdf5-segment-size">HDF5 file size (MiB)</label>
+                    <p>
+                      Application output setting. Files rotate as run_&lt;run-id&gt;.0000.h5,
+                      .0001.h5, and so on.
+                    </p>
+                  </div>
+                  <input
+                    id="hdf5-segment-size"
+                    v-model.number="hdf5SegmentSizeMb"
+                    aria-label="HDF5 file size in MiB"
+                    type="number"
+                    min="1"
+                    max="1048576"
+                    step="1"
+                  />
+                </article>
+              </template>
               <p v-if="!visibleFields.length" class="empty">No parameters match this filter.</p>
             </div>
           </div>
@@ -889,76 +927,6 @@ onMounted(() => daq.connect())
               {{ issue.message }}
             </li>
           </ul>
-
-          <div class="options">
-            <label
-              ><input v-model="captureRaw" type="checkbox" /> Preserve complete raw batches</label
-            >
-            <label
-              ><input v-model="journalTransport" type="checkbox" /> Journal socket evidence</label
-            >
-          </div>
-          <label class="field run-storage-field">
-            <span>HDF5 file size (MiB)</span>
-            <input
-              v-model.number="hdf5SegmentSizeMb"
-              aria-label="HDF5 file size in MiB"
-              type="number"
-              min="1"
-              max="1048576"
-              step="1"
-            />
-            <small>Files rotate as run_&lt;run-id&gt;.0000.h5, .0001.h5, and so on.</small>
-          </label>
-
-          <p class="stop-policy-summary" role="status">{{ configuredStopPolicy }}</p>
-
-          <div class="actions">
-            <button
-              class="secondary"
-              type="button"
-              :disabled="
-                daq.busy.value ||
-                !configuration ||
-                configurationErrors.length > 0 ||
-                !!stopPolicyError
-              "
-              @click="daq.validate(configuration)"
-            >
-              Validate
-            </button>
-            <button
-              class="primary"
-              type="button"
-              :disabled="
-                !daq.canStart.value ||
-                !configuration ||
-                configurationErrors.length > 0 ||
-                !!stopPolicyError ||
-                !Number.isInteger(hdf5SegmentSizeMb) ||
-                hdf5SegmentSizeMb < 1 ||
-                hdf5SegmentSizeMb > 1048576
-              "
-              @click="
-                daq.startRun({
-                  configuration,
-                  captureRaw,
-                  journalTransport,
-                  hdf5SegmentSizeMb,
-                })
-              "
-            >
-              Start run
-            </button>
-            <button
-              class="danger"
-              type="button"
-              :disabled="!daq.canStop.value"
-              @click="daq.stopRun()"
-            >
-              Stop and drain
-            </button>
-          </div>
         </div>
 
         <aside class="side-column">
@@ -1269,17 +1237,24 @@ onMounted(() => daq.connect())
       </section>
 
       <div
-        v-show="activeWorkspaceTab === 'monitoring'"
-        id="workspace-panel-monitoring"
+        v-show="activeWorkspaceTab === 'statistics'"
+        id="workspace-panel-statistics"
         role="tabpanel"
-        aria-labelledby="workspace-tab-monitoring"
+        aria-labelledby="workspace-tab-statistics"
       >
         <StatisticsTab
           :statistics="daq.snapshot.value?.statistics"
           :pipeline="daq.snapshot.value?.pipeline"
           :storage="daq.snapshot.value?.storage"
         />
+      </div>
 
+      <div
+        v-show="activeWorkspaceTab === 'plots'"
+        id="workspace-panel-plots"
+        role="tabpanel"
+        aria-labelledby="workspace-tab-plots"
+      >
         <PlotWorkspace
           :boards="boards"
           :running="daq.snapshot.value?.state === SystemState.RUNNING"

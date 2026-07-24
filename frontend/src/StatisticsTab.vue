@@ -35,6 +35,14 @@ const active = computed(() =>
     ? undefined
     : boards.value.find((board) => board.chain === selectedBoard.value),
 )
+watch(
+  boards,
+  (next) => {
+    if (selectedBoard.value !== 'all' && !next.some((board) => board.chain === selectedBoard.value))
+      selectedBoard.value = 'all'
+  },
+  { immediate: true },
+)
 
 function prior(board: DeepReadonly<BoardStatistics>) {
   return previous.value?.boards.find(

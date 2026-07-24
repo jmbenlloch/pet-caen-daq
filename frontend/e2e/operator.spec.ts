@@ -38,7 +38,7 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await expect(activeRunId).toBeVisible()
   await expect(activeRunId).toHaveText(/^\d+$/)
   const runId = (await activeRunId.textContent())!
-  await page.getByRole('tab', { name: /Monitoring/ }).click()
+  await page.getByRole('tab', { name: /Statistics/ }).click()
   const statistics = page.getByRole('region', { name: 'Statistics' })
   await expect(statistics.getByRole('tab', { name: 'Board 0' })).toBeVisible()
   await statistics.getByRole('tab', { name: 'Board 0' }).click()
@@ -48,6 +48,7 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await statistics.getByLabel('Cumulative counts').check()
   await expect(statistics).toContainText('PHA integrated count')
 
+  await page.getByRole('tab', { name: /Plots/ }).click()
   const plots = page.getByRole('region', { name: 'Plots and histograms' })
   await plots.getByLabel('Channels').click()
   await plots.getByRole('button', { name: 'Board 0 node 0 channel 1', exact: true }).click()
@@ -82,14 +83,12 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await expect(page.getByLabel('Stored runs').getByText(runId, { exact: true })).toBeVisible()
 })
 
-test('operator receives structured validation feedback before hardware mutation', async ({
-  page,
-}) => {
+test('start reports structured validation feedback before hardware mutation', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await page.getByRole('button', { name: 'View raw configuration' }).click()
   await page.getByLabel('JANUS configuration source').fill('Open TDlink 0 0')
-  await page.getByRole('button', { name: 'Validate' }).click()
+  await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByLabel('Validation issues')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
 })
@@ -100,8 +99,9 @@ test('backend automatically stops runs at time and event presets while manual st
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
 
-  await page.getByLabel('Run stop').selectOption('PRESET_TIME')
-  await page.getByLabel('Preset time (seconds)').fill('1')
+  await page.getByRole('tab', { name: 'RunCtrl', exact: true }).click()
+  await page.getByRole('combobox', { name: 'StopRunMode', exact: true }).selectOption('PRESET_TIME')
+  await page.getByRole('spinbutton', { name: 'PresetTime', exact: true }).fill('1')
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop and drain' })).toBeEnabled()
@@ -113,8 +113,10 @@ test('backend automatically stops runs at time and event presets while manual st
   await expect(page.getByText('preset_time', { exact: true })).toBeVisible()
 
   await page.getByRole('tab', { name: /Acquisition/ }).click()
-  await page.getByLabel('Run stop').selectOption('PRESET_COUNTS')
-  await page.getByLabel('Preset event count').fill('3')
+  await page
+    .getByRole('combobox', { name: 'StopRunMode', exact: true })
+    .selectOption('PRESET_COUNTS')
+  await page.getByRole('spinbutton', { name: 'PresetCounts', exact: true }).fill('3')
   await page.getByRole('button', { name: 'Start run' }).click()
   await page.getByRole('tab', { name: /Runs/ }).click()
   const completedHeading = page.locator('#completed-heading')
@@ -147,7 +149,7 @@ test('operator configures bounded values and channel masks without editing text'
   await expect(maskRows.nth(0)).toContainText(/B0.*0xFFFFFFFF · 0xFFFFFFFF/)
   await expect(maskRows.nth(1)).toContainText(/B1.*0xFFFFFFFF · 0xFFFFFFFF/)
   await expect(maskRows.nth(2)).toContainText(/B2.*0xFFFFFFFE · 0xFFFFFFFF/)
-  await expect(maskRows.nth(3)).toContainText(/B3.*0xFFFFFFFF · 0xFFFFFFFF.*global/)
+  await expect(maskRows.nth(3)).toContainText(/B3.*0xFFFFFFFF · 0xFFFFFFFF.*inherited/)
 
   await page.getByRole('tab', { name: 'All', exact: true }).click()
   await page.getByLabel('Find a parameter').fill('MajorityLevel')
@@ -180,7 +182,7 @@ test('operator configures bounded values and channel masks without editing text'
   await page.getByLabel('Find a parameter').fill('TD_CoarseThreshold')
   const coarseBoards = page.getByLabel('TD_CoarseThreshold values by board')
   await expect(coarseBoards).toContainText(/B0.*181/)
-  await expect(coarseBoards).toContainText(/B1.*183.*global/)
+  await expect(coarseBoards).toContainText(/B1.*183.*inherited/)
   await expect(coarseBoards).toContainText(/B2.*179/)
   await expect(coarseBoards).toContainText(/B3.*178/)
   await page.getByRole('button', { name: 'Per-board overrides' }).click()
@@ -194,7 +196,7 @@ test('operator configures bounded values and channel masks without editing text'
   const hvRows = hvBoards.locator('span')
   await expect(hvRows).toHaveCount(4)
   for (let board = 0; board < 4; board++)
-    await expect(hvRows.nth(board)).toContainText(new RegExp(`B${board}.*45\\.4.*global`))
+    await expect(hvRows.nth(board)).toContainText(new RegExp(`B${board}.*45\\.4.*inherited`))
 
   await page.getByLabel('Find a parameter').fill('HV_IndivAdj')
   await page.getByRole('button', { name: 'Per-channel overrides' }).click()

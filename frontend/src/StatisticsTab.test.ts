@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest'
 import { StatisticsTelemetrySchema } from './gen/pet/caen/daq/v1/system_pb'
 import StatisticsTab from './StatisticsTab.vue'
 
-function sample(elapsed: bigint, triggerCount: bigint, channelCount: bigint) {
+function sample(elapsed: bigint, triggerCount: bigint, channelCount: bigint, chain = 0) {
   return create(StatisticsTelemetrySchema, {
     elapsedMilliseconds: elapsed,
     boards: [
       {
-        chain: 0,
+        chain,
         timestamp: 125_000_000n,
         triggerId: 9n,
         triggerCount,
@@ -56,5 +56,17 @@ describe('StatisticsTab', () => {
 
     await wrapper.setProps({ statistics: sample(2000n, 15n, 7n) })
     expect(wrapper.text()).toContain('5.0 Hz')
+  })
+
+  it('returns to all boards when the selected board disappears from telemetry', async () => {
+    const wrapper = mount(StatisticsTab, { props: { statistics: sample(1000n, 10n, 4n) } })
+    await wrapper.findAll('[role="tab"]')[1].trigger('click')
+    expect(wrapper.get('[aria-label="Board 0 channel statistics"]').isVisible()).toBe(true)
+
+    await wrapper.setProps({ statistics: sample(2000n, 15n, 7n, 1) })
+
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('All boards')
+    expect(wrapper.text()).toContain('B1')
+    expect(wrapper.find('.channel-statistics').exists()).toBe(false)
   })
 })

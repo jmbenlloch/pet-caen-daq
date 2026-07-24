@@ -65,88 +65,118 @@ func (m *HealthMonitor) Run(ctx context.Context) error {
 func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 	pipeline := m.Source.PipelineStats()
 	storage := m.Source.StorageStats()
-	snapshot := m.Publisher.Snapshot()
-	snapshot.Pipeline = &daqv1.PipelineTelemetry{
-		QueueCapacity: uint64(pipeline.Capacity), QueueDepth: uint64(pipeline.QueueDepth),
-		AcceptedBatches: pipeline.AcceptedBatches, RejectedBatches: pipeline.RejectedBatches,
-		DecodedEvents: pipeline.DecodedEvents, DecodeFailures: pipeline.DecodeFailures,
+	var observations []runpipeline.BoardStats
+	boards, hasBoards := m.Source.(BoardHealthSource)
+	if hasBoards {
+		observations = boards.BoardStats()
 	}
-	health := daqv1.HealthStatus_HEALTH_STATUS_OK
-	if storage.LastError != "" || pipeline.SinkFailures > 0 {
-		health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
+	var elapsed time.Duration
+	statistics, hasStatistics := m.Source.(StatisticsSource)
+	if hasStatistics {
+		elapsed = statistics.StatisticsElapsed()
 	}
-	snapshot.Storage = &daqv1.StorageTelemetry{
-		Health: health, RunDirectory: storage.Directory, BytesWritten: storage.BytesWritten, LastError: storage.LastError,
-	}
-	if snapshot.CurrentRun != nil {
-		snapshot.CurrentRun.EventCount = storage.EventCount
-		snapshot.CurrentRun.RawBatchCount = storage.RawBatches
-		snapshot.CurrentRun.Incomplete = !storage.Finalized
-	}
-	if boards, ok := m.Source.(BoardHealthSource); ok {
-		observations := boards.BoardStats()
-		for _, observation := range observations {
-			for _, chain := range snapshot.Chains {
-				if chain.Index != uint32(observation.Chain) {
-					continue
-				}
-				for _, board := range chain.Boards {
-					if board.Node != uint32(observation.Node) {
+	return m.Publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		snapshot.Pipeline = &daqv1.PipelineTelemetry{
+			QueueCapacity: uint64(pipeline.Capacity), QueueDepth: uint64(pipeline.QueueDepth),
+			AcceptedBatches: pipeline.AcceptedBatches, RejectedBatches: pipeline.RejectedBatches,
+			DecodedEvents: pipeline.DecodedEvents, DecodeFailures: pipeline.DecodeFailures,
+		}
+		health := daqv1.HealthStatus_HEALTH_STATUS_OK
+		if storage.LastError != "" || pipeline.SinkFailures > 0 {
+			health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
+		}
+		snapshot.Storage = &daqv1.StorageTelemetry{
+			Health: health, RunDirectory: storage.Directory, BytesWritten: storage.BytesWritten, LastError: storage.LastError,
+		}
+		if snapshot.CurrentRun != nil {
+			snapshot.CurrentRun.EventCount = storage.EventCount
+			snapshot.CurrentRun.RawBatchCount = storage.RawBatches
+			snapshot.CurrentRun.Incomplete = !storage.Finalized
+		}
+		if hasBoards {
+			for _, observation := range observations {
+				for _, chain := range snapshot.Chains {
+					if chain.Index != uint32(observation.Chain) {
 						continue
 					}
-					board.EventCount = observation.EventCount
-					if shouldApplyBoardTelemetry(board, observation.TelemetryObservedAt) {
-						board.Health = daqv1.HealthStatus_HEALTH_STATUS_OK
-						if observation.FPGATemperature != nil {
-							board.FpgaTemperatureC = *observation.FPGATemperature
+					for _, board := range chain.Boards {
+						if board.Node != uint32(observation.Node) {
+							continue
 						}
-						if observation.BoardTemperature != nil {
-							board.BoardTemperatureC = *observation.BoardTemperature
-						}
-						if observation.DetectorTemperature != nil {
-							board.DetectorTemperatureC = *observation.DetectorTemperature
-						}
-						if observation.HVTemperature != nil {
-							board.HvTemperatureC = *observation.HVTemperature
-						}
-						if observation.HVVoltage != nil {
-							board.HvVoltageV = *observation.HVVoltage
-						}
-						if observation.HVCurrent != nil {
-							board.HvCurrentA = *observation.HVCurrent
-						}
-						board.TelemetryObservedAt = timestamppb.New(*observation.TelemetryObservedAt)
-						board.HvOn = observation.HVOn
-						board.HvRamping = observation.HVRamping
-						board.HvOverCurrent = observation.HVOverCurrent
-						board.HvOverVoltage = observation.HVOverVoltage
-						if observation.HVOverCurrent || observation.HVOverVoltage {
-							board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
+						board.EventCount = observation.EventCount
+						if shouldApplyBoardTelemetry(board, observation.TelemetryObservedAt) {
+							board.Health = daqv1.HealthStatus_HEALTH_STATUS_OK
+							if observation.FPGATemperature != nil {
+								board.FpgaTemperatureC = *observation.FPGATemperature
+							}
+							if observation.BoardTemperature != nil {
+								board.BoardTemperatureC = *observation.BoardTemperature
+							}
+							if observation.DetectorTemperature != nil {
+								board.DetectorTemperatureC = *observation.DetectorTemperature
+							}
+							if observation.HVTemperature != nil {
+								board.HvTemperatureC = *observation.HVTemperature
+							}
+							if observation.HVVoltage != nil {
+								board.HvVoltageV = *observation.HVVoltage
+							}
+							if observation.HVCurrent != nil {
+								board.HvCurrentA = *observation.HVCurrent
+							}
+							board.TelemetryObservedAt = timestamppb.New(*observation.TelemetryObservedAt)
+							board.HvOn = observation.HVOn
+							board.HvRamping = observation.HVRamping
+							board.HvOverCurrent = observation.HVOverCurrent
+							board.HvOverVoltage = observation.HVOverVoltage
+							if observation.HVOverCurrent || observation.HVOverVoltage {
+								board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
+							}
 						}
 					}
 				}
 			}
-		}
-		if statistics, ok := m.Source.(StatisticsSource); ok {
-			elapsed := statistics.StatisticsElapsed().Milliseconds()
-			if elapsed < 0 {
-				elapsed = 0
-			}
-			snapshot.Statistics = &daqv1.StatisticsTelemetry{ElapsedMilliseconds: uint64(elapsed)}
-			for _, observation := range observations {
-				snapshot.Statistics.Boards = append(snapshot.Statistics.Boards, &daqv1.BoardStatistics{
-					Chain: observationChain(observation), Node: uint32(observation.Node), Timestamp: observation.Timestamp,
-					TriggerId: observation.TriggerID, TriggerCount: observation.TriggerCount, LostTriggerCount: observation.LostTriggerCount,
-					DataBytes: observation.DataBytes, TOrCount: observation.TORCount,
-					ChannelTriggerCounts: observation.ChannelTriggerCount[:], TimestampCounts: observation.TimestampCount[:], PhaCounts: observation.PHACount[:],
-				})
+			if hasStatistics {
+				elapsedMilliseconds := elapsed.Milliseconds()
+				if elapsedMilliseconds < 0 {
+					elapsedMilliseconds = 0
+				}
+				snapshot.Statistics = &daqv1.StatisticsTelemetry{ElapsedMilliseconds: uint64(elapsedMilliseconds)}
+				snapshot.Statistics.Boards = statisticsBoards(snapshot, observations)
 			}
 		}
-	}
-	return m.Publisher.Publish(snapshot)
+	})
 }
 
-func observationChain(observation runpipeline.BoardStats) uint32 { return uint32(observation.Chain) }
+func statisticsBoards(snapshot *daqv1.TelemetrySnapshot, observations []runpipeline.BoardStats) []*daqv1.BoardStatistics {
+	type boardKey struct {
+		chain uint32
+		node  uint32
+	}
+	observed := make(map[boardKey]runpipeline.BoardStats, len(observations))
+	for _, observation := range observations {
+		observed[boardKey{chain: uint32(observation.Chain), node: uint32(observation.Node)}] = observation
+	}
+	result := make([]*daqv1.BoardStatistics, 0, len(observations))
+	for _, chain := range snapshot.GetChains() {
+		for _, board := range chain.GetBoards() {
+			statistic := &daqv1.BoardStatistics{Chain: chain.GetIndex(), Node: board.GetNode()}
+			if observation, ok := observed[boardKey{chain: chain.GetIndex(), node: board.GetNode()}]; ok {
+				statistic.Timestamp = observation.Timestamp
+				statistic.TriggerId = observation.TriggerID
+				statistic.TriggerCount = observation.TriggerCount
+				statistic.LostTriggerCount = observation.LostTriggerCount
+				statistic.DataBytes = observation.DataBytes
+				statistic.TOrCount = observation.TORCount
+				statistic.ChannelTriggerCounts = observation.ChannelTriggerCount[:]
+				statistic.TimestampCounts = observation.TimestampCount[:]
+				statistic.PhaCounts = observation.PHACount[:]
+			}
+			result = append(result, statistic)
+		}
+	}
+	return result
+}
 
 func shouldApplyBoardTelemetry(board *daqv1.Board, observedAt *time.Time) bool {
 	if observedAt == nil {

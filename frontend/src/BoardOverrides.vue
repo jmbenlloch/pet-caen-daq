@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { ConfigurationField, NumericConstraint } from './configuration'
+import { useEscapeClose } from './useEscapeClose'
 
 const props = defineProps<{
   field: ConfigurationField
   constraint: NumericConstraint
   overrides: Record<number, string>
 }>()
-defineEmits<{ apply: [values: Record<number, string>]; close: [] }>()
+const emit = defineEmits<{ apply: [values: Record<number, string>]; close: [] }>()
 const values = ref<Record<number, string>>({ ...props.overrides })
+
+useEscapeClose(() => emit('close'))
 
 function update(board: number, value: string) {
   const next = { ...values.value }

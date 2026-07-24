@@ -109,7 +109,7 @@ describe('JANUS configuration editor', () => {
     expect(numericError(field)).toBe('')
 
     const time = parseConfiguration('ChTrg_Width 2 us # width').fields[0]
-    expect(numericConstraint(time)).toMatchObject({ min: 0.008, max: 2.032, step: 0.008 })
+    expect(numericConstraint(time)).toMatchObject({ min: 0, max: 2.032, step: 0.008 })
     expect(numericError(time)).toBe('')
   })
 

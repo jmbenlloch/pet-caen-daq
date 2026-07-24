@@ -84,6 +84,30 @@ func TestHealthMonitorValidatesDependenciesAndCadence(t *testing.T) {
 	}
 }
 
+func TestStatisticsIncludeTopologyBoardsBeforeTheyEmitEvents(t *testing.T) {
+	snapshot := &daqv1.TelemetrySnapshot{Chains: []*daqv1.Chain{
+		{Index: 0, Boards: []*daqv1.Board{{Node: 0}}},
+		{Index: 1, Boards: []*daqv1.Board{{Node: 0}}},
+		{Index: 2, Boards: []*daqv1.Board{{Node: 0}}},
+		{Index: 3, Boards: []*daqv1.Board{{Node: 0}}},
+	}}
+	observations := []runpipeline.BoardStats{{Chain: 0, Node: 0, TriggerCount: 7}}
+
+	boards := statisticsBoards(snapshot, observations)
+
+	if len(boards) != 4 {
+		t.Fatalf("statistics boards = %d, want 4", len(boards))
+	}
+	for chain, board := range boards {
+		if board.GetChain() != uint32(chain) || board.GetNode() != 0 {
+			t.Fatalf("board %d identity = %d:%d", chain, board.GetChain(), board.GetNode())
+		}
+	}
+	if boards[0].GetTriggerCount() != 7 || boards[1].GetTriggerCount() != 0 {
+		t.Fatalf("statistics did not preserve observed and zero-filled boards: %+v", boards)
+	}
+}
+
 func TestBoardTelemetryOnlyAppliesNewerObservations(t *testing.T) {
 	current := time.Date(2026, 7, 22, 18, 0, 0, 0, time.UTC)
 	older := current.Add(-time.Second)

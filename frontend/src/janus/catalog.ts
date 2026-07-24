@@ -30,7 +30,7 @@ const constraints: Record<string, Pick<JanusParameter, 'min' | 'max' | 'step' | 
   TempFeedbackCoeff: { step: 0.1, units: ['mV/degC'] },
   PresetTime: { min: 0, step: 1, units: ['s', 'ms', 'us', 'ns'] },
   PresetCounts: { min: 0, step: 1 },
-  ChTrg_Width: { min: 8, max: 2032, step: 8, units: ['ns', 'us'] },
+  ChTrg_Width: { min: 0, max: 2032, step: 8, units: ['ns', 'us'] },
   Tlogic_Width: { min: 0, step: 8, units: ['ns', 'us'] },
   MajorityLevel: { min: 1, max: 64, step: 1 },
   PtrgPeriod: { min: 0, step: 8, units: ['ns', 'us', 'ms', 's'] },
@@ -76,6 +76,11 @@ const dependencies: Record<string, JanusDependency> = {
   },
 }
 
+const descriptions: Record<string, string> = {
+  ChTrg_Width:
+    'Coincidence window for PAIRED_AND counting mode. 0 disables it; otherwise use 8–2032 ns in 8 ns steps',
+}
+
 function unquote(value: string) {
   return value.startsWith('"') && value.endsWith('"') ? value.slice(1, -1) : value
 }
@@ -117,7 +122,7 @@ function parseDefinitions(source: string): JanusParameter[] {
       defaultValue: unquote(match[2]),
       scope: ({ g: 'global', b: 'board', c: 'channel' } as const)[match[3] as 'g' | 'b' | 'c'],
       widget: widget(match[4]),
-      description: match[5]?.trim() ?? '',
+      description: descriptions[match[1]] ?? match[5]?.trim() ?? '',
       options: [],
       ...constraints[match[1]],
       activeWhen: dependencies[match[1]],

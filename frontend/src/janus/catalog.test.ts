@@ -62,6 +62,13 @@ describe('JANUS 5202 5.0.0 parameter catalog', () => {
       parameter: 'StopRunMode',
       values: ['PRESET_TIME'],
     })
+    expect(janusParameterCatalog.get('ChTrg_Width')).toMatchObject({
+      min: 0,
+      max: 2032,
+      step: 8,
+      description:
+        'Coincidence window for PAIRED_AND counting mode. 0 disables it; otherwise use 8–2032 ns in 8 ns steps',
+    })
     expect(janusParameterCatalog.get('Vnom')?.widget).toBe('monitor')
   })
 })
