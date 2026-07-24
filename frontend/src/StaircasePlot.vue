@@ -77,7 +77,7 @@ function rebuild() {
 
 function render() {
   if (!plot) rebuild()
-  else plot.setData(alignedData(), false)
+  else plot.setData(alignedData(), true)
 }
 
 function resetZoom() {
