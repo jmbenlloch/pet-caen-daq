@@ -630,12 +630,25 @@ select:focus {
 }
 .board-dialog {
   width: min(620px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  padding: 26px;
+}
+.board-dialog .mask-heading h2 {
+  margin-top: 7px;
+}
+.board-dialog .channel-help {
+  margin-top: 17px;
+  line-height: 1.5;
 }
 .board-values {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 22px;
+}
+.board-dialog .mask-footer {
+  margin-top: 26px;
 }
 .board-values label {
   color: #8498af;
@@ -1351,6 +1364,64 @@ textarea {
 [data-theme='light'] .statistics-table td {
   border-color: #d6e0ea;
 }
+[data-theme='light'] .stepper {
+  border-color: #aebed0;
+  background: #ffffff;
+}
+[data-theme='light'] .stepper button {
+  color: #344c66;
+  background: #e8eef5;
+}
+[data-theme='light'] .stepper button:hover {
+  color: #09684f;
+  background: #d9e7e2;
+}
+[data-theme='light'] .switch {
+  color: #42566f;
+}
+[data-theme='light'] .switch input[type='checkbox'] {
+  border-color: #657b93;
+  background: #ffffff;
+}
+[data-theme='light'] .switch input[type='checkbox']:checked {
+  border-color: #168f70;
+  background:
+    linear-gradient(135deg, transparent 43%, #ffffff 43% 56%, transparent 56%) 2px 7px / 6px 6px
+      no-repeat,
+    linear-gradient(45deg, transparent 42%, #ffffff 42% 57%, transparent 57%) 6px 5px / 8px 8px
+      no-repeat,
+    #168f70;
+}
+[data-theme='light'] .field-range,
+[data-theme='light'] .unit {
+  color: #536a83;
+}
+[data-theme='light'] .board-value-summary,
+[data-theme='light'] .channel-override-counts,
+[data-theme='light'] .mask-board-value,
+[data-theme='light'] .mask-summary code {
+  color: #536a83;
+}
+[data-theme='light'] .board-value-summary span,
+[data-theme='light'] .channel-override-counts span {
+  border: 1px solid #c9d6e4;
+  background: #edf3f8;
+}
+[data-theme='light'] .board-value-summary strong,
+[data-theme='light'] .mask-board-value strong {
+  color: #243b55;
+}
+[data-theme='light'] .board-value-summary small {
+  color: #60748d;
+}
+[data-theme='light'] .board-dialog .channel-help strong {
+  color: #344c66;
+}
+[data-theme='light'] .override {
+  color: #76510a;
+  border: 1px solid #dfbd70;
+  background: #fff2cf;
+}
 [data-theme='light'] .section-tabs button,
 [data-theme='light'] .link-button,
 [data-theme='light'] .secondary,
@@ -1579,6 +1650,9 @@ textarea {
   }
   .board-values {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .board-dialog {
+    padding: 20px;
   }
   .channel-values {
     grid-template-columns: repeat(4, 1fr);
