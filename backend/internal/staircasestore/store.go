@@ -165,9 +165,16 @@ func readManifest(parent, scanID string) (Manifest, string, error) {
 }
 
 func List(parent string, limit int) ([]Manifest, error) {
+	manifests, _, err := ListPage(parent, limit, 0, nil)
+	return manifests, err
+}
+
+// ListPage returns one newest-first page and the total number of finalized
+// scans matching the optional board filter.
+func ListPage(parent string, limit, offset int, board *uint32) ([]Manifest, int, error) {
 	entries, err := os.ReadDir(parent)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var manifests []Manifest
 	for _, entry := range entries {
@@ -175,15 +182,22 @@ func List(parent string, limit int) ([]Manifest, error) {
 			continue
 		}
 		manifest, err := ReadManifest(parent, strings.TrimPrefix(entry.Name(), "scan-"))
-		if err == nil && manifest.CompletedAt != "" {
+		if err == nil && manifest.CompletedAt != "" && (board == nil || manifest.Board == *board) {
 			manifests = append(manifests, manifest)
 		}
 	}
 	sort.Slice(manifests, func(i, j int) bool { return manifests[i].StartedAt > manifests[j].StartedAt })
+	total := len(manifests)
+	if offset >= len(manifests) {
+		return nil, total, nil
+	}
+	if offset > 0 {
+		manifests = manifests[offset:]
+	}
 	if limit > 0 && len(manifests) > limit {
 		manifests = manifests[:limit]
 	}
-	return manifests, nil
+	return manifests, total, nil
 }
 
 func OpenArtifact(parent, scanID, name string) (*os.File, error) {

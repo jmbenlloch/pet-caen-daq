@@ -149,6 +149,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	if catalog != nil {
 		runService.Catalog = catalog
 		runService.AllocateRunID = catalog.AllocateRunID
+		scanService.AllocateRunID = catalog.AllocateRunID
 		runService.ReconcileCatalog = func(reconcileCtx context.Context, parent string) error {
 			_, err := catalog.Reconcile(reconcileCtx, parent)
 			return err

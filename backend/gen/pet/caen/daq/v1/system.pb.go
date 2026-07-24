@@ -3011,6 +3011,8 @@ func (x *CancelScanResponse) GetSnapshot() *TelemetrySnapshot {
 type ListScansRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Limit         uint32                 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        uint32                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
+	Board         *uint32                `protobuf:"varint,3,opt,name=board,proto3,oneof" json:"board,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3052,9 +3054,24 @@ func (x *ListScansRequest) GetLimit() uint32 {
 	return 0
 }
 
+func (x *ListScansRequest) GetOffset() uint32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *ListScansRequest) GetBoard() uint32 {
+	if x != nil && x.Board != nil {
+		return *x.Board
+	}
+	return 0
+}
+
 type ListScansResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scans         []*ScanSummary         `protobuf:"bytes,1,rep,name=scans,proto3" json:"scans,omitempty"`
+	TotalCount    uint32                 `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3094,6 +3111,13 @@ func (x *ListScansResponse) GetScans() []*ScanSummary {
 		return x.Scans
 	}
 	return nil
+}
+
+func (x *ListScansResponse) GetTotalCount() uint32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
 }
 
 type GetStaircaseRequest struct {
@@ -4631,11 +4655,16 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\frequested_by\x18\x02 \x01(\tR\vrequestedBy\"\x88\x01\n" +
 	"\x12CancelScanResponse\x122\n" +
 	"\x04scan\x18\x01 \x01(\v2\x1e.pet.caen.daq.v1.StaircaseScanR\x04scan\x12>\n" +
-	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"(\n" +
+	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"e\n" +
 	"\x10ListScansRequest\x12\x14\n" +
-	"\x05limit\x18\x01 \x01(\rR\x05limit\"G\n" +
+	"\x05limit\x18\x01 \x01(\rR\x05limit\x12\x16\n" +
+	"\x06offset\x18\x02 \x01(\rR\x06offset\x12\x19\n" +
+	"\x05board\x18\x03 \x01(\rH\x00R\x05board\x88\x01\x01B\b\n" +
+	"\x06_board\"h\n" +
 	"\x11ListScansResponse\x122\n" +
-	"\x05scans\x18\x01 \x03(\v2\x1c.pet.caen.daq.v1.ScanSummaryR\x05scans\".\n" +
+	"\x05scans\x18\x01 \x03(\v2\x1c.pet.caen.daq.v1.ScanSummaryR\x05scans\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\rR\n" +
+	"totalCount\".\n" +
 	"\x13GetStaircaseRequest\x12\x17\n" +
 	"\ascan_id\x18\x01 \x01(\tR\x06scanId\"J\n" +
 	"\x14GetStaircaseResponse\x122\n" +
@@ -5067,6 +5096,7 @@ func file_pet_caen_daq_v1_system_proto_init() {
 	}
 	file_pet_caen_daq_v1_system_proto_msgTypes[28].OneofWrappers = []any{}
 	file_pet_caen_daq_v1_system_proto_msgTypes[29].OneofWrappers = []any{}
+	file_pet_caen_daq_v1_system_proto_msgTypes[42].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

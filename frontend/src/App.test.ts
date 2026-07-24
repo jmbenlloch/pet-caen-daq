@@ -97,7 +97,7 @@ function dashboardApi(state = SystemState.READY): DaqApi {
     histograms: vi.fn().mockResolvedValue([]),
     startStaircase: vi.fn().mockResolvedValue(undefined),
     cancelScan: vi.fn().mockResolvedValue(undefined),
-    listScans: vi.fn().mockResolvedValue([]),
+    listScans: vi.fn().mockResolvedValue({ scans: [], totalCount: 0 }),
     staircase: vi.fn().mockResolvedValue(undefined),
   }
 }

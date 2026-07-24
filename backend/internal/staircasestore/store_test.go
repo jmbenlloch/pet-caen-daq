@@ -37,3 +37,34 @@ func TestWriterPersistsRecoverablePointsAndManifest(t *testing.T) {
 		t.Fatalf("final manifest = %#v", manifest)
 	}
 }
+
+func TestListPageFiltersBeforePaginating(t *testing.T) {
+	parent := t.TempDir()
+	request := staircase.Request{Minimum: 100, Maximum: 100, Step: 1, Dwell: time.Millisecond}
+	for _, item := range []struct {
+		id      string
+		board   uint32
+		started time.Time
+	}{
+		{id: "1", board: 2, started: time.Unix(10, 0)},
+		{id: "2", board: 0, started: time.Unix(20, 0)},
+		{id: "3", board: 2, started: time.Unix(30, 0)},
+	} {
+		writer, err := Create(parent, NewManifest(item.id, item.board, "operator", request, item.started))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.Finalize(item.started.Add(time.Second).UTC().Format(time.RFC3339Nano), "completed", "completed", true); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	board := uint32(2)
+	page, total, err := ListPage(parent, 1, 1, &board)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || len(page) != 1 || page[0].ScanID != "1" {
+		t.Fatalf("page=%+v total=%d, want second of two board-2 scans", page, total)
+	}
+}

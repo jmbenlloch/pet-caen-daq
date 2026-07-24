@@ -44,13 +44,18 @@ export interface DaqApi {
   ): Promise<HistogramDataset[]>
   startStaircase(request: StartStaircaseRequest): Promise<StaircaseScan | undefined>
   cancelScan(scanId: string, requestedBy: string): Promise<StaircaseScan | undefined>
-  listScans(limit?: number): Promise<ScanSummary[]>
+  listScans(limit?: number, offset?: number, board?: number): Promise<ScanHistoryPage>
   staircase(scanId: string): Promise<StaircaseScan | undefined>
 }
 
 export interface RunCommandResult {
   run?: RunSummary
   snapshot?: TelemetrySnapshot
+}
+
+export interface ScanHistoryPage {
+  scans: ScanSummary[]
+  totalCount: number
 }
 
 export function createDaqApi(baseUrl = window.location.origin): DaqApi {
@@ -131,8 +136,8 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     async cancelScan(scanId, requestedBy) {
       return (await scans.cancelScan({ scanId, requestedBy })).scan
     },
-    async listScans(limit = 50) {
-      return (await scans.listScans({ limit })).scans
+    async listScans(limit = 50, offset = 0, board) {
+      return await scans.listScans({ limit, offset, board })
     },
     async staircase(scanId) {
       return (await scans.getStaircase({ scanId })).scan

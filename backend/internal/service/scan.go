@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -31,6 +29,9 @@ type ScanService struct {
 	Telemetry  SnapshotPublisher
 	ScanParent string
 	Now        func() time.Time
+	// AllocateRunID shares the acquisition run catalog's monotonically
+	// increasing identity sequence with diagnostic scans.
+	AllocateRunID func(context.Context) (string, error)
 
 	mu     sync.Mutex
 	active *activeScan
@@ -61,13 +62,19 @@ func (s *ScanService) StartStaircase(ctx context.Context, request *connect.Reque
 	if state := s.Controller.StateSnapshot().State; state != acquisition.StateReady {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("staircase requires ready state, currently %s", state))
 	}
+	if s.AllocateRunID == nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("run number allocation is unavailable"))
+	}
 	now := time.Now
 	if s.Now != nil {
 		now = s.Now
 	}
-	scanID, err := newScanID(now())
+	scanID, err := s.AllocateRunID(ctx)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("allocate scan run number: %w", err))
+	}
+	if !validRunID.MatchString(scanID) {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("allocated scan run number %q is invalid", scanID))
 	}
 	writer, err := staircasestore.Create(s.ScanParent, staircasestore.NewManifest(scanID, domain.Board, actor, domain, now()))
 	if err != nil {
@@ -160,11 +167,17 @@ func (s *ScanService) ListScans(_ context.Context, request *connect.Request[daqv
 	if limit < 1 || limit > 100 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("limit must be between 1 and 100"))
 	}
-	manifests, err := staircasestore.List(s.ScanParent, limit)
+	offset := int(request.Msg.GetOffset())
+	var board *uint32
+	if request.Msg.Board != nil {
+		value := request.Msg.GetBoard()
+		board = &value
+	}
+	manifests, total, err := staircasestore.ListPage(s.ScanParent, limit, offset, board)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	response := &daqv1.ListScansResponse{}
+	response := &daqv1.ListScansResponse{TotalCount: uint32(total)}
 	for _, manifest := range manifests {
 		response.Scans = append(response.Scans, protoSummary(manifest))
 	}
@@ -258,12 +271,4 @@ func protoSummary(manifest staircasestore.Manifest) *daqv1.ScanSummary {
 		}
 	}
 	return summary
-}
-
-func newScanID(now time.Time) (string, error) {
-	var suffix [4]byte
-	if _, err := rand.Read(suffix[:]); err != nil {
-		return "", fmt.Errorf("allocate scan ID: %w", err)
-	}
-	return now.UTC().Format("20060102T150405.000000000Z") + "-" + hex.EncodeToString(suffix[:]), nil
 }

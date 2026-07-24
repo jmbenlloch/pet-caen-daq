@@ -323,10 +323,13 @@ message CancelScanResponse {
 
 message ListScansRequest {
   uint32 limit = 1;
+  uint32 offset = 2;
+  optional uint32 board = 3;
 }
 
 message ListScansResponse {
   repeated ScanSummary scans = 1;
+  uint32 total_count = 2;
 }
 
 message GetStaircaseRequest {
