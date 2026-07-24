@@ -122,16 +122,8 @@ func (w *Writer) writeManifest() error {
 }
 
 func Read(parent, scanID string) (Manifest, []staircase.Point, error) {
-	if strings.ContainsAny(scanID, `/\`) || scanID == "" {
-		return Manifest{}, nil, errors.New("invalid scan ID")
-	}
-	dir := filepath.Join(parent, "scan-"+scanID)
-	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	manifest, dir, err := readManifest(parent, scanID)
 	if err != nil {
-		return Manifest{}, nil, err
-	}
-	var manifest Manifest
-	if err := json.Unmarshal(data, &manifest); err != nil {
 		return Manifest{}, nil, err
 	}
 	file, err := os.Open(filepath.Join(dir, "points.jsonl"))
@@ -151,6 +143,27 @@ func Read(parent, scanID string) (Manifest, []staircase.Point, error) {
 	return manifest, points, scanner.Err()
 }
 
+func ReadManifest(parent, scanID string) (Manifest, error) {
+	manifest, _, err := readManifest(parent, scanID)
+	return manifest, err
+}
+
+func readManifest(parent, scanID string) (Manifest, string, error) {
+	if strings.ContainsAny(scanID, `/\`) || scanID == "" {
+		return Manifest{}, "", errors.New("invalid scan ID")
+	}
+	dir := filepath.Join(parent, "scan-"+scanID)
+	data, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return Manifest{}, "", err
+	}
+	var manifest Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return Manifest{}, "", err
+	}
+	return manifest, dir, nil
+}
+
 func List(parent string, limit int) ([]Manifest, error) {
 	entries, err := os.ReadDir(parent)
 	if err != nil {
@@ -161,7 +174,7 @@ func List(parent string, limit int) ([]Manifest, error) {
 		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "scan-") {
 			continue
 		}
-		manifest, _, err := Read(parent, strings.TrimPrefix(entry.Name(), "scan-"))
+		manifest, err := ReadManifest(parent, strings.TrimPrefix(entry.Name(), "scan-"))
 		if err == nil && manifest.CompletedAt != "" {
 			manifests = append(manifests, manifest)
 		}
@@ -171,6 +184,20 @@ func List(parent string, limit int) ([]Manifest, error) {
 		manifests = manifests[:limit]
 	}
 	return manifests, nil
+}
+
+func OpenArtifact(parent, scanID, name string) (*os.File, error) {
+	if strings.ContainsAny(scanID, `/\`) || scanID == "" || filepath.Base(name) != name {
+		return nil, errors.New("invalid scan artifact identity")
+	}
+	manifest, err := ReadManifest(parent, scanID)
+	if err != nil {
+		return nil, err
+	}
+	if manifest.Artifact == nil || manifest.Artifact.Name != name {
+		return nil, os.ErrNotExist
+	}
+	return os.Open(filepath.Join(parent, "scan-"+scanID, name))
 }
 
 func fileSHA256(path string) (string, error) {

@@ -5,12 +5,15 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircase"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircasestore"
 )
 
 func TestRunHistory(t *testing.T) {
@@ -62,6 +65,33 @@ func TestRunHistory(t *testing.T) {
 	_, err = service.ListRuns(context.Background(), connect.NewRequest(&daqv1.ListRunsRequest{Limit: 101}))
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("limit error = %v", err)
+	}
+}
+
+func TestRunHistoryIncludesAndFiltersStaircaseScans(t *testing.T) {
+	parent := t.TempDir()
+	request := staircase.Request{Board: 1, Minimum: 200, Maximum: 300, Step: 100, Dwell: time.Millisecond}
+	writer, err := staircasestore.Create(parent, staircasestore.NewManifest("scan-1", 1, "operator", request, time.Date(2026, 7, 24, 12, 0, 0, 0, time.UTC)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Append(staircase.Point{Threshold: 300}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Finalize("2026-07-24T12:00:01Z", "completed", "completed", true); err != nil {
+		t.Fatal(err)
+	}
+	service := &RunService{RunParent: parent}
+	listed, err := service.ListRuns(context.Background(), connect.NewRequest(&daqv1.ListRunsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed.Msg.Runs) != 1 || listed.Msg.Runs[0].GetRunType() != daqv1.RunType_RUN_TYPE_STAIRCASE || listed.Msg.Runs[0].GetRunId() != "scan-1" {
+		t.Fatalf("runs = %+v", listed.Msg.Runs)
+	}
+	found, err := service.SearchRuns(context.Background(), connect.NewRequest(&daqv1.SearchRunsRequest{RunType: daqv1.RunType_RUN_TYPE_STAIRCASE}))
+	if err != nil || len(found.Msg.Runs) != 1 || found.Msg.Runs[0].GetRunType() != daqv1.RunType_RUN_TYPE_STAIRCASE {
+		t.Fatalf("search=%+v error=%v", found, err)
 	}
 }
 

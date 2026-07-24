@@ -74,6 +74,24 @@
   text-align: left;
 }
 
+.run-type {
+  display: inline-flex;
+  border: 1px solid #47627d;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  color: #c9d7e7;
+  background: #17263a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.run-type.scan {
+  border-color: #8e6ac8;
+  color: #eadfff;
+  background: #2a1d43;
+}
+
 [data-theme='light'] .staircase-plot {
   border-color: #bac8d8;
   background: #fff;
@@ -89,6 +107,18 @@
 
 [data-theme='light'] .staircase-plot text {
   fill: #40536b;
+}
+
+[data-theme='light'] .run-type {
+  border-color: #9eb0c4;
+  color: #263b53;
+  background: #e8eef5;
+}
+
+[data-theme='light'] .run-type.scan {
+  border-color: #8e70bb;
+  color: #4e3277;
+  background: #eee7fa;
 }
 [data-theme='light'] {
   color-scheme: light;

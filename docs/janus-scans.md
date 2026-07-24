@@ -47,6 +47,10 @@ The threshold staircase described below is implemented on
   through `GetStaircase`.
 - The simulator returns deterministic threshold-dependent channel, T-OR, and
   Q-OR counters.
+- Finalized scans are included in the common run-history contract with
+  `run_type=STAIRCASE`; acquisitions use `run_type=DATA`. The run table shows
+  distinct type badges, and search accepts All types, Data runs, or Staircase
+  scans. Scan artifacts remain downloadable from the common artifact action.
 - Completion and cancellation perform a full hard, non-HV production
   configuration restore with register readback. Scan or restoration failures
   enter `FAULT`; successful cancellation returns to `READY`.

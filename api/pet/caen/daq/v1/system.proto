@@ -168,6 +168,8 @@ message SearchRunsRequest {
   optional uint64 run_number = 8;
   // Inclusive upper bound. Requires run_number.
   optional uint64 maximum_run_number = 9;
+  // Unspecified returns every type.
+  RunType run_type = 10;
 }
 
 message SearchRunsResponse {
@@ -444,6 +446,13 @@ message RunSummary {
   // Final cumulative statistics for a completed run. Absent for active,
   // incomplete, and legacy runs that predate statistics persistence.
   StatisticsTelemetry final_statistics = 12;
+  RunType run_type = 13;
+}
+
+enum RunType {
+  RUN_TYPE_UNSPECIFIED = 0;
+  RUN_TYPE_DATA = 1;
+  RUN_TYPE_STAIRCASE = 2;
 }
 
 message Artifact {

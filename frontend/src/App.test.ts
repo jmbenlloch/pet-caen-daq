@@ -6,6 +6,7 @@ import type { DaqApi } from './api'
 import {
   ConfigurationLayer,
   HealthStatus,
+  RunType,
   RunSummarySchema,
   SystemState,
   TelemetrySnapshotSchema,
@@ -465,6 +466,25 @@ describe('operator dashboard', () => {
     expect(wrapper.find('[aria-label="Search results"]').exists()).toBe(false)
     expect(wrapper.find('[aria-label="Stored runs"]').exists()).toBe(true)
     wrapper.unmount()
+  })
+
+  it('searches all, data, or staircase run types', async () => {
+    const api = dashboardApi()
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+    await wrapper.get('[aria-controls="run-search-form"]').trigger('click')
+    const type = wrapper.get('[aria-label="Run type"]')
+    expect(type.findAll('option').map((option) => option.text())).toEqual([
+      'All types',
+      'Data runs',
+      'Staircase scans',
+    ])
+    await type.setValue(String(RunType.STAIRCASE))
+    await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
+    await flushPromises()
+    expect(api.searchRuns).toHaveBeenCalledWith(
+      expect.objectContaining({ runType: RunType.STAIRCASE }),
+    )
   })
 
   it('derives enum choices and hides implementation-only search fields', async () => {

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { isMaskField, parseConfiguration, type ConfigurationField } from './configuration'
 import { bytes, compact, localDateTime } from './presentation'
+import { RunType } from './gen/pet/caen/daq/v1/system_pb'
 
 interface RunRecord {
   runId: string
@@ -15,6 +16,7 @@ interface RunRecord {
   stopMode: string
   presetTimeMilliseconds: bigint
   presetEventCount: bigint
+  runType: RunType
 }
 
 const props = withDefaults(
@@ -84,6 +86,7 @@ async function selectRun(run: RunRecord) {
     return
   }
   selectedRunId.value = run.runId
+  if (run.runType === RunType.STAIRCASE) return
   if (Object.hasOwn(configurations.value, run.runId)) return
   configurationLoading.value = run.runId
   delete configurationErrors.value[run.runId]
@@ -94,6 +97,10 @@ async function selectRun(run: RunRecord) {
   } finally {
     if (configurationLoading.value === run.runId) configurationLoading.value = ''
   }
+}
+
+function typeLabel(run: RunRecord) {
+  return run.runType === RunType.STAIRCASE ? 'Staircase scan' : 'Data run'
 }
 
 function downloadConfiguration(runId: string) {
@@ -128,6 +135,7 @@ function maskChannels(field: ConfigurationField) {
         <thead>
           <tr>
             <th scope="col">Run</th>
+            <th scope="col">Type</th>
             <th scope="col">Date</th>
             <th scope="col">Duration</th>
             <th scope="col">Events</th>
@@ -153,9 +161,14 @@ function maskChannels(field: ConfigurationField) {
                   {{ run.runId }}
                 </button>
               </th>
+              <td>
+                <span :class="['run-type', { scan: run.runType === RunType.STAIRCASE }]">{{
+                  typeLabel(run)
+                }}</span>
+              </td>
               <td>{{ localDateTime(run.startedAt) }}</td>
               <td>{{ duration(run) }}</td>
-              <td>{{ compact(run.eventCount) }}</td>
+              <td>{{ run.runType === RunType.STAIRCASE ? '—' : compact(run.eventCount) }}</td>
               <td>{{ bytes(totalSize(run)) }}</td>
               <td>
                 <span :class="['run-status', { incomplete: run.incomplete }]">
@@ -164,7 +177,7 @@ function maskChannels(field: ConfigurationField) {
               </td>
             </tr>
             <tr v-if="selectedRunId === run.runId" :id="`run-details-${run.runId}`">
-              <td colspan="6" class="run-detail-cell">
+              <td colspan="7" class="run-detail-cell">
                 <section class="run-detail" :aria-label="`Details for run ${run.runId}`">
                   <div class="run-detail-heading">
                     <div>
@@ -176,6 +189,10 @@ function maskChannels(field: ConfigurationField) {
                     </button>
                   </div>
                   <dl class="run-facts">
+                    <div>
+                      <dt>Type</dt>
+                      <dd>{{ typeLabel(run) }}</dd>
+                    </div>
                     <div>
                       <dt>Started</dt>
                       <dd>{{ localDateTime(run.startedAt) }}</dd>
@@ -192,11 +209,11 @@ function maskChannels(field: ConfigurationField) {
                       <dt>Termination</dt>
                       <dd>{{ run.terminationReason || 'Not reported' }}</dd>
                     </div>
-                    <div>
+                    <div v-if="run.runType !== RunType.STAIRCASE">
                       <dt>Events</dt>
                       <dd>{{ compact(run.eventCount) }}</dd>
                     </div>
-                    <div>
+                    <div v-if="run.runType !== RunType.STAIRCASE">
                       <dt>Raw batches</dt>
                       <dd>{{ compact(run.rawBatchCount) }}</dd>
                     </div>
@@ -204,7 +221,7 @@ function maskChannels(field: ConfigurationField) {
                       <dt>Data size</dt>
                       <dd>{{ bytes(totalSize(run)) }}</dd>
                     </div>
-                    <div>
+                    <div v-if="run.runType !== RunType.STAIRCASE">
                       <dt>Stop mode</dt>
                       <dd>{{ run.stopMode || 'Not reported' }}</dd>
                     </div>
@@ -238,7 +255,7 @@ function maskChannels(field: ConfigurationField) {
                     <p v-else class="empty">No artifact metadata was recorded.</p>
                   </div>
 
-                  <div class="run-detail-section">
+                  <div v-if="run.runType !== RunType.STAIRCASE" class="run-detail-section">
                     <div class="configuration-heading">
                       <div>
                         <h4>Configuration</h4>
@@ -315,6 +332,10 @@ function maskChannels(field: ConfigurationField) {
                         </div>
                       </details>
                     </div>
+                  </div>
+                  <div v-else class="run-detail-section">
+                    <h4>Scan dataset</h4>
+                    <p>Open the Scans workspace to compare channels, T-OR, and Q-OR curves.</p>
                   </div>
                 </section>
               </td>

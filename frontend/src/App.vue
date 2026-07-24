@@ -28,6 +28,7 @@ import {
   ConfigurationLayer,
   DiagnosticSeverity,
   HealthStatus,
+  RunType,
   SearchRunsRequestSchema,
   SystemState,
   type SearchRunsRequest,
@@ -101,6 +102,7 @@ function newSearchPredicate(): SearchPredicateInput {
 }
 const searchPredicates = ref<SearchPredicateInput[]>([newSearchPredicate()])
 const searchMinimumEvents = ref('')
+const searchRunType = ref(RunType.UNSPECIFIED)
 const searchRunNumber = ref('')
 const searchMaximumRunNumber = ref('')
 const searchFormError = ref('')
@@ -264,6 +266,7 @@ function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
     return create(SearchRunsRequestSchema, {
       configuration,
       minimumEventCount,
+      runType: searchRunType.value,
       runNumber,
       maximumRunNumber,
       limit: 20,
@@ -294,6 +297,7 @@ async function loadMoreSearchResults() {
 function clearRunSearch() {
   searchPredicates.value = [newSearchPredicate()]
   searchMinimumEvents.value = ''
+  searchRunType.value = RunType.UNSPECIFIED
   searchRunNumber.value = ''
   searchMaximumRunNumber.value = ''
   searchFormError.value = ''
@@ -1332,6 +1336,14 @@ onMounted(() => daq.connect())
               </button>
             </div>
             <div class="search-metadata">
+              <label>
+                Run type
+                <select v-model="searchRunType" aria-label="Run type">
+                  <option :value="RunType.UNSPECIFIED">All types</option>
+                  <option :value="RunType.DATA">Data runs</option>
+                  <option :value="RunType.STAIRCASE">Staircase scans</option>
+                </select>
+              </label>
               <label>
                 Run number
                 <input v-model="searchRunNumber" type="number" min="0" aria-label="Run number" />

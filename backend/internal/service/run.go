@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircasestore"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -97,7 +99,11 @@ const (
 )
 
 func (s *RunService) SearchRuns(ctx context.Context, request *connect.Request[daqv1.SearchRunsRequest]) (*connect.Response[daqv1.SearchRunsResponse], error) {
-	if s.Catalog == nil {
+	runType := request.Msg.GetRunType()
+	if runType != daqv1.RunType_RUN_TYPE_UNSPECIFIED && runType != daqv1.RunType_RUN_TYPE_DATA && runType != daqv1.RunType_RUN_TYPE_STAIRCASE {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_TYPE", fmt.Errorf("run_type is invalid"))
+	}
+	if s.Catalog == nil && runType != daqv1.RunType_RUN_TYPE_STAIRCASE {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_CATALOG_UNAVAILABLE", fmt.Errorf("run catalog is not configured"))
 	}
 	message := request.Msg
@@ -165,25 +171,42 @@ func (s *RunService) SearchRuns(ctx context.Context, request *connect.Request[da
 		}
 		query.Configuration = append(query.Configuration, converted)
 	}
-	runs, err := s.Catalog.List(ctx, query)
-	if err != nil {
-		return nil, serviceError(connect.CodeInternal, "RUN_SEARCH_FAILED", err)
-	}
 	response := &daqv1.SearchRunsResponse{}
-	hasMore := len(runs) > limit
-	if hasMore {
-		runs = runs[:limit]
+	if runType != daqv1.RunType_RUN_TYPE_STAIRCASE {
+		runs, err := s.Catalog.List(ctx, query)
+		if err != nil {
+			return nil, serviceError(connect.CodeInternal, "RUN_SEARCH_FAILED", err)
+		}
+		for _, run := range runs {
+			manifest, err := runstore.ReadManifest(filepath.Join(s.RunParent, "run-"+run.RunID), run.RunID)
+			if err != nil {
+				return nil, serviceError(connect.CodeInternal, "RUN_SEARCH_INSPECTION_FAILED", err)
+			}
+			response.Runs = append(response.Runs, manifestSummary(s.RunParent, manifest))
+		}
 	}
-	for _, run := range runs {
-		manifest, err := runstore.ReadManifest(filepath.Join(s.RunParent, "run-"+run.RunID), run.RunID)
+	if runType != daqv1.RunType_RUN_TYPE_DATA && scanCompatibleSearch(message) {
+		manifests, err := staircasestore.List(s.RunParent, 0)
 		if err != nil {
 			return nil, serviceError(connect.CodeInternal, "RUN_SEARCH_INSPECTION_FAILED", err)
 		}
-		response.Runs = append(response.Runs, manifestSummary(s.RunParent, manifest))
+		for _, manifest := range manifests {
+			if scanMatchesQuery(manifest, query) {
+				response.Runs = append(response.Runs, staircaseRunSummary(manifest))
+			}
+		}
 	}
-	if hasMore && len(runs) != 0 {
-		last := runs[len(runs)-1]
-		response.NextPageToken = encodeSearchCursor(searchCursor{StartedAt: last.StartedAt, RunID: last.RunID})
+	sort.Slice(response.Runs, func(i, j int) bool {
+		left, right := summaryStartedAt(response.Runs[i]), summaryStartedAt(response.Runs[j])
+		return left > right || left == right && response.Runs[i].GetRunId() > response.Runs[j].GetRunId()
+	})
+	hasMore := len(response.Runs) > limit
+	if hasMore {
+		response.Runs = response.Runs[:limit]
+	}
+	if hasMore && len(response.Runs) != 0 {
+		last := response.Runs[len(response.Runs)-1]
+		response.NextPageToken = encodeSearchCursor(searchCursor{StartedAt: summaryStartedAt(last), RunID: last.GetRunId()})
 	}
 	return connect.NewResponse(response), nil
 }
@@ -307,6 +330,20 @@ func (s *RunService) ListRuns(_ context.Context, request *connect.Request[daqv1.
 	for _, manifest := range manifests {
 		response.Runs = append(response.Runs, manifestSummary(s.RunParent, manifest))
 	}
+	scans, err := staircasestore.List(s.RunParent, limit)
+	if err != nil {
+		return nil, serviceError(connect.CodeInternal, "RUN_HISTORY_INSPECTION_FAILED", err)
+	}
+	for _, scan := range scans {
+		response.Runs = append(response.Runs, staircaseRunSummary(scan))
+	}
+	sort.Slice(response.Runs, func(i, j int) bool {
+		left, right := summaryStartedAt(response.Runs[i]), summaryStartedAt(response.Runs[j])
+		return left > right || left == right && response.Runs[i].GetRunId() > response.Runs[j].GetRunId()
+	})
+	if len(response.Runs) > limit {
+		response.Runs = response.Runs[:limit]
+	}
 	return connect.NewResponse(response), nil
 }
 
@@ -340,7 +377,10 @@ func (s *RunService) DownloadArtifact(_ context.Context, request *connect.Reques
 	}
 	file, _, err := runstore.OpenArtifact(s.RunParent, runID, name)
 	if errors.Is(err, runstore.ErrRunNotFound) || errors.Is(err, runstore.ErrArtifactNotFound) {
-		return serviceError(connect.CodeNotFound, "ARTIFACT_NOT_FOUND", err)
+		file, err = staircasestore.OpenArtifact(s.RunParent, runID, name)
+		if errors.Is(err, os.ErrNotExist) {
+			return serviceError(connect.CodeNotFound, "ARTIFACT_NOT_FOUND", err)
+		}
 	}
 	if err != nil {
 		return serviceError(connect.CodeInternal, "ARTIFACT_OPEN_FAILED", err)
@@ -367,6 +407,7 @@ func manifestSummary(parent string, manifest runstore.Manifest) *daqv1.RunSummar
 	run := &daqv1.RunSummary{
 		RunId: manifest.RunID, TerminationReason: manifest.TerminationReason,
 		EventCount: manifest.EventCount, RawBatchCount: manifest.RawBatchCount,
+		RunType: daqv1.RunType_RUN_TYPE_DATA,
 	}
 	if value, err := time.Parse(time.RFC3339Nano, manifest.StartedAt); err == nil {
 		run.StartedAt = timestamppb.New(value)
@@ -406,6 +447,56 @@ func statisticsTelemetry(statistics *runstore.RunStatistics) *daqv1.StatisticsTe
 		result.Boards = append(result.Boards, converted)
 	}
 	return result
+}
+
+func staircaseRunSummary(manifest staircasestore.Manifest) *daqv1.RunSummary {
+	run := &daqv1.RunSummary{
+		RunId: manifest.ScanID, RunType: daqv1.RunType_RUN_TYPE_STAIRCASE,
+		TerminationReason: manifest.TerminationReason,
+		Incomplete:        manifest.CompletedAt == "" || manifest.State == "running",
+	}
+	if value, err := time.Parse(time.RFC3339Nano, manifest.StartedAt); err == nil {
+		run.StartedAt = timestamppb.New(value)
+	}
+	if value, err := time.Parse(time.RFC3339Nano, manifest.CompletedAt); err == nil {
+		run.CompletedAt = timestamppb.New(value)
+	}
+	if artifact := manifest.Artifact; artifact != nil {
+		run.Artifacts = append(run.Artifacts, &daqv1.Artifact{
+			Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256,
+		})
+	}
+	return run
+}
+
+func scanCompatibleSearch(message *daqv1.SearchRunsRequest) bool {
+	return len(message.GetConfiguration()) == 0 && message.RunNumber == nil &&
+		message.MaximumRunNumber == nil && message.GetMinimumEventCount() == 0
+}
+
+func scanMatchesQuery(manifest staircasestore.Manifest, query runcatalog.Query) bool {
+	if query.TerminationReason != "" && manifest.TerminationReason != query.TerminationReason {
+		return false
+	}
+	if query.StartedAfter != "" && manifest.StartedAt < query.StartedAfter {
+		return false
+	}
+	if query.StartedBefore != "" && manifest.StartedAt > query.StartedBefore {
+		return false
+	}
+	if query.BeforeStartedAt != "" &&
+		(manifest.StartedAt > query.BeforeStartedAt ||
+			manifest.StartedAt == query.BeforeStartedAt && manifest.ScanID >= query.BeforeRunID) {
+		return false
+	}
+	return true
+}
+
+func summaryStartedAt(summary *daqv1.RunSummary) string {
+	if summary == nil || summary.GetStartedAt() == nil {
+		return ""
+	}
+	return summary.GetStartedAt().AsTime().UTC().Format(catalogTimestampFormat)
 }
 
 func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest]) (*connect.Response[daqv1.StartRunResponse], error) {
