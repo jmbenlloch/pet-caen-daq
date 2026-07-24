@@ -39,7 +39,8 @@ describe('StatisticsTab', () => {
     expect(wrapper.text()).toContain('10.0 Hz')
     await wrapper.findAll('[role="tab"]')[1].trigger('click')
     expect(wrapper.text()).toContain('Per-channel metric')
-    expect(wrapper.text()).toContain('timestamp-bearing event rate')
+    expect(wrapper.text()).toContain('Discriminator firings reported for each detector channel.')
+    expect(wrapper.text()).toContain('How to read and configure this panel')
     expect(wrapper.get('[aria-label="Board 0 channel statistics"]').text()).toContain('3.0 Hz')
 
     await wrapper.get('input[type="checkbox"]').setValue(true)
