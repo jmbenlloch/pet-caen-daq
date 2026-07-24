@@ -115,6 +115,16 @@ func TestSearchRunsValidatesContractAndCatalogAvailability(t *testing.T) {
 	if connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("predicate error=%v", err)
 	}
+	maximum := uint64(20)
+	_, err = service.SearchRuns(context.Background(), connect.NewRequest(&daqv1.SearchRunsRequest{MaximumRunNumber: &maximum}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("run range error=%v", err)
+	}
+	minimum := uint64(21)
+	_, err = service.SearchRuns(context.Background(), connect.NewRequest(&daqv1.SearchRunsRequest{RunNumber: &minimum, MaximumRunNumber: &maximum}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("inverted run range error=%v", err)
+	}
 }
 
 func TestCompletedRunReconcilesCatalogWithoutFailingOnCatalogError(t *testing.T) {

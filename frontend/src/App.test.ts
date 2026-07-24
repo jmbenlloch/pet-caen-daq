@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
 import type { DaqApi } from './api'
 import {
+  ConfigurationLayer,
   HealthStatus,
   RunSummarySchema,
   SystemState,
@@ -387,18 +388,28 @@ describe('operator dashboard', () => {
   it('searches run configuration with typed scoped predicates and clears results', async () => {
     const api = dashboardApi()
     vi.mocked(api.searchRuns).mockResolvedValue({
-      runs: [create(RunSummarySchema, { runId: 'matching-run', eventCount: 120n })],
+      runs: [create(RunSummarySchema, { runId: '40', eventCount: 120n })],
       nextPageToken: '',
       $typeName: 'pet.caen.daq.v1.SearchRunsResponse',
     })
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
 
-    await wrapper.get('[aria-label="Parameter 1"]').setValue('TD_CoarseThreshold')
-    await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
+    await wrapper.get('[aria-label="Parameter 1"]').trigger('click')
+    const parameterOptions = wrapper.get('[aria-label="Parameters 1"]')
+    expect(parameterOptions.text()).toContain('TestPulsePreamp')
+    expect(parameterOptions.findAll('[role="option"]').length).toBeGreaterThan(50)
+    await parameterOptions
+      .findAll('[role="option"]')
+      .find((option) => option.text().includes('TD_CoarseThreshold'))!
+      .trigger('click')
+    expect(wrapper.get('[aria-label="Parameter 1"]').attributes('aria-expanded')).toBe('false')
     await wrapper.get('[aria-label="Board 1"]').setValue('2')
+    await wrapper.get('[aria-label="Match 1"]').setValue('range')
     await wrapper.get('[aria-label="Value 1"]').setValue('200')
     await wrapper.get('[aria-label="Maximum 1"]').setValue('240')
+    await wrapper.get('[aria-label="Run number"]').setValue('40')
+    await wrapper.get('[aria-label="Maximum run number"]').setValue('42')
     await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
     await flushPromises()
 
@@ -410,6 +421,7 @@ describe('operator dashboard', () => {
         configuration: [
           expect.objectContaining({
             parameter: 'TD_CoarseThreshold',
+            layer: ConfigurationLayer.RESOLVED,
             scope: expect.objectContaining({
               scope: expect.objectContaining({
                 case: 'board',
@@ -422,13 +434,16 @@ describe('operator dashboard', () => {
             }),
           }),
         ],
+        runNumber: 40n,
+        maximumRunNumber: 42n,
       }),
     )
-    expect(wrapper.get('[aria-label="Search results"]').text()).toContain('matching-run')
+    expect(wrapper.get('[aria-label="Search results"]').text()).toContain('40')
+    expect(wrapper.find('[aria-label="Stored runs"]').exists()).toBe(false)
     await wrapper.get('[aria-label="Search results"]').get('.run-link').trigger('click')
     await flushPromises()
-    expect(api.runConfiguration).toHaveBeenCalledWith('matching-run')
-    const details = wrapper.get('[aria-label="Details for run matching-run"]')
+    expect(api.runConfiguration).toHaveBeenCalledWith('40')
+    const details = wrapper.get('[aria-label="Details for run 40"]')
     expect(details.text()).toContain('HV_Vbias')
     expect(details.text()).toContain('55.0')
     expect(details.text()).toContain('Download configuration (.txt)')
@@ -437,6 +452,7 @@ describe('operator dashboard', () => {
       .find((button) => button.text() === 'Clear')!
       .trigger('click')
     expect(wrapper.find('[aria-label="Search results"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Stored runs"]').exists()).toBe(true)
     wrapper.unmount()
   })
 
@@ -452,6 +468,82 @@ describe('operator dashboard', () => {
     const value = wrapper.get('[aria-label="Value 1"]')
     expect(value.element.tagName).toBe('SELECT')
     expect(value.findAll('option').map((option) => option.text())).toContain('PRESET_COUNTS')
+    wrapper.unmount()
+  })
+
+  it('searches channel parameters across all boards and channels by default', async () => {
+    const api = dashboardApi()
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Parameter 1"]').setValue('HG_Gain')
+    await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
+    expect((wrapper.get('[aria-label="Board 1"]').element as HTMLSelectElement).value).toBe('')
+    expect((wrapper.get('[aria-label="Channel 1"]').element as HTMLSelectElement).value).toBe('')
+    expect(wrapper.get('[aria-label="Channel 1"]').attributes('disabled')).toBeDefined()
+    await wrapper.get('[aria-label="Match 1"]').setValue('range')
+    await wrapper.get('[aria-label="Value 1"]').setValue('1')
+    await wrapper.get('[aria-label="Maximum 1"]').setValue('63')
+    await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
+    await flushPromises()
+
+    expect(api.searchRuns).toHaveBeenCalledWith(
+      expect.objectContaining({
+        configuration: [
+          expect.objectContaining({
+            parameter: 'HG_Gain',
+            layer: ConfigurationLayer.RESOLVED,
+          }),
+        ],
+      }),
+    )
+    expect(vi.mocked(api.searchRuns).mock.calls[0][0].configuration[0].scope).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('shows the allowed range for numeric configuration parameters', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Parameter 1"]').setValue('ZS_Threshold_HG')
+    await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
+
+    expect(wrapper.get('.search-range-hint').text()).toBe('Allowed: 0–65535')
+    expect(wrapper.get('[aria-label="Value 1"]').attributes('min')).toBe('0')
+    expect(wrapper.get('[aria-label="Value 1"]').attributes('max')).toBe('65535')
+    wrapper.unmount()
+  })
+
+  it('clearly distinguishes exact numeric searches from ranges', async () => {
+    const api = dashboardApi()
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    await wrapper.get('[aria-label="Parameter 1"]').setValue('HV_Vbias')
+    await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
+    expect((wrapper.get('[aria-label="Match 1"]').element as HTMLSelectElement).value).toBe('exact')
+    expect(wrapper.find('[aria-label="Maximum 1"]').exists()).toBe(false)
+    await wrapper.get('[aria-label="Value 1"]').setValue('20')
+    await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
+    await flushPromises()
+
+    const predicate = vi.mocked(api.searchRuns).mock.calls[0][0].configuration[0]
+    expect(predicate.comparison).toEqual(
+      expect.objectContaining({
+        case: 'real',
+        value: expect.objectContaining({ equal: 20 }),
+      }),
+    )
+    if (predicate.comparison.case === 'real') {
+      expect(predicate.comparison.value.minimum).toBeUndefined()
+      expect(predicate.comparison.value.maximum).toBeUndefined()
+    }
+
+    await wrapper.get('[aria-label="Match 1"]').setValue('range')
+    expect(wrapper.find('[aria-label="Maximum 1"]').exists()).toBe(true)
+    expect(wrapper.get('[aria-label="Value 1"]').element.parentElement?.textContent).toContain(
+      'Minimum',
+    )
     wrapper.unmount()
   })
 })

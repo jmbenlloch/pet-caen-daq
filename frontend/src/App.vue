@@ -78,6 +78,7 @@ type SearchScope = 'global' | 'board' | 'channel'
 interface SearchPredicateInput {
   id: number
   parameter: string
+  numericMatch: 'exact' | 'range'
   board: string
   channel: string
   value: string
@@ -88,17 +89,20 @@ function newSearchPredicate(): SearchPredicateInput {
   return {
     id: nextSearchPredicateId++,
     parameter: '',
-    board: '0',
-    channel: '0',
+    numericMatch: 'exact',
+    board: '',
+    channel: '',
     value: '',
     maximum: '',
   }
 }
 const searchPredicates = ref<SearchPredicateInput[]>([newSearchPredicate()])
-const searchTerminationReason = ref('')
 const searchMinimumEvents = ref('')
+const searchRunNumber = ref('')
+const searchMaximumRunNumber = ref('')
 const searchFormError = ref('')
 const lastSearchRequest = ref<SearchRunsRequest>()
+const openSearchParameterId = ref<number>()
 function addSearchPredicate() {
   searchPredicates.value.push(newSearchPredicate())
 }
@@ -123,11 +127,43 @@ function searchOptions(parameter: JanusParameter): string[] {
   return parameter.widget === 'boolean' ? ['0', '1'] : []
 }
 
+function searchAllowedRange(parameter: JanusParameter) {
+  if (parameter.min !== undefined && parameter.max !== undefined)
+    return `Allowed: ${parameter.min}–${parameter.max}`
+  if (parameter.min !== undefined) return `Minimum allowed: ${parameter.min}`
+  if (parameter.max !== undefined) return `Maximum allowed: ${parameter.max}`
+  return ''
+}
+
 function selectSearchParameter(predicate: SearchPredicateInput) {
   predicate.value = ''
   predicate.maximum = ''
-  predicate.board = '0'
-  predicate.channel = '0'
+  predicate.numericMatch = 'exact'
+  predicate.board = ''
+  predicate.channel = ''
+}
+
+function matchingSearchParameters(predicate: SearchPredicateInput) {
+  const query = predicate.parameter.trim().toLocaleLowerCase()
+  if (!query) return janusParameters
+  return janusParameters.filter(
+    (parameter) =>
+      parameter.name.toLocaleLowerCase().includes(query) ||
+      parameter.section.toLocaleLowerCase().includes(query) ||
+      parameter.description.toLocaleLowerCase().includes(query),
+  )
+}
+
+function chooseSearchParameter(predicate: SearchPredicateInput, parameter: JanusParameter) {
+  predicate.parameter = parameter.name
+  selectSearchParameter(predicate)
+  openSearchParameterId.value = undefined
+}
+
+function closeSearchParameterList(event: FocusEvent, predicateId: number) {
+  const container = event.currentTarget as HTMLElement
+  if (event.relatedTarget instanceof Node && container.contains(event.relatedTarget)) return
+  if (openSearchParameterId.value === predicateId) openSearchParameterId.value = undefined
 }
 
 function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
@@ -144,38 +180,44 @@ function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
         if (!parameter) throw new Error(`Choose "${predicate.parameter}" from the parameter list.`)
         const valueType = searchValueType(parameter)
         const scope = parameter.scope as SearchScope
+        const layer =
+          scope === 'global' ? ConfigurationLayer.REQUESTED : ConfigurationLayer.RESOLVED
         const scopeValue =
           scope === 'global'
             ? { case: 'global' as const, value: true }
-            : scope === 'board'
-              ? { case: 'board' as const, value: Number(predicate.board) }
-              : {
-                  case: 'channel' as const,
-                  value: { board: Number(predicate.board), channel: Number(predicate.channel) },
-                }
+            : !predicate.board
+              ? undefined
+              : scope === 'board' || !predicate.channel
+                ? { case: 'board' as const, value: Number(predicate.board) }
+                : {
+                    case: 'channel' as const,
+                    value: { board: Number(predicate.board), channel: Number(predicate.channel) },
+                  }
         const scopedNumbers =
-          scopeValue.case === 'board'
+          scopeValue?.case === 'board'
             ? [scopeValue.value]
-            : scopeValue.case === 'channel'
+            : scopeValue?.case === 'channel'
               ? [scopeValue.value.board, scopeValue.value.channel]
               : []
         if (scopedNumbers.some((value) => !Number.isInteger(value) || value < 0))
           throw new Error('Board and channel must be non-negative integers.')
-        const requestScope = { scope: scopeValue }
+        const requestScope = scopeValue ? { scope: scopeValue } : undefined
         if (valueType === 'text') {
           return {
             parameter: parameter.name,
-            layer: ConfigurationLayer.RESOLVED,
+            layer,
             scope: requestScope,
             comparison: { case: 'text' as const, value: { equal: requestedValue } },
           }
         }
-        const isRange = Boolean(requestedMaximum)
+        const isRange = predicate.numericMatch === 'range'
+        if (isRange && !requestedMaximum)
+          throw new Error('Range filters need both a minimum and maximum.')
         if (valueType === 'integer') {
           const value = BigInt(requestedValue)
           return {
             parameter: parameter.name,
-            layer: ConfigurationLayer.RESOLVED,
+            layer,
             scope: requestScope,
             comparison: {
               case: 'integer' as const,
@@ -191,7 +233,7 @@ function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
           throw new Error('Real-number filters need valid numeric values.')
         return {
           parameter: parameter.name,
-          layer: ConfigurationLayer.RESOLVED,
+          layer,
           scope: requestScope,
           comparison: {
             case: 'real' as const,
@@ -199,13 +241,27 @@ function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
           },
         }
       })
-    const minimumEventCount = searchMinimumEvents.value.trim()
-      ? BigInt(searchMinimumEvents.value)
-      : 0n
+    const minimumEvents = String(searchMinimumEvents.value).trim()
+    const requestedRunNumber = String(searchRunNumber.value).trim()
+    const requestedMaximumRunNumber = String(searchMaximumRunNumber.value).trim()
+    const minimumEventCount = minimumEvents ? BigInt(minimumEvents) : 0n
+    const runNumber = requestedRunNumber ? BigInt(requestedRunNumber) : undefined
+    const maximumRunNumber = requestedMaximumRunNumber
+      ? BigInt(searchMaximumRunNumber.value)
+      : undefined
+    if (runNumber !== undefined && runNumber < 0n)
+      throw new Error('Run number must be non-negative.')
+    if (maximumRunNumber !== undefined && maximumRunNumber < 0n)
+      throw new Error('Maximum run number must be non-negative.')
+    if (maximumRunNumber !== undefined && runNumber === undefined)
+      throw new Error('A maximum run number requires a run number.')
+    if (runNumber !== undefined && maximumRunNumber !== undefined && runNumber > maximumRunNumber)
+      throw new Error('Run number must not exceed the maximum.')
     return create(SearchRunsRequestSchema, {
       configuration,
-      terminationReason: searchTerminationReason.value.trim(),
       minimumEventCount,
+      runNumber,
+      maximumRunNumber,
       limit: 20,
       pageToken,
     })
@@ -233,8 +289,9 @@ async function loadMoreSearchResults() {
 
 function clearRunSearch() {
   searchPredicates.value = [newSearchPredicate()]
-  searchTerminationReason.value = ''
   searchMinimumEvents.value = ''
+  searchRunNumber.value = ''
+  searchMaximumRunNumber.value = ''
   searchFormError.value = ''
   lastSearchRequest.value = undefined
   daq.clearSearch()
@@ -1131,50 +1188,108 @@ onMounted(() => daq.connect())
             :key="predicate.id"
             class="search-predicate"
           >
-            <label>
-              Parameter
+            <div
+              class="search-parameter-field"
+              @focusout="closeSearchParameterList($event, predicate.id)"
+            >
+              <label :for="`search-parameter-${predicate.id}`">Parameter</label>
               <input
+                :id="`search-parameter-${predicate.id}`"
                 v-model="predicate.parameter"
                 :aria-label="`Parameter ${index + 1}`"
-                :list="`search-parameters-${predicate.id}`"
+                role="combobox"
+                aria-autocomplete="list"
+                :aria-expanded="openSearchParameterId === predicate.id"
+                :aria-controls="`search-parameters-${predicate.id}`"
                 placeholder="Search parameters…"
                 autocomplete="off"
+                @focus="openSearchParameterId = predicate.id"
+                @click="openSearchParameterId = predicate.id"
+                @input="selectSearchParameter(predicate)"
                 @change="selectSearchParameter(predicate)"
               />
-              <datalist :id="`search-parameters-${predicate.id}`">
-                <option
-                  v-for="parameter in janusParameters"
+              <div
+                v-if="openSearchParameterId === predicate.id"
+                :id="`search-parameters-${predicate.id}`"
+                class="search-parameter-options"
+                role="listbox"
+                :aria-label="`Parameters ${index + 1}`"
+              >
+                <button
+                  v-for="parameter in matchingSearchParameters(predicate)"
                   :key="parameter.name"
-                  :value="parameter.name"
+                  type="button"
+                  role="option"
+                  :aria-selected="predicate.parameter === parameter.name"
+                  @click="chooseSearchParameter(predicate, parameter)"
                 >
-                  {{ parameter.section }} — {{ parameter.description }}
-                </option>
-              </datalist>
-            </label>
+                  <strong>{{ parameter.name }}</strong>
+                  <span>{{ parameter.section }} — {{ parameter.description }}</span>
+                </button>
+                <p v-if="!matchingSearchParameters(predicate).length">No parameters found.</p>
+              </div>
+            </div>
             <div v-if="searchParameter(predicate)" class="search-scope">
               Scope
               <strong>{{ searchParameter(predicate)?.scope }}</strong>
             </div>
             <label v-if="searchParameter(predicate)?.scope !== 'global'">
               Board
-              <input
+              <select
                 v-model="predicate.board"
-                type="number"
-                min="0"
                 :aria-label="`Board ${index + 1}`"
-              />
+                @change="predicate.channel = ''"
+              >
+                <option value="">All boards</option>
+                <option v-for="board in 4" :key="board - 1" :value="String(board - 1)">
+                  Board {{ board - 1 }}
+                </option>
+              </select>
             </label>
             <label v-if="searchParameter(predicate)?.scope === 'channel'">
               Channel
-              <input
+              <select
                 v-model="predicate.channel"
-                type="number"
-                min="0"
+                :disabled="!predicate.board"
                 :aria-label="`Channel ${index + 1}`"
-              />
+              >
+                <option value="">All channels</option>
+                <option v-for="channel in 64" :key="channel - 1" :value="String(channel - 1)">
+                  Channel {{ channel - 1 }}
+                </option>
+              </select>
+            </label>
+            <label
+              v-if="
+                searchParameter(predicate) &&
+                searchValueType(searchParameter(predicate)!) !== 'text'
+              "
+              class="search-match"
+            >
+              Match
+              <select v-model="predicate.numericMatch" :aria-label="`Match ${index + 1}`">
+                <option value="exact">Exact value</option>
+                <option value="range">Range</option>
+              </select>
             </label>
             <label v-if="searchParameter(predicate)">
-              {{ searchValueType(searchParameter(predicate)!) === 'text' ? 'Value' : 'Minimum' }}
+              <span>
+                {{
+                  searchValueType(searchParameter(predicate)!) === 'text' ||
+                  predicate.numericMatch === 'exact'
+                    ? 'Value'
+                    : 'Minimum'
+                }}
+                <small
+                  v-if="
+                    searchValueType(searchParameter(predicate)!) !== 'text' &&
+                    searchAllowedRange(searchParameter(predicate)!)
+                  "
+                  class="search-range-hint"
+                >
+                  {{ searchAllowedRange(searchParameter(predicate)!) }}
+                </small>
+              </span>
               <select
                 v-if="searchOptions(searchParameter(predicate)!).length"
                 v-model="predicate.value"
@@ -1202,10 +1317,11 @@ onMounted(() => daq.connect())
             <label
               v-if="
                 searchParameter(predicate) &&
-                searchValueType(searchParameter(predicate)!) !== 'text'
+                searchValueType(searchParameter(predicate)!) !== 'text' &&
+                predicate.numericMatch === 'range'
               "
             >
-              Maximum <span class="optional">(optional)</span>
+              Maximum
               <input
                 v-model="predicate.maximum"
                 type="number"
@@ -1227,8 +1343,17 @@ onMounted(() => daq.connect())
           </div>
           <div class="search-metadata">
             <label>
-              Termination reason
-              <input v-model="searchTerminationReason" placeholder="preset_counts" />
+              Run number
+              <input v-model="searchRunNumber" type="number" min="0" aria-label="Run number" />
+            </label>
+            <label>
+              Maximum run number <span class="optional">(optional)</span>
+              <input
+                v-model="searchMaximumRunNumber"
+                type="number"
+                min="0"
+                aria-label="Maximum run number"
+              />
             </label>
             <label>
               Minimum events
@@ -1275,6 +1400,7 @@ onMounted(() => daq.connect())
           </button>
         </div>
         <RunHistoryTable
+          v-else
           :runs="daq.runHistory.value"
           :configuration="api.runConfiguration"
           :download-artifact="daq.downloadArtifact"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { parseConfiguration } from './configuration'
+import { isMaskField, parseConfiguration, type ConfigurationField } from './configuration'
 import { bytes, compact, localDateTime } from './presentation'
 
 interface RunRecord {
@@ -105,6 +105,19 @@ function downloadConfiguration(runId: string) {
   anchor.download = `run_${runId}_configuration.txt`
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+function maskChannels(field: ConfigurationField) {
+  if (!isMaskField(field)) return []
+  try {
+    const value = BigInt(field.value)
+    const offset = field.name.endsWith('1') ? 32 : 0
+    return Array.from({ length: 32 }, (_, bit) => bit)
+      .filter((bit) => (value & (1n << BigInt(bit))) !== 0n)
+      .map((bit) => bit + offset)
+  } catch {
+    return []
+  }
 }
 </script>
 
@@ -281,7 +294,19 @@ function downloadConfiguration(runId: string) {
                                   }}
                                 </td>
                                 <td>
-                                  <code>{{ field.value }}</code>
+                                  <details v-if="isMaskField(field)" class="mask-value">
+                                    <summary>
+                                      <code>{{ field.value }}</code>
+                                    </summary>
+                                    <span>
+                                      {{
+                                        maskChannels(field).length
+                                          ? `Channels: ${maskChannels(field).join(', ')}`
+                                          : 'No channels selected'
+                                      }}
+                                    </span>
+                                  </details>
+                                  <code v-else>{{ field.value }}</code>
                                 </td>
                                 <td>{{ field.help || '—' }}</td>
                               </tr>

@@ -61,3 +61,45 @@ func TestGeneratedClientSearchesRunCatalog(t *testing.T) {
 		t.Fatalf("search response=%+v", response.Msg)
 	}
 }
+
+func TestGeneratedClientSearchesExactRunNumber(t *testing.T) {
+	parent := t.TempDir()
+	catalog, err := runcatalog.Open(filepath.Join(parent, "catalog.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer catalog.Close()
+	for _, id := range []string{"27", "28", "29"} {
+		writer, err := runstore.Create(parent, runstore.Manifest{RunID: id, StartedAt: "2026-07-22T12:00:00Z"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.Finalize("2026-07-22T12:01:00Z", "operator_stop"); err != nil {
+			t.Fatal(err)
+		}
+		manifest, err := runstore.ReadManifest(filepath.Join(parent, "run-"+id), id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := catalog.IndexManifest(context.Background(), runcatalog.IndexRequest{
+			Manifest: manifest, ManifestPath: filepath.Join(parent, "run-"+id, "manifest.json"), ManifestSHA256: "hash-" + id,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	path, handler := daqv1connect.NewRunServiceHandler(&service.RunService{RunParent: parent, Catalog: catalog})
+	mux := http.NewServeMux()
+	mux.Handle(path, handler)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	client := daqv1connect.NewRunServiceClient(server.Client(), server.URL)
+	runNumber := uint64(28)
+	response, err := client.SearchRuns(context.Background(), connect.NewRequest(&daqv1.SearchRunsRequest{RunNumber: &runNumber}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Msg.GetRuns()) != 1 || response.Msg.GetRuns()[0].GetRunId() != "28" {
+		t.Fatalf("search response=%+v", response.Msg)
+	}
+}

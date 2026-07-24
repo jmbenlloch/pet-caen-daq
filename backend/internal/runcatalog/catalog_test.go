@@ -135,6 +135,60 @@ func TestListUsesStableExclusivePaginationCursor(t *testing.T) {
 	}
 }
 
+func TestListFiltersByExactRunNumberAndInclusiveRange(t *testing.T) {
+	catalog, err := Open(filepath.Join(t.TempDir(), "catalog.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer catalog.Close()
+	for _, id := range []string{"8", "9", "10", "run-9"} {
+		if err := catalog.IndexManifest(context.Background(), IndexRequest{
+			Manifest:     runstore.Manifest{SchemaVersion: 1, RunID: id, StartedAt: "2026-07-22T12:00:00Z"},
+			ManifestPath: "/runs/run-" + id + "/manifest.json", ManifestSHA256: "hash-" + id,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exact := uint64(9)
+	runs, err := catalog.List(context.Background(), Query{RunNumber: &exact})
+	if err != nil || len(runs) != 1 || runs[0].RunID != "9" {
+		t.Fatalf("exact runs=%+v error=%v", runs, err)
+	}
+	maximum := uint64(10)
+	runs, err = catalog.List(context.Background(), Query{RunNumber: &exact, MaximumRunNumber: &maximum})
+	if err != nil || len(runs) != 2 {
+		t.Fatalf("range runs=%+v error=%v", runs, err)
+	}
+}
+
+func TestListResolvedChannelMatchesInheritedBoardValue(t *testing.T) {
+	catalog, err := Open(filepath.Join(t.TempDir(), "catalog.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer catalog.Close()
+	gain := int64(55)
+	if err := catalog.IndexManifest(context.Background(), IndexRequest{
+		Manifest:     runstore.Manifest{SchemaVersion: 1, RunID: "28", StartedAt: "2026-07-22T12:00:00Z"},
+		ManifestPath: "/runs/run-28/manifest.json", ManifestSHA256: "hash-28",
+		Configuration: []ConfigurationValue{{
+			Layer: "resolved", Parameter: "HG_Gain", Board: 0, Channel: -1,
+			Type: ValueInteger, Integer: &gain, RawValue: "55",
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	board, channel := 0, 0
+	minimum, maximum := int64(1), int64(63)
+	runs, err := catalog.List(context.Background(), Query{Configuration: []Predicate{{
+		Layer: "resolved", Parameter: "HG_Gain", Board: &board, Channel: &channel,
+		IntegerMinimum: &minimum, IntegerMaximum: &maximum,
+	}}})
+	if err != nil || len(runs) != 1 || runs[0].RunID != "28" {
+		t.Fatalf("inherited channel search runs=%+v error=%v", runs, err)
+	}
+}
+
 func pointer[T any](value T) *T { return &value }
 
 func TestCatalogAllocatesMonotonicRunIDsAboveIndexedRuns(t *testing.T) {
