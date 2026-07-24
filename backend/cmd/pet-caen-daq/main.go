@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1/daqv1connect"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
@@ -128,6 +130,11 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		client.Close()
 		return err
 	}
+	if !*inspectOnly {
+		firmwareCtx, cancelFirmware := context.WithTimeout(ctx, 5*time.Second)
+		readHVModuleFirmware(firmwareCtx, client, &topology, output)
+		cancelFirmware()
+	}
 	printDiscoveredDevices(output, topology)
 	defer client.Close()
 	if *inspectOnly {
@@ -198,7 +205,11 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	}()
 	boards := make([]configaudit.BoardEvidence, 0, len(topology.Boards))
 	for _, board := range topology.Boards {
-		boards = append(boards, configaudit.BoardEvidence{Board: int(board.Chain), FirmwareRevision: board.FirmwareRevision})
+		boards = append(boards, configaudit.BoardEvidence{
+			Board: int(board.Chain), FirmwareRevision: board.FirmwareRevision,
+			HVModuleFirmwareRaw: board.HVModuleFirmwareRaw, HVModuleFirmwareVersion: board.HVModuleFirmwareVersion,
+			HVModuleFirmwareAvailable: board.HVModuleFirmwareAvailable,
+		})
 	}
 	runService := &service.RunService{
 		Controller: coordinator, Telemetry: publisher, Boards: boards,
@@ -281,8 +292,30 @@ func executionIdentity(topology dt5215.Topology, connections []janusconfig.Conne
 func printDiscoveredDevices(output io.Writer, topology dt5215.Topology) {
 	fmt.Fprintf(output, "devices found=%d\n", len(topology.Boards))
 	for _, board := range topology.Boards {
-		fmt.Fprintf(output, "device chain=%d node=%d product_id=%d fpga_firmware=%#08x acquisition_status=%#08x\n",
-			board.Chain, board.Node, board.ProductID, board.FirmwareRevision, board.AcquisitionState)
+		hvFirmware := "unavailable"
+		if board.HVModuleFirmwareAvailable {
+			hvFirmware = strconv.FormatFloat(float64(board.HVModuleFirmwareVersion), 'f', 1, 32)
+		}
+		fmt.Fprintf(output, "device chain=%d node=%d product_id=%d fpga_firmware=%#08x hv_module_firmware=%s hv_module_firmware_raw=%#08x acquisition_status=%#08x\n",
+			board.Chain, board.Node, board.ProductID, board.FirmwareRevision, hvFirmware, board.HVModuleFirmwareRaw, board.AcquisitionState)
+	}
+}
+
+func readHVModuleFirmware(ctx context.Context, hardware dt5202.HVHardware, topology *dt5215.Topology, output io.Writer) {
+	for index := range topology.Boards {
+		board := &topology.Boards[index]
+		raw, version, err := dt5202.ReadHVModuleFirmware(ctx, hardware, board.Chain, board.Node)
+		board.HVModuleFirmwareRaw = raw
+		if err != nil {
+			fmt.Fprintf(output, "device warning chain=%d node=%d hv_module_firmware=unavailable error=%v\n", board.Chain, board.Node, err)
+			continue
+		}
+		if math.IsNaN(float64(version)) {
+			fmt.Fprintf(output, "device warning chain=%d node=%d hv_module_firmware=unavailable raw=%#08x\n", board.Chain, board.Node, raw)
+			continue
+		}
+		board.HVModuleFirmwareVersion = version
+		board.HVModuleFirmwareAvailable = true
 	}
 }
 
@@ -299,7 +332,9 @@ func topologySnapshot(topology dt5215.Topology) *daqv1.TelemetrySnapshot {
 	boards := make(map[uint16][]*daqv1.Board)
 	for _, board := range topology.Boards {
 		boards[board.Chain] = append(boards[board.Chain], &daqv1.Board{
-			Node: uint32(board.Node), ProductId: board.ProductID, FpgaFirmware: board.FirmwareRevision, Health: daqv1.HealthStatus_HEALTH_STATUS_OK,
+			Node: uint32(board.Node), ProductId: board.ProductID, FpgaFirmware: board.FirmwareRevision,
+			HvModuleFirmwareRaw: board.HVModuleFirmwareRaw, HvModuleFirmwareVersion: board.HVModuleFirmwareVersion,
+			HvModuleFirmwareAvailable: board.HVModuleFirmwareAvailable, Health: daqv1.HealthStatus_HEALTH_STATUS_OK,
 		})
 	}
 	for index, chain := range topology.Chains {

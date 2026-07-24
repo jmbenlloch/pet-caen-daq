@@ -60,11 +60,14 @@ type EnumerationInfo struct {
 }
 
 type BoardInfo struct {
-	Chain            uint16
-	Node             uint16
-	ProductID        uint32
-	FirmwareRevision uint32
-	AcquisitionState uint32
+	Chain                     uint16
+	Node                      uint16
+	ProductID                 uint32
+	FirmwareRevision          uint32
+	HVModuleFirmwareRaw       uint32
+	HVModuleFirmwareVersion   float32
+	HVModuleFirmwareAvailable bool
+	AcquisitionState          uint32
 }
 
 func EncodeChainInfoRequest(chain uint16) ([]byte, error) {

@@ -164,6 +164,16 @@ The DT5202 HV module is accessed indirectly through `a_hv_regaddr` and `a_hv_reg
 
 The source-confirmed hard-configuration sequence initializes the bus, selects PID precision through peripheral register 30, writes voltage register 2 twice, current-limit register 5 twice, temperature coefficients 7/8/9 twice, and feedback coefficient/enable registers 28/1 twice. Repeated writes reproduce FERSlib's workaround for unreliable first accesses. Applying this plan is a separate explicit operation because changing HV setpoints is safety-relevant; ordinary FPGA configuration does not implicitly perform it.
 
+JANUS also reads A7585 HV-module firmware from peripheral register 252 with
+data type 3, producing indirect selector `0x000103fc`. The returned 32-bit word
+contains IEEE-754 float bits: JANUS prints the decoded value during connection
+and stores it in run information. Native normal startup now performs the same
+source-confirmed read, preserves both the raw word and decoded value in board
+telemetry and run configuration evidence, and reports unavailable or NaN
+results without aborting acquisition. `-inspect-only` deliberately skips this
+probe because indirect HV reads require selector writes and that mode promises
+no hardware writes. The simulator returns deterministic A7585 version `1.2`.
+
 ## Pedestal calibration semantics
 
 `Pedestal` is not a DT5202 register. FERSlib loads 64 low-gain and 64 high-gain calibration values from a protected flash page during board connection, then corrects decoded energy as `raw + common_pedestal - channel_calibration`, clamped to the energy range. The Go decoder preserves raw values and exposes this correction as a separate pure step requiring calibration provenance.

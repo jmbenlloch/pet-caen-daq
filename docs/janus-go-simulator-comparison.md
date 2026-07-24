@@ -24,6 +24,20 @@ The comparison supports these conclusions:
 - All 28 HV selector/data settings written by both clients had equal values.
   Go additionally wrote selector `0x021e = 1` and `0x2001 = 0` on every board
   as explicit enable/shutdown safety state.
+- A focused follow-up on 2026-07-24 applied two matched HV profiles and
+  explicitly switched all four simulated outputs on and off from both clients.
+  Every functional voltage, current-limit, temperature-sensor, feedback, and
+  output-enable selector/data value was equal. Go reinitializes the HV bus
+  before every output switch; JANUS relies on FERSlib's process-local
+  `HVinit` state after the first initialization.
+- Both clients use the firmware-4+ direct monitor registers for FPGA/board/HV
+  temperatures, voltage, current, and status. Go reads the combined HV status
+  word once per sample; JANUS reads that same word separately for detector
+  temperature, HV temperature, and output/fault status.
+- JANUS also reads A7585 HV-module firmware register 252 through indirect
+  selector `0x000103fc`, interprets its raw IEEE-754 bits as a version number,
+  prints it during connection, and records it in JANUS run information. The
+  native backend previously recorded only DT5202 FPGA firmware.
 - The complete configuration transcripts are **not byte-identical**. JANUS
   issued 1,900 `WREG` requests in the selected configuration cycle and Go
   issued 2,398. JANUS uses `CitirocSlowControl`; Go performs the
@@ -37,6 +51,64 @@ their application-level data is decoder-compatible. It does not by itself
 prove that the different Citiroc and command sequences are equivalent on
 physical hardware; the native sequence remains covered by source-derived
 encoders, byte-level tests, and the separately indexed real-hardware captures.
+
+## Focused HV configuration and switching follow-up
+
+The 2026-07-24 follow-up used the same JANUS/FERSlib and simulator versions
+listed below. Both clients reached `READY`; no acquisition was active while
+switching HV. The Go backend was launched with `-authorize-hv-config`, and its
+`SystemService/SetHighVoltage` operation was used with an empty board list to
+select all four boards. JANUS used its native console HV panel's all-board
+control.
+
+| Profile | `HV_Vbias` | `HV_Imax` | `TempSensType` | Feedback |
+| --- | ---: | ---: | --- | --- |
+| A | 40.0 V | 0.5 mA | TMP37 | disabled, 20 mV/°C |
+| B | 60.0 V | 2.0 mA | LM94021_G11 | enabled, 35 mV/°C |
+
+For both profiles and every board, the functional indirect HV transactions
+matched:
+
+| Function | Selector | Profile A data | Profile B data |
+| --- | ---: | ---: | ---: |
+| Bias voltage | `0x0102` | `400000` | `600000` |
+| Current limit | `0x0105` | `5000` | `20000` |
+| Temperature coefficients | `0x0107`–`0x0109` | `0, 500000, 0` | `0, -736300, 1942500` |
+| Feedback coefficient | `0x011c` | `-200000` | `-350000` |
+| Feedback enable | `0x0001` | `0` | `2` |
+| Output ON | `0x0200` | `1` | `1` |
+| Output OFF | `0x0200` | `0` | `0` |
+
+Each capture contains four ON and four OFF transactions, one of each per
+board. JANUS sends the selector/data pair directly because its HV bus is
+already initialized. Go precedes each per-board switch with `0x2001 = 0`.
+Consequently, per profile JANUS sends four bus initializations during
+configuration, while Go sends twelve: four during configuration, four before
+ON, and four before OFF. The extra Go transactions are defensive
+initialization and do not change the requested output state.
+
+JANUS's HV panel also repeatedly reads configured setpoints through indirect
+selectors `0x10102` and `0x10105`. Go monitors the firmware-4+ direct registers
+instead. Both read direct registers `0x01000340`, `0x01000348`,
+`0x01000356`, `0x01000358`, and `0x01000360`; JANUS reads `0x01000360`
+three times per monitor update because three public helper calls independently
+consume the same combined word.
+
+The ignored evidence directory is
+`test-results/janus-go-hv-switch-comparison/`. Capture hashes are:
+
+```text
+2ef8cf591451e1d4231777f5f986b0dc60fa00aab27b4e20c73ad6e2261a517d  janus-a.pcap
+ebfbdddc3aed0b531cc20f3d7b914ee83c8d4c848f280985f0b65da978047fad  go-a.pcap
+9c2ba09e88f10d5da8873583baeb6ca0b805e3d9376550f6646428ed48ef349d  janus-b.pcap
+13be3b0aff86e73a5b5c73a911f95f6e9209ce972a0a1911d349a89d40b75ccc  go-b.pcap
+355c835667e21e4cd9a3cd6b23b314ea7d32a6a0fcd041709522c6c39fabb18d  analysis.txt
+```
+
+The successful captures do not exercise the clients' different partial-failure
+policy. Go rolls back already-enabled boards if a later board fails during an
+all-board enable. JANUS's console panel loops over boards without an equivalent
+rollback transaction.
 
 ## Inputs and environment
 

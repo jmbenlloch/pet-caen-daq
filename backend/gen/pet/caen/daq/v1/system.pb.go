@@ -2792,8 +2792,13 @@ type Board struct {
 	HvOverVoltage        bool                   `protobuf:"varint,15,opt,name=hv_over_voltage,json=hvOverVoltage,proto3" json:"hv_over_voltage,omitempty"`
 	// Wall-clock time when service telemetry was last received from this board.
 	TelemetryObservedAt *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=telemetry_observed_at,json=telemetryObservedAt,proto3" json:"telemetry_observed_at,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Raw IEEE-754 bits returned by A7585 peripheral register 252.
+	HvModuleFirmwareRaw uint32 `protobuf:"varint,17,opt,name=hv_module_firmware_raw,json=hvModuleFirmwareRaw,proto3" json:"hv_module_firmware_raw,omitempty"`
+	// Decoded A7585 firmware version when hv_module_firmware_available is true.
+	HvModuleFirmwareVersion   float32 `protobuf:"fixed32,18,opt,name=hv_module_firmware_version,json=hvModuleFirmwareVersion,proto3" json:"hv_module_firmware_version,omitempty"`
+	HvModuleFirmwareAvailable bool    `protobuf:"varint,19,opt,name=hv_module_firmware_available,json=hvModuleFirmwareAvailable,proto3" json:"hv_module_firmware_available,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *Board) Reset() {
@@ -2936,6 +2941,27 @@ func (x *Board) GetTelemetryObservedAt() *timestamppb.Timestamp {
 		return x.TelemetryObservedAt
 	}
 	return nil
+}
+
+func (x *Board) GetHvModuleFirmwareRaw() uint32 {
+	if x != nil {
+		return x.HvModuleFirmwareRaw
+	}
+	return 0
+}
+
+func (x *Board) GetHvModuleFirmwareVersion() float32 {
+	if x != nil {
+		return x.HvModuleFirmwareVersion
+	}
+	return 0
+}
+
+func (x *Board) GetHvModuleFirmwareAvailable() bool {
+	if x != nil {
+		return x.HvModuleFirmwareAvailable
+	}
+	return false
 }
 
 type PipelineTelemetry struct {
@@ -3382,7 +3408,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x05index\x18\x01 \x01(\rR\x05index\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x125\n" +
 	"\x06health\x18\x03 \x01(\x0e2\x1d.pet.caen.daq.v1.HealthStatusR\x06health\x12.\n" +
-	"\x06boards\x18\x04 \x03(\v2\x16.pet.caen.daq.v1.BoardR\x06boards\"\x8d\x05\n" +
+	"\x06boards\x18\x04 \x03(\v2\x16.pet.caen.daq.v1.BoardR\x06boards\"\xc0\x06\n" +
 	"\x05Board\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\rR\x04node\x12\x1d\n" +
 	"\n" +
@@ -3405,7 +3431,10 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"hv_ramping\x18\r \x01(\bR\thvRamping\x12&\n" +
 	"\x0fhv_over_current\x18\x0e \x01(\bR\rhvOverCurrent\x12&\n" +
 	"\x0fhv_over_voltage\x18\x0f \x01(\bR\rhvOverVoltage\x12N\n" +
-	"\x15telemetry_observed_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\x13telemetryObservedAt\"\x81\x02\n" +
+	"\x15telemetry_observed_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\x13telemetryObservedAt\x123\n" +
+	"\x16hv_module_firmware_raw\x18\x11 \x01(\rR\x13hvModuleFirmwareRaw\x12;\n" +
+	"\x1ahv_module_firmware_version\x18\x12 \x01(\x02R\x17hvModuleFirmwareVersion\x12?\n" +
+	"\x1chv_module_firmware_available\x18\x13 \x01(\bR\x19hvModuleFirmwareAvailable\"\x81\x02\n" +
 	"\x11PipelineTelemetry\x12%\n" +
 	"\x0equeue_capacity\x18\x01 \x01(\x04R\rqueueCapacity\x12\x1f\n" +
 	"\vqueue_depth\x18\x02 \x01(\x04R\n" +

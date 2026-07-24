@@ -3,6 +3,7 @@ package dt5202
 import (
 	"context"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 )
@@ -127,5 +128,33 @@ func TestReadHVTelemetryDecodesDirectMonitorRegisters(t *testing.T) {
 		got.DetectorTemperatureC != 25.6 || got.HVTemperatureC != 30.72 ||
 		!got.On || !got.Ramping || !got.OverCurrent || got.OverVoltage {
 		t.Fatalf("telemetry = %#v", got)
+	}
+}
+
+func TestReadHVModuleFirmwareMatchesFERSlibIndirectTransaction(t *testing.T) {
+	raw := math.Float32bits(1.2)
+	hardware := &hvHardware{reads: map[uint32]uint32{
+		uint32(AcquisitionStatus): 0,
+		uint32(HVRegisterData):    raw,
+	}}
+	gotRaw, version, err := ReadHVModuleFirmware(context.Background(), hardware, 2, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotRaw != raw || version != math.Float32frombits(raw) {
+		t.Fatalf("firmware = raw %#x version %v", gotRaw, version)
+	}
+	want := []RegisterWrite{
+		{HVRegisterAddress, 0x2001}, {HVRegisterData, 0},
+		{HVRegisterAddress, 0x21e}, {HVRegisterData, 1},
+		{HVRegisterAddress, 0x103fc},
+	}
+	if len(hardware.writes) != len(want) {
+		t.Fatalf("writes = %#v", hardware.writes)
+	}
+	for index := range want {
+		if hardware.writes[index] != want[index] {
+			t.Errorf("write %d = %#v, want %#v", index, hardware.writes[index], want[index])
+		}
 	}
 }
