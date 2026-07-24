@@ -1,6 +1,7 @@
 import { create } from '@bufbuild/protobuf'
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+import type { DaqApi } from './api'
 import {
   BoardSchema,
   HistogramDatasetSchema,
@@ -9,12 +10,34 @@ import {
 } from './gen/pet/caen/daq/v1/system_pb'
 import PlotWorkspace from './PlotWorkspace.vue'
 
+function apiWithRuns(...runs: ReturnType<typeof createRun>[]): DaqApi {
+  return {
+    searchRuns: vi.fn().mockResolvedValue({ runs, nextPageToken: '' }),
+  } as unknown as DaqApi
+}
+
+function createRun(runId: string) {
+  return create(RunSummarySchema, {
+    runId,
+    artifacts: [
+      {
+        $typeName: 'pet.caen.daq.v1.Artifact',
+        kind: 'histograms',
+        name: `run_${runId}.histograms.h5`,
+        sizeBytes: 1n,
+        sha256: 'hash',
+      },
+    ],
+  })
+}
+
 describe('PlotWorkspace', () => {
-  it('requests the latest persisted run when run history becomes available on page load', async () => {
+  it('requests the latest persisted run from the paginated picker on page load', async () => {
+    const run = createRun('42')
     const wrapper = mount(PlotWorkspace, {
       props: {
+        api: apiWithRuns(run),
         boards: [{ chain: 2, ...create(BoardSchema, { node: 3 }) }],
-        runs: [],
         running: false,
         loading: false,
         datasets: [],
@@ -26,25 +49,7 @@ describe('PlotWorkspace', () => {
         },
       },
     })
-
-    expect(wrapper.emitted('request')).toBeUndefined()
-
-    await wrapper.setProps({
-      runs: [
-        create(RunSummarySchema, {
-          runId: '42',
-          artifacts: [
-            {
-              $typeName: 'pet.caen.daq.v1.Artifact',
-              kind: 'histograms',
-              name: 'run_42.histograms.h5',
-              sizeBytes: 1n,
-              sha256: 'hash',
-            },
-          ],
-        }),
-      ],
-    })
+    await flushPromises()
 
     expect(wrapper.emitted('request')).toHaveLength(1)
     expect(wrapper.emitted('request')?.[0]).toEqual([
@@ -55,22 +60,11 @@ describe('PlotWorkspace', () => {
   })
 
   it('switches from a persisted run to the live plot when a run starts', async () => {
-    const persistedRun = create(RunSummarySchema, {
-      runId: '41',
-      artifacts: [
-        {
-          $typeName: 'pet.caen.daq.v1.Artifact',
-          kind: 'histograms',
-          name: 'run_41.histograms.h5',
-          sizeBytes: 1n,
-          sha256: 'hash',
-        },
-      ],
-    })
+    const persistedRun = createRun('41')
     const wrapper = mount(PlotWorkspace, {
       props: {
+        api: apiWithRuns(persistedRun),
         boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
-        runs: [persistedRun],
         running: false,
         loading: false,
         datasets: [],
@@ -82,26 +76,27 @@ describe('PlotWorkspace', () => {
         },
       },
     })
+    await flushPromises()
 
-    expect(wrapper.get<HTMLSelectElement>('[aria-label="Histogram run"]').element.value).toBe('41')
+    expect(wrapper.get('.plot-run-source').text()).toContain('Run 41')
 
     await wrapper.setProps({
       activeRunId: '42',
       running: true,
     })
 
-    expect(wrapper.get<HTMLSelectElement>('[aria-label="Histogram run"]').element.value).toBe('42')
+    expect(wrapper.get('.plot-run-source').text()).toContain('Run 42 · live')
     expect(wrapper.text()).not.toContain('Viewing persisted histograms')
   })
 
   it('requests selected channel sets and presents returned bins to the live plot', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
+        api: apiWithRuns(createRun('41')),
         boards: [
           { chain: 1, ...create(BoardSchema, { node: 2 }) },
           { chain: 3, ...create(BoardSchema, { node: 0 }) },
         ],
-        runs: [],
         activeRunId: '42',
         running: true,
         loading: false,
@@ -158,22 +153,9 @@ describe('PlotWorkspace', () => {
     await wrapper.setProps({
       activeRunId: undefined,
       running: false,
-      runs: [
-        create(RunSummarySchema, {
-          runId: '41',
-          artifacts: [
-            {
-              $typeName: 'pet.caen.daq.v1.Artifact',
-              kind: 'histograms',
-              name: 'run_41.histograms.h5',
-              sizeBytes: 1n,
-              sha256: 'hash',
-            },
-          ],
-        }),
-      ],
     })
-    expect(wrapper.get('[aria-label="Histogram run"]').element).toHaveProperty('value', '41')
+    await flushPromises()
+    expect(wrapper.get('.plot-run-source').text()).toContain('Run 41')
     expect(wrapper.text()).toContain('Viewing persisted histograms from run 41.')
     wrapper.get('[aria-label="Live selected-channel histogram plot"]')
   })
@@ -181,8 +163,8 @@ describe('PlotWorkspace', () => {
   it('keeps the manual request button stable during automatic refresh', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
+        api: apiWithRuns(),
         boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
-        runs: [],
         activeRunId: '42',
         running: true,
         loading: false,
@@ -209,11 +191,11 @@ describe('PlotWorkspace', () => {
   it('enforces the 64-channel request limit in the selector', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
+        api: apiWithRuns(),
         boards: [
           { chain: 0, ...create(BoardSchema, { node: 0 }) },
           { chain: 1, ...create(BoardSchema, { node: 0 }) },
         ],
-        runs: [],
         activeRunId: '42',
         running: true,
         loading: false,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch, type DeepReadonly } from 'vue'
+import type { DaqApi } from './api'
 import {
   HistogramKind,
   type Board,
@@ -9,21 +10,27 @@ import {
 } from './gen/pet/caen/daq/v1/system_pb'
 import { compact } from './presentation'
 import HistogramPlot from './HistogramPlot.vue'
+import RunDataPicker from './RunDataPicker.vue'
 
-const props = defineProps<{
-  boards: Array<{ chain: number; node: number } & DeepReadonly<Board>>
-  runs: readonly DeepReadonly<RunSummary>[]
-  activeRunId?: string
-  running: boolean
-  loading: boolean
-  datasets: readonly DeepReadonly<HistogramDataset>[]
-  theme: 'dark' | 'light'
-}>()
+const props = withDefaults(
+  defineProps<{
+    api: DaqApi
+    boards: Array<{ chain: number; node: number } & DeepReadonly<Board>>
+    activeRunId?: string
+    running: boolean
+    loading: boolean
+    datasets: readonly DeepReadonly<HistogramDataset>[]
+    theme: 'dark' | 'light'
+    runPickerEnabled?: boolean
+  }>(),
+  { activeRunId: undefined, runPickerEnabled: true },
+)
 const emit = defineEmits<{
   request: [runId: string, kind: HistogramKind, selections: HistogramSelection[]]
 }>()
 const kind = ref(HistogramKind.PHA_HIGH_GAIN)
 const selectedRunId = ref('')
+const selectedRun = ref<DeepReadonly<RunSummary>>()
 const selected = ref(new Set<string>())
 const selectorOpen = ref(false)
 const autoRefresh = ref(true)
@@ -33,29 +40,23 @@ const selectionLimit = 64
 let timer: number | undefined
 let lastAutomaticRequest = ''
 
-const persistedRuns = computed(() =>
-  props.runs.filter(
-    (run) =>
-      run.runId !== props.activeRunId &&
-      run.artifacts.some((artifact) => artifact.kind === 'histograms'),
-  ),
-)
-
 watch(
-  [() => props.activeRunId, persistedRuns],
-  ([activeRunId, runs], previousValues) => {
-    const previousActiveRunId = previousValues?.[0]
+  () => props.activeRunId,
+  (activeRunId, previousActiveRunId) => {
     if (activeRunId && activeRunId !== previousActiveRunId) {
+      selectedRun.value = undefined
       selectedRunId.value = activeRunId
-      return
+    } else if (!activeRunId && previousActiveRunId && selectedRunId.value === previousActiveRunId) {
+      selectedRunId.value = ''
     }
-    const available = new Set(runs.map((run) => run.runId))
-    if (activeRunId) available.add(activeRunId)
-    if (!available.has(selectedRunId.value))
-      selectedRunId.value = activeRunId || runs[0]?.runId || ''
   },
   { immediate: true },
 )
+
+function selectRun(run: DeepReadonly<RunSummary>) {
+  selectedRun.value = run
+  selectedRunId.value = run.runId
+}
 
 watch(
   () => props.boards,
@@ -131,9 +132,9 @@ function request() {
 }
 
 watch(
-  [selectedRunId, kind, selected, persistedRuns],
-  ([runId, histogramKind, selections, runs]) => {
-    if (!runId || !selections.size || !runs.some((run) => run.runId === runId)) return
+  [selectedRunId, kind, selected, selectedRun],
+  ([runId, histogramKind, selections, historicalRun]) => {
+    if (!runId || !selections.size || !historicalRun || historicalRun.runId !== runId) return
     const requestKey = `${runId}:${histogramKind}`
     if (requestKey === lastAutomaticRequest) return
     lastAutomaticRequest = requestKey
@@ -183,14 +184,16 @@ const kindLabel = computed(
       <span class="safety">uPlot · drag horizontally to zoom</span>
     </div>
     <div class="plot-controls">
-      <label
-        >Run<select v-model="selectedRunId" aria-label="Histogram run">
-          <option v-if="activeRunId" :value="activeRunId">Run {{ activeRunId }} · live</option>
-          <option v-for="(run, index) in persistedRuns" :key="run.runId" :value="run.runId">
-            Run {{ run.runId }}{{ index === 0 && !activeRunId ? ' · latest' : '' }}
-          </option>
-        </select></label
-      >
+      <div class="plot-run-source">
+        <span>Selected run</span>
+        <strong>
+          {{
+            selectedRunId
+              ? `Run ${selectedRunId}${selectedRunId === activeRunId ? ' · live' : ''}`
+              : 'None'
+          }}
+        </strong>
+      </div>
       <label
         >Histogram<select v-model="kind">
           <option :value="HistogramKind.PHA_HIGH_GAIN">PHA high gain</option>
@@ -306,5 +309,14 @@ const kindLabel = computed(
         </div>
       </article>
     </div>
+    <RunDataPicker
+      :api="api"
+      capability="histograms"
+      :selected-run-id="selectedRunId"
+      :active-run-id="activeRunId"
+      auto-select-first
+      :enabled="runPickerEnabled"
+      @select="selectRun"
+    />
   </section>
 </template>
