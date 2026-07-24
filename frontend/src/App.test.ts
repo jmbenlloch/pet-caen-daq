@@ -102,6 +102,10 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     const disconnect = connected.get('.hardware-connection-action')
+    expect(connected.get('.connection').text()).toContain('Backend online')
+    expect(connected.get('.hardware-state').text()).toBe('Hardware connected')
+    expect(connected.get('.hardware-status-dot').classes()).toContain('live')
+    expect(connected.get('.connection').text()).not.toContain('backend-test')
     expect(connected.findAll('.hardware-connection-action')).toHaveLength(1)
     expect(disconnect.text()).toBe('Disconnect hardware')
     expect(disconnect.classes()).toContain('disconnect')
@@ -115,6 +119,9 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     const connect = disconnected.get('.hardware-connection-action')
+    expect(disconnected.get('.connection').text()).toContain('Backend online')
+    expect(disconnected.get('.hardware-state').text()).toBe('Hardware disconnected')
+    expect(disconnected.get('.hardware-status-dot').classes()).toContain('disconnected')
     expect(disconnected.findAll('.hardware-connection-action')).toHaveLength(1)
     expect(connect.text()).toBe('Connect hardware')
     expect(connect.classes()).toContain('connect')
@@ -122,6 +129,44 @@ describe('operator dashboard', () => {
     expect(disconnectedApi.connectHardware).toHaveBeenCalledWith('operator')
     expect(disconnectedApi.disconnectHardware).not.toHaveBeenCalled()
     disconnected.unmount()
+  })
+
+  it('shows only the run action relevant to the current state', async () => {
+    const api = dashboardApi()
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Start run')).toBe(true)
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Stop and drain')).toBe(
+      false,
+    )
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Start run')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Start run')).toBe(false)
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Stop and drain')).toBe(
+      true,
+    )
+    wrapper.unmount()
+  })
+
+  it('offers an immediate retry while automatic backend retries continue', async () => {
+    const api = dashboardApi()
+    vi.mocked(api.snapshot).mockRejectedValue(new Error('backend unavailable'))
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    expect(wrapper.get('.backend-state').text()).toBe('Backend offline')
+    const retry = wrapper.get('.backend-retry-action')
+    expect(retry.text()).toBe('Retry backend')
+    await retry.trigger('click')
+    await flushPromises()
+    expect(api.snapshot).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
   })
 
   it('separates operator tasks into keyboard-accessible workspace tabs', async () => {

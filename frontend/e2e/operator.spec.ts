@@ -25,7 +25,7 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await page.getByRole('tab', { name: /Hardware/ }).click()
   await expect(page.getByText('DT5202 · node 0')).toHaveCount(4)
-  await expect(page.getByText('Live telemetry')).toBeVisible()
+  await expect(page.getByText('Backend online')).toBeVisible()
   await page.getByRole('tab', { name: /Acquisition/ }).click()
   await expect(page.getByLabel('Configuration parameters')).toBeVisible()
   await page.getByRole('tab', { name: 'All', exact: true }).click()
