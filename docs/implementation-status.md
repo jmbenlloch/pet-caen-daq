@@ -223,6 +223,12 @@ attributes preserve the zero-based segment index and first global event
 sequence, and every finalized segment is separately sized, hashed, and listed
 as a downloadable `decoded_events` artifact.
 
+HDF5 compression is also selected per run through the API and operator UI,
+directly below the segment-size control. Supported values are `none` and
+`blosc-lz4-level4-bitshuffle`; omitted values resolve to Blosc LZ4 level 4
+with bit-shuffle. The choice applies consistently to event segments and the
+optional histogram artifact and is recorded in the run storage identity.
+
 The HDF5 run identity is now complete for facts available to the native
 backend. The external manifest, creation-time `/run/metadata_json`, and
 finalized `/run/manifest_json` carry configuration hashes and parser/audit

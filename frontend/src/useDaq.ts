@@ -204,6 +204,7 @@ export function useDaq(api: DaqApi) {
     journalTransport: boolean
     persistHistograms: boolean
     hdf5SegmentSizeMb: number
+    hdf5Compression: string
   }) {
     busy.value = true
     error.value = ''
@@ -219,6 +220,7 @@ export function useDaq(api: DaqApi) {
           journalTransport: input.journalTransport,
           persistHistograms: input.persistHistograms,
           hdf5SegmentSizeMb: input.hdf5SegmentSizeMb,
+          hdf5Compression: input.hdf5Compression,
         }),
       )
       accept(result.snapshot)

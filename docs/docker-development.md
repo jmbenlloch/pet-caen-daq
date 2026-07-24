@@ -79,13 +79,13 @@ The image includes distro-packaged Python, NumPy, and h5py; the tagged run
 writer test invokes `scripts/validate-hdf5.py` against its finalized artifact
 to verify physical types and cross-dataset references independently of the Go
 binding.
-Production event compression is disabled by default. Standalone histogram
-artifacts default to Blosc LZ4 level 4 with bit-shuffle because their many
-sparse, fixed-size chunks compress particularly well. Set
-`PET_CAEN_HDF5_COMPRESSION=none` to disable histogram compression, or opt event
-files into the same compression using
-`PET_CAEN_HDF5_COMPRESSION=blosc-lz4-level4-bitshuffle`; each event file records
-the choice internally and the independent validator checks its filter parameters.
+Production runs select compression per execution through `StartRunRequest`.
+The operator UI offers `none` and Blosc LZ4 level 4 with bit-shuffle, with
+Blosc as the default for both event segments and standalone histogram
+artifacts. Each event file records the choice internally and the independent
+validator checks its filter parameters. Offline conversion, benchmark, and
+scan tools continue to accept `PET_CAEN_HDF5_COMPRESSION`; that environment
+variable does not override a run's requested compression.
 `task build:hdf5` builds the backend with production HDF5 run storage, and
 `task docker:build` selects that target. The ordinary `task build` retains JSON
 development storage and does not require native HDF5.

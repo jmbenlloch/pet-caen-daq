@@ -224,7 +224,7 @@ func writeEffectiveConfiguration(configuration *hdf5.Group, metadata Metadata) e
 		{"pedestal_plans", pedestalPlans, compoundConfigurationPedestal()},
 		{"pedestal_channels", pedestalChannels, compoundConfigurationPedestalChannel()},
 	} {
-		if err := writeConfigurationTable(effective, item.name, item.rows, item.typ); err != nil {
+		if err := writeConfigurationTable(effective, item.name, item.rows, item.typ, metadata.Compression); err != nil {
 			return err
 		}
 	}
@@ -254,8 +254,8 @@ func effectiveMasks(plan dt5202.ConfigurationPlan) maskSet {
 	return result
 }
 
-func writeConfigurationTable(group *hdf5.Group, name string, rows any, datatype *hdf5.CompoundType) error {
-	dataset, err := createTable(group, name, datatype)
+func writeConfigurationTable(group *hdf5.Group, name string, rows any, datatype *hdf5.CompoundType, compression string) error {
+	dataset, err := createTable(group, name, datatype, compression)
 	if err != nil {
 		return err
 	}

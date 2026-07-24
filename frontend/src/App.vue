@@ -59,6 +59,7 @@ const captureRaw = ref(false)
 const journalTransport = ref(false)
 const persistHistograms = ref(true)
 const hdf5SegmentSizeMb = ref(500)
+const hdf5Compression = ref('blosc-lz4-level4-bitshuffle')
 const configFile = ref<HTMLInputElement>()
 type WorkspaceTab = 'acquisition' | 'statistics' | 'plots' | 'scans' | 'hardware' | 'runs'
 const workspaceTabs: { id: WorkspaceTab; label: string; description: string }[] = [
@@ -729,6 +730,7 @@ onMounted(() => daq.connect())
                     journalTransport,
                     persistHistograms,
                     hdf5SegmentSizeMb,
+                    hdf5Compression,
                   })
                 "
               >
@@ -1051,6 +1053,22 @@ onMounted(() => daq.connect())
                     max="1048576"
                     step="1"
                   />
+                </article>
+                <article class="parameter-row">
+                  <div class="parameter-copy">
+                    <label for="hdf5-compression">HDF5 compression</label>
+                    <p>Application output setting. Applied to event and histogram files.</p>
+                  </div>
+                  <select
+                    id="hdf5-compression"
+                    v-model="hdf5Compression"
+                    aria-label="HDF5 compression"
+                  >
+                    <option value="blosc-lz4-level4-bitshuffle">
+                      Blosc LZ4 · level 4 · bit-shuffle
+                    </option>
+                    <option value="none">None</option>
+                  </select>
                 </article>
               </template>
               <p v-if="!visibleFields.length" class="empty">No parameters match this filter.</p>

@@ -32,6 +32,10 @@ type staircaseChannelRow struct {
 // and channel rows are separate datasets so channel arrays remain portable
 // across HDF5 readers.
 func WriteStaircase(path string, metadata []byte, points []staircase.Point) (err error) {
+	compression, err := compressionName()
+	if err != nil {
+		return err
+	}
 	file, err := hdf5.CreateFile(path, hdf5.F_ACC_EXCL)
 	if err != nil {
 		return fmt.Errorf("create staircase HDF5: %w", err)
@@ -53,12 +57,12 @@ func WriteStaircase(path string, metadata []byte, points []staircase.Point) (err
 	if err := createBytes(scan, "metadata_json", metadata); err != nil {
 		return err
 	}
-	pointDataset, err := createTable(scan, "points", compoundStaircasePoint())
+	pointDataset, err := createTable(scan, "points", compoundStaircasePoint(), compression)
 	if err != nil {
 		return err
 	}
 	defer pointDataset.Close()
-	channelDataset, err := createTable(scan, "channel_measurements", compoundStaircaseChannel())
+	channelDataset, err := createTable(scan, "channel_measurements", compoundStaircaseChannel(), compression)
 	if err != nil {
 		return err
 	}

@@ -542,6 +542,13 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if segmentSizeMB > maxHDF5SegmentSizeMB {
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HDF5_SEGMENT_SIZE", fmt.Errorf("HDF5 segment size %d MiB exceeds maximum %d MiB", segmentSizeMB, maxHDF5SegmentSizeMB))
 	}
+	compression := message.GetHdf5Compression()
+	if compression == "" {
+		compression = runstore.HDF5CompressionBloscLZ4
+	}
+	if compression != runstore.HDF5CompressionNone && compression != runstore.HDF5CompressionBloscLZ4 {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HDF5_COMPRESSION", fmt.Errorf("unsupported HDF5 compression %q", compression))
+	}
 	if s.Controller.ActiveRunID() != "" {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ALREADY_ACTIVE", fmt.Errorf("run %q is already active", s.Controller.ActiveRunID()))
 	}
@@ -597,6 +604,7 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		Histograms:           histogramOptions,
 		PersistHistograms:    message.GetPersistHistograms(),
 		HDF5SegmentSizeBytes: uint64(segmentSizeMB) * bytesPerMiB,
+		HDF5Compression:      compression,
 		Concentrator:         concentrator,
 	}
 	if err := s.Controller.Start(ctx, runID, message.GetRequestedBy(), options); err != nil {

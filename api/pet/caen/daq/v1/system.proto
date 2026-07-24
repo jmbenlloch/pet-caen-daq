@@ -127,6 +127,9 @@ message StartRunRequest {
   uint32 hdf5_segment_size_mb = 6;
   // Write a standalone run-wide HDF5 histogram artifact after draining.
   bool persist_histograms = 7;
+  // Compression applied to HDF5 event segments and histogram artifacts.
+  // Empty selects blosc-lz4-level4-bitshuffle.
+  string hdf5_compression = 8;
 }
 
 message StartRunResponse {

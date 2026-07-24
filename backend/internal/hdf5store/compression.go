@@ -7,13 +7,14 @@ import (
 	"os"
 	"sync"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	hdf5 "github.com/next-exp/hdf5-go"
 )
 
 const (
 	CompressionEnvironment = "PET_CAEN_HDF5_COMPRESSION"
-	CompressionNone        = "none"
-	CompressionBloscLZ4    = "blosc-lz4-level4-bitshuffle"
+	CompressionNone        = runstore.HDF5CompressionNone
+	CompressionBloscLZ4    = runstore.HDF5CompressionBloscLZ4
 )
 
 var registerBloscOnce sync.Once
@@ -38,16 +39,6 @@ func compressionNameWithDefault(defaultName string) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported HDF5 compression %q", value)
 	}
-}
-
-func configureCompression(properties *hdf5.PropList) error {
-	name, err := compressionName()
-	return configureNamedCompression(properties, name, err)
-}
-
-func configureHistogramCompression(properties *hdf5.PropList) error {
-	name, err := histogramCompressionName()
-	return configureNamedCompression(properties, name, err)
 }
 
 func configureNamedCompression(properties *hdf5.PropList, name string, err error) error {

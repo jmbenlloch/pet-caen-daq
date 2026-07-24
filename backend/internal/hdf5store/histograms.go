@@ -18,6 +18,14 @@ const HistogramSchemaVersion = 1
 // dataset; run-wide counters and axis information remain uint64/float64
 // attributes.
 func SaveHistograms(path, runID string, histograms []runstore.HistogramDataset) (err error) {
+	compression, err := histogramCompressionName()
+	if err != nil {
+		return err
+	}
+	return saveHistograms(path, runID, histograms, compression)
+}
+
+func saveHistograms(path, runID string, histograms []runstore.HistogramDataset, compression string) (err error) {
 	file, err := hdf5.CreateFile(path, hdf5.F_ACC_EXCL)
 	if err != nil {
 		return fmt.Errorf("create histogram HDF5 file: %w", err)
@@ -51,7 +59,7 @@ func SaveHistograms(path, runID string, histograms []runstore.HistogramDataset) 
 	defer group.Close()
 	for _, histogram := range histograms {
 		name := fmt.Sprintf("%s_%d_%d_%d", histogram.Kind, histogram.Chain, histogram.Node, histogram.Channel)
-		dataset, err := createHistogramPrimitive(group, name, hdf5.T_STD_U32LE)
+		dataset, err := createPrimitiveNamed(group, name, hdf5.T_STD_U32LE, compression)
 		if err != nil {
 			return err
 		}

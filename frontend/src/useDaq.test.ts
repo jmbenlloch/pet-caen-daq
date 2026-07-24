@@ -103,6 +103,7 @@ describe('useDaq', () => {
       journalTransport: true,
       persistHistograms: true,
       hdf5SegmentSizeMb: 500,
+      hdf5Compression: 'blosc-lz4-level4-bitshuffle',
     })
 
     expect(api.validate).toHaveBeenCalledWith('invalid')

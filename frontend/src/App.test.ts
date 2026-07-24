@@ -237,6 +237,9 @@ describe('operator dashboard', () => {
     expect(options).toHaveLength(2)
     expect(options.every((option) => !(option.element as HTMLInputElement).checked)).toBe(true)
     expect(wrapper.get('input[aria-label="HDF5 file size in MiB"]').isVisible()).toBe(true)
+    expect(wrapper.get<HTMLSelectElement>('#hdf5-compression').element.value).toBe(
+      'blosc-lz4-level4-bitshuffle',
+    )
     wrapper.unmount()
   })
 
@@ -353,6 +356,7 @@ describe('operator dashboard', () => {
     const segmentSize = wrapper.get('input[aria-label="HDF5 file size in MiB"]')
     expect(segmentSize.element).toHaveProperty('value', '500')
     await segmentSize.setValue('128')
+    await wrapper.get('#hdf5-compression').setValue('none')
     expect(wrapper.get<HTMLInputElement>('#persist-histograms').element.checked).toBe(true)
     await wrapper.get('button.primary').trigger('click')
     await flushPromises()
@@ -366,6 +370,7 @@ describe('operator dashboard', () => {
         journalTransport: false,
         persistHistograms: true,
         hdf5SegmentSizeMb: 128,
+        hdf5Compression: 'none',
       }),
     )
     expect(wrapper.get('#system-heading').text()).toBe('Running')

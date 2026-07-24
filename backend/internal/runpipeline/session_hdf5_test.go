@@ -12,6 +12,7 @@ import (
 )
 
 func TestSessionPersistsFinalHistogramSnapshotWhenSelected(t *testing.T) {
+	t.Setenv("PET_CAEN_HDF5_COMPRESSION", "invalid-environment-value")
 	parent := t.TempDir()
 	factory := Factory{Options: Options{
 		Parent: parent, Capacity: 1, Backpressure: acquisition.BackpressureBlock, Now: time.Now,
@@ -39,6 +40,9 @@ func TestSessionPersistsFinalHistogramSnapshotWhenSelected(t *testing.T) {
 	manifest, err := runstore.ReadManifest(session.Directory(), "histogram-session")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if manifest.ExecutionIdentity.Storage.Compression != runstore.HDF5CompressionBloscLZ4 {
+		t.Fatalf("compression = %q", manifest.ExecutionIdentity.Storage.Compression)
 	}
 	found := false
 	for _, artifact := range manifest.Artifacts {

@@ -113,13 +113,17 @@ type Metadata struct {
 	Boards                 []runstore.BoardIdentity
 	SegmentIndex           uint32
 	EventSequenceBase      uint64
+	Compression            string
 }
 
 func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
-	compression, err := compressionName()
-	if err != nil {
-		return nil, err
+	compression := metadata.Compression
+	if compression == "" {
+		if compression, err = compressionName(); err != nil {
+			return nil, err
+		}
 	}
+	metadata.Compression = compression
 	file, err := hdf5.CreateFile(path, hdf5.F_ACC_EXCL)
 	if err != nil {
 		return nil, fmt.Errorf("create HDF5 file: %w", err)
@@ -195,49 +199,49 @@ func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
 	}
 	defer run.Close()
 
-	if w.index.dataset, err = createTable(events, "index", compoundIndex()); err != nil {
+	if w.index.dataset, err = createTable(events, "index", compoundIndex(), compression); err != nil {
 		return nil, err
 	}
-	if w.spectroscopy.dataset, err = createTable(spectroscopy, "events", compoundSpectroscopy()); err != nil {
+	if w.spectroscopy.dataset, err = createTable(spectroscopy, "events", compoundSpectroscopy(), compression); err != nil {
 		return nil, err
 	}
-	if w.energies.dataset, err = createTable(spectroscopy, "energies", compoundEnergy()); err != nil {
+	if w.energies.dataset, err = createTable(spectroscopy, "energies", compoundEnergy(), compression); err != nil {
 		return nil, err
 	}
-	if w.timings.dataset, err = createTable(spectroscopy, "timings", compoundTiming()); err != nil {
+	if w.timings.dataset, err = createTable(spectroscopy, "timings", compoundTiming(), compression); err != nil {
 		return nil, err
 	}
-	if w.timingEvents.dataset, err = createTable(timing, "events", compoundTimingEvent()); err != nil {
+	if w.timingEvents.dataset, err = createTable(timing, "events", compoundTimingEvent(), compression); err != nil {
 		return nil, err
 	}
-	if w.timingHits.dataset, err = createTable(timing, "hits", compoundTiming()); err != nil {
+	if w.timingHits.dataset, err = createTable(timing, "hits", compoundTiming(), compression); err != nil {
 		return nil, err
 	}
-	if w.counting.dataset, err = createTable(counting, "events", compoundCounting()); err != nil {
+	if w.counting.dataset, err = createTable(counting, "events", compoundCounting(), compression); err != nil {
 		return nil, err
 	}
-	if w.counts.dataset, err = createTable(counting, "counts", compoundCount()); err != nil {
+	if w.counts.dataset, err = createTable(counting, "counts", compoundCount(), compression); err != nil {
 		return nil, err
 	}
-	if w.waveform.dataset, err = createTable(waveform, "events", compoundWaveform()); err != nil {
+	if w.waveform.dataset, err = createTable(waveform, "events", compoundWaveform(), compression); err != nil {
 		return nil, err
 	}
-	if w.samples.dataset, err = createTable(waveform, "samples", compoundSample()); err != nil {
+	if w.samples.dataset, err = createTable(waveform, "samples", compoundSample(), compression); err != nil {
 		return nil, err
 	}
-	if w.service.dataset, err = createTable(service, "events", compoundService()); err != nil {
+	if w.service.dataset, err = createTable(service, "events", compoundService(), compression); err != nil {
 		return nil, err
 	}
-	if w.counters.dataset, err = createTable(service, "counters", compoundCounter()); err != nil {
+	if w.counters.dataset, err = createTable(service, "counters", compoundCounter(), compression); err != nil {
 		return nil, err
 	}
-	if w.unknown.dataset, err = createPrimitive(service, "unknown_payload", hdf5.T_STD_U8LE); err != nil {
+	if w.unknown.dataset, err = createPrimitiveNamed(service, "unknown_payload", hdf5.T_STD_U8LE, compression); err != nil {
 		return nil, err
 	}
-	if w.test.dataset, err = createTable(test, "events", compoundTest()); err != nil {
+	if w.test.dataset, err = createTable(test, "events", compoundTest(), compression); err != nil {
 		return nil, err
 	}
-	if w.words.dataset, err = createPrimitive(test, "words", hdf5.T_STD_U32LE); err != nil {
+	if w.words.dataset, err = createPrimitiveNamed(test, "words", hdf5.T_STD_U32LE, compression); err != nil {
 		return nil, err
 	}
 	if err := createBytes(configuration, "requested_janus", metadata.RequestedConfiguration); err != nil {
@@ -401,13 +405,15 @@ func (w *Writer) Finalize(manifestJSON []byte) (err error) {
 func createPrimitive(location interface {
 	CreateDatasetWith(string, *hdf5.Datatype, *hdf5.Dataspace, *hdf5.PropList) (*hdf5.Dataset, error)
 }, name string, datatype *hdf5.Datatype) (*hdf5.Dataset, error) {
-	return createPrimitiveWithCompression(location, name, datatype, configureCompression)
+	return createPrimitiveNamed(location, name, datatype, CompressionNone)
 }
 
-func createHistogramPrimitive(location interface {
+func createPrimitiveNamed(location interface {
 	CreateDatasetWith(string, *hdf5.Datatype, *hdf5.Dataspace, *hdf5.PropList) (*hdf5.Dataset, error)
-}, name string, datatype *hdf5.Datatype) (*hdf5.Dataset, error) {
-	return createPrimitiveWithCompression(location, name, datatype, configureHistogramCompression)
+}, name string, datatype *hdf5.Datatype, compression string) (*hdf5.Dataset, error) {
+	return createPrimitiveWithCompression(location, name, datatype, func(properties *hdf5.PropList) error {
+		return configureNamedCompression(properties, compression, nil)
+	})
 }
 
 func createPrimitiveWithCompression(location interface {
@@ -512,7 +518,7 @@ func createUintAttribute(group *hdf5.Group, name string, datatype *hdf5.Datatype
 
 func createTable(location interface {
 	CreateDatasetWith(string, *hdf5.Datatype, *hdf5.Dataspace, *hdf5.PropList) (*hdf5.Dataset, error)
-}, name string, datatype *hdf5.CompoundType) (*hdf5.Dataset, error) {
+}, name string, datatype *hdf5.CompoundType, compression string) (*hdf5.Dataset, error) {
 	defer datatype.Close()
 	space, err := hdf5.CreateSimpleDataspace([]uint{0}, []uint{^uint(0)})
 	if err != nil {
@@ -527,7 +533,7 @@ func createTable(location interface {
 	if err := properties.SetChunk([]uint{16384}); err != nil {
 		return nil, err
 	}
-	if err := configureCompression(properties); err != nil {
+	if err := configureNamedCompression(properties, compression, nil); err != nil {
 		return nil, err
 	}
 	dataset, err := location.CreateDatasetWith(name, &datatype.Datatype, space, properties)
