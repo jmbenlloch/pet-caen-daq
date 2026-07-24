@@ -104,13 +104,18 @@ test('backend automatically stops runs at time and event presets while manual st
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop and drain' })).toBeEnabled()
+  const activeRunId = page.locator('.run-now strong')
+  await expect(activeRunId).toHaveText(/^\d+$/)
+  const timedRun = (await activeRunId.textContent())!
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
   await page.getByRole('tab', { name: /Runs/ }).click()
-  const timedRun = (await page.locator('#completed-heading').textContent())!
-  expect(timedRun).toMatch(/^\d+$/)
-  const timedRunSummary = page.getByRole('region', { name: timedRun })
-  await expect(timedRunSummary).toBeVisible()
-  await expect(timedRunSummary.getByText('preset_time', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Refresh' }).click()
+  const storedRuns = page.getByRole('table', { name: 'Stored runs' })
+  const timedRunRow = storedRuns
+    .getByRole('button', { name: timedRun, exact: true })
+    .locator('..')
+    .locator('..')
+  await expect(timedRunRow.getByText('preset_time', { exact: true })).toBeVisible()
 
   await page.getByRole('tab', { name: /Acquisition/ }).click()
   await page
@@ -118,15 +123,17 @@ test('backend automatically stops runs at time and event presets while manual st
     .selectOption('PRESET_COUNTS')
   await page.getByRole('spinbutton', { name: 'PresetCounts', exact: true }).fill('3')
   await page.getByRole('button', { name: 'Start run' }).click()
+  await expect(activeRunId).toHaveText(/^\d+$/)
+  await expect(activeRunId).not.toHaveText(timedRun)
+  const countedRun = (await activeRunId.textContent())!
+  await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible({ timeout: 10_000 })
   await page.getByRole('tab', { name: /Runs/ }).click()
-  const completedHeading = page.locator('#completed-heading')
-  await expect(completedHeading).not.toHaveText(timedRun, { timeout: 10_000 })
-  const countedRun = (await completedHeading.textContent())!
-  expect(countedRun).toMatch(/^\d+$/)
-  expect(Number(countedRun)).toBeGreaterThan(Number(timedRun))
-  const countedRunSummary = page.getByRole('region', { name: countedRun })
-  await expect(countedRunSummary).toBeVisible()
-  await expect(countedRunSummary.getByText('preset_counts', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Refresh' }).click()
+  const countedRunRow = storedRuns
+    .getByRole('button', { name: countedRun, exact: true })
+    .locator('..')
+    .locator('..')
+  await expect(countedRunRow.getByText('preset_counts', { exact: true })).toBeVisible()
 })
 
 test('operator configures bounded values and channel masks without editing text', async ({

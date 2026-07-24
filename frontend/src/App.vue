@@ -31,7 +31,7 @@ import {
   SystemState,
   type SearchRunsRequest,
 } from './gen/pet/caen/daq/v1/system_pb'
-import { bytes, compact, healthLabel, localDateTime, stateLabel } from './presentation'
+import { compact, healthLabel, localDateTime, stateLabel } from './presentation'
 import { useDaq } from './useDaq'
 import { janusParameterCatalog, janusParameters, type JanusParameter } from './janus/catalog'
 
@@ -104,6 +104,7 @@ const searchMaximumRunNumber = ref('')
 const searchFormError = ref('')
 const lastSearchRequest = ref<SearchRunsRequest>()
 const openSearchParameterId = ref<number>()
+const showRunSearch = ref(false)
 function addSearchPredicate() {
   searchPredicates.value.push(newSearchPredicate())
 }
@@ -1121,53 +1122,6 @@ onMounted(() => daq.connect())
       </section>
 
       <section
-        v-if="daq.latestCompletedRun.value"
-        v-show="activeWorkspaceTab === 'runs'"
-        class="completed panel"
-        aria-labelledby="completed-heading"
-      >
-        <div class="completed-summary">
-          <div>
-            <p class="eyebrow">Latest completed run</p>
-            <h2 id="completed-heading">{{ daq.latestCompletedRun.value.runId }}</h2>
-          </div>
-          <dl class="completed-counts">
-            <div>
-              <dt>Termination</dt>
-              <dd>{{ daq.latestCompletedRun.value.terminationReason || 'Completed normally' }}</dd>
-            </div>
-            <div>
-              <dt>Events</dt>
-              <dd>{{ compact(daq.latestCompletedRun.value.eventCount) }}</dd>
-            </div>
-            <div>
-              <dt>Raw batches</dt>
-              <dd>{{ compact(daq.latestCompletedRun.value.rawBatchCount) }}</dd>
-            </div>
-          </dl>
-        </div>
-        <div v-if="daq.latestCompletedRun.value.incomplete" class="incomplete" role="alert">
-          This run is incomplete. Preserve and inspect its evidence before recovery.
-        </div>
-        <div class="artifacts" aria-label="Run artifacts">
-          <article
-            v-for="artifact in daq.latestCompletedRun.value.artifacts"
-            :key="artifact.name"
-            class="artifact"
-          >
-            <div>
-              <strong>{{ artifact.name }}</strong>
-              <span>{{ artifact.kind }} · {{ bytes(artifact.sizeBytes) }}</span>
-            </div>
-            <code :title="artifact.sha256">{{ artifact.sha256 || 'Digest unavailable' }}</code>
-          </article>
-          <p v-if="!daq.latestCompletedRun.value.artifacts.length" class="empty">
-            No artifact metadata was returned.
-          </p>
-        </div>
-      </section>
-
-      <section
         v-show="activeWorkspaceTab === 'runs'"
         id="workspace-panel-runs"
         class="completed panel"
@@ -1188,206 +1142,226 @@ onMounted(() => daq.connect())
             Refresh
           </button>
         </div>
-        <form class="run-search" aria-label="Search stored runs" @submit.prevent="submitRunSearch">
-          <div class="search-heading">
+        <div class="run-search">
+          <button
+            class="search-toggle"
+            type="button"
+            aria-controls="run-search-form"
+            :aria-expanded="showRunSearch"
+            @click="showRunSearch = !showRunSearch"
+          >
             <div>
               <strong>Search configurations</strong>
-              <p>All filters must match. Numeric values use the catalog's canonical units.</p>
+              <span>Filter runs by configuration, run number, or event count.</span>
             </div>
-            <button class="link-button" type="button" @click="addSearchPredicate">
-              Add filter
-            </button>
-          </div>
-          <div
-            v-for="(predicate, index) in searchPredicates"
-            :key="predicate.id"
-            class="search-predicate"
+            <span aria-hidden="true">{{ showRunSearch ? 'Hide' : 'Open' }}</span>
+          </button>
+          <form
+            v-if="showRunSearch"
+            id="run-search-form"
+            class="search-form"
+            aria-label="Search stored runs"
+            @submit.prevent="submitRunSearch"
           >
+            <div class="search-heading">
+              <p>All filters must match. Numeric values use the catalog's canonical units.</p>
+              <button class="link-button" type="button" @click="addSearchPredicate">
+                Add filter
+              </button>
+            </div>
             <div
-              class="search-parameter-field"
-              @focusout="closeSearchParameterList($event, predicate.id)"
+              v-for="(predicate, index) in searchPredicates"
+              :key="predicate.id"
+              class="search-predicate"
             >
-              <label :for="`search-parameter-${predicate.id}`">Parameter</label>
-              <input
-                :id="`search-parameter-${predicate.id}`"
-                v-model="predicate.parameter"
-                :aria-label="`Parameter ${index + 1}`"
-                role="combobox"
-                aria-autocomplete="list"
-                :aria-expanded="openSearchParameterId === predicate.id"
-                :aria-controls="`search-parameters-${predicate.id}`"
-                placeholder="Search parameters…"
-                autocomplete="off"
-                @focus="openSearchParameterId = predicate.id"
-                @click="openSearchParameterId = predicate.id"
-                @input="selectSearchParameter(predicate)"
-                @change="selectSearchParameter(predicate)"
-              />
               <div
-                v-if="openSearchParameterId === predicate.id"
-                :id="`search-parameters-${predicate.id}`"
-                class="search-parameter-options"
-                role="listbox"
-                :aria-label="`Parameters ${index + 1}`"
+                class="search-parameter-field"
+                @focusout="closeSearchParameterList($event, predicate.id)"
               >
-                <button
-                  v-for="parameter in matchingSearchParameters(predicate)"
-                  :key="parameter.name"
-                  type="button"
-                  role="option"
-                  :aria-selected="predicate.parameter === parameter.name"
-                  @click="chooseSearchParameter(predicate, parameter)"
+                <label :for="`search-parameter-${predicate.id}`">Parameter</label>
+                <input
+                  :id="`search-parameter-${predicate.id}`"
+                  v-model="predicate.parameter"
+                  :aria-label="`Parameter ${index + 1}`"
+                  role="combobox"
+                  aria-autocomplete="list"
+                  :aria-expanded="openSearchParameterId === predicate.id"
+                  :aria-controls="`search-parameters-${predicate.id}`"
+                  placeholder="Search parameters…"
+                  autocomplete="off"
+                  @focus="openSearchParameterId = predicate.id"
+                  @click="openSearchParameterId = predicate.id"
+                  @input="selectSearchParameter(predicate)"
+                  @change="selectSearchParameter(predicate)"
+                />
+                <div
+                  v-if="openSearchParameterId === predicate.id"
+                  :id="`search-parameters-${predicate.id}`"
+                  class="search-parameter-options"
+                  role="listbox"
+                  :aria-label="`Parameters ${index + 1}`"
                 >
-                  <strong>{{ parameter.name }}</strong>
-                  <span>{{ parameter.section }} — {{ parameter.description }}</span>
-                </button>
-                <p v-if="!matchingSearchParameters(predicate).length">No parameters found.</p>
+                  <button
+                    v-for="parameter in matchingSearchParameters(predicate)"
+                    :key="parameter.name"
+                    type="button"
+                    role="option"
+                    :aria-selected="predicate.parameter === parameter.name"
+                    @click="chooseSearchParameter(predicate, parameter)"
+                  >
+                    <strong>{{ parameter.name }}</strong>
+                    <span>{{ parameter.section }} — {{ parameter.description }}</span>
+                  </button>
+                  <p v-if="!matchingSearchParameters(predicate).length">No parameters found.</p>
+                </div>
               </div>
-            </div>
-            <div v-if="searchParameter(predicate)" class="search-scope">
-              Scope
-              <strong>{{ searchParameter(predicate)?.scope }}</strong>
-            </div>
-            <label v-if="searchParameter(predicate)?.scope !== 'global'">
-              Board
-              <select
-                v-model="predicate.board"
-                :aria-label="`Board ${index + 1}`"
-                @change="predicate.channel = ''"
+              <div v-if="searchParameter(predicate)" class="search-scope">
+                Scope
+                <strong>{{ searchParameter(predicate)?.scope }}</strong>
+              </div>
+              <label v-if="searchParameter(predicate)?.scope !== 'global'">
+                Board
+                <select
+                  v-model="predicate.board"
+                  :aria-label="`Board ${index + 1}`"
+                  @change="predicate.channel = ''"
+                >
+                  <option value="">All boards</option>
+                  <option v-for="board in 4" :key="board - 1" :value="String(board - 1)">
+                    Board {{ board - 1 }}
+                  </option>
+                </select>
+              </label>
+              <label v-if="searchParameter(predicate)?.scope === 'channel'">
+                Channel
+                <select
+                  v-model="predicate.channel"
+                  :disabled="!predicate.board"
+                  :aria-label="`Channel ${index + 1}`"
+                >
+                  <option value="">All channels</option>
+                  <option v-for="channel in 64" :key="channel - 1" :value="String(channel - 1)">
+                    Channel {{ channel - 1 }}
+                  </option>
+                </select>
+              </label>
+              <label
+                v-if="
+                  searchParameter(predicate) &&
+                  searchValueType(searchParameter(predicate)!) !== 'text'
+                "
+                class="search-match"
               >
-                <option value="">All boards</option>
-                <option v-for="board in 4" :key="board - 1" :value="String(board - 1)">
-                  Board {{ board - 1 }}
-                </option>
-              </select>
-            </label>
-            <label v-if="searchParameter(predicate)?.scope === 'channel'">
-              Channel
-              <select
-                v-model="predicate.channel"
-                :disabled="!predicate.board"
-                :aria-label="`Channel ${index + 1}`"
-              >
-                <option value="">All channels</option>
-                <option v-for="channel in 64" :key="channel - 1" :value="String(channel - 1)">
-                  Channel {{ channel - 1 }}
-                </option>
-              </select>
-            </label>
-            <label
-              v-if="
-                searchParameter(predicate) &&
-                searchValueType(searchParameter(predicate)!) !== 'text'
-              "
-              class="search-match"
-            >
-              Match
-              <select v-model="predicate.numericMatch" :aria-label="`Match ${index + 1}`">
-                <option value="exact">Exact value</option>
-                <option value="range">Range</option>
-              </select>
-            </label>
-            <label v-if="searchParameter(predicate)">
-              <span>
-                {{
-                  searchValueType(searchParameter(predicate)!) === 'text' ||
-                  predicate.numericMatch === 'exact'
-                    ? 'Value'
-                    : 'Minimum'
-                }}
-                <small
-                  v-if="
-                    searchValueType(searchParameter(predicate)!) !== 'text' &&
-                    searchAllowedRange(searchParameter(predicate)!)
+                Match
+                <select v-model="predicate.numericMatch" :aria-label="`Match ${index + 1}`">
+                  <option value="exact">Exact value</option>
+                  <option value="range">Range</option>
+                </select>
+              </label>
+              <label v-if="searchParameter(predicate)">
+                <span>
+                  {{
+                    searchValueType(searchParameter(predicate)!) === 'text' ||
+                    predicate.numericMatch === 'exact'
+                      ? 'Value'
+                      : 'Minimum'
+                  }}
+                  <small
+                    v-if="
+                      searchValueType(searchParameter(predicate)!) !== 'text' &&
+                      searchAllowedRange(searchParameter(predicate)!)
+                    "
+                    class="search-range-hint"
+                  >
+                    {{ searchAllowedRange(searchParameter(predicate)!) }}
+                  </small>
+                </span>
+                <select
+                  v-if="searchOptions(searchParameter(predicate)!).length"
+                  v-model="predicate.value"
+                  :aria-label="`Value ${index + 1}`"
+                >
+                  <option value="" disabled>Select a value…</option>
+                  <option
+                    v-for="option in searchOptions(searchParameter(predicate)!)"
+                    :key="option"
+                    :value="option"
+                  >
+                    {{ option }}
+                  </option>
+                </select>
+                <input
+                  v-else
+                  v-model="predicate.value"
+                  :type="
+                    searchValueType(searchParameter(predicate)!) === 'text' ? 'text' : 'number'
                   "
-                  class="search-range-hint"
-                >
-                  {{ searchAllowedRange(searchParameter(predicate)!) }}
-                </small>
-              </span>
-              <select
-                v-if="searchOptions(searchParameter(predicate)!).length"
-                v-model="predicate.value"
-                :aria-label="`Value ${index + 1}`"
+                  :min="searchParameter(predicate)?.min"
+                  :max="searchParameter(predicate)?.max"
+                  :step="searchParameter(predicate)?.step"
+                  :aria-label="`Value ${index + 1}`"
+                />
+              </label>
+              <label
+                v-if="
+                  searchParameter(predicate) &&
+                  searchValueType(searchParameter(predicate)!) !== 'text' &&
+                  predicate.numericMatch === 'range'
+                "
               >
-                <option value="" disabled>Select a value…</option>
-                <option
-                  v-for="option in searchOptions(searchParameter(predicate)!)"
-                  :key="option"
-                  :value="option"
-                >
-                  {{ option }}
-                </option>
-              </select>
-              <input
-                v-else
-                v-model="predicate.value"
-                :type="searchValueType(searchParameter(predicate)!) === 'text' ? 'text' : 'number'"
-                :min="searchParameter(predicate)?.min"
-                :max="searchParameter(predicate)?.max"
-                :step="searchParameter(predicate)?.step"
-                :aria-label="`Value ${index + 1}`"
-              />
-            </label>
-            <label
-              v-if="
-                searchParameter(predicate) &&
-                searchValueType(searchParameter(predicate)!) !== 'text' &&
-                predicate.numericMatch === 'range'
-              "
-            >
-              Maximum
-              <input
-                v-model="predicate.maximum"
-                type="number"
-                :min="searchParameter(predicate)?.min"
-                :max="searchParameter(predicate)?.max"
-                :step="searchParameter(predicate)?.step"
-                :aria-label="`Maximum ${index + 1}`"
-              />
-            </label>
-            <button
-              v-if="searchPredicates.length > 1"
-              class="link-button remove-filter"
-              type="button"
-              :aria-label="`Remove filter ${index + 1}`"
-              @click="removeSearchPredicate(predicate.id)"
-            >
-              Remove
-            </button>
-          </div>
-          <div class="search-metadata">
-            <label>
-              Run number
-              <input v-model="searchRunNumber" type="number" min="0" aria-label="Run number" />
-            </label>
-            <label>
-              Maximum run number <span class="optional">(optional)</span>
-              <input
-                v-model="searchMaximumRunNumber"
-                type="number"
-                min="0"
-                aria-label="Maximum run number"
-              />
-            </label>
-            <label>
-              Minimum events
-              <input v-model="searchMinimumEvents" type="number" min="0" />
-            </label>
-          </div>
-          <p v-if="searchFormError" class="field-error" role="alert">{{ searchFormError }}</p>
-          <p v-if="daq.searchError.value" class="field-error" role="alert">
-            Search failed: {{ daq.searchError.value }}
-          </p>
-          <div class="actions">
-            <button class="primary" type="submit" :disabled="daq.searchLoading.value">
-              {{ daq.searchLoading.value ? 'Searching…' : 'Search runs' }}
-            </button>
-            <button type="button" :disabled="daq.searchLoading.value" @click="clearRunSearch">
-              Clear
-            </button>
-          </div>
-        </form>
+                Maximum
+                <input
+                  v-model="predicate.maximum"
+                  type="number"
+                  :min="searchParameter(predicate)?.min"
+                  :max="searchParameter(predicate)?.max"
+                  :step="searchParameter(predicate)?.step"
+                  :aria-label="`Maximum ${index + 1}`"
+                />
+              </label>
+              <button
+                v-if="searchPredicates.length > 1"
+                class="link-button remove-filter"
+                type="button"
+                :aria-label="`Remove filter ${index + 1}`"
+                @click="removeSearchPredicate(predicate.id)"
+              >
+                Remove
+              </button>
+            </div>
+            <div class="search-metadata">
+              <label>
+                Run number
+                <input v-model="searchRunNumber" type="number" min="0" aria-label="Run number" />
+              </label>
+              <label>
+                Maximum run number <span class="optional">(optional)</span>
+                <input
+                  v-model="searchMaximumRunNumber"
+                  type="number"
+                  min="0"
+                  aria-label="Maximum run number"
+                />
+              </label>
+              <label>
+                Minimum events
+                <input v-model="searchMinimumEvents" type="number" min="0" />
+              </label>
+            </div>
+            <p v-if="searchFormError" class="field-error" role="alert">{{ searchFormError }}</p>
+            <p v-if="daq.searchError.value" class="field-error" role="alert">
+              Search failed: {{ daq.searchError.value }}
+            </p>
+            <div class="actions">
+              <button class="primary" type="submit" :disabled="daq.searchLoading.value">
+                {{ daq.searchLoading.value ? 'Searching…' : 'Search runs' }}
+              </button>
+              <button type="button" :disabled="daq.searchLoading.value" @click="clearRunSearch">
+                Clear
+              </button>
+            </div>
+          </form>
+        </div>
         <div v-if="daq.searchPerformed.value" class="search-results" aria-live="polite">
           <p
             v-if="
