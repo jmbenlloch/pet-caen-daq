@@ -90,6 +90,7 @@ function dashboardApi(state = SystemState.READY): DaqApi {
       }),
     ]),
     searchRuns: vi.fn().mockResolvedValue({ runs: [], nextPageToken: '' }),
+    runConfiguration: vi.fn().mockResolvedValue('HV_Vbias 55.0\nStopRunMode MANUAL'),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
     histograms: vi.fn().mockResolvedValue([]),
   }
@@ -390,16 +391,16 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     await wrapper.get('[aria-label="Parameter 1"]').setValue('TD_CoarseThreshold')
-    await wrapper.get('[aria-label="Scope 1"]').setValue('channel')
+    await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
     await wrapper.get('[aria-label="Board 1"]').setValue('2')
-    await wrapper.get('[aria-label="Channel 1"]').setValue('17')
-    await wrapper.get('[aria-label="Type 1"]').setValue('integer')
-    await wrapper.get('[aria-label="Match 1"]').setValue('range')
     await wrapper.get('[aria-label="Value 1"]').setValue('200')
     await wrapper.get('[aria-label="Maximum 1"]').setValue('240')
     await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
     await flushPromises()
 
+    expect(wrapper.find('.field-error').exists() ? wrapper.find('.field-error').text() : '').toBe(
+      '',
+    )
     expect(api.searchRuns).toHaveBeenCalledWith(
       expect.objectContaining({
         configuration: [
@@ -407,8 +408,8 @@ describe('operator dashboard', () => {
             parameter: 'TD_CoarseThreshold',
             scope: expect.objectContaining({
               scope: expect.objectContaining({
-                case: 'channel',
-                value: expect.objectContaining({ board: 2, channel: 17 }),
+                case: 'board',
+                value: 2,
               }),
             }),
             comparison: expect.objectContaining({
@@ -421,10 +422,35 @@ describe('operator dashboard', () => {
     )
     expect(wrapper.get('[aria-label="Search results"]').text()).toContain('matching-run')
     await wrapper
+      .get('[aria-label="Search results"]')
+      .findAll('button')
+      .find((button) => button.text() === 'View configuration')!
+      .trigger('click')
+    await flushPromises()
+    expect(api.runConfiguration).toHaveBeenCalledWith('matching-run')
+    expect(wrapper.get('[aria-label="Configuration for run matching-run"]').text()).toContain(
+      'HV_Vbias 55.0',
+    )
+    await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Clear')!
       .trigger('click')
     expect(wrapper.find('[aria-label="Search results"]').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('derives enum choices and hides implementation-only search fields', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    expect(wrapper.find('[aria-label="Layer 1"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Type 1"]').exists()).toBe(false)
+    await wrapper.get('[aria-label="Parameter 1"]').setValue('StopRunMode')
+    await wrapper.get('[aria-label="Parameter 1"]').trigger('change')
+
+    const value = wrapper.get('[aria-label="Value 1"]')
+    expect(value.element.tagName).toBe('SELECT')
+    expect(value.findAll('option').map((option) => option.text())).toContain('PRESET_COUNTS')
     wrapper.unmount()
   })
 })

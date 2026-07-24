@@ -14,7 +14,11 @@ import (
 
 func TestRunHistory(t *testing.T) {
 	parent := t.TempDir()
-	writer, err := runstore.Create(parent, runstore.Manifest{RunID: "54", StartedAt: "2026-07-21T10:00:00Z"})
+	writer, err := runstore.Create(parent, runstore.Manifest{
+		RunID:                  "54",
+		StartedAt:              "2026-07-21T10:00:00Z",
+		RequestedConfiguration: "HV_Vbias 55.0\nStopRunMode MANUAL\n",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,6 +36,10 @@ func TestRunHistory(t *testing.T) {
 	}
 	if len(listed.Msg.Runs) != 1 || listed.Msg.Runs[0].GetRunId() != "54" || listed.Msg.Runs[0].GetEventCount() != 1 || listed.Msg.Runs[0].GetIncomplete() {
 		t.Fatalf("runs = %+v", listed.Msg.Runs)
+	}
+	configuration, err := service.GetRunConfiguration(context.Background(), connect.NewRequest(&daqv1.GetRunConfigurationRequest{RunId: "54"}))
+	if err != nil || configuration.Msg.GetJanusConfiguration() != "HV_Vbias 55.0\nStopRunMode MANUAL\n" {
+		t.Fatalf("configuration=%+v error=%v", configuration, err)
 	}
 
 	_, err = service.ListRuns(context.Background(), connect.NewRequest(&daqv1.ListRunsRequest{Limit: 101}))

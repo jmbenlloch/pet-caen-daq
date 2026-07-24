@@ -58,6 +58,7 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
       .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.READY })),
     listRuns: vi.fn().mockResolvedValue([]),
     searchRuns: vi.fn().mockResolvedValue({ runs: [], nextPageToken: '' }),
+    runConfiguration: vi.fn().mockResolvedValue(''),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
     histograms: vi.fn().mockResolvedValue([]),
     ...overrides,

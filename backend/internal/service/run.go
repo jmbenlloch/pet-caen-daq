@@ -289,6 +289,26 @@ func (s *RunService) ListRuns(_ context.Context, request *connect.Request[daqv1.
 	return connect.NewResponse(response), nil
 }
 
+func (s *RunService) GetRunConfiguration(_ context.Context, request *connect.Request[daqv1.GetRunConfigurationRequest]) (*connect.Response[daqv1.GetRunConfigurationResponse], error) {
+	runID := request.Msg.GetRunId()
+	if !validRunID.MatchString(runID) {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_ID", fmt.Errorf("a valid run_id is required"))
+	}
+	if s.RunParent == "" {
+		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_HISTORY_UNAVAILABLE", fmt.Errorf("run storage is not configured"))
+	}
+	manifest, err := runstore.ReadManifest(filepath.Join(s.RunParent, "run-"+runID), runID)
+	if errors.Is(err, runstore.ErrRunNotFound) {
+		return nil, serviceError(connect.CodeNotFound, "RUN_NOT_FOUND", err)
+	}
+	if err != nil {
+		return nil, serviceError(connect.CodeInternal, "RUN_CONFIGURATION_INSPECTION_FAILED", err)
+	}
+	return connect.NewResponse(&daqv1.GetRunConfigurationResponse{
+		JanusConfiguration: manifest.RequestedConfiguration,
+	}), nil
+}
+
 func (s *RunService) DownloadArtifact(_ context.Context, request *connect.Request[daqv1.DownloadArtifactRequest], stream *connect.ServerStream[daqv1.DownloadArtifactResponse]) error {
 	runID, name := request.Msg.GetRunId(), request.Msg.GetArtifactName()
 	if !validRunID.MatchString(runID) || name == "" || filepath.Base(name) != name {
