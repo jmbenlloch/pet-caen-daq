@@ -38,7 +38,7 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await expect(activeRunId).toBeVisible()
   await expect(activeRunId).toHaveText(/^\d+$/)
   const runId = (await activeRunId.textContent())!
-  await page.getByRole('tab', { name: /Monitoring/ }).click()
+  await page.getByRole('tab', { name: /Statistics/ }).click()
   const statistics = page.getByRole('region', { name: 'Statistics' })
   await expect(statistics.getByRole('tab', { name: 'Board 0' })).toBeVisible()
   await statistics.getByRole('tab', { name: 'Board 0' }).click()
@@ -48,6 +48,7 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await statistics.getByLabel('Cumulative counts').check()
   await expect(statistics).toContainText('PHA integrated count')
 
+  await page.getByRole('tab', { name: /Plots/ }).click()
   const plots = page.getByRole('region', { name: 'Plots and histograms' })
   await plots.getByLabel('Channels').click()
   await plots.getByRole('button', { name: 'Board 0 node 0 channel 1', exact: true }).click()

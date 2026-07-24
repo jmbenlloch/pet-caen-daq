@@ -99,23 +99,24 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     const acquisition = wrapper.get('#workspace-tab-acquisition')
-    const monitoring = wrapper.get('#workspace-tab-monitoring')
+    const statistics = wrapper.get('#workspace-tab-statistics')
     expect(acquisition.attributes('aria-selected')).toBe('true')
     expect(wrapper.get('#workspace-panel-acquisition').isVisible()).toBe(true)
-    expect(wrapper.get('#workspace-panel-monitoring').isVisible()).toBe(false)
+    expect(wrapper.get('#workspace-panel-statistics').isVisible()).toBe(false)
+    expect(wrapper.get('#workspace-panel-plots').isVisible()).toBe(false)
 
     await acquisition.trigger('keydown', { key: 'ArrowRight' })
     await new Promise((resolve) => requestAnimationFrame(resolve))
-    expect(monitoring.attributes('aria-selected')).toBe('true')
+    expect(statistics.attributes('aria-selected')).toBe('true')
     expect((wrapper.get('#workspace-panel-acquisition').element as HTMLElement).style.display).toBe(
       'none',
     )
     expect(
-      (wrapper.get('#workspace-panel-monitoring').element as HTMLElement).style.display,
+      (wrapper.get('#workspace-panel-statistics').element as HTMLElement).style.display,
     ).not.toBe('none')
-    expect(document.activeElement).toBe(monitoring.element)
+    expect(document.activeElement).toBe(statistics.element)
 
-    await monitoring.trigger('keydown', { key: 'End' })
+    await statistics.trigger('keydown', { key: 'End' })
     await new Promise((resolve) => requestAnimationFrame(resolve))
     expect(wrapper.get('#workspace-tab-runs').attributes('aria-selected')).toBe('true')
     expect(wrapper.get('#workspace-panel-runs').isVisible()).toBe(true)

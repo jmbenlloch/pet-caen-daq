@@ -53,10 +53,11 @@ const captureRaw = ref(false)
 const journalTransport = ref(false)
 const hdf5SegmentSizeMb = ref(500)
 const configFile = ref<HTMLInputElement>()
-type WorkspaceTab = 'acquisition' | 'monitoring' | 'hardware' | 'runs'
+type WorkspaceTab = 'acquisition' | 'statistics' | 'plots' | 'hardware' | 'runs'
 const workspaceTabs: { id: WorkspaceTab; label: string; description: string }[] = [
   { id: 'acquisition', label: 'Acquisition', description: 'Configure and control runs' },
-  { id: 'monitoring', label: 'Monitoring', description: 'Statistics and plots' },
+  { id: 'statistics', label: 'Statistics', description: 'Live rates and counters' },
+  { id: 'plots', label: 'Plots', description: 'Histograms and channels' },
   { id: 'hardware', label: 'Hardware', description: 'Boards and high voltage' },
   { id: 'runs', label: 'Runs', description: 'History and artifacts' },
 ]
@@ -1236,17 +1237,24 @@ onMounted(() => daq.connect())
       </section>
 
       <div
-        v-show="activeWorkspaceTab === 'monitoring'"
-        id="workspace-panel-monitoring"
+        v-show="activeWorkspaceTab === 'statistics'"
+        id="workspace-panel-statistics"
         role="tabpanel"
-        aria-labelledby="workspace-tab-monitoring"
+        aria-labelledby="workspace-tab-statistics"
       >
         <StatisticsTab
           :statistics="daq.snapshot.value?.statistics"
           :pipeline="daq.snapshot.value?.pipeline"
           :storage="daq.snapshot.value?.storage"
         />
+      </div>
 
+      <div
+        v-show="activeWorkspaceTab === 'plots'"
+        id="workspace-panel-plots"
+        role="tabpanel"
+        aria-labelledby="workspace-tab-plots"
+      >
         <PlotWorkspace
           :boards="boards"
           :running="daq.snapshot.value?.state === SystemState.RUNNING"

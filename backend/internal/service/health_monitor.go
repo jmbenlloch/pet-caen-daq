@@ -142,20 +142,41 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 					elapsedMilliseconds = 0
 				}
 				snapshot.Statistics = &daqv1.StatisticsTelemetry{ElapsedMilliseconds: uint64(elapsedMilliseconds)}
-				for _, observation := range observations {
-					snapshot.Statistics.Boards = append(snapshot.Statistics.Boards, &daqv1.BoardStatistics{
-						Chain: observationChain(observation), Node: uint32(observation.Node), Timestamp: observation.Timestamp,
-						TriggerId: observation.TriggerID, TriggerCount: observation.TriggerCount, LostTriggerCount: observation.LostTriggerCount,
-						DataBytes: observation.DataBytes, TOrCount: observation.TORCount,
-						ChannelTriggerCounts: observation.ChannelTriggerCount[:], TimestampCounts: observation.TimestampCount[:], PhaCounts: observation.PHACount[:],
-					})
-				}
+				snapshot.Statistics.Boards = statisticsBoards(snapshot, observations)
 			}
 		}
 	})
 }
 
-func observationChain(observation runpipeline.BoardStats) uint32 { return uint32(observation.Chain) }
+func statisticsBoards(snapshot *daqv1.TelemetrySnapshot, observations []runpipeline.BoardStats) []*daqv1.BoardStatistics {
+	type boardKey struct {
+		chain uint32
+		node  uint32
+	}
+	observed := make(map[boardKey]runpipeline.BoardStats, len(observations))
+	for _, observation := range observations {
+		observed[boardKey{chain: uint32(observation.Chain), node: uint32(observation.Node)}] = observation
+	}
+	result := make([]*daqv1.BoardStatistics, 0, len(observations))
+	for _, chain := range snapshot.GetChains() {
+		for _, board := range chain.GetBoards() {
+			statistic := &daqv1.BoardStatistics{Chain: chain.GetIndex(), Node: board.GetNode()}
+			if observation, ok := observed[boardKey{chain: chain.GetIndex(), node: board.GetNode()}]; ok {
+				statistic.Timestamp = observation.Timestamp
+				statistic.TriggerId = observation.TriggerID
+				statistic.TriggerCount = observation.TriggerCount
+				statistic.LostTriggerCount = observation.LostTriggerCount
+				statistic.DataBytes = observation.DataBytes
+				statistic.TOrCount = observation.TORCount
+				statistic.ChannelTriggerCounts = observation.ChannelTriggerCount[:]
+				statistic.TimestampCounts = observation.TimestampCount[:]
+				statistic.PhaCounts = observation.PHACount[:]
+			}
+			result = append(result, statistic)
+		}
+	}
+	return result
+}
 
 func shouldApplyBoardTelemetry(board *daqv1.Board, observedAt *time.Time) bool {
 	if observedAt == nil {
