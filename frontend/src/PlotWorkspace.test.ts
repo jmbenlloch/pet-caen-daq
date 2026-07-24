@@ -10,6 +10,90 @@ import {
 import PlotWorkspace from './PlotWorkspace.vue'
 
 describe('PlotWorkspace', () => {
+  it('requests the latest persisted run when run history becomes available on page load', async () => {
+    const wrapper = mount(PlotWorkspace, {
+      props: {
+        boards: [{ chain: 2, ...create(BoardSchema, { node: 3 }) }],
+        runs: [],
+        running: false,
+        loading: false,
+        datasets: [],
+        theme: 'light',
+      },
+      global: {
+        stubs: {
+          HistogramPlot: { template: '<div />' },
+        },
+      },
+    })
+
+    expect(wrapper.emitted('request')).toBeUndefined()
+
+    await wrapper.setProps({
+      runs: [
+        create(RunSummarySchema, {
+          runId: '42',
+          artifacts: [
+            {
+              $typeName: 'pet.caen.daq.v1.Artifact',
+              kind: 'histograms',
+              name: 'run_42.histograms.h5',
+              sizeBytes: 1n,
+              sha256: 'hash',
+            },
+          ],
+        }),
+      ],
+    })
+
+    expect(wrapper.emitted('request')).toHaveLength(1)
+    expect(wrapper.emitted('request')?.[0]).toEqual([
+      '42',
+      HistogramKind.PHA_HIGH_GAIN,
+      [expect.objectContaining({ chain: 2, node: 3, channel: 0 })],
+    ])
+  })
+
+  it('switches from a persisted run to the live plot when a run starts', async () => {
+    const persistedRun = create(RunSummarySchema, {
+      runId: '41',
+      artifacts: [
+        {
+          $typeName: 'pet.caen.daq.v1.Artifact',
+          kind: 'histograms',
+          name: 'run_41.histograms.h5',
+          sizeBytes: 1n,
+          sha256: 'hash',
+        },
+      ],
+    })
+    const wrapper = mount(PlotWorkspace, {
+      props: {
+        boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
+        runs: [persistedRun],
+        running: false,
+        loading: false,
+        datasets: [],
+        theme: 'light',
+      },
+      global: {
+        stubs: {
+          HistogramPlot: { template: '<div />' },
+        },
+      },
+    })
+
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Histogram run"]').element.value).toBe('41')
+
+    await wrapper.setProps({
+      activeRunId: '42',
+      running: true,
+    })
+
+    expect(wrapper.get<HTMLSelectElement>('[aria-label="Histogram run"]').element.value).toBe('42')
+    expect(wrapper.text()).not.toContain('Viewing persisted histograms')
+  })
+
   it('requests selected channel sets and presents returned bins to the live plot', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
