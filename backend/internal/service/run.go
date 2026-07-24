@@ -736,6 +736,7 @@ func protobufState(state acquisition.State) daqv1.SystemState {
 		acquisition.StateDraining:     daqv1.SystemState_SYSTEM_STATE_DRAINING,
 		acquisition.StateFault:        daqv1.SystemState_SYSTEM_STATE_FAULT,
 		acquisition.StateRecovering:   daqv1.SystemState_SYSTEM_STATE_RECOVERING,
+		acquisition.StateScanning:     daqv1.SystemState_SYSTEM_STATE_SCANNING,
 	}
 	return states[state]
 }

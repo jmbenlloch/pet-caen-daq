@@ -22,6 +22,7 @@ const (
 	StateDraining     State = "draining"
 	StateFault        State = "fault"
 	StateRecovering   State = "recovering"
+	StateScanning     State = "scanning"
 )
 
 type Transition struct {
@@ -91,7 +92,7 @@ func (m *StateMachine) Move(to State, actor string) (Transition, error) {
 func validState(state State) bool {
 	switch state {
 	case StateDisconnected, StateConnecting, StateIdle, StateConfiguring, StateReady,
-		StateStarting, StateRunning, StateStopping, StateDraining, StateFault, StateRecovering:
+		StateStarting, StateRunning, StateStopping, StateDraining, StateFault, StateRecovering, StateScanning:
 		return true
 	default:
 		return false
@@ -112,7 +113,9 @@ func allowedTransition(from, to State) bool {
 	case StateConfiguring:
 		return to == StateReady || to == StateIdle
 	case StateReady:
-		return to == StateStarting || to == StateConfiguring || to == StateDisconnected
+		return to == StateStarting || to == StateConfiguring || to == StateScanning || to == StateDisconnected
+	case StateScanning:
+		return to == StateReady
 	case StateStarting:
 		return to == StateRunning || to == StateStopping
 	case StateRunning:

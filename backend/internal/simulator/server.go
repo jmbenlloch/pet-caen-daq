@@ -522,11 +522,35 @@ func (s *Server) handleReadRegister(connection net.Conn) error {
 		} else {
 			value = board.Registers[address]
 		}
+	case uint32(dt5202.TimeORCount):
+		value = simulatedStaircaseCount(board, 64)
+	case uint32(dt5202.ChargeORCount):
+		value = simulatedStaircaseCount(board, 65)
 	default:
-		value = board.Registers[address]
+		if address&0xffff == uint32(dt5202.HitCounter)&0xffff && address&0x02000000 != 0 {
+			value = simulatedStaircaseCount(board, int((address>>16)&0x3f))
+		} else {
+			value = board.Registers[address]
+		}
 	}
 	binary.LittleEndian.PutUint32(response[4:8], value)
 	return writeAll(connection, response)
+}
+
+func simulatedStaircaseCount(board *Board, channel int) uint32 {
+	threshold := board.Registers[uint32(dt5202.TimeCoarseThreshold)]
+	if channel == 65 {
+		threshold = board.Registers[uint32(dt5202.ChargeCoarseThreshold)]
+	}
+	rate := int64(12000) - int64(threshold)*24 + int64(channel%8)*17
+	if rate < 2 {
+		rate = 2
+	}
+	dwellSeconds := float64(board.Registers[uint32(dt5202.DwellTime)]) * 8e-9
+	if dwellSeconds <= 0 {
+		dwellSeconds = 1
+	}
+	return uint32(float64(rate)*dwellSeconds + 0.5)
 }
 
 func (s *Server) handleWriteRegister(connection net.Conn) error {

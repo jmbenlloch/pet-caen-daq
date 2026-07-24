@@ -10,10 +10,12 @@ import (
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/service"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircase"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -36,6 +38,7 @@ type hardwareRuntime struct {
 	client        *dt5215.Client
 	coordinator   *acquisition.Coordinator
 	configurator  *acquisition.Configurator
+	staircase     *acquisition.StaircaseCoordinator
 	hv            *service.NativeHVController
 	monitorCancel context.CancelFunc
 	topology      dt5215.Topology
@@ -114,10 +117,16 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 		hvTargets = append(hvTargets, service.HVTarget{Board: connection.Board, Chain: uint16(connection.Chain), Node: uint16(connection.Node)})
 	}
 	configurationCtx, cancelConfiguration := context.WithTimeout(ctx, 30*time.Second)
-	_, err = configurator.Configure(configurationCtx, r.document, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: r.authorizeHV})
+	configured, err := configurator.Configure(configurationCtx, r.document, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: r.authorizeHV})
 	cancelConfiguration()
 	if err != nil {
 		r.publishConnectFailure(fmt.Errorf("apply connection configuration: %w", err))
+		return err
+	}
+	scanTargets := staircaseTargets(targets, configured.Plans)
+	staircaseCoordinator, err := acquisition.NewStaircaseCoordinator(states, client, scanTargets)
+	if err != nil {
+		r.publishConnectFailure(err)
 		return err
 	}
 	hv := &service.NativeHVController{Hardware: client, States: states, Publisher: r.publisher, Targets: hvTargets, Authorized: r.authorizeHV}
@@ -128,7 +137,7 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 		}
 	}()
 	r.mu.Lock()
-	r.client, r.coordinator, r.configurator, r.hv = client, coordinator, configurator, hv
+	r.client, r.coordinator, r.configurator, r.staircase, r.hv = client, coordinator, configurator, staircaseCoordinator, hv
 	r.monitorCancel, r.topology = monitorCancel, topology
 	r.mu.Unlock()
 	failed = false
@@ -149,7 +158,7 @@ func (r *hardwareRuntime) Disconnect(_ context.Context, actor string) error {
 		return fmt.Errorf("stop active run %q before disconnecting hardware", runID)
 	}
 	client, cancel := r.client, r.monitorCancel
-	r.client, r.coordinator, r.configurator, r.hv, r.monitorCancel = nil, nil, nil, nil, nil
+	r.client, r.coordinator, r.configurator, r.staircase, r.hv, r.monitorCancel = nil, nil, nil, nil, nil, nil
 	r.topology = dt5215.Topology{}
 	r.mu.Unlock()
 	if cancel != nil {
@@ -170,7 +179,7 @@ func (r *hardwareRuntime) Close() error {
 	defer r.opMu.Unlock()
 	r.mu.Lock()
 	client, cancel := r.client, r.monitorCancel
-	r.client, r.coordinator, r.configurator, r.hv, r.monitorCancel = nil, nil, nil, nil, nil
+	r.client, r.coordinator, r.configurator, r.staircase, r.hv, r.monitorCancel = nil, nil, nil, nil, nil, nil
 	r.topology = dt5215.Topology{}
 	r.mu.Unlock()
 	if cancel != nil {
@@ -262,7 +271,35 @@ func (r *hardwareRuntime) Configure(ctx context.Context, document *janusconfig.D
 	for _, connection := range r.connections {
 		targets = append(targets, acquisition.ConfigurationTarget{Board: connection.Board, Chain: uint16(connection.Chain), Node: uint16(connection.Node)})
 	}
-	return r.configurator.Configure(ctx, document, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: r.authorizeHV})
+	result, err := r.configurator.Configure(ctx, document, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: r.authorizeHV})
+	if err == nil && r.staircase != nil {
+		r.staircase.SetTargets(staircaseTargets(targets, result.Plans))
+	}
+	return result, err
+}
+
+func (r *hardwareRuntime) Run(ctx context.Context, request staircase.Request, actor string, observe func(staircase.Point) error) (bool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.staircase == nil {
+		return false, fmt.Errorf("hardware is disconnected")
+	}
+	return r.staircase.Run(ctx, request, actor, observe)
+}
+
+func staircaseTargets(targets []acquisition.ConfigurationTarget, plans []dt5202.ConfigurationPlan) []acquisition.StaircaseTarget {
+	byBoard := make(map[int]acquisition.ConfigurationTarget, len(targets))
+	for _, target := range targets {
+		byBoard[target.Board] = target
+	}
+	result := make([]acquisition.StaircaseTarget, 0, len(plans))
+	for _, plan := range plans {
+		target, ok := byBoard[plan.Board]
+		if ok {
+			result = append(result, acquisition.StaircaseTarget{Board: uint32(plan.Board), Chain: target.Chain, Node: target.Node, Plan: plan})
+		}
+	}
+	return result
 }
 
 func (r *hardwareRuntime) Set(ctx context.Context, boards []uint32, enabled bool, actor string) error {

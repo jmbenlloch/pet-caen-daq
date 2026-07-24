@@ -94,6 +94,10 @@ function dashboardApi(state = SystemState.READY): DaqApi {
     runConfiguration: vi.fn().mockResolvedValue('HV_Vbias 55.0\nStopRunMode MANUAL'),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
     histograms: vi.fn().mockResolvedValue([]),
+    startStaircase: vi.fn().mockResolvedValue(undefined),
+    cancelScan: vi.fn().mockResolvedValue(undefined),
+    listScans: vi.fn().mockResolvedValue([]),
+    staircase: vi.fn().mockResolvedValue(undefined),
   }
 }
 

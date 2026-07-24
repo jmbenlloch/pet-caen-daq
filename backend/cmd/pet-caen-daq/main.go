@@ -145,6 +145,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		Controller: runtime, Telemetry: publisher, HardwareMetadata: runtime, RunParent: *runParent,
 		Configure: runtime.Configure,
 	}
+	scanService := &service.ScanService{Controller: runtime, Telemetry: publisher, ScanParent: *runParent}
 	if catalog != nil {
 		runService.Catalog = catalog
 		runService.AllocateRunID = catalog.AllocateRunID
@@ -160,8 +161,10 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	mux := http.NewServeMux()
 	systemPath, systemHandler := daqv1connect.NewSystemServiceHandler(systemService)
 	runPath, runHandler := daqv1connect.NewRunServiceHandler(runService)
+	scanPath, scanHandler := daqv1connect.NewScanServiceHandler(scanService)
 	mux.Handle(systemPath, systemHandler)
 	mux.Handle(runPath, runHandler)
+	mux.Handle(scanPath, scanHandler)
 	if *frontendDirectory != "" {
 		frontendHandler, frontendErr := webui.New(*frontendDirectory)
 		if frontendErr != nil {

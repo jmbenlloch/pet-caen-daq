@@ -30,6 +30,15 @@ service RunService {
   rpc GetHistograms(GetHistogramsRequest) returns (GetHistogramsResponse) {}
 }
 
+// ScanService owns exclusive diagnostic scans. Scans are not physics runs and
+// cannot overlap run control, configuration, or other scans.
+service ScanService {
+  rpc StartStaircase(StartStaircaseRequest) returns (StartStaircaseResponse) {}
+  rpc CancelScan(CancelScanRequest) returns (CancelScanResponse) {}
+  rpc ListScans(ListScansRequest) returns (ListScansResponse) {}
+  rpc GetStaircase(GetStaircaseRequest) returns (GetStaircaseResponse) {}
+}
+
 message GetSystemSnapshotRequest {}
 
 message GetConfigurationTemplateRequest {}
@@ -282,6 +291,92 @@ message TelemetrySnapshot {
   StatisticsTelemetry statistics = 10;
   RunSummary latest_completed_run = 11;
   Concentrator concentrator = 12;
+  StaircaseScan current_staircase = 13;
+  ScanSummary latest_completed_scan = 14;
+}
+
+message StartStaircaseRequest {
+  uint32 board = 1;
+  uint32 minimum_threshold = 2;
+  uint32 maximum_threshold = 3;
+  uint32 step = 4;
+  uint32 dwell_milliseconds = 5;
+  string requested_by = 6;
+}
+
+message StartStaircaseResponse {
+  StaircaseScan scan = 1;
+  TelemetrySnapshot snapshot = 2;
+}
+
+message CancelScanRequest {
+  string scan_id = 1;
+  string requested_by = 2;
+}
+
+message CancelScanResponse {
+  StaircaseScan scan = 1;
+  TelemetrySnapshot snapshot = 2;
+}
+
+message ListScansRequest {
+  uint32 limit = 1;
+}
+
+message ListScansResponse {
+  repeated ScanSummary scans = 1;
+}
+
+message GetStaircaseRequest {
+  string scan_id = 1;
+}
+
+message GetStaircaseResponse {
+  StaircaseScan scan = 1;
+}
+
+enum ScanState {
+  SCAN_STATE_UNSPECIFIED = 0;
+  SCAN_STATE_PREPARING = 1;
+  SCAN_STATE_RUNNING = 2;
+  SCAN_STATE_RESTORING = 3;
+  SCAN_STATE_COMPLETED = 4;
+  SCAN_STATE_CANCELLED = 5;
+  SCAN_STATE_FAILED = 6;
+}
+
+message ScanSummary {
+  string scan_id = 1;
+  uint32 board = 2;
+  google.protobuf.Timestamp started_at = 3;
+  google.protobuf.Timestamp completed_at = 4;
+  ScanState state = 5;
+  string termination_reason = 6;
+  uint32 completed_points = 7;
+  uint32 total_points = 8;
+  Artifact artifact = 9;
+}
+
+message StaircaseScan {
+  ScanSummary summary = 1;
+  uint32 minimum_threshold = 2;
+  uint32 maximum_threshold = 3;
+  uint32 step = 4;
+  uint32 dwell_milliseconds = 5;
+  repeated StaircasePoint points = 6;
+  // JANUS-parity scans change both common coarse discriminator DACs.
+  bool scans_td_and_qd = 7;
+}
+
+message StaircasePoint {
+  uint32 threshold = 1;
+  uint64 elapsed_nanoseconds = 2;
+  repeated uint64 channel_counts = 3;
+  repeated double channel_rates_cps = 4;
+  uint64 t_or_count = 5;
+  uint64 q_or_count = 6;
+  double t_or_rate_cps = 7;
+  double q_or_rate_cps = 8;
 }
 
 message Concentrator {
@@ -331,6 +426,7 @@ enum SystemState {
   SYSTEM_STATE_STOPPING = 9;
   SYSTEM_STATE_DRAINING = 10;
   SYSTEM_STATE_RECOVERING = 11;
+  SYSTEM_STATE_SCANNING = 12;
 }
 
 message RunSummary {

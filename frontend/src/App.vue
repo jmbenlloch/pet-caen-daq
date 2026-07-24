@@ -11,6 +11,7 @@ import NumericField from './NumericField.vue'
 import PlotWorkspace from './PlotWorkspace.vue'
 import RunHistoryTable from './RunHistoryTable.vue'
 import StatisticsTab from './StatisticsTab.vue'
+import StaircaseWorkspace from './StaircaseWorkspace.vue'
 import {
   isBooleanField,
   isMaskField,
@@ -58,11 +59,12 @@ const journalTransport = ref(false)
 const persistHistograms = ref(false)
 const hdf5SegmentSizeMb = ref(500)
 const configFile = ref<HTMLInputElement>()
-type WorkspaceTab = 'acquisition' | 'statistics' | 'plots' | 'hardware' | 'runs'
+type WorkspaceTab = 'acquisition' | 'statistics' | 'plots' | 'scans' | 'hardware' | 'runs'
 const workspaceTabs: { id: WorkspaceTab; label: string; description: string }[] = [
   { id: 'acquisition', label: 'Acquisition', description: 'Configure and control runs' },
   { id: 'statistics', label: 'Statistics', description: 'Live rates and counters' },
   { id: 'plots', label: 'Plots', description: 'Histograms and channels' },
+  { id: 'scans', label: 'Scans', description: 'Live and stored staircases' },
   { id: 'hardware', label: 'Hardware', description: 'Boards and high voltage' },
   { id: 'runs', label: 'Runs', description: 'History and artifacts' },
 ]
@@ -1426,6 +1428,19 @@ onMounted(() => daq.connect())
           :datasets="daq.histogramDatasets.value"
           :theme="theme"
           @request="daq.loadHistograms"
+        />
+      </div>
+
+      <div
+        v-show="activeWorkspaceTab === 'scans'"
+        id="workspace-panel-scans"
+        role="tabpanel"
+        aria-labelledby="workspace-tab-scans"
+      >
+        <StaircaseWorkspace
+          :api="api"
+          :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
+          :live="daq.snapshot.value?.currentStaircase"
         />
       </div>
 

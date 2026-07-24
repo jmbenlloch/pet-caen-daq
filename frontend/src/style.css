@@ -7,6 +7,89 @@
   background: #09111f;
   font-synthesis: none;
 }
+
+.staircase-workspace {
+  display: grid;
+  gap: 1rem;
+}
+
+.staircase-controls input {
+  width: 7rem;
+}
+
+.staircase-status {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto;
+  gap: 0.35rem 1rem;
+}
+
+.staircase-status progress {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.staircase-series {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.staircase-plot {
+  width: 100%;
+  min-height: 18rem;
+  border: 1px solid #34465f;
+  border-radius: 0.75rem;
+  background: #0d1929;
+}
+
+.staircase-plot line {
+  stroke: #60728b;
+}
+
+.staircase-plot polyline {
+  fill: none;
+  stroke: #4fb3ff;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.staircase-plot text {
+  fill: #a8b8ca;
+  font-size: 12px;
+}
+
+.scan-history-title {
+  margin-top: 0.75rem;
+}
+
+.scan-history {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.scan-history button {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  text-align: left;
+}
+
+[data-theme='light'] .staircase-plot {
+  border-color: #bac8d8;
+  background: #fff;
+}
+
+[data-theme='light'] .staircase-plot line {
+  stroke: #718096;
+}
+
+[data-theme='light'] .staircase-plot polyline {
+  stroke: #006dc2;
+}
+
+[data-theme='light'] .staircase-plot text {
+  fill: #40536b;
+}
 [data-theme='light'] {
   color-scheme: light;
   color: #17243a;
