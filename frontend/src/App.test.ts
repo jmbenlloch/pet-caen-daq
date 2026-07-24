@@ -66,6 +66,8 @@ function dashboardApi(): DaqApi {
         '# Run control\nPresetTime 15 # Preset Time, Range=[1 s, 3600 s]\nEnableJobs 0 # Enable Jobs',
       ),
     telemetry: pendingTelemetry,
+    connectHardware: vi.fn().mockResolvedValue(create(TelemetrySnapshotSchema)),
+    disconnectHardware: vi.fn().mockResolvedValue(create(TelemetrySnapshotSchema)),
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
     start: vi.fn().mockResolvedValue({
       snapshot: create(TelemetrySnapshotSchema, {

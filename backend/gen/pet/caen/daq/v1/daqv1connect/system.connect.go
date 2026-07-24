@@ -47,6 +47,12 @@ const (
 	// SystemServiceStreamTelemetryProcedure is the fully-qualified name of the SystemService's
 	// StreamTelemetry RPC.
 	SystemServiceStreamTelemetryProcedure = "/pet.caen.daq.v1.SystemService/StreamTelemetry"
+	// SystemServiceConnectHardwareProcedure is the fully-qualified name of the SystemService's
+	// ConnectHardware RPC.
+	SystemServiceConnectHardwareProcedure = "/pet.caen.daq.v1.SystemService/ConnectHardware"
+	// SystemServiceDisconnectHardwareProcedure is the fully-qualified name of the SystemService's
+	// DisconnectHardware RPC.
+	SystemServiceDisconnectHardwareProcedure = "/pet.caen.daq.v1.SystemService/DisconnectHardware"
 	// SystemServiceSetHighVoltageProcedure is the fully-qualified name of the SystemService's
 	// SetHighVoltage RPC.
 	SystemServiceSetHighVoltageProcedure = "/pet.caen.daq.v1.SystemService/SetHighVoltage"
@@ -72,6 +78,8 @@ type SystemServiceClient interface {
 	GetConfigurationTemplate(context.Context, *connect.Request[v1.GetConfigurationTemplateRequest]) (*connect.Response[v1.GetConfigurationTemplateResponse], error)
 	ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error)
 	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest]) (*connect.ServerStreamForClient[v1.StreamTelemetryResponse], error)
+	ConnectHardware(context.Context, *connect.Request[v1.ConnectHardwareRequest]) (*connect.Response[v1.ConnectHardwareResponse], error)
+	DisconnectHardware(context.Context, *connect.Request[v1.DisconnectHardwareRequest]) (*connect.Response[v1.DisconnectHardwareResponse], error)
 	SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error)
 }
 
@@ -110,6 +118,18 @@ func NewSystemServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(systemServiceMethods.ByName("StreamTelemetry")),
 			connect.WithClientOptions(opts...),
 		),
+		connectHardware: connect.NewClient[v1.ConnectHardwareRequest, v1.ConnectHardwareResponse](
+			httpClient,
+			baseURL+SystemServiceConnectHardwareProcedure,
+			connect.WithSchema(systemServiceMethods.ByName("ConnectHardware")),
+			connect.WithClientOptions(opts...),
+		),
+		disconnectHardware: connect.NewClient[v1.DisconnectHardwareRequest, v1.DisconnectHardwareResponse](
+			httpClient,
+			baseURL+SystemServiceDisconnectHardwareProcedure,
+			connect.WithSchema(systemServiceMethods.ByName("DisconnectHardware")),
+			connect.WithClientOptions(opts...),
+		),
 		setHighVoltage: connect.NewClient[v1.SetHighVoltageRequest, v1.SetHighVoltageResponse](
 			httpClient,
 			baseURL+SystemServiceSetHighVoltageProcedure,
@@ -125,6 +145,8 @@ type systemServiceClient struct {
 	getConfigurationTemplate *connect.Client[v1.GetConfigurationTemplateRequest, v1.GetConfigurationTemplateResponse]
 	validateConfiguration    *connect.Client[v1.ValidateConfigurationRequest, v1.ValidateConfigurationResponse]
 	streamTelemetry          *connect.Client[v1.StreamTelemetryRequest, v1.StreamTelemetryResponse]
+	connectHardware          *connect.Client[v1.ConnectHardwareRequest, v1.ConnectHardwareResponse]
+	disconnectHardware       *connect.Client[v1.DisconnectHardwareRequest, v1.DisconnectHardwareResponse]
 	setHighVoltage           *connect.Client[v1.SetHighVoltageRequest, v1.SetHighVoltageResponse]
 }
 
@@ -148,6 +170,16 @@ func (c *systemServiceClient) StreamTelemetry(ctx context.Context, req *connect.
 	return c.streamTelemetry.CallServerStream(ctx, req)
 }
 
+// ConnectHardware calls pet.caen.daq.v1.SystemService.ConnectHardware.
+func (c *systemServiceClient) ConnectHardware(ctx context.Context, req *connect.Request[v1.ConnectHardwareRequest]) (*connect.Response[v1.ConnectHardwareResponse], error) {
+	return c.connectHardware.CallUnary(ctx, req)
+}
+
+// DisconnectHardware calls pet.caen.daq.v1.SystemService.DisconnectHardware.
+func (c *systemServiceClient) DisconnectHardware(ctx context.Context, req *connect.Request[v1.DisconnectHardwareRequest]) (*connect.Response[v1.DisconnectHardwareResponse], error) {
+	return c.disconnectHardware.CallUnary(ctx, req)
+}
+
 // SetHighVoltage calls pet.caen.daq.v1.SystemService.SetHighVoltage.
 func (c *systemServiceClient) SetHighVoltage(ctx context.Context, req *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error) {
 	return c.setHighVoltage.CallUnary(ctx, req)
@@ -159,6 +191,8 @@ type SystemServiceHandler interface {
 	GetConfigurationTemplate(context.Context, *connect.Request[v1.GetConfigurationTemplateRequest]) (*connect.Response[v1.GetConfigurationTemplateResponse], error)
 	ValidateConfiguration(context.Context, *connect.Request[v1.ValidateConfigurationRequest]) (*connect.Response[v1.ValidateConfigurationResponse], error)
 	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest], *connect.ServerStream[v1.StreamTelemetryResponse]) error
+	ConnectHardware(context.Context, *connect.Request[v1.ConnectHardwareRequest]) (*connect.Response[v1.ConnectHardwareResponse], error)
+	DisconnectHardware(context.Context, *connect.Request[v1.DisconnectHardwareRequest]) (*connect.Response[v1.DisconnectHardwareResponse], error)
 	SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error)
 }
 
@@ -193,6 +227,18 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(systemServiceMethods.ByName("StreamTelemetry")),
 		connect.WithHandlerOptions(opts...),
 	)
+	systemServiceConnectHardwareHandler := connect.NewUnaryHandler(
+		SystemServiceConnectHardwareProcedure,
+		svc.ConnectHardware,
+		connect.WithSchema(systemServiceMethods.ByName("ConnectHardware")),
+		connect.WithHandlerOptions(opts...),
+	)
+	systemServiceDisconnectHardwareHandler := connect.NewUnaryHandler(
+		SystemServiceDisconnectHardwareProcedure,
+		svc.DisconnectHardware,
+		connect.WithSchema(systemServiceMethods.ByName("DisconnectHardware")),
+		connect.WithHandlerOptions(opts...),
+	)
 	systemServiceSetHighVoltageHandler := connect.NewUnaryHandler(
 		SystemServiceSetHighVoltageProcedure,
 		svc.SetHighVoltage,
@@ -209,6 +255,10 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 			systemServiceValidateConfigurationHandler.ServeHTTP(w, r)
 		case SystemServiceStreamTelemetryProcedure:
 			systemServiceStreamTelemetryHandler.ServeHTTP(w, r)
+		case SystemServiceConnectHardwareProcedure:
+			systemServiceConnectHardwareHandler.ServeHTTP(w, r)
+		case SystemServiceDisconnectHardwareProcedure:
+			systemServiceDisconnectHardwareHandler.ServeHTTP(w, r)
 		case SystemServiceSetHighVoltageProcedure:
 			systemServiceSetHighVoltageHandler.ServeHTTP(w, r)
 		default:
@@ -234,6 +284,14 @@ func (UnimplementedSystemServiceHandler) ValidateConfiguration(context.Context, 
 
 func (UnimplementedSystemServiceHandler) StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest], *connect.ServerStream[v1.StreamTelemetryResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.StreamTelemetry is not implemented"))
+}
+
+func (UnimplementedSystemServiceHandler) ConnectHardware(context.Context, *connect.Request[v1.ConnectHardwareRequest]) (*connect.Response[v1.ConnectHardwareResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.ConnectHardware is not implemented"))
+}
+
+func (UnimplementedSystemServiceHandler) DisconnectHardware(context.Context, *connect.Request[v1.DisconnectHardwareRequest]) (*connect.Response[v1.DisconnectHardwareResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.DisconnectHardware is not implemented"))
 }
 
 func (UnimplementedSystemServiceHandler) SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error) {

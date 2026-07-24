@@ -19,6 +19,8 @@ export interface DaqApi {
   snapshot(): Promise<TelemetrySnapshot | undefined>
   configurationTemplate(): Promise<string>
   telemetry(signal: AbortSignal): AsyncIterable<TelemetrySnapshot>
+  connectHardware(requestedBy: string): Promise<TelemetrySnapshot>
+  disconnectHardware(requestedBy: string): Promise<TelemetrySnapshot>
   validate(configuration: string): Promise<{ valid: boolean; issues: ValidationIssue[] }>
   start(request: StartRunRequest): Promise<RunCommandResult>
   stop(request: StopRunRequest): Promise<RunCommandResult>
@@ -62,6 +64,16 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     async validate(janusConfiguration) {
       const response = await system.validateConfiguration({ janusConfiguration })
       return { valid: response.valid, issues: response.issues }
+    },
+    async connectHardware(requestedBy) {
+      const response = await system.connectHardware({ requestedBy })
+      if (!response.snapshot) throw new Error('Connect command returned no telemetry snapshot')
+      return response.snapshot
+    },
+    async disconnectHardware(requestedBy) {
+      const response = await system.disconnectHardware({ requestedBy })
+      if (!response.snapshot) throw new Error('Disconnect command returned no telemetry snapshot')
+      return response.snapshot
     },
     async start(request) {
       const response = await runs.startRun(request)

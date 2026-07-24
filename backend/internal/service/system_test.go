@@ -2,12 +2,29 @@ package service
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"connectrpc.com/connect"
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
 )
+
+type connectionControllerStub struct {
+	connectActor    string
+	disconnectActor string
+	connectErr      error
+}
+
+func (s *connectionControllerStub) Connect(_ context.Context, actor string) error {
+	s.connectActor = actor
+	return s.connectErr
+}
+
+func (s *connectionControllerStub) Disconnect(_ context.Context, actor string) error {
+	s.disconnectActor = actor
+	return nil
+}
 
 func TestGetSystemSnapshotIncludesCompatibleAndCompleteRepresentations(t *testing.T) {
 	publisher, _ := telemetry.NewPublisher("instance-a", &daqv1.TelemetrySnapshot{
@@ -37,5 +54,34 @@ func TestGetConfigurationTemplateReturnsExactStartupDocument(t *testing.T) {
 	}
 	if response.Msg.GetJanusConfiguration() != configuration {
 		t.Fatalf("configuration = %q", response.Msg.GetJanusConfiguration())
+	}
+}
+
+func TestHardwareConnectionCommandsRequireIdentityAndReturnSnapshot(t *testing.T) {
+	publisher, _ := telemetry.NewPublisher("instance-a", &daqv1.TelemetrySnapshot{State: daqv1.SystemState_SYSTEM_STATE_DISCONNECTED}, nil)
+	controller := &connectionControllerStub{}
+	service := &SystemService{Source: publisher, Hardware: controller}
+	if _, err := service.ConnectHardware(context.Background(), connect.NewRequest(&daqv1.ConnectHardwareRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("missing identity code = %v", connect.CodeOf(err))
+	}
+	publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) { snapshot.State = daqv1.SystemState_SYSTEM_STATE_READY })
+	response, err := service.ConnectHardware(context.Background(), connect.NewRequest(&daqv1.ConnectHardwareRequest{RequestedBy: "operator"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controller.connectActor != "operator" || response.Msg.GetSnapshot().GetState() != daqv1.SystemState_SYSTEM_STATE_READY {
+		t.Fatalf("connect response = %+v actor=%q", response.Msg, controller.connectActor)
+	}
+	if _, err = service.DisconnectHardware(context.Background(), connect.NewRequest(&daqv1.DisconnectHardwareRequest{RequestedBy: "operator"})); err != nil || controller.disconnectActor != "operator" {
+		t.Fatalf("disconnect error=%v actor=%q", err, controller.disconnectActor)
+	}
+}
+
+func TestHardwareConnectionFailureIsFailedPrecondition(t *testing.T) {
+	publisher, _ := telemetry.NewPublisher("instance-a", nil, nil)
+	service := &SystemService{Source: publisher, Hardware: &connectionControllerStub{connectErr: errors.New("offline")}}
+	_, err := service.ConnectHardware(context.Background(), connect.NewRequest(&daqv1.ConnectHardwareRequest{RequestedBy: "operator"}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("connect code = %v error=%v", connect.CodeOf(err), err)
 	}
 }

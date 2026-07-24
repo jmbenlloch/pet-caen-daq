@@ -40,6 +40,10 @@ type RunController interface {
 
 type ConfigurationApplier func(context.Context, *janusconfig.Document, string) (acquisition.ConfigurationResult, error)
 
+type HardwareMetadataProvider interface {
+	HardwareMetadata() ([]configaudit.BoardEvidence, *dt5215.ConcentratorInfo)
+}
+
 type SnapshotPublisher interface {
 	Snapshot() *daqv1.TelemetrySnapshot
 	Publish(*daqv1.TelemetrySnapshot) *daqv1.TelemetrySnapshot
@@ -58,6 +62,7 @@ type RunService struct {
 	Configure        ConfigurationApplier
 	Boards           []configaudit.BoardEvidence
 	Concentrator     *dt5215.ConcentratorInfo
+	HardwareMetadata HardwareMetadataProvider
 	HealthInterval   time.Duration
 	RunParent        string
 	ReconcileCatalog func(context.Context, string) error
@@ -383,7 +388,11 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if state := s.Controller.StateSnapshot().State; state != acquisition.StateReady {
 		return nil, serviceError(connect.CodeFailedPrecondition, "SYSTEM_NOT_READY", fmt.Errorf("configuration completed in state %s, want ready", state))
 	}
-	audit, err := configaudit.Build(document, configured.Plans, s.Boards)
+	boards, concentrator := s.Boards, s.Concentrator
+	if s.HardwareMetadata != nil {
+		boards, concentrator = s.HardwareMetadata.HardwareMetadata()
+	}
+	audit, err := configaudit.Build(document, configured.Plans, boards)
 	if err != nil || !audit.Valid {
 		if err == nil {
 			err = fmt.Errorf("effective configuration audit rejected one or more settings")
@@ -402,7 +411,7 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
 		Histograms:           histogramOptions,
 		HDF5SegmentSizeBytes: uint64(segmentSizeMB) * bytesPerMiB,
-		Concentrator:         s.Concentrator,
+		Concentrator:         concentrator,
 	}
 	if err := s.Controller.Start(ctx, runID, message.GetRequestedBy(), options); err != nil {
 		if errors.Is(err, runstore.ErrRunExists) {
