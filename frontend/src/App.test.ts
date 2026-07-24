@@ -143,9 +143,14 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api: dashboardApi() } })
     await flushPromises()
 
-    const options = wrapper.findAll('.options input[type="checkbox"]')
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'RunCtrl')!
+      .trigger('click')
+    const options = [wrapper.get('#capture-raw'), wrapper.get('#journal-transport')]
     expect(options).toHaveLength(2)
     expect(options.every((option) => !(option.element as HTMLInputElement).checked)).toBe(true)
+    expect(wrapper.get('input[aria-label="HDF5 file size in MiB"]').isVisible()).toBe(true)
     wrapper.unmount()
   })
 
@@ -215,6 +220,10 @@ describe('operator dashboard', () => {
     ).toBe(true)
     await wrapper.get('input[id^="PresetTime"]').setValue('30')
     await wrapper.get('input[id^="PresetTime"]').trigger('change')
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'RunCtrl')!
+      .trigger('click')
     const segmentSize = wrapper.get('input[aria-label="HDF5 file size in MiB"]')
     expect(segmentSize.element).toHaveProperty('value', '500')
     await segmentSize.setValue('128')
@@ -240,8 +249,12 @@ describe('operator dashboard', () => {
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
 
-    await wrapper.get('select').setValue('PRESET_COUNTS')
-    const presetCounts = wrapper.get('input[type="number"][min="1"]')
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'RunCtrl')!
+      .trigger('click')
+    await wrapper.get('select[id^="StopRunMode"]').setValue('PRESET_COUNTS')
+    const presetCounts = wrapper.get('input[id^="PresetCounts"]')
     const presetCountsInput = presetCounts.element as HTMLInputElement
     presetCountsInput.value = '3'
     await presetCounts.trigger('input')

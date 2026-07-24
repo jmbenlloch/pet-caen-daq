@@ -299,13 +299,6 @@ function setField(field: ConfigurationField, value: string) {
   configurationDocument.value = updateConfiguration(configurationDocument.value, field, value)
 }
 
-function setGlobalField(name: string, value: string) {
-  const field = configurationDocument.value.fields.find(
-    (candidate) => candidate.name === name && candidate.index === undefined,
-  )
-  if (field) setField(field, value)
-}
-
 function openMask(field: ConfigurationField) {
   const highName = field.name.replace(/0$/, '1')
   const high = configurationDocument.value.fields.find(
@@ -621,41 +614,6 @@ onMounted(() => daq.connect())
             <span class="safety">Configuration is validated before start</span>
           </div>
 
-          <div class="fields">
-            <label>
-              Run stop
-              <select
-                :value="stopMode"
-                @change="setGlobalField('StopRunMode', ($event.target as HTMLSelectElement).value)"
-              >
-                <option value="MANUAL">Manual only</option>
-                <option value="PRESET_TIME">After elapsed time</option>
-                <option value="PRESET_COUNTS">After event count</option>
-              </select>
-            </label>
-            <label v-if="stopMode === 'PRESET_TIME'">
-              Preset time (seconds)
-              <input
-                :value="Number.parseFloat(presetTime)"
-                type="number"
-                min="0.001"
-                step="1"
-                @input="setGlobalField('PresetTime', ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-            <label v-if="stopMode === 'PRESET_COUNTS'">
-              Preset event count
-              <input
-                :value="presetCounts"
-                type="number"
-                min="1"
-                step="1"
-                @input="setGlobalField('PresetCounts', ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-          </div>
-          <p v-if="stopPolicyError" class="field-error" role="alert">{{ stopPolicyError }}</p>
-
           <div class="config-heading">
             <div>
               <label>Acquisition parameters</label>
@@ -851,6 +809,46 @@ onMounted(() => daq.connect())
                   </button>
                 </div>
               </article>
+              <template v-if="selectedSection === 'RunCtrl'">
+                <article class="parameter-row">
+                  <div class="parameter-copy">
+                    <label for="capture-raw">Preserve complete raw batches</label>
+                    <p>Application output setting. Keep complete raw batches from the backend.</p>
+                  </div>
+                  <label class="switch">
+                    <input id="capture-raw" v-model="captureRaw" type="checkbox" />
+                    <span>{{ captureRaw ? 'Enabled' : 'Disabled' }}</span>
+                  </label>
+                </article>
+                <article class="parameter-row">
+                  <div class="parameter-copy">
+                    <label for="journal-transport">Journal socket evidence</label>
+                    <p>Application output setting. Record socket traffic for diagnostics.</p>
+                  </div>
+                  <label class="switch">
+                    <input id="journal-transport" v-model="journalTransport" type="checkbox" />
+                    <span>{{ journalTransport ? 'Enabled' : 'Disabled' }}</span>
+                  </label>
+                </article>
+                <article class="parameter-row">
+                  <div class="parameter-copy">
+                    <label for="hdf5-segment-size">HDF5 file size (MiB)</label>
+                    <p>
+                      Application output setting. Files rotate as run_&lt;run-id&gt;.0000.h5,
+                      .0001.h5, and so on.
+                    </p>
+                  </div>
+                  <input
+                    id="hdf5-segment-size"
+                    v-model.number="hdf5SegmentSizeMb"
+                    aria-label="HDF5 file size in MiB"
+                    type="number"
+                    min="1"
+                    max="1048576"
+                    step="1"
+                  />
+                </article>
+              </template>
               <p v-if="!visibleFields.length" class="empty">No parameters match this filter.</p>
             </div>
           </div>
@@ -889,27 +887,6 @@ onMounted(() => daq.connect())
               {{ issue.message }}
             </li>
           </ul>
-
-          <div class="options">
-            <label
-              ><input v-model="captureRaw" type="checkbox" /> Preserve complete raw batches</label
-            >
-            <label
-              ><input v-model="journalTransport" type="checkbox" /> Journal socket evidence</label
-            >
-          </div>
-          <label class="field run-storage-field">
-            <span>HDF5 file size (MiB)</span>
-            <input
-              v-model.number="hdf5SegmentSizeMb"
-              aria-label="HDF5 file size in MiB"
-              type="number"
-              min="1"
-              max="1048576"
-              step="1"
-            />
-            <small>Files rotate as run_&lt;run-id&gt;.0000.h5, .0001.h5, and so on.</small>
-          </label>
 
           <p class="stop-policy-summary" role="status">{{ configuredStopPolicy }}</p>
 
