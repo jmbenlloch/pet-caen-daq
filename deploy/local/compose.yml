@@ -1,0 +1,71 @@
+name: pet-caen-local
+
+services:
+  simulator:
+    image: ${PET_CAEN_BUILD_IMAGE:-pet-caen-daq-build:latest}
+    command:
+      - ./bin/caen-simulator
+      - -control
+      - 0.0.0.0:9760
+      - -stream
+      - 0.0.0.0:9000
+      - -event-interval
+      - 100ms
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace:ro
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9760 && exec 4<>/dev/tcp/127.0.0.1/9000"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+
+  daq:
+    image: ${PET_CAEN_RUNTIME_IMAGE:-pet-caen-daq:latest}
+    depends_on:
+      simulator:
+        condition: service_healthy
+    command:
+      - -config
+      - /etc/pet-caen/config.txt
+      - -control
+      - simulator:9760
+      - -stream
+      - simulator:9000
+      - -listen
+      - 0.0.0.0:8080
+      - -runs
+      - /var/lib/pet-caen/runs
+      - -authorize-hv-config
+    ports:
+      - "8080:8080"
+    volumes:
+      - runs:/var/lib/pet-caen/runs
+
+  frontend:
+    image: ${PET_CAEN_BUILD_IMAGE:-pet-caen-daq-build:latest}
+    depends_on:
+      - daq
+    command:
+      - npm
+      - --prefix
+      - frontend
+      - run
+      - dev
+      - --
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5173"
+    environment:
+      DAQ_API_URL: http://daq:8080
+      HOME: /tmp/pet-caen-home
+    ports:
+      - "5173:5173"
+    user: "${PET_CAEN_UID:-1000}:${PET_CAEN_GID:-1000}"
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+
+volumes:
+  runs:
