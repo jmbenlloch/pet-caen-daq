@@ -11,6 +11,10 @@ import (
 // generatedBatch deterministically derives event data from the board's
 // effective register state. A zero requestedQualifier selects AcquisitionControl.
 func generatedBatch(chain, node uint8, sequence uint64, requestedQualifier uint8, board *Board) ([]byte, error) {
+	return generatedBatchAt(chain, node, sequence, sequence, requestedQualifier, board)
+}
+
+func generatedBatchAt(chain, node uint8, sequence, timestamp uint64, requestedQualifier uint8, board *Board) ([]byte, error) {
 	qualifier := requestedQualifier
 	if qualifier == 0 {
 		qualifier = uint8(board.Registers[uint32(dt5202.AcquisitionControl)] & 0xff)
@@ -37,7 +41,7 @@ func generatedBatch(chain, node uint8, sequence uint64, requestedQualifier uint8
 	if err != nil {
 		return nil, err
 	}
-	return eventBatch(chain, node, qualifier, sequence, payload), nil
+	return eventBatchAt(chain, node, qualifier, sequence, timestamp, payload), nil
 }
 
 func register(board *Board, base dt5202.Register, channel uint8) (uint32, bool) {

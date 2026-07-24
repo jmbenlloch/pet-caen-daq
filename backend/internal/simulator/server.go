@@ -83,6 +83,7 @@ type Server struct {
 	synchronized   bool
 	streamData     chan streamItem
 	eventSequence  uint64
+	eventTimestamp uint64
 	periodicOnce   sync.Once
 	faults         []Fault
 	hvRampDuration time.Duration
@@ -135,19 +136,25 @@ func (s *Server) generatePeriodicEvents(interval time.Duration) {
 	defer s.wg.Done()
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	timestampIncrement := uint64(interval / (8 * time.Nanosecond))
+	if timestampIncrement == 0 {
+		timestampIncrement = 1
+	}
 	for {
 		select {
 		case <-ticker.C:
 			s.mu.Lock()
 			s.eventSequence++
 			sequence := s.eventSequence
+			s.eventTimestamp = (s.eventTimestamp + timestampIncrement) & ((uint64(1) << 48) - 1)
+			timestamp := s.eventTimestamp
 			for chain := range s.topology.Chains {
 				for node := range s.topology.Chains[chain] {
 					board := &s.topology.Chains[chain][node]
 					if !dt5202.Status(board.Status).Has(dt5202.StatusRunning) {
 						continue
 					}
-					batch, err := generatedBatch(uint8(chain), uint8(node), sequence, 0, board)
+					batch, err := generatedBatchAt(uint8(chain), uint8(node), sequence, timestamp, 0, board)
 					if err != nil {
 						continue
 					}
@@ -670,12 +677,16 @@ func (s *Server) handleCommand(connection net.Conn) error {
 	return writeStatus(connection, 0)
 }
 func eventBatch(chain, node, qualifier uint8, sequence uint64, payload []byte) []byte {
+	return eventBatchAt(chain, node, qualifier, sequence, sequence, payload)
+}
+
+func eventBatchAt(chain, node, qualifier uint8, sequence, timestamp uint64, payload []byte) []byte {
 	batch := make([]byte, 12+32+len(payload))
 	binary.LittleEndian.PutUint32(batch, 0xffffffff)
 	binary.LittleEndian.PutUint32(batch[4:], 0xffffffff)
 	binary.LittleEndian.PutUint32(batch[8:], uint32(chain)|(1<<8))
 	binary.LittleEndian.PutUint32(batch[12:], uint32(len(payload)/4))
-	timestamp := sequence & ((uint64(1) << 48) - 1)
+	timestamp &= (uint64(1) << 48) - 1
 	binary.LittleEndian.PutUint32(batch[16:], uint32(timestamp&0xff)<<24)
 	binary.LittleEndian.PutUint32(batch[20:], uint32(timestamp>>8))
 	binary.LittleEndian.PutUint32(batch[24:], uint32(timestamp>>40)|uint32(sequence<<16))
