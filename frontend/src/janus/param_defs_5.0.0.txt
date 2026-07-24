@@ -282,7 +282,7 @@ MuxClkPeriod					"300 ns"			g		du		# Multiplexer readout speed. Best setting = 3
 #	- 16
 
 _BLANK 							-					-		-
-EHistoNbin						4K					g		c		# Number of channels (bins) in the PHA histogram
+EHistoNbin						4K					g		c		# Online PHA histogram bins only. Rebins the live plot; does not change hardware, decoded energy values, or stored event data
 	- DISABLED
 	- 256
 	- 512
@@ -460,6 +460,5 @@ TestPulsePreamp					BOTH				g		c		# Test pulse can feed both HG and LG preamps o
 [Log]
 #---------------------------------------------------------------------------------------
 # Empty section (Tab used by GUI)
-
 
 

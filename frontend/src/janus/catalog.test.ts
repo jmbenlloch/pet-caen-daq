@@ -55,6 +55,9 @@ describe('JANUS 5202 5.0.0 parameter catalog', () => {
       'COUNTING',
       'WAVEFORM',
     ])
+    expect(janusParameterCatalog.get('EHistoNbin')?.description).toBe(
+      'Online PHA histogram bins only. Rebins the live plot; does not change hardware, decoded energy values, or stored event data',
+    )
     expect(janusParameterCatalog.get('PresetTime')?.activeWhen).toEqual({
       parameter: 'StopRunMode',
       values: ['PRESET_TIME'],
