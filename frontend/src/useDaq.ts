@@ -205,6 +205,30 @@ export function useDaq(api: DaqApi) {
     }
   }
 
+  async function connectHardware() {
+    busy.value = true
+    error.value = ''
+    try {
+      accept(await api.connectHardware(operatorIdentity))
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      busy.value = false
+    }
+  }
+
+  async function disconnectHardware() {
+    busy.value = true
+    error.value = ''
+    try {
+      accept(await api.disconnectHardware(operatorIdentity))
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      busy.value = false
+    }
+  }
+
   async function loadHistograms(kind: HistogramKind, selections: HistogramSelection[]) {
     const runId = snapshot.value?.currentRun?.runId
     if (!runId) {
@@ -253,12 +277,24 @@ export function useDaq(api: DaqApi) {
     canStart: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     canStop: computed(() => snapshot.value?.state === SystemState.RUNNING && !busy.value),
     canSwitchHV: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
+    canConnectHardware: computed(
+      () => snapshot.value?.state === SystemState.DISCONNECTED && connected.value && !busy.value,
+    ),
+    canDisconnectHardware: computed(
+      () =>
+        (snapshot.value?.state === SystemState.IDLE ||
+          snapshot.value?.state === SystemState.READY ||
+          snapshot.value?.state === SystemState.FAULT) &&
+        !busy.value,
+    ),
     connect,
     disconnect,
     validate,
     startRun,
     stopRun,
     setHighVoltage,
+    connectHardware,
+    disconnectHardware,
     loadHistograms,
     refreshHistory,
     searchRuns,

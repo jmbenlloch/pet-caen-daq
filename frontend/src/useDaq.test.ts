@@ -44,6 +44,12 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
     ),
     configurationTemplate: vi.fn().mockResolvedValue('Open[0] usb:host:tdl:0:0'),
     telemetry: deferredStream(),
+    connectHardware: vi
+      .fn()
+      .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.READY })),
+    disconnectHardware: vi
+      .fn()
+      .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.DISCONNECTED })),
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
     start: vi.fn().mockResolvedValue({}),
     stop: vi.fn().mockResolvedValue({}),
@@ -94,6 +100,27 @@ describe('useDaq', () => {
 
     expect(api.validate).toHaveBeenCalledWith('invalid')
     expect(start).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('connects and disconnects hardware without stopping backend telemetry', async () => {
+    const api = fakeApi({
+      snapshot: vi
+        .fn()
+        .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.DISCONNECTED })),
+    })
+    const { store, wrapper } = mountStore(api)
+    void store.connect()
+    await vi.waitFor(() => expect(store.canConnectHardware.value).toBe(true))
+
+    await store.connectHardware()
+    expect(api.connectHardware).toHaveBeenCalledWith('operator')
+    expect(store.snapshot.value?.state).toBe(SystemState.READY)
+
+    await store.disconnectHardware()
+    expect(api.disconnectHardware).toHaveBeenCalledWith('operator')
+    expect(store.snapshot.value?.state).toBe(SystemState.DISCONNECTED)
+    expect(store.connected.value).toBe(true)
     wrapper.unmount()
   })
 

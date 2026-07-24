@@ -63,3 +63,15 @@ startup recovery, power or reconnect hardware only under the site's approved
 procedure. Repeat read-only acceptance before another configured startup. Never
 write `VR_ENABLED_LINKS`; correct persistent TDlink provisioning in the DT5215
 web interface.
+## Runtime connection control
+
+The backend starts its API before hardware discovery and remains available if
+the DT5215 cannot be reached. It attempts one connection at startup. The
+operator dashboard can retry with **Connect hardware** after restoring the
+network or concentrator, and can close both DT5215 transports with
+**Disconnect hardware**.
+
+Connecting repeats topology discovery, startup recovery, configuration, and HV
+monitor initialization. Disconnecting is allowed only when no run is active;
+stop and drain the run first. A disconnected backend continues to serve run
+history and configuration validation, but rejects acquisition and HV commands.

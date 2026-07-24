@@ -13,6 +13,8 @@ service SystemService {
   rpc GetConfigurationTemplate(GetConfigurationTemplateRequest) returns (GetConfigurationTemplateResponse) {}
   rpc ValidateConfiguration(ValidateConfigurationRequest) returns (ValidateConfigurationResponse) {}
   rpc StreamTelemetry(StreamTelemetryRequest) returns (stream StreamTelemetryResponse) {}
+  rpc ConnectHardware(ConnectHardwareRequest) returns (ConnectHardwareResponse) {}
+  rpc DisconnectHardware(DisconnectHardwareRequest) returns (DisconnectHardwareResponse) {}
   rpc SetHighVoltage(SetHighVoltageRequest) returns (SetHighVoltageResponse) {}
 }
 
@@ -74,6 +76,22 @@ message StreamTelemetryRequest {}
 message StreamTelemetryResponse {
   // Every response is independently usable. The first response on each new
   // stream is a full snapshot and replaces all client-side telemetry state.
+  TelemetrySnapshot snapshot = 1;
+}
+
+message ConnectHardwareRequest {
+  string requested_by = 1;
+}
+
+message ConnectHardwareResponse {
+  TelemetrySnapshot snapshot = 1;
+}
+
+message DisconnectHardwareRequest {
+  string requested_by = 1;
+}
+
+message DisconnectHardwareResponse {
   TelemetrySnapshot snapshot = 1;
 }
 

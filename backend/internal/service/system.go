@@ -16,11 +16,45 @@ type SnapshotSource interface {
 	Subscribe(context.Context) <-chan *daqv1.TelemetrySnapshot
 }
 
+type HardwareConnectionController interface {
+	Connect(context.Context, string) error
+	Disconnect(context.Context, string) error
+}
+
 type SystemService struct {
 	daqv1connect.UnimplementedSystemServiceHandler
 	Source                SnapshotSource
 	ConfigurationTemplate string
 	HV                    HVController
+	Hardware              HardwareConnectionController
+}
+
+func (s *SystemService) ConnectHardware(ctx context.Context, request *connect.Request[daqv1.ConnectHardwareRequest]) (*connect.Response[daqv1.ConnectHardwareResponse], error) {
+	if s.Hardware == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, nil)
+	}
+	actor := strings.TrimSpace(request.Msg.GetRequestedBy())
+	if actor == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requested_by is required"))
+	}
+	if err := s.Hardware.Connect(ctx, actor); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	return connect.NewResponse(&daqv1.ConnectHardwareResponse{Snapshot: s.Source.Snapshot()}), nil
+}
+
+func (s *SystemService) DisconnectHardware(ctx context.Context, request *connect.Request[daqv1.DisconnectHardwareRequest]) (*connect.Response[daqv1.DisconnectHardwareResponse], error) {
+	if s.Hardware == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, nil)
+	}
+	actor := strings.TrimSpace(request.Msg.GetRequestedBy())
+	if actor == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requested_by is required"))
+	}
+	if err := s.Hardware.Disconnect(ctx, actor); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	return connect.NewResponse(&daqv1.DisconnectHardwareResponse{Snapshot: s.Source.Snapshot()}), nil
 }
 
 func (s *SystemService) SetHighVoltage(ctx context.Context, request *connect.Request[daqv1.SetHighVoltageRequest]) (*connect.Response[daqv1.SetHighVoltageResponse], error) {

@@ -559,6 +559,22 @@ onMounted(() => daq.connect())
               <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
               <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
             </div>
+            <div class="actions hardware-connection-actions">
+              <button
+                type="button"
+                :disabled="!daq.canConnectHardware.value"
+                @click="daq.connectHardware()"
+              >
+                Connect hardware
+              </button>
+              <button
+                type="button"
+                :disabled="!daq.canDisconnectHardware.value"
+                @click="daq.disconnectHardware()"
+              >
+                Disconnect hardware
+              </button>
+            </div>
           </div>
           <div class="run-control">
             <div v-if="daq.snapshot.value?.currentRun" class="run-now">
