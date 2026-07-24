@@ -20,8 +20,11 @@ const (
 )
 
 type BoardEvidence struct {
-	Board            int    `json:"board"`
-	FirmwareRevision uint32 `json:"firmware_revision"`
+	Board                     int     `json:"board"`
+	FirmwareRevision          uint32  `json:"firmware_revision"`
+	HVModuleFirmwareRaw       uint32  `json:"hv_module_firmware_raw,omitempty"`
+	HVModuleFirmwareVersion   float32 `json:"hv_module_firmware_version,omitempty"`
+	HVModuleFirmwareAvailable bool    `json:"hv_module_firmware_available"`
 }
 
 type EffectiveValue struct {

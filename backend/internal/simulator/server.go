@@ -19,6 +19,7 @@ import (
 type Board struct {
 	ProductID        uint32
 	FirmwareRevision uint32
+	HVFirmwareRaw    uint32
 	Status           uint32
 	Registers        map[uint32]uint32
 	CitirocLoads     [2]uint32
@@ -45,6 +46,7 @@ func ProductionTopology() Topology {
 		topology.Chains[chain] = []Board{{
 			ProductID:        pid,
 			FirmwareRevision: 0xA7070800 | uint32(chain),
+			HVFirmwareRaw:    math.Float32bits(1.2),
 			Status:           1,
 			Registers:        monitorRegisters(),
 			CommonPedestal:   50,
@@ -486,6 +488,12 @@ func (s *Server) handleReadRegister(connection net.Conn) error {
 		value = board.Status
 	case uint32(dt5202.SPIData):
 		value = board.readSPI()
+	case uint32(dt5202.HVRegisterData):
+		if board.hvSelector == 0x103fc {
+			value = board.HVFirmwareRaw
+		} else {
+			value = board.Registers[address]
+		}
 	default:
 		value = board.Registers[address]
 	}

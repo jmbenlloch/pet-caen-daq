@@ -382,6 +382,11 @@ func TestProductionConfigurationDiscoversSimulatedTopology(t *testing.T) {
 	if got := len(topology.Boards); got != 4 {
 		t.Fatalf("board count = %d, want 4", got)
 	}
+	if topology.Concentrator.SoftwareRevision != "2026.4.1.1" ||
+		topology.Concentrator.FPGARevision != "25.11.24.01-2-2" ||
+		topology.Concentrator.ProductID != 66643 {
+		t.Fatalf("concentrator = %#v", topology.Concentrator)
+	}
 	wantPIDs := []uint32{64883, 64138, 64885, 64884}
 	for index, board := range topology.Boards {
 		if board.Chain != uint16(index) || board.Node != 0 || board.ProductID != wantPIDs[index] {

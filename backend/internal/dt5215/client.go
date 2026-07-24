@@ -177,6 +177,14 @@ func (c *Client) ReadRegister(ctx context.Context, chain, node uint16, address u
 	return DecodeReadRegisterResponse(response)
 }
 
+func (c *Client) ConcentratorInfo(ctx context.Context) (ConcentratorInfo, error) {
+	response, err := c.exchange(ctx, []byte("VERS"), 68)
+	if err != nil {
+		return ConcentratorInfo{}, fmt.Errorf("VERS: %w", err)
+	}
+	return DecodeConcentratorVersionResponse(response)
+}
+
 func (c *Client) exchange(ctx context.Context, request []byte, responseSize int) ([]byte, error) {
 	return c.exchangeWithTimeout(ctx, request, responseSize, defaultOperationTimeout)
 }
@@ -243,6 +251,7 @@ func writeAll(writer io.Writer, data []byte) error {
 
 // Topology is the discovered and validated version-one system topology.
 type Topology struct {
+	Concentrator ConcentratorInfo
 	Chains       [MaxChains]ChainInfo
 	Enumerations [MaxChains]EnumerationInfo
 	Boards       []BoardInfo
@@ -271,7 +280,11 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 		expectedByChain[connection.Chain] = connection
 	}
 
-	var topology Topology
+	concentrator, err := c.ConcentratorInfo(ctx)
+	if err != nil {
+		return Topology{}, fmt.Errorf("read DT5215 identity: %w", err)
+	}
+	topology := Topology{Concentrator: concentrator}
 	requiresEnumeration := false
 	for chain := 0; chain < MaxChains; chain++ {
 		info, err := c.ChainInfo(ctx, uint16(chain))

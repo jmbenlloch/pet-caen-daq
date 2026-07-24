@@ -55,6 +55,32 @@ func TestDecodeChainInfo(t *testing.T) {
 	}
 }
 
+func TestDecodeConcentratorVersionResponse(t *testing.T) {
+	response := make([]byte, 68)
+	littleEndian.PutUint32(response[:4], 64)
+	copy(response[4:20], "2026.4.1.1")
+	copy(response[20:52], "25.11.24.01-2-2")
+	copy(response[52:68], "66643")
+	info, err := DecodeConcentratorVersionResponse(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.SoftwareRevision != "2026.4.1.1" || info.FPGARevision != "25.11.24.01-2-2" || info.ProductID != 66643 {
+		t.Fatalf("concentrator info = %#v", info)
+	}
+}
+
+func TestDecodeConcentratorVersionRejectsMalformedPID(t *testing.T) {
+	response := make([]byte, 68)
+	littleEndian.PutUint32(response[:4], 64)
+	copy(response[4:20], "2026.4.1.1")
+	copy(response[20:52], "25.11.24.01-2-2")
+	copy(response[52:68], "not-a-pid")
+	if _, err := DecodeConcentratorVersionResponse(response); err == nil {
+		t.Fatal("malformed concentrator PID was accepted")
+	}
+}
+
 func TestDecodeEnumerateStatus(t *testing.T) {
 	response := make([]byte, 12)
 	littleEndian.PutUint32(response[0:4], StatusChainDisabled)

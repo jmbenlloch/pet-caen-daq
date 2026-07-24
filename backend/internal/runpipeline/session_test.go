@@ -26,9 +26,11 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 		},
 	}}
 	audit := &configaudit.Report{SchemaVersion: 1, Valid: true}
+	concentrator := &dt5215.ConcentratorInfo{SoftwareRevision: "2026.4.1.1", FPGARevision: "25.11.24.01-2-2", ProductID: 66643}
 	created, err := factory.New("42", acquisition.RunOptions{
 		CaptureRaw: true, JournalTransport: true, RequestedBy: "operator",
 		RequestedConfiguration: "Open 0=0", EffectiveConfiguration: []dt5202.ConfigurationPlan{{Board: 0}}, ConfigurationAudit: audit,
+		Concentrator: concentrator,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -66,6 +68,7 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 		ConfigurationAudit     *configaudit.Report            `json:"configuration_audit"`
 		ConfigurationIdentity  runstore.ConfigurationIdentity `json:"configuration_identity"`
 		ExecutionIdentity      runstore.ExecutionIdentity     `json:"execution_identity"`
+		Concentrator           *dt5215.ConcentratorInfo       `json:"concentrator"`
 	}
 	if err := json.Unmarshal(manifestData, &manifest); err != nil {
 		t.Fatal(err)
@@ -87,6 +90,9 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 		identity.Runtime.PipelineCapacity != 2 || identity.Runtime.BackpressurePolicy != "block" ||
 		!identity.Runtime.CaptureRaw || !identity.Runtime.JournalTransport {
 		t.Fatalf("execution identity = %+v", identity)
+	}
+	if manifest.Concentrator == nil || *manifest.Concentrator != *concentrator {
+		t.Fatalf("concentrator metadata = %+v", manifest.Concentrator)
 	}
 	if _, err := os.Stat(filepath.Join(session.Directory(), "incomplete")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("incomplete marker remains: %v", err)

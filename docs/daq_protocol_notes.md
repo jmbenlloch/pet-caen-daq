@@ -77,12 +77,19 @@ The four ASCII opcode bytes are followed by packed little-endian binary fields. 
 | Synchronize chains | `SNT0` (4 B) | u32 status |
 | Reset links | `RLNK` (4 B) | u32 status |
 | Clear concentrator stream | `CLRS` (4 B) | u32 status |
-| Version information | `VERS` (4 B) | u32 byte count, then a variable binary block parsed by `LLtdl_GetCncInfo` |
+| Version information | `VERS` (4 B) | u32 byte count (`64` in the supported layout), then software revision bytes 0–15, FPGA revision bytes 16–47, and decimal PID bytes 48–63 |
 | Board-information block | `RBIC` plus fields used in the source | variable; parsed by `LLtdl_GetCncInfo` |
 
 Broadcast addressing is chain `0x00ff`, node `0x00ff`. `FERS_SendCommand` uses `FCMD` for a board reached through TDlink. The default `TDL_COMMAND_DELAY` is 1,000,000 units, with the header documenting one unit as 10 ns. Delayed/broadcast synchronization uses `DCMD` and additional concentrator synchronization logic; use the source implementation as authoritative because this area has firmware-dependent paths and comments marking experimental behavior.
 
 The full enumeration, reset, synchronization, master/slave, external-run, GPS, and multi-concentrator procedures are in `FERS_LLtdl.c` and `FERS_readout.c`. They should initially be reused rather than rewritten.
+
+Native discovery decodes `VERS` before topology validation and retains the
+DT5215 software revision, FPGA revision, and PID in the topology snapshot.
+Those fields are exposed in system telemetry and copied into every run
+manifest as immutable concentrator identity. Malformed lengths, empty
+revisions, or non-decimal PIDs fail discovery rather than producing ambiguous
+run provenance.
 
 ## DT5202 commands and register access
 
@@ -163,6 +170,16 @@ The official Citiroc 1A V2.53 datasheet, section 8.2 and tables 5 and 7, is auth
 The DT5202 HV module is accessed indirectly through `a_hv_regaddr` and `a_hv_regdata`. A write selector is `(data_type << 8) | peripheral_register`; data type 0 is signed integer, 1 is fixed point scaled by 10,000, 2 is unsigned integer, and 3 is float. The bus initialization selector is `0x2001`. Each selector and data write is followed by polling acquisition-status bit 17 (I2C busy), while bit 18 reports I2C failure.
 
 The source-confirmed hard-configuration sequence initializes the bus, selects PID precision through peripheral register 30, writes voltage register 2 twice, current-limit register 5 twice, temperature coefficients 7/8/9 twice, and feedback coefficient/enable registers 28/1 twice. Repeated writes reproduce FERSlib's workaround for unreliable first accesses. Applying this plan is a separate explicit operation because changing HV setpoints is safety-relevant; ordinary FPGA configuration does not implicitly perform it.
+
+JANUS also reads A7585 HV-module firmware from peripheral register 252 with
+data type 3, producing indirect selector `0x000103fc`. The returned 32-bit word
+contains IEEE-754 float bits: JANUS prints the decoded value during connection
+and stores it in run information. Native normal startup now performs the same
+source-confirmed read, preserves both the raw word and decoded value in board
+telemetry and run configuration evidence, and reports unavailable or NaN
+results without aborting acquisition. `-inspect-only` deliberately skips this
+probe because indirect HV reads require selector writes and that mode promises
+no hardware writes. The simulator returns deterministic A7585 version `1.2`.
 
 ## Pedestal calibration semantics
 

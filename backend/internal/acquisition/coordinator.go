@@ -33,6 +33,7 @@ type RunOptions struct {
 	RequestedConfiguration string
 	EffectiveConfiguration []dt5202.ConfigurationPlan
 	ConfigurationAudit     *configaudit.Report
+	Concentrator           *dt5215.ConcentratorInfo
 	Histograms             HistogramOptions
 	HDF5SegmentSizeBytes   uint64
 }

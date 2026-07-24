@@ -60,7 +60,8 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
 		HDF5SegmentSizeBytes:   runOptions.HDF5SegmentSizeBytes,
 		RequestedConfiguration: runOptions.RequestedConfiguration, EffectiveConfiguration: runOptions.EffectiveConfiguration,
-		ConfigurationAudit: runOptions.ConfigurationAudit, ConfigurationIdentity: configurationIdentity, ExecutionIdentity: identity,
+		ConfigurationAudit: runOptions.ConfigurationAudit, Concentrator: runOptions.Concentrator,
+		ConfigurationIdentity: configurationIdentity, ExecutionIdentity: identity,
 	})
 	if err != nil {
 		return nil, err

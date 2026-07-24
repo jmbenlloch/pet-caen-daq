@@ -5,9 +5,9 @@
 Started on 2026-07-21:
 
 - `task hardware:inspect` validates an already-ready four-link topology and
-  reads board product, FPGA firmware, and acquisition-status registers without
-  any hardware write, reset, enumeration, synchronization, API bind, or run
-  storage mutation;
+  reads DT5215 software/FPGA/PID identity plus board product, FPGA firmware,
+  and acquisition-status registers without any hardware write, reset,
+  enumeration, synchronization, API bind, or run storage mutation;
 - pre-enumeration links cause the read-only check to fail with an explicit
   diagnostic instead of silently crossing into runtime initialization; and
 - the hardware operations guide records provisioning, bounded acquisition,
@@ -75,7 +75,12 @@ state for all four boards. Explicit per-board and all-board switches are exposed
 only while Ready; HV-on requires the backend authorization flag and a failed
 multi-board enable rolls already-enabled targets back off. The channel adjustment
 dialog calculates live `Vnom`, and `TempSensType` accepts either a named sensor
-or custom `c0 c1 c2` coefficients.
+or custom `c0 c1 c2` coefficients. Normal startup also reads the A7585
+HV-module firmware version through the source-confirmed indirect transaction;
+raw IEEE-754 bits, decoded version, and availability are exposed in board
+telemetry and persisted with per-board run configuration evidence. Failure of
+this informational read is warned but does not abort startup, and read-only
+inspection skips it because the peripheral read requires selector writes.
 
 The Statistics tab now consumes cumulative run evidence published with each
 complete telemetry snapshot. It provides JANUS-equivalent all-board timestamp,

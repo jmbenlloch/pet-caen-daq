@@ -36,7 +36,12 @@ func loadProduction(t *testing.T) (*janusconfig.Document, []dt5202.Configuration
 
 func TestProductionAuditAccountsForEveryAssignment(t *testing.T) {
 	doc, plans := loadProduction(t)
-	boards := []BoardEvidence{{0, 0x0800a707}, {1, 0x0800a707}, {2, 0x0800a707}, {3, 0x0800a707}}
+	boards := []BoardEvidence{
+		{Board: 0, FirmwareRevision: 0x0800a707},
+		{Board: 1, FirmwareRevision: 0x0800a707},
+		{Board: 2, FirmwareRevision: 0x0800a707},
+		{Board: 3, FirmwareRevision: 0x0800a707},
+	}
 	report, err := Build(doc, plans, boards)
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +76,12 @@ func TestProductionAuditAccountsForEveryAssignment(t *testing.T) {
 
 func TestAuditRejectsFirmwareBeforeDigitalProbePacking(t *testing.T) {
 	doc, plans := loadProduction(t)
-	boards := []BoardEvidence{{0, 0x04000000}, {1, 0x08000000}, {2, 0x08000000}, {3, 0x08000000}}
+	boards := []BoardEvidence{
+		{Board: 0, FirmwareRevision: 0x04000000},
+		{Board: 1, FirmwareRevision: 0x08000000},
+		{Board: 2, FirmwareRevision: 0x08000000},
+		{Board: 3, FirmwareRevision: 0x08000000},
+	}
 	report, err := Build(doc, plans, boards)
 	if err != nil {
 		t.Fatal(err)
