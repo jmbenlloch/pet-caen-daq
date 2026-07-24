@@ -25,6 +25,7 @@ func TestPeriodicEventsAdvanceForEveryRunningBoard(t *testing.T) {
 	}
 
 	sequences := make([]uint64, 0, 8)
+	timestamps := make([]uint64, 0, 8)
 	deadline := time.After(time.Second)
 	for len(sequences) < 8 {
 		select {
@@ -37,6 +38,7 @@ func TestPeriodicEventsAdvanceForEveryRunningBoard(t *testing.T) {
 				t.Fatal("periodic event timestamp is zero")
 			}
 			sequences = append(sequences, wire[0].Descriptor.TriggerID)
+			timestamps = append(timestamps, wire[0].Descriptor.Timestamp)
 		case <-deadline:
 			t.Fatalf("received %d periodic events, want 8", len(sequences))
 		}
@@ -48,6 +50,9 @@ func TestPeriodicEventsAdvanceForEveryRunningBoard(t *testing.T) {
 	}
 	if sequences[4] != sequences[0]+1 {
 		t.Fatalf("successive tick trigger IDs = %d then %d", sequences[0], sequences[4])
+	}
+	if timestamps[4]-timestamps[0] != uint64(time.Millisecond/(8*time.Nanosecond)) {
+		t.Fatalf("successive tick timestamps = %d then %d", timestamps[0], timestamps[4])
 	}
 }
 

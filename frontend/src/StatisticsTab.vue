@@ -114,6 +114,15 @@ const metricLabel = computed(
       phaCounts: 'PHA',
     })[metric.value],
 )
+
+const metricDescription = computed(
+  () =>
+    ({
+      channelTriggerCounts: 'Discriminator firings reported for each detector channel.',
+      timestampCounts: 'Events carrying timing information for each detector channel.',
+      phaCounts: 'Pulse-height measurements decoded for each detector channel.',
+    })[metric.value],
+)
 </script>
 
 <template>
@@ -123,7 +132,38 @@ const metricLabel = computed(
         <p class="eyebrow">Live runtime view</p>
         <h2 id="statistics-heading">Statistics</h2>
       </div>
-      <div v-if="selectedBoard !== 'all'" class="statistics-controls">
+      <p class="statistics-controls-hint">
+        {{
+          selectedBoard === 'all'
+            ? 'Select a board for per-channel metrics.'
+            : `Viewing Board ${selectedBoard} channels`
+        }}
+      </p>
+    </div>
+
+    <div class="statistics-overview-row">
+      <div class="statistics-summary" aria-label="Global statistics">
+        <span
+          ><strong>{{ compact(pipeline?.decodedEvents) }}</strong> decoded events</span
+        >
+        <span
+          ><strong>{{ compact(pipeline?.acceptedBatches) }}</strong> accepted batches</span
+        >
+        <span
+          ><strong>{{ compact(pipeline?.rejectedBatches) }}</strong> rejected batches</span
+        >
+        <span
+          ><strong>{{ bytes(storage?.bytesWritten) }}</strong> persisted</span
+        >
+        <span
+          ><strong
+            >{{ (Number(statistics?.elapsedMilliseconds ?? 0n) / 1000).toFixed(1) }} s</strong
+          >
+          elapsed</span
+        >
+      </div>
+
+      <div v-if="selectedBoard !== 'all'" class="statistics-channel-toolbar">
         <label>
           Per-channel metric
           <select v-model="metric">
@@ -136,31 +176,11 @@ const metricLabel = computed(
           <input v-model="integral" type="checkbox" />
           <span>Cumulative counts</span>
         </label>
-        <p class="statistics-controls-help">
-          Choose the per-channel view: discriminator-trigger rate, timestamp-bearing event rate, or
-          PHA-event rate. Enable cumulative counts to show totals instead of rates.
-        </p>
+        <div class="statistics-metric-description">
+          <strong>{{ metricLabel }}</strong>
+          <span>{{ metricDescription }}</span>
+        </div>
       </div>
-      <p v-else class="statistics-controls-hint">Select a board for per-channel metrics.</p>
-    </div>
-
-    <div class="statistics-summary" aria-label="Global statistics">
-      <span
-        ><strong>{{ compact(pipeline?.decodedEvents) }}</strong> decoded events</span
-      >
-      <span
-        ><strong>{{ compact(pipeline?.acceptedBatches) }}</strong> accepted batches</span
-      >
-      <span
-        ><strong>{{ compact(pipeline?.rejectedBatches) }}</strong> rejected batches</span
-      >
-      <span
-        ><strong>{{ bytes(storage?.bytesWritten) }}</strong> persisted</span
-      >
-      <span
-        ><strong>{{ (Number(statistics?.elapsedMilliseconds ?? 0n) / 1000).toFixed(1) }} s</strong>
-        elapsed</span
-      >
     </div>
 
     <div class="statistics-board-tabs" role="tablist" aria-label="Statistics board">
@@ -228,5 +248,40 @@ const metricLabel = computed(
         {{ integral ? 'integrated count' : 'rate over the latest telemetry interval' }}
       </p>
     </div>
+
+    <details class="statistics-guide">
+      <summary>How to read and configure this panel</summary>
+      <dl>
+        <div>
+          <dt>All boards</dt>
+          <dd>
+            Compares board-level throughput, latest hardware timestamp, trigger continuity, T-OR
+            activity, and decoded payload rate.
+          </dd>
+        </div>
+        <div>
+          <dt>Channel trigger</dt>
+          <dd>Counts channel discriminator firings, before requiring a PHA or timestamp value.</dd>
+        </div>
+        <div>
+          <dt>Timestamp</dt>
+          <dd>Counts channel events that include timing information.</dd>
+        </div>
+        <div>
+          <dt>PHA</dt>
+          <dd>Counts decoded pulse-height measurements used for energy spectra.</dd>
+        </div>
+        <div>
+          <dt>Interval mode</dt>
+          <dd>
+            The default view shows rates calculated between the two latest telemetry snapshots.
+          </dd>
+        </div>
+        <div>
+          <dt>Cumulative counts</dt>
+          <dd>Shows totals accumulated since the current run started instead of live rates.</dd>
+        </div>
+      </dl>
+    </details>
   </section>
 </template>

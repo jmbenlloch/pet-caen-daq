@@ -4,6 +4,7 @@ import { defineComponent } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DaqApi } from './api'
 import {
+  HistogramKind,
   SystemState,
   RunSummarySchema,
   SearchRunsRequestSchema,
@@ -151,6 +152,48 @@ describe('useDaq', () => {
       expect.objectContaining({ runId: 'run-55', requestedBy: 'operator' }),
     )
     expect(store.latestCompletedRun.value).toEqual(completed)
+    wrapper.unmount()
+  })
+
+  it('does not surface an in-flight histogram failure when the run is stopped', async () => {
+    let rejectHistograms!: (reason: Error) => void
+    const histograms = vi.fn().mockReturnValue(
+      new Promise((_, reject) => {
+        rejectHistograms = reject
+      }),
+    )
+    let resolveStop!: (value: Record<string, never>) => void
+    const stop = vi.fn().mockReturnValue(
+      new Promise<Record<string, never>>((resolve) => {
+        resolveStop = resolve
+      }),
+    )
+    const api = fakeApi({
+      snapshot: vi.fn().mockResolvedValue(
+        create(TelemetrySnapshotSchema, {
+          state: SystemState.RUNNING,
+          currentRun: { runId: 'run-55' },
+        }),
+      ),
+      histograms,
+      stop,
+    })
+    const { store, wrapper } = mountStore(api)
+    void store.connect()
+    await vi.waitFor(() => expect(store.snapshot.value?.currentRun?.runId).toBe('run-55'))
+
+    const histogramRequest = store.loadHistograms(HistogramKind.PHA_HIGH_GAIN, [])
+    const stopRequest = store.stopRun()
+    rejectHistograms(new Error('[failed_precondition] requested run is not active'))
+    await histogramRequest
+
+    expect(store.error.value).toBe('')
+    expect(store.histogramsLoading.value).toBe(false)
+    await store.loadHistograms(HistogramKind.PHA_HIGH_GAIN, [])
+    expect(histograms).toHaveBeenCalledTimes(1)
+
+    resolveStop({})
+    await stopRequest
     wrapper.unmount()
   })
 

@@ -9,6 +9,7 @@ import HvStatusPanel from './HvStatusPanel.vue'
 import MaskEditor from './MaskEditor.vue'
 import NumericField from './NumericField.vue'
 import PlotWorkspace from './PlotWorkspace.vue'
+import RunHistoryTable from './RunHistoryTable.vue'
 import StatisticsTab from './StatisticsTab.vue'
 import {
   isBooleanField,
@@ -98,29 +99,6 @@ const searchTerminationReason = ref('')
 const searchMinimumEvents = ref('')
 const searchFormError = ref('')
 const lastSearchRequest = ref<SearchRunsRequest>()
-const expandedRunConfiguration = ref('')
-const runConfigurations = ref<Record<string, string>>({})
-const runConfigurationLoading = ref('')
-const runConfigurationErrors = ref<Record<string, string>>({})
-
-async function toggleRunConfiguration(runId: string) {
-  if (expandedRunConfiguration.value === runId) {
-    expandedRunConfiguration.value = ''
-    return
-  }
-  expandedRunConfiguration.value = runId
-  if (Object.hasOwn(runConfigurations.value, runId)) return
-  runConfigurationLoading.value = runId
-  delete runConfigurationErrors.value[runId]
-  try {
-    runConfigurations.value[runId] = await api.runConfiguration(runId)
-  } catch (reason) {
-    runConfigurationErrors.value[runId] = reason instanceof Error ? reason.message : String(reason)
-  } finally {
-    if (runConfigurationLoading.value === runId) runConfigurationLoading.value = ''
-  }
-}
-
 function addSearchPredicate() {
   searchPredicates.value.push(newSearchPredicate())
 }
@@ -259,7 +237,6 @@ function clearRunSearch() {
   searchMinimumEvents.value = ''
   searchFormError.value = ''
   lastSearchRequest.value = undefined
-  expandedRunConfiguration.value = ''
   daq.clearSearch()
 }
 
@@ -1280,58 +1257,13 @@ onMounted(() => daq.connect())
           >
             No runs match these filters.
           </p>
-          <div v-else class="artifacts" aria-label="Search results">
-            <article
-              v-for="run in daq.searchResults.value"
-              :key="run.runId"
-              class="artifact history-run"
-            >
-              <div>
-                <strong>{{ run.runId }}</strong>
-                <span
-                  >{{ compact(run.eventCount) }} events ·
-                  {{ run.terminationReason || 'Completed' }}</span
-                >
-              </div>
-              <div class="history-actions">
-                <button
-                  class="link-button"
-                  type="button"
-                  :aria-expanded="expandedRunConfiguration === run.runId"
-                  @click="toggleRunConfiguration(run.runId)"
-                >
-                  {{
-                    expandedRunConfiguration === run.runId
-                      ? 'Hide configuration'
-                      : 'View configuration'
-                  }}
-                </button>
-                <button
-                  v-for="artifact in run.artifacts"
-                  :key="artifact.name"
-                  class="link-button"
-                  type="button"
-                  :disabled="daq.busy.value"
-                  @click="daq.downloadArtifact(run.runId, artifact.name)"
-                >
-                  {{ artifact.name }} · {{ bytes(artifact.sizeBytes) }}
-                </button>
-              </div>
-              <div
-                v-if="expandedRunConfiguration === run.runId"
-                class="run-configuration"
-                :aria-label="`Configuration for run ${run.runId}`"
-              >
-                <p v-if="runConfigurationLoading === run.runId" class="muted">
-                  Loading configuration…
-                </p>
-                <p v-else-if="runConfigurationErrors[run.runId]" class="field-error" role="alert">
-                  Could not load configuration: {{ runConfigurationErrors[run.runId] }}
-                </p>
-                <pre v-else>{{ runConfigurations[run.runId] || 'No configuration recorded.' }}</pre>
-              </div>
-            </article>
-          </div>
+          <RunHistoryTable
+            v-else
+            :runs="daq.searchResults.value"
+            :configuration="api.runConfiguration"
+            :download-artifact="daq.downloadArtifact"
+            label="Search results"
+          />
           <button
             v-if="daq.searchNextPageToken.value"
             class="link-button load-more"
@@ -1342,59 +1274,11 @@ onMounted(() => daq.connect())
             Load more
           </button>
         </div>
-        <div class="artifacts" aria-label="Stored runs">
-          <article
-            v-for="run in daq.runHistory.value"
-            :key="run.runId"
-            class="artifact history-run"
-          >
-            <div>
-              <strong>{{ run.runId }}</strong>
-              <span
-                >{{ compact(run.eventCount) }} events ·
-                {{ run.terminationReason || (run.incomplete ? 'Incomplete' : 'Completed') }}</span
-              >
-            </div>
-            <div class="history-actions">
-              <button
-                class="link-button"
-                type="button"
-                :aria-expanded="expandedRunConfiguration === run.runId"
-                @click="toggleRunConfiguration(run.runId)"
-              >
-                {{
-                  expandedRunConfiguration === run.runId
-                    ? 'Hide configuration'
-                    : 'View configuration'
-                }}
-              </button>
-              <button
-                v-for="artifact in run.artifacts"
-                :key="artifact.name"
-                class="link-button"
-                type="button"
-                :disabled="daq.busy.value"
-                @click="daq.downloadArtifact(run.runId, artifact.name)"
-              >
-                {{ artifact.name }} · {{ bytes(artifact.sizeBytes) }}
-              </button>
-            </div>
-            <div
-              v-if="expandedRunConfiguration === run.runId"
-              class="run-configuration"
-              :aria-label="`Configuration for run ${run.runId}`"
-            >
-              <p v-if="runConfigurationLoading === run.runId" class="muted">
-                Loading configuration…
-              </p>
-              <p v-else-if="runConfigurationErrors[run.runId]" class="field-error" role="alert">
-                Could not load configuration: {{ runConfigurationErrors[run.runId] }}
-              </p>
-              <pre v-else>{{ runConfigurations[run.runId] || 'No configuration recorded.' }}</pre>
-            </div>
-          </article>
-          <p v-if="!daq.runHistory.value.length" class="empty">No stored runs found.</p>
-        </div>
+        <RunHistoryTable
+          :runs="daq.runHistory.value"
+          :configuration="api.runConfiguration"
+          :download-artifact="daq.downloadArtifact"
+        />
       </section>
 
       <div

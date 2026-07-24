@@ -318,7 +318,11 @@ describe('operator dashboard', () => {
     expect(wrapper.get('#statistics-heading').text()).toBe('Statistics')
     expect(wrapper.text()).toContain('Trigger ID')
     expect(wrapper.text()).toContain('run-54')
-    expect(wrapper.text()).toContain('events.jsonl · 4.0 KiB')
+    expect(wrapper.get('[aria-label="Stored runs"]').text()).toContain('Data size')
+    await wrapper.get('.run-link').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[aria-label="Details for run run-54"]').text()).toContain('events.jsonl')
+    expect(wrapper.get('[aria-label="Details for run run-54"]').text()).toContain('4.0 KiB')
 
     expect(wrapper.text()).not.toContain('Requested by')
     expect(wrapper.text()).not.toContain('Run ID')
@@ -421,16 +425,13 @@ describe('operator dashboard', () => {
       }),
     )
     expect(wrapper.get('[aria-label="Search results"]').text()).toContain('matching-run')
-    await wrapper
-      .get('[aria-label="Search results"]')
-      .findAll('button')
-      .find((button) => button.text() === 'View configuration')!
-      .trigger('click')
+    await wrapper.get('[aria-label="Search results"]').get('.run-link').trigger('click')
     await flushPromises()
     expect(api.runConfiguration).toHaveBeenCalledWith('matching-run')
-    expect(wrapper.get('[aria-label="Configuration for run matching-run"]').text()).toContain(
-      'HV_Vbias 55.0',
-    )
+    const details = wrapper.get('[aria-label="Details for run matching-run"]')
+    expect(details.text()).toContain('HV_Vbias')
+    expect(details.text()).toContain('55.0')
+    expect(details.text()).toContain('Download configuration (.txt)')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'Clear')!
