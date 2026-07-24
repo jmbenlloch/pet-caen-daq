@@ -2224,7 +2224,9 @@ textarea {
 }
 .plot-controls {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto auto auto;
+  grid-template-columns:
+    minmax(180px, 0.9fr) minmax(180px, 0.9fr) minmax(170px, 0.55fr) auto auto
+    max-content;
   align-items: end;
   gap: 12px;
   margin-top: 20px;
@@ -2275,7 +2277,23 @@ textarea {
 }
 .histogram-channel-control button {
   width: 100%;
+  min-height: 42px;
+  border: 1px solid #34465f !important;
+  border-radius: 7px;
+  padding: 8px 11px;
+  color: #cad6e5;
+  background: #17263a;
+  font-size: 0.8rem;
+  font-weight: 650;
   text-align: left;
+}
+.histogram-channel-control button:hover:not(:disabled) {
+  border-color: #4f6b8b !important;
+  background: #22344a;
+}
+.histogram-channel-control button:focus-visible {
+  outline: 3px solid #3fcaa1;
+  outline-offset: 2px;
 }
 .histogram-channel-selector {
   display: grid;
@@ -2299,10 +2317,41 @@ textarea {
   display: flex;
   gap: 6px;
 }
-.histogram-board-selector header button {
-  padding: 4px 8px;
+.histogram-board-selector header .histogram-board-action {
+  min-height: 32px;
+  border: 1px solid #34465f !important;
+  border-radius: 7px;
+  padding: 5px 10px;
   color: #a9bad0;
   background: #17263a;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+.histogram-board-selector header .histogram-board-action:hover:not(:disabled) {
+  border-color: #4f6b8b !important;
+  color: #dce6f2;
+  background: #22344a;
+}
+.histogram-board-selector header .histogram-board-action:focus-visible,
+.plot-request-button:focus-visible {
+  outline: 3px solid #3fcaa1;
+  outline-offset: 2px;
+}
+.plot-request-button {
+  min-height: 42px;
+  border: 1px solid #3f83bd;
+  border-radius: 8px;
+  padding: 9px 16px;
+  color: #d7ebfb;
+  background: #17456c;
+  font-size: 0.8rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.plot-request-button:hover:not(:disabled) {
+  border-color: #63a7df;
+  color: #f0f8ff;
+  background: #205985;
 }
 .histogram-channel-grid {
   gap: 4px;
@@ -2572,6 +2621,36 @@ textarea {
   border-color: #0f755c !important;
   color: #07533f;
   background: #ccecdf;
+}
+[data-theme='light'] .histogram-board-selector header .histogram-board-action {
+  border-color: #b8c7d8 !important;
+  color: #344c66;
+  background: #f4f7fa;
+}
+[data-theme='light'] .histogram-board-selector header .histogram-board-action:hover:not(:disabled) {
+  border-color: #8ca4bd !important;
+  color: #223b55;
+  background: #e8eef5;
+}
+[data-theme='light'] .histogram-channel-control button {
+  border-color: #b8c7d8 !important;
+  color: #344c66;
+  background: #f4f7fa;
+}
+[data-theme='light'] .histogram-channel-control button:hover:not(:disabled) {
+  border-color: #8ca4bd !important;
+  color: #223b55;
+  background: #e8eef5;
+}
+[data-theme='light'] .plot-request-button {
+  border-color: #77a9d1;
+  color: #174f7b;
+  background: #e2f0fb;
+}
+[data-theme='light'] .plot-request-button:hover:not(:disabled) {
+  border-color: #4f8fc2;
+  color: #103f65;
+  background: #cfe7f8;
 }
 [data-theme='light'] .board-card,
 [data-theme='light'] .artifact,

@@ -110,7 +110,8 @@ describe('PlotWorkspace', () => {
       },
     })
     await wrapper.get('[aria-haspopup="true"]').trigger('click')
-    expect(wrapper.findAll('.histogram-board-selector header .secondary')).toHaveLength(4)
+    expect(wrapper.findAll('.histogram-board-action')).toHaveLength(4)
+    expect(wrapper.get('.plot-request-button').classes()).toContain('secondary-accent')
     await wrapper.get('[aria-label="Board 1 node 2 channel 2"]').trigger('click')
     await wrapper.get('[aria-label="Board 1 node 2 channel 8"]').trigger('click')
     await wrapper.get('[aria-label="Board 1 node 2 channel 9"]').trigger('click')

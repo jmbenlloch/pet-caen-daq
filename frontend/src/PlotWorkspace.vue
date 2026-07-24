@@ -222,7 +222,7 @@ const kindLabel = computed(
       >
       <button
         type="button"
-        class="secondary"
+        class="secondary-accent plot-request-button"
         :disabled="!selectedRunId"
         :aria-busy="loading"
         @click="request"
@@ -241,14 +241,14 @@ const kindLabel = computed(
           <span>
             <button
               type="button"
-              class="secondary"
+              class="secondary histogram-board-action"
               @click="selectBoard(board.chain, board.node, true)"
             >
               All
             </button>
             <button
               type="button"
-              class="secondary"
+              class="secondary histogram-board-action"
               @click="selectBoard(board.chain, board.node, false)"
             >
               Clear
