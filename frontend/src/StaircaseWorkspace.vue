@@ -9,6 +9,7 @@ import {
   type ScanSummary,
   type StaircaseScan,
 } from './gen/pet/caen/daq/v1/system_pb'
+import { localDateTime } from './presentation'
 
 const props = defineProps<{
   api: DaqApi
@@ -23,6 +24,8 @@ const step = ref(5)
 const dwellMilliseconds = ref(500)
 const selectedSeries = ref('channel:0')
 const history = ref<ScanSummary[]>([])
+const historyPage = ref(1)
+const historyPageSize = 8
 const finalized = ref<StaircaseScan>()
 const busy = ref(false)
 const error = ref('')
@@ -35,13 +38,30 @@ const running = computed(
     props.live?.summary?.state === ScanState.RUNNING ||
     props.live?.summary?.state === ScanState.RESTORING,
 )
+const historyPageCount = computed(() =>
+  Math.max(1, Math.ceil(history.value.length / historyPageSize)),
+)
+const visibleHistory = computed(() => {
+  const start = (historyPage.value - 1) * historyPageSize
+  return history.value.slice(start, start + historyPageSize)
+})
 
 async function refresh() {
   try {
-    history.value = await props.api.listScans(50)
+    history.value = await props.api.listScans(100)
+    historyPage.value = 1
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : String(reason)
   }
+}
+
+function scanRunLabel(scanId: string) {
+  return /^\d+$/.test(scanId) ? `Run ${scanId}` : 'Legacy scan'
+}
+
+function scanStateLabel(state: ScanState) {
+  const label = ScanState[state] ?? 'Unknown'
+  return label.charAt(0) + label.slice(1).toLowerCase()
 }
 
 async function start() {
@@ -127,7 +147,7 @@ const plot = computed(() => {
 </script>
 
 <template>
-  <section class="panel staircase-workspace" aria-labelledby="staircase-heading">
+  <section class="plots panel staircase-workspace" aria-labelledby="staircase-heading">
     <div class="section-title">
       <div>
         <p class="eyebrow">Diagnostic scan</p>
@@ -146,13 +166,25 @@ const plot = computed(() => {
       <label
         >Dwell (ms)<input v-model.number="dwellMilliseconds" type="number" min="1" max="34000"
       /></label>
-      <button type="button" :disabled="!canStart" :aria-busy="busy" @click="start">
-        Start scan
-      </button>
-      <button v-if="running" type="button" class="danger" :disabled="busy" @click="cancel">
-        Cancel
-      </button>
+      <div class="actions staircase-actions">
+        <button
+          type="button"
+          class="primary"
+          :disabled="!canStart"
+          :aria-busy="busy"
+          @click="start"
+        >
+          Start scan
+        </button>
+        <button v-if="running" type="button" class="danger" :disabled="busy" @click="cancel">
+          Cancel
+        </button>
+      </div>
     </div>
+    <p class="muted">
+      Dwell time is the counting interval at each threshold. A longer dwell collects more events for
+      steadier rate measurements, but increases the total scan duration.
+    </p>
     <p class="muted">
       For a dark-count staircase, turn the light source off and confirm the intended HV state before
       starting.
@@ -160,7 +192,7 @@ const plot = computed(() => {
     <p v-if="error" class="field-error" role="alert">{{ error }}</p>
 
     <div v-if="displayed" class="staircase-status">
-      <strong>{{ displayed.summary?.scanId }}</strong>
+      <strong>{{ scanRunLabel(displayed.summary?.scanId ?? '') }}</strong>
       <span>
         {{ displayed.summary?.completedPoints }} / {{ displayed.summary?.totalPoints }} points ·
         {{ ScanState[displayed.summary?.state ?? ScanState.UNSPECIFIED] }}
@@ -205,21 +237,36 @@ const plot = computed(() => {
         <p class="eyebrow">Stored scan datasets</p>
         <h3>Finalized staircases</h3>
       </div>
-      <button type="button" class="secondary" @click="refresh">Refresh</button>
+      <button type="button" class="link-button" :disabled="busy" @click="refresh">Refresh</button>
     </div>
     <div class="scan-history">
+      <div v-if="visibleHistory.length" class="scan-history-header" aria-hidden="true">
+        <span>Run</span>
+        <span>Started</span>
+        <span>Board</span>
+        <span>Points</span>
+        <span>Status</span>
+      </div>
       <button
-        v-for="scan in history"
+        v-for="scan in visibleHistory"
         :key="scan.scanId"
         type="button"
         class="secondary"
         @click="load(scan.scanId)"
       >
-        <strong>{{ scan.scanId }}</strong>
-        <span
-          >Board {{ scan.board }} · {{ scan.completedPoints }}/{{ scan.totalPoints }} points</span
-        >
+        <strong data-label="Run">{{ scanRunLabel(scan.scanId) }}</strong>
+        <span data-label="Started">{{ localDateTime(scan.startedAt) }}</span>
+        <span data-label="Board">{{ scan.board }}</span>
+        <span data-label="Points">{{ scan.completedPoints }} / {{ scan.totalPoints }}</span>
+        <span data-label="Status" class="scan-history-state">{{ scanStateLabel(scan.state) }}</span>
       </button>
     </div>
+    <nav v-if="historyPageCount > 1" class="run-pagination" aria-label="Scan history pages">
+      <button type="button" :disabled="historyPage === 1" @click="historyPage--">Previous</button>
+      <span>Page {{ historyPage }} of {{ historyPageCount }}</span>
+      <button type="button" :disabled="historyPage === historyPageCount" @click="historyPage++">
+        Next
+      </button>
+    </nav>
   </section>
 </template>
