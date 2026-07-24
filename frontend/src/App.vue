@@ -275,8 +275,14 @@ const configuredStopPolicy = computed(() => {
 })
 
 const state = computed(() => stateLabel[daq.snapshot.value?.state ?? 0])
+const backendOnline = computed(() => daq.connected.value && !daq.stale.value)
 const hardwareDisconnected = computed(() => daq.snapshot.value?.state === SystemState.DISCONNECTED)
 const hardwareConnecting = computed(() => daq.snapshot.value?.state === SystemState.CONNECTING)
+const hardwareConnectionLabel = computed(() => {
+  if (!backendOnline.value) return 'Hardware state unknown'
+  if (hardwareConnecting.value) return 'Hardware connecting'
+  return hardwareDisconnected.value ? 'Hardware disconnected' : 'Hardware connected'
+})
 const hardwareActionLabel = computed(() => {
   if (hardwareConnecting.value) return 'Connecting hardware…'
   return hardwareDisconnected.value ? 'Connect hardware' : 'Disconnect hardware'
@@ -570,40 +576,46 @@ onMounted(() => daq.connect())
           </div>
           <HvStatusPanel :boards="boards" />
         </div>
-        <div class="hero-control">
+        <div class="hero-control" aria-label="Operations">
           <div class="system-utilities">
             <div class="connection" role="status" aria-live="polite">
+              <span class="status-dot" :class="{ live: backendOnline }" aria-hidden="true" />
+              <span class="backend-state" :class="{ offline: !backendOnline }">
+                {{ backendOnline ? 'Backend online' : 'Backend offline' }}
+              </span>
               <span
-                class="status-dot"
-                :class="{ live: daq.connected.value && !daq.stale.value }"
+                class="status-dot hardware-status-dot"
+                :class="{
+                  live: backendOnline && !hardwareDisconnected && !hardwareConnecting,
+                  disconnected: backendOnline && hardwareDisconnected,
+                }"
                 aria-hidden="true"
               />
-              <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
-              <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
+              <span class="hardware-state">{{ hardwareConnectionLabel }}</span>
+              <button
+                v-if="!backendOnline"
+                type="button"
+                class="connection-action backend-retry-action"
+                @click="daq.connect()"
+              >
+                Retry backend
+              </button>
+              <button
+                v-if="backendOnline && !hardwareConnecting"
+                type="button"
+                class="connection-action hardware-connection-action"
+                :class="{ connect: hardwareDisconnected, disconnect: !hardwareDisconnected }"
+                :disabled="hardwareActionDisabled"
+                @click="toggleHardwareConnection"
+              >
+                {{ hardwareActionLabel }}
+              </button>
             </div>
-            <button
-              type="button"
-              class="hardware-connection-action"
-              :class="{ connect: hardwareDisconnected, disconnect: !hardwareDisconnected }"
-              :disabled="hardwareActionDisabled"
-              @click="toggleHardwareConnection"
-            >
-              {{ hardwareActionLabel }}
-            </button>
           </div>
           <div class="run-control">
-            <div v-if="daq.snapshot.value?.currentRun" class="run-now">
-              <span>Active run</span>
-              <strong>{{ daq.snapshot.value.currentRun.runId }}</strong>
-              <span>{{ compact(daq.snapshot.value.currentRun.eventCount) }} events</span>
-              <small>{{ activeStopPolicy() }}</small>
-            </div>
-            <div v-else class="run-now quiet" role="status">
-              <span>No active run</span>
-              <small>{{ configuredStopPolicy }}</small>
-            </div>
             <div class="actions hero-actions">
               <button
+                v-if="!daq.snapshot.value?.currentRun"
                 class="primary"
                 type="button"
                 :disabled="
@@ -627,6 +639,7 @@ onMounted(() => daq.connect())
                 Start run
               </button>
               <button
+                v-else
                 class="danger"
                 type="button"
                 :disabled="!daq.canStop.value"
@@ -634,6 +647,17 @@ onMounted(() => daq.connect())
               >
                 Stop and drain
               </button>
+            </div>
+            <div v-if="daq.snapshot.value?.currentRun" class="run-now">
+              <span>
+                Active run <strong>{{ daq.snapshot.value.currentRun.runId }}</strong> ·
+                {{ compact(daq.snapshot.value.currentRun.eventCount) }} events
+              </span>
+              <small>{{ activeStopPolicy() }}</small>
+            </div>
+            <div v-else class="run-now quiet" role="status">
+              <span>No active run</span>
+              <small>{{ configuredStopPolicy }}</small>
             </div>
           </div>
         </div>

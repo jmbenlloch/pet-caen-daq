@@ -54,18 +54,20 @@ export function useDaq(api: DaqApi) {
 
   async function connect() {
     if (stopped) return
+    window.clearTimeout(reconnectTimer)
     streamController?.abort()
-    streamController = new AbortController()
+    const controller = new AbortController()
+    streamController = controller
     try {
       void refreshHistory()
       if (!configurationTemplate.value) {
         configurationTemplate.value = await api.configurationTemplate()
       }
       accept(await api.snapshot())
-      for await (const next of api.telemetry(streamController.signal)) accept(next)
-      if (!streamController.signal.aborted) throw new Error('Telemetry stream ended')
+      for await (const next of api.telemetry(controller.signal)) accept(next)
+      if (!controller.signal.aborted) throw new Error('Telemetry stream ended')
     } catch (reason) {
-      if (streamController.signal.aborted || stopped) return
+      if (controller.signal.aborted || stopped) return
       connected.value = false
       stale.value = true
       error.value = reason instanceof Error ? reason.message : String(reason)
