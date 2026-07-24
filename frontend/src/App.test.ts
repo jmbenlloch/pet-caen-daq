@@ -178,6 +178,42 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
+  it('closes every configuration dialog with Escape', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'HV_bias')!
+      .trigger('click')
+    await wrapper.get('.board-overrides-button').trigger('click')
+    expect(wrapper.get('.board-dialog').isVisible()).toBe(true)
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.board-dialog').exists()).toBe(false)
+
+    await wrapper.get('.channel-overrides-button').trigger('click')
+    expect(wrapper.get('.channel-dialog').isVisible()).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.channel-dialog').exists()).toBe(false)
+
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'All')!
+      .trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Configure channels')!
+      .trigger('click')
+    expect(wrapper.get('.mask-dialog').isVisible()).toBe(true)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('.mask-dialog').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
   it('switches and persists the operator color theme', async () => {
     localStorage.removeItem('pet-caen-theme')
     const wrapper = mount(App, { props: { api: dashboardApi() } })

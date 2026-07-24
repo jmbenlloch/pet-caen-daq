@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { parseNumericValue, type ConfigurationField, type NumericConstraint } from './configuration'
+import { useEscapeClose } from './useEscapeClose'
 
 const props = defineProps<{
   field: ConfigurationField
@@ -9,10 +10,12 @@ const props = defineProps<{
   nominalBias?: Record<number, number>
   adjustmentRange?: string
 }>()
-defineEmits<{ apply: [board: number, values: Record<number, string>]; close: [] }>()
+const emit = defineEmits<{ apply: [board: number, values: Record<number, string>]; close: [] }>()
 const board = ref(0)
 const values = ref<Record<number, string>>({})
 const general = computed(() => parseNumericValue(props.field.value)?.number ?? 0)
+
+useEscapeClose(() => emit('close'))
 
 function loadBoard() {
   values.value = { ...(props.overrides[board.value] ?? {}) }
