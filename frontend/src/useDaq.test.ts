@@ -57,7 +57,7 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
     setHighVoltage: vi
       .fn()
       .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.READY })),
-    listRuns: vi.fn().mockResolvedValue([]),
+    listRuns: vi.fn().mockResolvedValue({ runs: [], nextPageToken: '' }),
     searchRuns: vi.fn().mockResolvedValue({ runs: [], nextPageToken: '' }),
     runConfiguration: vi.fn().mockResolvedValue(''),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
@@ -230,6 +230,27 @@ describe('useDaq', () => {
       true,
     )
     expect(store.searchResults.value.map((run) => run.runId)).toEqual(['newest', 'next'])
+    wrapper.unmount()
+  })
+
+  it('loads run history through server-provided continuation tokens', async () => {
+    const newest = create(RunSummarySchema, { runId: 'newest' })
+    const older = create(RunSummarySchema, { runId: 'older' })
+    const listRuns = vi
+      .fn()
+      .mockResolvedValueOnce({ runs: [newest], nextPageToken: 'page-2' })
+      .mockResolvedValueOnce({ runs: [older], nextPageToken: '' })
+    const { store, wrapper } = mountStore(fakeApi({ listRuns }))
+
+    await store.refreshHistory()
+    expect(listRuns).toHaveBeenCalledWith(20)
+    expect(store.runHistory.value.map((run) => run.runId)).toEqual(['newest'])
+    expect(store.runHistoryNextPageToken.value).toBe('page-2')
+
+    await store.loadMoreHistory()
+    expect(listRuns).toHaveBeenLastCalledWith(20, 'page-2')
+    expect(store.runHistory.value.map((run) => run.runId)).toEqual(['newest', 'older'])
+    expect(store.runHistoryNextPageToken.value).toBe('')
     wrapper.unmount()
   })
 

@@ -68,6 +68,44 @@ func TestRunHistory(t *testing.T) {
 	}
 }
 
+func TestRunHistoryPagination(t *testing.T) {
+	parent := t.TempDir()
+	for _, item := range []struct{ id, started string }{
+		{"c", "2026-07-22T12:00:00Z"},
+		{"b", "2026-07-22T12:00:00Z"},
+		{"a", "2026-07-22T11:00:00Z"},
+	} {
+		writer, err := runstore.Create(parent, runstore.Manifest{RunID: item.id, StartedAt: item.started})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.Finalize(item.started, "completed"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	service := &RunService{RunParent: parent}
+	first, err := service.ListRuns(context.Background(), connect.NewRequest(&daqv1.ListRunsRequest{Limit: 2}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Msg.Runs) != 2 || first.Msg.Runs[0].GetRunId() != "c" || first.Msg.Runs[1].GetRunId() != "b" || first.Msg.GetNextPageToken() == "" {
+		t.Fatalf("first page = %+v", first.Msg)
+	}
+	second, err := service.ListRuns(context.Background(), connect.NewRequest(&daqv1.ListRunsRequest{
+		Limit: 2, PageToken: first.Msg.GetNextPageToken(),
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.Msg.Runs) != 1 || second.Msg.Runs[0].GetRunId() != "a" || second.Msg.GetNextPageToken() != "" {
+		t.Fatalf("second page = %+v", second.Msg)
+	}
+	_, err = service.ListRuns(context.Background(), connect.NewRequest(&daqv1.ListRunsRequest{PageToken: "invalid"}))
+	if connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("page token error = %v", err)
+	}
+}
+
 func TestRunHistoryIncludesAndFiltersStaircaseScans(t *testing.T) {
 	parent := t.TempDir()
 	request := staircase.Request{Board: 1, Minimum: 200, Maximum: 300, Step: 100, Dwell: time.Millisecond}

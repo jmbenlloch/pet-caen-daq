@@ -176,12 +176,17 @@ function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
   searchFormError.value = ''
   try {
     const configuration = searchPredicates.value
-      .filter((predicate) => predicate.parameter.trim() || String(predicate.value).trim())
+      .filter(
+        (predicate) =>
+          predicate.parameter.trim() ||
+          String(predicate.value).trim() ||
+          String(predicate.maximum).trim(),
+      )
       .map((predicate) => {
         const requestedValue = String(predicate.value).trim()
         const requestedMaximum = String(predicate.maximum).trim()
-        if (!predicate.parameter.trim() || !requestedValue)
-          throw new Error('Each configuration filter needs a parameter and value.')
+        if (!predicate.parameter.trim())
+          throw new Error('Each configuration filter needs a parameter.')
         const parameter = searchParameter(predicate)
         if (!parameter) throw new Error(`Choose "${predicate.parameter}" from the parameter list.`)
         const valueType = searchValueType(parameter)
@@ -209,6 +214,7 @@ function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
           throw new Error('Board and channel must be non-negative integers.')
         const requestScope = scopeValue ? { scope: scopeValue } : undefined
         if (valueType === 'text') {
+          if (!requestedValue) throw new Error('Text filters need a value.')
           return {
             parameter: parameter.name,
             layer,
@@ -217,33 +223,40 @@ function buildSearchRequest(pageToken = ''): SearchRunsRequest | undefined {
           }
         }
         const isRange = predicate.numericMatch === 'range'
-        if (isRange && !requestedMaximum)
-          throw new Error('Range filters need both a minimum and maximum.')
+        if (!isRange && !requestedValue) throw new Error('Exact filters need a value.')
+        if (isRange && !requestedValue && !requestedMaximum)
+          throw new Error('Range filters need a minimum, a maximum, or both.')
         if (valueType === 'integer') {
-          const value = BigInt(requestedValue)
+          const minimum = requestedValue ? BigInt(requestedValue) : undefined
+          const maximum = requestedMaximum ? BigInt(requestedMaximum) : undefined
+          if (minimum !== undefined && maximum !== undefined && minimum > maximum)
+            throw new Error('Range minimum must not exceed its maximum.')
           return {
             parameter: parameter.name,
             layer,
             scope: requestScope,
             comparison: {
               case: 'integer' as const,
-              value: isRange
-                ? { minimum: value, maximum: BigInt(requestedMaximum) }
-                : { equal: value },
+              value: isRange ? { minimum, maximum } : { equal: minimum },
             },
           }
         }
-        const value = Number(requestedValue)
-        const maximum = Number(requestedMaximum)
-        if (!Number.isFinite(value) || (isRange && !Number.isFinite(maximum)))
+        const minimum = requestedValue ? Number(requestedValue) : undefined
+        const maximum = requestedMaximum ? Number(requestedMaximum) : undefined
+        if (
+          (minimum !== undefined && !Number.isFinite(minimum)) ||
+          (maximum !== undefined && !Number.isFinite(maximum))
+        )
           throw new Error('Real-number filters need valid numeric values.')
+        if (minimum !== undefined && maximum !== undefined && minimum > maximum)
+          throw new Error('Range minimum must not exceed its maximum.')
         return {
           parameter: parameter.name,
           layer,
           scope: requestScope,
           comparison: {
             case: 'real' as const,
-            value: isRange ? { minimum: value, maximum } : { equal: value },
+            value: isRange ? { minimum, maximum } : { equal: minimum },
           },
         }
       })
@@ -1171,7 +1184,11 @@ onMounted(() => daq.connect())
           >
             <div class="search-heading">
               <p>All filters must match. Numeric values use the catalog's canonical units.</p>
-              <button class="link-button" type="button" @click="addSearchPredicate">
+              <button
+                class="search-filter-button secondary"
+                type="button"
+                @click="addSearchPredicate"
+              >
                 Add filter
               </button>
             </div>
@@ -1327,7 +1344,7 @@ onMounted(() => daq.connect())
               </label>
               <button
                 v-if="searchPredicates.length > 1"
-                class="link-button remove-filter"
+                class="search-filter-button danger remove-filter"
                 type="button"
                 :aria-label="`Remove filter ${index + 1}`"
                 @click="removeSearchPredicate(predicate.id)"
@@ -1408,6 +1425,15 @@ onMounted(() => daq.connect())
           :configuration="api.runConfiguration"
           :download-artifact="daq.downloadArtifact"
         />
+        <button
+          v-if="!daq.searchPerformed.value && daq.runHistoryNextPageToken.value"
+          class="link-button load-more"
+          type="button"
+          :disabled="daq.runHistoryLoading.value"
+          @click="daq.loadMoreHistory"
+        >
+          {{ daq.runHistoryLoading.value ? 'Loading…' : 'Load more' }}
+        </button>
       </section>
 
       <div

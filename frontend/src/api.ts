@@ -12,6 +12,7 @@ import {
   type HistogramDataset,
   type HistogramKind,
   type HistogramSelection,
+  type ListRunsResponse,
   type SearchRunsRequest,
   type SearchRunsResponse,
   type StaircaseScan,
@@ -33,7 +34,7 @@ export interface DaqApi {
     enabled: boolean,
     requestedBy: string,
   ): Promise<TelemetrySnapshot>
-  listRuns(limit?: number): Promise<RunSummary[]>
+  listRuns(limit?: number, pageToken?: string): Promise<ListRunsResponse>
   searchRuns(request: SearchRunsRequest): Promise<SearchRunsResponse>
   runConfiguration(runId: string): Promise<string>
   downloadArtifact(runId: string, artifactName: string): Promise<Blob>
@@ -103,8 +104,8 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
       if (!response.snapshot) throw new Error('HV command returned no telemetry snapshot')
       return response.snapshot
     },
-    async listRuns(limit = 50) {
-      return (await runs.listRuns({ limit })).runs
+    async listRuns(limit = 50, pageToken = '') {
+      return await runs.listRuns({ limit, pageToken })
     },
     async searchRuns(request) {
       return await runs.searchRuns(request)

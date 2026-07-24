@@ -147,11 +147,15 @@ message StopRunResponse {
 message ListRunsRequest {
   // Zero uses the server default. Servers may enforce a lower maximum.
   uint32 limit = 1;
+  // Opaque cursor returned by the preceding response.
+  string page_token = 2;
 }
 
 message ListRunsResponse {
-  // Runs are ordered newest first using completion time, then start time and ID.
+  // Runs are ordered newest first using start time, then ID.
   repeated RunSummary runs = 1;
+  // Empty when there are no more runs.
+  string next_page_token = 2;
 }
 
 message SearchRunsRequest {

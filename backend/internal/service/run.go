@@ -322,29 +322,56 @@ func (s *RunService) ListRuns(_ context.Context, request *connect.Request[daqv1.
 	if s.RunParent == "" {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_HISTORY_UNAVAILABLE", fmt.Errorf("run storage is not configured"))
 	}
-	manifests, err := runstore.ListManifests(s.RunParent, limit)
+	var cursor searchCursor
+	if request.Msg.GetPageToken() != "" {
+		var err error
+		cursor, err = decodeSearchCursor(request.Msg.GetPageToken())
+		if err != nil {
+			return nil, serviceError(connect.CodeInvalidArgument, "INVALID_PAGE_TOKEN", err)
+		}
+	}
+	manifests, err := runstore.ListManifests(s.RunParent, 0)
 	if err != nil {
 		return nil, serviceError(connect.CodeInternal, "RUN_HISTORY_INSPECTION_FAILED", err)
 	}
 	response := &daqv1.ListRunsResponse{Runs: make([]*daqv1.RunSummary, 0, len(manifests))}
 	for _, manifest := range manifests {
-		response.Runs = append(response.Runs, manifestSummary(s.RunParent, manifest))
+		summary := manifestSummary(s.RunParent, manifest)
+		if summaryIsBeforeCursor(summary, cursor) {
+			response.Runs = append(response.Runs, summary)
+		}
 	}
-	scans, err := staircasestore.List(s.RunParent, limit)
+	scans, err := staircasestore.List(s.RunParent, 0)
 	if err != nil {
 		return nil, serviceError(connect.CodeInternal, "RUN_HISTORY_INSPECTION_FAILED", err)
 	}
 	for _, scan := range scans {
-		response.Runs = append(response.Runs, staircaseRunSummary(scan))
+		summary := staircaseRunSummary(scan)
+		if summaryIsBeforeCursor(summary, cursor) {
+			response.Runs = append(response.Runs, summary)
+		}
 	}
 	sort.Slice(response.Runs, func(i, j int) bool {
 		left, right := summaryStartedAt(response.Runs[i]), summaryStartedAt(response.Runs[j])
 		return left > right || left == right && response.Runs[i].GetRunId() > response.Runs[j].GetRunId()
 	})
-	if len(response.Runs) > limit {
+	hasMore := len(response.Runs) > limit
+	if hasMore {
 		response.Runs = response.Runs[:limit]
 	}
+	if hasMore && len(response.Runs) != 0 {
+		last := response.Runs[len(response.Runs)-1]
+		response.NextPageToken = encodeSearchCursor(searchCursor{StartedAt: summaryStartedAt(last), RunID: last.GetRunId()})
+	}
 	return connect.NewResponse(response), nil
+}
+
+func summaryIsBeforeCursor(summary *daqv1.RunSummary, cursor searchCursor) bool {
+	if cursor.StartedAt == "" {
+		return true
+	}
+	startedAt := summaryStartedAt(summary)
+	return startedAt < cursor.StartedAt || startedAt == cursor.StartedAt && summary.GetRunId() < cursor.RunID
 }
 
 func (s *RunService) GetRunConfiguration(_ context.Context, request *connect.Request[daqv1.GetRunConfigurationRequest]) (*connect.Response[daqv1.GetRunConfigurationResponse], error) {

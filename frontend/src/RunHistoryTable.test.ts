@@ -10,7 +10,7 @@ function timestamp(value: string) {
 }
 
 describe('run history table', () => {
-  it('paginates runs and presents complete details with readable configuration', async () => {
+  it('presents the server-provided runs with complete readable details', async () => {
     const runs = Array.from({ length: 12 }, (_, index) =>
       create(RunSummarySchema, {
         runId: String(12 - index),
@@ -33,8 +33,7 @@ describe('run history table', () => {
       props: { runs, configuration, downloadArtifact },
     })
 
-    expect(wrapper.get('[aria-label="Stored runs"]').findAll('.run-row')).toHaveLength(10)
-    expect(wrapper.text()).toContain('Page 1 of 2 · 12 runs')
+    expect(wrapper.get('[aria-label="Stored runs"]').findAll('.run-row')).toHaveLength(12)
     expect(wrapper.text()).toContain('2m 5s')
     expect(wrapper.text()).toContain('5.0 MiB')
 
@@ -48,12 +47,7 @@ describe('run history table', () => {
     expect(details.text()).toContain('HV_bias')
     expect(details.find('pre').exists()).toBe(false)
 
-    await wrapper
-      .findAll('.run-pagination button')
-      .find((button) => button.text() === 'Next')!
-      .trigger('click')
-    expect(wrapper.get('[aria-label="Stored runs"]').findAll('.run-row')).toHaveLength(2)
-    expect(wrapper.text()).toContain('Page 2 of 2 · 12 runs')
+    expect(wrapper.find('.run-pagination').exists()).toBe(false)
   })
 
   it('expands hexadecimal masks into decimal channel numbers', async () => {

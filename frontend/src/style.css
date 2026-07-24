@@ -1770,8 +1770,16 @@ textarea {
 [data-theme='light'] .search-range-hint {
   color: #607b96;
 }
+.search-filter-button {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
 .remove-filter {
   justify-self: start;
+  margin-left: 0;
   margin-bottom: 3px;
 }
 .search-results {

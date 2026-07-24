@@ -26,6 +26,8 @@ export function useDaq(api: DaqApi) {
   const validationIssues = ref<ValidationIssue[]>([])
   const latestCompletedRun = ref<RunSummary>()
   const runHistory = ref<RunSummary[]>([])
+  const runHistoryNextPageToken = ref('')
+  const runHistoryLoading = ref(false)
   const searchResults = ref<RunSummary[]>([])
   const searchNextPageToken = ref('')
   const searchLoading = ref(false)
@@ -38,6 +40,7 @@ export function useDaq(api: DaqApi) {
   let staleTimer: number | undefined
   let reconnectTimer: number | undefined
   let histogramRequestSequence = 0
+  let historyRequestSequence = 0
   let searchRequestSequence = 0
   let stopped = false
 
@@ -83,10 +86,35 @@ export function useDaq(api: DaqApi) {
   }
 
   async function refreshHistory() {
+    const sequence = ++historyRequestSequence
+    runHistoryLoading.value = true
     try {
-      runHistory.value = await api.listRuns(100)
+      const response = await api.listRuns(20)
+      if (sequence !== historyRequestSequence) return
+      runHistory.value = response.runs
+      runHistoryNextPageToken.value = response.nextPageToken
     } catch (reason) {
-      error.value = reason instanceof Error ? reason.message : String(reason)
+      if (sequence === historyRequestSequence)
+        error.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      if (sequence === historyRequestSequence) runHistoryLoading.value = false
+    }
+  }
+
+  async function loadMoreHistory() {
+    if (!runHistoryNextPageToken.value || runHistoryLoading.value) return
+    const sequence = ++historyRequestSequence
+    runHistoryLoading.value = true
+    try {
+      const response = await api.listRuns(20, runHistoryNextPageToken.value)
+      if (sequence !== historyRequestSequence) return
+      runHistory.value = [...runHistory.value, ...response.runs]
+      runHistoryNextPageToken.value = response.nextPageToken
+    } catch (reason) {
+      if (sequence === historyRequestSequence)
+        error.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      if (sequence === historyRequestSequence) runHistoryLoading.value = false
     }
   }
 
@@ -298,6 +326,8 @@ export function useDaq(api: DaqApi) {
     validationIssues: readonly(validationIssues),
     latestCompletedRun: readonly(latestCompletedRun),
     runHistory: readonly(runHistory),
+    runHistoryNextPageToken: readonly(runHistoryNextPageToken),
+    runHistoryLoading: readonly(runHistoryLoading),
     searchResults: readonly(searchResults),
     searchNextPageToken: readonly(searchNextPageToken),
     searchLoading: readonly(searchLoading),
@@ -329,6 +359,7 @@ export function useDaq(api: DaqApi) {
     disconnectHardware,
     loadHistograms,
     refreshHistory,
+    loadMoreHistory,
     searchRuns,
     clearSearch,
     downloadArtifact,
