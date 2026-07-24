@@ -51,7 +51,7 @@ func SaveHistograms(path, runID string, histograms []runstore.HistogramDataset) 
 	defer group.Close()
 	for _, histogram := range histograms {
 		name := fmt.Sprintf("%s_%d_%d_%d", histogram.Kind, histogram.Chain, histogram.Node, histogram.Channel)
-		dataset, err := createPrimitive(group, name, hdf5.T_STD_U32LE)
+		dataset, err := createHistogramPrimitive(group, name, hdf5.T_STD_U32LE)
 		if err != nil {
 			return err
 		}

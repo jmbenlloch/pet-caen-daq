@@ -401,6 +401,18 @@ func (w *Writer) Finalize(manifestJSON []byte) (err error) {
 func createPrimitive(location interface {
 	CreateDatasetWith(string, *hdf5.Datatype, *hdf5.Dataspace, *hdf5.PropList) (*hdf5.Dataset, error)
 }, name string, datatype *hdf5.Datatype) (*hdf5.Dataset, error) {
+	return createPrimitiveWithCompression(location, name, datatype, configureCompression)
+}
+
+func createHistogramPrimitive(location interface {
+	CreateDatasetWith(string, *hdf5.Datatype, *hdf5.Dataspace, *hdf5.PropList) (*hdf5.Dataset, error)
+}, name string, datatype *hdf5.Datatype) (*hdf5.Dataset, error) {
+	return createPrimitiveWithCompression(location, name, datatype, configureHistogramCompression)
+}
+
+func createPrimitiveWithCompression(location interface {
+	CreateDatasetWith(string, *hdf5.Datatype, *hdf5.Dataspace, *hdf5.PropList) (*hdf5.Dataset, error)
+}, name string, datatype *hdf5.Datatype, configure func(*hdf5.PropList) error) (*hdf5.Dataset, error) {
 	space, err := hdf5.CreateSimpleDataspace([]uint{0}, []uint{^uint(0)})
 	if err != nil {
 		return nil, err
@@ -414,7 +426,7 @@ func createPrimitive(location interface {
 	if err := properties.SetChunk([]uint{16384}); err != nil {
 		return nil, err
 	}
-	if err := configureCompression(properties); err != nil {
+	if err := configure(properties); err != nil {
 		return nil, err
 	}
 	dataset, err := location.CreateDatasetWith(name, datatype, space, properties)

@@ -32,6 +32,10 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await page.getByLabel('Find a parameter').fill('PresetTime')
   await page.getByRole('spinbutton', { name: 'PresetTime', exact: true }).fill('30')
 
+  await page.getByRole('tab', { name: 'RunCtrl', exact: true }).click()
+  const persistHistograms = page.locator('#persist-histograms')
+  await expect(persistHistograms).toBeChecked()
+  await persistHistograms.uncheck()
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   const activeRunId = page.locator('.run-now strong')
@@ -101,6 +105,7 @@ test('backend automatically stops runs at time and event presets while manual st
   await page.getByRole('tab', { name: 'RunCtrl', exact: true }).click()
   await page.getByRole('combobox', { name: 'StopRunMode', exact: true }).selectOption('PRESET_TIME')
   await page.getByRole('spinbutton', { name: 'PresetTime', exact: true }).fill('1')
+  await page.locator('#persist-histograms').uncheck()
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(page.getByRole('heading', { name: 'Running' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Stop and drain' })).toBeEnabled()
@@ -121,7 +126,7 @@ test('backend automatically stops runs at time and event presets while manual st
   await page
     .getByRole('combobox', { name: 'StopRunMode', exact: true })
     .selectOption('PRESET_COUNTS')
-  await page.getByRole('spinbutton', { name: 'PresetCounts', exact: true }).fill('3')
+  await page.getByRole('spinbutton', { name: 'PresetCounts', exact: true }).fill('30')
   await page.getByRole('button', { name: 'Start run' }).click()
   await expect(activeRunId).toHaveText(/^\d+$/)
   await expect(activeRunId).not.toHaveText(timedRun)
