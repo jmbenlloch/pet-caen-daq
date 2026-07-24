@@ -236,6 +236,55 @@ func (ScanState) EnumDescriptor() ([]byte, []int) {
 	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{3}
 }
 
+type ScanType int32
+
+const (
+	ScanType_SCAN_TYPE_UNSPECIFIED ScanType = 0
+	ScanType_SCAN_TYPE_STAIRCASE   ScanType = 1
+	ScanType_SCAN_TYPE_HOLD_DELAY  ScanType = 2
+)
+
+// Enum value maps for ScanType.
+var (
+	ScanType_name = map[int32]string{
+		0: "SCAN_TYPE_UNSPECIFIED",
+		1: "SCAN_TYPE_STAIRCASE",
+		2: "SCAN_TYPE_HOLD_DELAY",
+	}
+	ScanType_value = map[string]int32{
+		"SCAN_TYPE_UNSPECIFIED": 0,
+		"SCAN_TYPE_STAIRCASE":   1,
+		"SCAN_TYPE_HOLD_DELAY":  2,
+	}
+)
+
+func (x ScanType) Enum() *ScanType {
+	p := new(ScanType)
+	*p = x
+	return p
+}
+
+func (x ScanType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ScanType) Descriptor() protoreflect.EnumDescriptor {
+	return file_pet_caen_daq_v1_system_proto_enumTypes[4].Descriptor()
+}
+
+func (ScanType) Type() protoreflect.EnumType {
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[4]
+}
+
+func (x ScanType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ScanType.Descriptor instead.
+func (ScanType) EnumDescriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{4}
+}
+
 type SystemState int32
 
 const (
@@ -299,11 +348,11 @@ func (x SystemState) String() string {
 }
 
 func (SystemState) Descriptor() protoreflect.EnumDescriptor {
-	return file_pet_caen_daq_v1_system_proto_enumTypes[4].Descriptor()
+	return file_pet_caen_daq_v1_system_proto_enumTypes[5].Descriptor()
 }
 
 func (SystemState) Type() protoreflect.EnumType {
-	return &file_pet_caen_daq_v1_system_proto_enumTypes[4]
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[5]
 }
 
 func (x SystemState) Number() protoreflect.EnumNumber {
@@ -312,15 +361,16 @@ func (x SystemState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SystemState.Descriptor instead.
 func (SystemState) EnumDescriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{4}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{5}
 }
 
 type RunType int32
 
 const (
-	RunType_RUN_TYPE_UNSPECIFIED RunType = 0
-	RunType_RUN_TYPE_DATA        RunType = 1
-	RunType_RUN_TYPE_STAIRCASE   RunType = 2
+	RunType_RUN_TYPE_UNSPECIFIED     RunType = 0
+	RunType_RUN_TYPE_DATA            RunType = 1
+	RunType_RUN_TYPE_STAIRCASE       RunType = 2
+	RunType_RUN_TYPE_HOLD_DELAY_SCAN RunType = 3
 )
 
 // Enum value maps for RunType.
@@ -329,11 +379,13 @@ var (
 		0: "RUN_TYPE_UNSPECIFIED",
 		1: "RUN_TYPE_DATA",
 		2: "RUN_TYPE_STAIRCASE",
+		3: "RUN_TYPE_HOLD_DELAY_SCAN",
 	}
 	RunType_value = map[string]int32{
-		"RUN_TYPE_UNSPECIFIED": 0,
-		"RUN_TYPE_DATA":        1,
-		"RUN_TYPE_STAIRCASE":   2,
+		"RUN_TYPE_UNSPECIFIED":     0,
+		"RUN_TYPE_DATA":            1,
+		"RUN_TYPE_STAIRCASE":       2,
+		"RUN_TYPE_HOLD_DELAY_SCAN": 3,
 	}
 )
 
@@ -348,11 +400,11 @@ func (x RunType) String() string {
 }
 
 func (RunType) Descriptor() protoreflect.EnumDescriptor {
-	return file_pet_caen_daq_v1_system_proto_enumTypes[5].Descriptor()
+	return file_pet_caen_daq_v1_system_proto_enumTypes[6].Descriptor()
 }
 
 func (RunType) Type() protoreflect.EnumType {
-	return &file_pet_caen_daq_v1_system_proto_enumTypes[5]
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[6]
 }
 
 func (x RunType) Number() protoreflect.EnumNumber {
@@ -361,7 +413,7 @@ func (x RunType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RunType.Descriptor instead.
 func (RunType) EnumDescriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{5}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{6}
 }
 
 type HealthStatus int32
@@ -403,11 +455,11 @@ func (x HealthStatus) String() string {
 }
 
 func (HealthStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_pet_caen_daq_v1_system_proto_enumTypes[6].Descriptor()
+	return file_pet_caen_daq_v1_system_proto_enumTypes[7].Descriptor()
 }
 
 func (HealthStatus) Type() protoreflect.EnumType {
-	return &file_pet_caen_daq_v1_system_proto_enumTypes[6]
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[7]
 }
 
 func (x HealthStatus) Number() protoreflect.EnumNumber {
@@ -416,7 +468,7 @@ func (x HealthStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use HealthStatus.Descriptor instead.
 func (HealthStatus) EnumDescriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{6}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{7}
 }
 
 type DiagnosticSeverity int32
@@ -455,11 +507,11 @@ func (x DiagnosticSeverity) String() string {
 }
 
 func (DiagnosticSeverity) Descriptor() protoreflect.EnumDescriptor {
-	return file_pet_caen_daq_v1_system_proto_enumTypes[7].Descriptor()
+	return file_pet_caen_daq_v1_system_proto_enumTypes[8].Descriptor()
 }
 
 func (DiagnosticSeverity) Type() protoreflect.EnumType {
-	return &file_pet_caen_daq_v1_system_proto_enumTypes[7]
+	return &file_pet_caen_daq_v1_system_proto_enumTypes[8]
 }
 
 func (x DiagnosticSeverity) Number() protoreflect.EnumNumber {
@@ -468,7 +520,7 @@ func (x DiagnosticSeverity) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DiagnosticSeverity.Descriptor instead.
 func (DiagnosticSeverity) EnumDescriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{7}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{8}
 }
 
 type GetSystemSnapshotRequest struct {
@@ -2649,23 +2701,24 @@ func (x *HistogramDataset) GetOverflow() uint64 {
 }
 
 type TelemetrySnapshot struct {
-	state               protoimpl.MessageState `protogen:"open.v1"`
-	InstanceId          string                 `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
-	Sequence            uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
-	ObservedAt          *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
-	State               SystemState            `protobuf:"varint,4,opt,name=state,proto3,enum=pet.caen.daq.v1.SystemState" json:"state,omitempty"`
-	CurrentRun          *RunSummary            `protobuf:"bytes,5,opt,name=current_run,json=currentRun,proto3" json:"current_run,omitempty"`
-	Chains              []*Chain               `protobuf:"bytes,6,rep,name=chains,proto3" json:"chains,omitempty"`
-	Pipeline            *PipelineTelemetry     `protobuf:"bytes,7,opt,name=pipeline,proto3" json:"pipeline,omitempty"`
-	Storage             *StorageTelemetry      `protobuf:"bytes,8,opt,name=storage,proto3" json:"storage,omitempty"`
-	Diagnostics         []*Diagnostic          `protobuf:"bytes,9,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
-	Statistics          *StatisticsTelemetry   `protobuf:"bytes,10,opt,name=statistics,proto3" json:"statistics,omitempty"`
-	LatestCompletedRun  *RunSummary            `protobuf:"bytes,11,opt,name=latest_completed_run,json=latestCompletedRun,proto3" json:"latest_completed_run,omitempty"`
-	Concentrator        *Concentrator          `protobuf:"bytes,12,opt,name=concentrator,proto3" json:"concentrator,omitempty"`
-	CurrentStaircase    *StaircaseScan         `protobuf:"bytes,13,opt,name=current_staircase,json=currentStaircase,proto3" json:"current_staircase,omitempty"`
-	LatestCompletedScan *ScanSummary           `protobuf:"bytes,14,opt,name=latest_completed_scan,json=latestCompletedScan,proto3" json:"latest_completed_scan,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	InstanceId           string                 `protobuf:"bytes,1,opt,name=instance_id,json=instanceId,proto3" json:"instance_id,omitempty"`
+	Sequence             uint64                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	ObservedAt           *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=observed_at,json=observedAt,proto3" json:"observed_at,omitempty"`
+	State                SystemState            `protobuf:"varint,4,opt,name=state,proto3,enum=pet.caen.daq.v1.SystemState" json:"state,omitempty"`
+	CurrentRun           *RunSummary            `protobuf:"bytes,5,opt,name=current_run,json=currentRun,proto3" json:"current_run,omitempty"`
+	Chains               []*Chain               `protobuf:"bytes,6,rep,name=chains,proto3" json:"chains,omitempty"`
+	Pipeline             *PipelineTelemetry     `protobuf:"bytes,7,opt,name=pipeline,proto3" json:"pipeline,omitempty"`
+	Storage              *StorageTelemetry      `protobuf:"bytes,8,opt,name=storage,proto3" json:"storage,omitempty"`
+	Diagnostics          []*Diagnostic          `protobuf:"bytes,9,rep,name=diagnostics,proto3" json:"diagnostics,omitempty"`
+	Statistics           *StatisticsTelemetry   `protobuf:"bytes,10,opt,name=statistics,proto3" json:"statistics,omitempty"`
+	LatestCompletedRun   *RunSummary            `protobuf:"bytes,11,opt,name=latest_completed_run,json=latestCompletedRun,proto3" json:"latest_completed_run,omitempty"`
+	Concentrator         *Concentrator          `protobuf:"bytes,12,opt,name=concentrator,proto3" json:"concentrator,omitempty"`
+	CurrentStaircase     *StaircaseScan         `protobuf:"bytes,13,opt,name=current_staircase,json=currentStaircase,proto3" json:"current_staircase,omitempty"`
+	LatestCompletedScan  *ScanSummary           `protobuf:"bytes,14,opt,name=latest_completed_scan,json=latestCompletedScan,proto3" json:"latest_completed_scan,omitempty"`
+	CurrentHoldDelayScan *HoldDelayScan         `protobuf:"bytes,15,opt,name=current_hold_delay_scan,json=currentHoldDelayScan,proto3" json:"current_hold_delay_scan,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *TelemetrySnapshot) Reset() {
@@ -2792,6 +2845,13 @@ func (x *TelemetrySnapshot) GetCurrentStaircase() *StaircaseScan {
 func (x *TelemetrySnapshot) GetLatestCompletedScan() *ScanSummary {
 	if x != nil {
 		return x.LatestCompletedScan
+	}
+	return nil
+}
+
+func (x *TelemetrySnapshot) GetCurrentHoldDelayScan() *HoldDelayScan {
+	if x != nil {
+		return x.CurrentHoldDelayScan
 	}
 	return nil
 }
@@ -2932,6 +2992,150 @@ func (x *StartStaircaseResponse) GetSnapshot() *TelemetrySnapshot {
 	return nil
 }
 
+type StartHoldDelayScanRequest struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Board               uint32                 `protobuf:"varint,1,opt,name=board,proto3" json:"board,omitempty"`
+	MinimumDelayNs      uint32                 `protobuf:"varint,2,opt,name=minimum_delay_ns,json=minimumDelayNs,proto3" json:"minimum_delay_ns,omitempty"`
+	MaximumDelayNs      uint32                 `protobuf:"varint,3,opt,name=maximum_delay_ns,json=maximumDelayNs,proto3" json:"maximum_delay_ns,omitempty"`
+	StepNs              uint32                 `protobuf:"varint,4,opt,name=step_ns,json=stepNs,proto3" json:"step_ns,omitempty"`
+	EventsPerDelay      uint32                 `protobuf:"varint,5,opt,name=events_per_delay,json=eventsPerDelay,proto3" json:"events_per_delay,omitempty"`
+	PointTimeoutSeconds uint32                 `protobuf:"varint,6,opt,name=point_timeout_seconds,json=pointTimeoutSeconds,proto3" json:"point_timeout_seconds,omitempty"`
+	RequestedBy         string                 `protobuf:"bytes,7,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *StartHoldDelayScanRequest) Reset() {
+	*x = StartHoldDelayScanRequest{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartHoldDelayScanRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartHoldDelayScanRequest) ProtoMessage() {}
+
+func (x *StartHoldDelayScanRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartHoldDelayScanRequest.ProtoReflect.Descriptor instead.
+func (*StartHoldDelayScanRequest) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *StartHoldDelayScanRequest) GetBoard() uint32 {
+	if x != nil {
+		return x.Board
+	}
+	return 0
+}
+
+func (x *StartHoldDelayScanRequest) GetMinimumDelayNs() uint32 {
+	if x != nil {
+		return x.MinimumDelayNs
+	}
+	return 0
+}
+
+func (x *StartHoldDelayScanRequest) GetMaximumDelayNs() uint32 {
+	if x != nil {
+		return x.MaximumDelayNs
+	}
+	return 0
+}
+
+func (x *StartHoldDelayScanRequest) GetStepNs() uint32 {
+	if x != nil {
+		return x.StepNs
+	}
+	return 0
+}
+
+func (x *StartHoldDelayScanRequest) GetEventsPerDelay() uint32 {
+	if x != nil {
+		return x.EventsPerDelay
+	}
+	return 0
+}
+
+func (x *StartHoldDelayScanRequest) GetPointTimeoutSeconds() uint32 {
+	if x != nil {
+		return x.PointTimeoutSeconds
+	}
+	return 0
+}
+
+func (x *StartHoldDelayScanRequest) GetRequestedBy() string {
+	if x != nil {
+		return x.RequestedBy
+	}
+	return ""
+}
+
+type StartHoldDelayScanResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scan          *HoldDelayScan         `protobuf:"bytes,1,opt,name=scan,proto3" json:"scan,omitempty"`
+	Snapshot      *TelemetrySnapshot     `protobuf:"bytes,2,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartHoldDelayScanResponse) Reset() {
+	*x = StartHoldDelayScanResponse{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartHoldDelayScanResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartHoldDelayScanResponse) ProtoMessage() {}
+
+func (x *StartHoldDelayScanResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartHoldDelayScanResponse.ProtoReflect.Descriptor instead.
+func (*StartHoldDelayScanResponse) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *StartHoldDelayScanResponse) GetScan() *HoldDelayScan {
+	if x != nil {
+		return x.Scan
+	}
+	return nil
+}
+
+func (x *StartHoldDelayScanResponse) GetSnapshot() *TelemetrySnapshot {
+	if x != nil {
+		return x.Snapshot
+	}
+	return nil
+}
+
 type CancelScanRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ScanId        string                 `protobuf:"bytes,1,opt,name=scan_id,json=scanId,proto3" json:"scan_id,omitempty"`
@@ -2942,7 +3146,7 @@ type CancelScanRequest struct {
 
 func (x *CancelScanRequest) Reset() {
 	*x = CancelScanRequest{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[40]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2954,7 +3158,7 @@ func (x *CancelScanRequest) String() string {
 func (*CancelScanRequest) ProtoMessage() {}
 
 func (x *CancelScanRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[40]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2967,7 +3171,7 @@ func (x *CancelScanRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelScanRequest.ProtoReflect.Descriptor instead.
 func (*CancelScanRequest) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{40}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *CancelScanRequest) GetScanId() string {
@@ -2988,13 +3192,14 @@ type CancelScanResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scan          *StaircaseScan         `protobuf:"bytes,1,opt,name=scan,proto3" json:"scan,omitempty"`
 	Snapshot      *TelemetrySnapshot     `protobuf:"bytes,2,opt,name=snapshot,proto3" json:"snapshot,omitempty"`
+	HoldDelayScan *HoldDelayScan         `protobuf:"bytes,3,opt,name=hold_delay_scan,json=holdDelayScan,proto3" json:"hold_delay_scan,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CancelScanResponse) Reset() {
 	*x = CancelScanResponse{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[41]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3006,7 +3211,7 @@ func (x *CancelScanResponse) String() string {
 func (*CancelScanResponse) ProtoMessage() {}
 
 func (x *CancelScanResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[41]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3019,7 +3224,7 @@ func (x *CancelScanResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelScanResponse.ProtoReflect.Descriptor instead.
 func (*CancelScanResponse) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{41}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *CancelScanResponse) GetScan() *StaircaseScan {
@@ -3036,18 +3241,26 @@ func (x *CancelScanResponse) GetSnapshot() *TelemetrySnapshot {
 	return nil
 }
 
+func (x *CancelScanResponse) GetHoldDelayScan() *HoldDelayScan {
+	if x != nil {
+		return x.HoldDelayScan
+	}
+	return nil
+}
+
 type ListScansRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Limit         uint32                 `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
 	Offset        uint32                 `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`
 	Board         *uint32                `protobuf:"varint,3,opt,name=board,proto3,oneof" json:"board,omitempty"`
+	ScanType      ScanType               `protobuf:"varint,4,opt,name=scan_type,json=scanType,proto3,enum=pet.caen.daq.v1.ScanType" json:"scan_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListScansRequest) Reset() {
 	*x = ListScansRequest{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[42]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3059,7 +3272,7 @@ func (x *ListScansRequest) String() string {
 func (*ListScansRequest) ProtoMessage() {}
 
 func (x *ListScansRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[42]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3072,7 +3285,7 @@ func (x *ListScansRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScansRequest.ProtoReflect.Descriptor instead.
 func (*ListScansRequest) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{42}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ListScansRequest) GetLimit() uint32 {
@@ -3096,6 +3309,13 @@ func (x *ListScansRequest) GetBoard() uint32 {
 	return 0
 }
 
+func (x *ListScansRequest) GetScanType() ScanType {
+	if x != nil {
+		return x.ScanType
+	}
+	return ScanType_SCAN_TYPE_UNSPECIFIED
+}
+
 type ListScansResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scans         []*ScanSummary         `protobuf:"bytes,1,rep,name=scans,proto3" json:"scans,omitempty"`
@@ -3106,7 +3326,7 @@ type ListScansResponse struct {
 
 func (x *ListScansResponse) Reset() {
 	*x = ListScansResponse{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[43]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3118,7 +3338,7 @@ func (x *ListScansResponse) String() string {
 func (*ListScansResponse) ProtoMessage() {}
 
 func (x *ListScansResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[43]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3131,7 +3351,7 @@ func (x *ListScansResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScansResponse.ProtoReflect.Descriptor instead.
 func (*ListScansResponse) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{43}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ListScansResponse) GetScans() []*ScanSummary {
@@ -3157,7 +3377,7 @@ type GetStaircaseRequest struct {
 
 func (x *GetStaircaseRequest) Reset() {
 	*x = GetStaircaseRequest{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[44]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3169,7 +3389,7 @@ func (x *GetStaircaseRequest) String() string {
 func (*GetStaircaseRequest) ProtoMessage() {}
 
 func (x *GetStaircaseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[44]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3182,7 +3402,7 @@ func (x *GetStaircaseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStaircaseRequest.ProtoReflect.Descriptor instead.
 func (*GetStaircaseRequest) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{44}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *GetStaircaseRequest) GetScanId() string {
@@ -3201,7 +3421,7 @@ type GetStaircaseResponse struct {
 
 func (x *GetStaircaseResponse) Reset() {
 	*x = GetStaircaseResponse{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[45]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3213,7 +3433,7 @@ func (x *GetStaircaseResponse) String() string {
 func (*GetStaircaseResponse) ProtoMessage() {}
 
 func (x *GetStaircaseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[45]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3226,10 +3446,98 @@ func (x *GetStaircaseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStaircaseResponse.ProtoReflect.Descriptor instead.
 func (*GetStaircaseResponse) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{45}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *GetStaircaseResponse) GetScan() *StaircaseScan {
+	if x != nil {
+		return x.Scan
+	}
+	return nil
+}
+
+type GetHoldDelayScanRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ScanId        string                 `protobuf:"bytes,1,opt,name=scan_id,json=scanId,proto3" json:"scan_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHoldDelayScanRequest) Reset() {
+	*x = GetHoldDelayScanRequest{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHoldDelayScanRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHoldDelayScanRequest) ProtoMessage() {}
+
+func (x *GetHoldDelayScanRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHoldDelayScanRequest.ProtoReflect.Descriptor instead.
+func (*GetHoldDelayScanRequest) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *GetHoldDelayScanRequest) GetScanId() string {
+	if x != nil {
+		return x.ScanId
+	}
+	return ""
+}
+
+type GetHoldDelayScanResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scan          *HoldDelayScan         `protobuf:"bytes,1,opt,name=scan,proto3" json:"scan,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHoldDelayScanResponse) Reset() {
+	*x = GetHoldDelayScanResponse{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHoldDelayScanResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHoldDelayScanResponse) ProtoMessage() {}
+
+func (x *GetHoldDelayScanResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHoldDelayScanResponse.ProtoReflect.Descriptor instead.
+func (*GetHoldDelayScanResponse) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *GetHoldDelayScanResponse) GetScan() *HoldDelayScan {
 	if x != nil {
 		return x.Scan
 	}
@@ -3247,13 +3555,14 @@ type ScanSummary struct {
 	CompletedPoints   uint32                 `protobuf:"varint,7,opt,name=completed_points,json=completedPoints,proto3" json:"completed_points,omitempty"`
 	TotalPoints       uint32                 `protobuf:"varint,8,opt,name=total_points,json=totalPoints,proto3" json:"total_points,omitempty"`
 	Artifact          *Artifact              `protobuf:"bytes,9,opt,name=artifact,proto3" json:"artifact,omitempty"`
+	ScanType          ScanType               `protobuf:"varint,10,opt,name=scan_type,json=scanType,proto3,enum=pet.caen.daq.v1.ScanType" json:"scan_type,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ScanSummary) Reset() {
 	*x = ScanSummary{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[46]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3265,7 +3574,7 @@ func (x *ScanSummary) String() string {
 func (*ScanSummary) ProtoMessage() {}
 
 func (x *ScanSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[46]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3278,7 +3587,7 @@ func (x *ScanSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScanSummary.ProtoReflect.Descriptor instead.
 func (*ScanSummary) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{46}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *ScanSummary) GetScanId() string {
@@ -3344,6 +3653,13 @@ func (x *ScanSummary) GetArtifact() *Artifact {
 	return nil
 }
 
+func (x *ScanSummary) GetScanType() ScanType {
+	if x != nil {
+		return x.ScanType
+	}
+	return ScanType_SCAN_TYPE_UNSPECIFIED
+}
+
 type StaircaseScan struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Summary           *ScanSummary           `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
@@ -3360,7 +3676,7 @@ type StaircaseScan struct {
 
 func (x *StaircaseScan) Reset() {
 	*x = StaircaseScan{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[47]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3372,7 +3688,7 @@ func (x *StaircaseScan) String() string {
 func (*StaircaseScan) ProtoMessage() {}
 
 func (x *StaircaseScan) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[47]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3385,7 +3701,7 @@ func (x *StaircaseScan) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StaircaseScan.ProtoReflect.Descriptor instead.
 func (*StaircaseScan) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{47}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *StaircaseScan) GetSummary() *ScanSummary {
@@ -3453,7 +3769,7 @@ type StaircasePoint struct {
 
 func (x *StaircasePoint) Reset() {
 	*x = StaircasePoint{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[48]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3465,7 +3781,7 @@ func (x *StaircasePoint) String() string {
 func (*StaircasePoint) ProtoMessage() {}
 
 func (x *StaircasePoint) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[48]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3478,7 +3794,7 @@ func (x *StaircasePoint) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StaircasePoint.ProtoReflect.Descriptor instead.
 func (*StaircasePoint) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{48}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *StaircasePoint) GetThreshold() uint32 {
@@ -3537,6 +3853,234 @@ func (x *StaircasePoint) GetQOrRateCps() float64 {
 	return 0
 }
 
+type HoldDelayScan struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Summary             *ScanSummary           `protobuf:"bytes,1,opt,name=summary,proto3" json:"summary,omitempty"`
+	MinimumDelayNs      uint32                 `protobuf:"varint,2,opt,name=minimum_delay_ns,json=minimumDelayNs,proto3" json:"minimum_delay_ns,omitempty"`
+	MaximumDelayNs      uint32                 `protobuf:"varint,3,opt,name=maximum_delay_ns,json=maximumDelayNs,proto3" json:"maximum_delay_ns,omitempty"`
+	StepNs              uint32                 `protobuf:"varint,4,opt,name=step_ns,json=stepNs,proto3" json:"step_ns,omitempty"`
+	EventsPerDelay      uint32                 `protobuf:"varint,5,opt,name=events_per_delay,json=eventsPerDelay,proto3" json:"events_per_delay,omitempty"`
+	PointTimeoutSeconds uint32                 `protobuf:"varint,6,opt,name=point_timeout_seconds,json=pointTimeoutSeconds,proto3" json:"point_timeout_seconds,omitempty"`
+	Points              []*HoldDelayPoint      `protobuf:"bytes,7,rep,name=points,proto3" json:"points,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *HoldDelayScan) Reset() {
+	*x = HoldDelayScan{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HoldDelayScan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HoldDelayScan) ProtoMessage() {}
+
+func (x *HoldDelayScan) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HoldDelayScan.ProtoReflect.Descriptor instead.
+func (*HoldDelayScan) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *HoldDelayScan) GetSummary() *ScanSummary {
+	if x != nil {
+		return x.Summary
+	}
+	return nil
+}
+
+func (x *HoldDelayScan) GetMinimumDelayNs() uint32 {
+	if x != nil {
+		return x.MinimumDelayNs
+	}
+	return 0
+}
+
+func (x *HoldDelayScan) GetMaximumDelayNs() uint32 {
+	if x != nil {
+		return x.MaximumDelayNs
+	}
+	return 0
+}
+
+func (x *HoldDelayScan) GetStepNs() uint32 {
+	if x != nil {
+		return x.StepNs
+	}
+	return 0
+}
+
+func (x *HoldDelayScan) GetEventsPerDelay() uint32 {
+	if x != nil {
+		return x.EventsPerDelay
+	}
+	return 0
+}
+
+func (x *HoldDelayScan) GetPointTimeoutSeconds() uint32 {
+	if x != nil {
+		return x.PointTimeoutSeconds
+	}
+	return 0
+}
+
+func (x *HoldDelayScan) GetPoints() []*HoldDelayPoint {
+	if x != nil {
+		return x.Points
+	}
+	return nil
+}
+
+type HoldDelayPoint struct {
+	state              protoimpl.MessageState       `protogen:"open.v1"`
+	DelayNs            uint32                       `protobuf:"varint,1,opt,name=delay_ns,json=delayNs,proto3" json:"delay_ns,omitempty"`
+	EffectiveDelayNs   uint32                       `protobuf:"varint,2,opt,name=effective_delay_ns,json=effectiveDelayNs,proto3" json:"effective_delay_ns,omitempty"`
+	EventsCollected    uint32                       `protobuf:"varint,3,opt,name=events_collected,json=eventsCollected,proto3" json:"events_collected,omitempty"`
+	ElapsedNanoseconds uint64                       `protobuf:"varint,4,opt,name=elapsed_nanoseconds,json=elapsedNanoseconds,proto3" json:"elapsed_nanoseconds,omitempty"`
+	Channels           []*HoldDelayChannelHistogram `protobuf:"bytes,5,rep,name=channels,proto3" json:"channels,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *HoldDelayPoint) Reset() {
+	*x = HoldDelayPoint{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HoldDelayPoint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HoldDelayPoint) ProtoMessage() {}
+
+func (x *HoldDelayPoint) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HoldDelayPoint.ProtoReflect.Descriptor instead.
+func (*HoldDelayPoint) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *HoldDelayPoint) GetDelayNs() uint32 {
+	if x != nil {
+		return x.DelayNs
+	}
+	return 0
+}
+
+func (x *HoldDelayPoint) GetEffectiveDelayNs() uint32 {
+	if x != nil {
+		return x.EffectiveDelayNs
+	}
+	return 0
+}
+
+func (x *HoldDelayPoint) GetEventsCollected() uint32 {
+	if x != nil {
+		return x.EventsCollected
+	}
+	return 0
+}
+
+func (x *HoldDelayPoint) GetElapsedNanoseconds() uint64 {
+	if x != nil {
+		return x.ElapsedNanoseconds
+	}
+	return 0
+}
+
+func (x *HoldDelayPoint) GetChannels() []*HoldDelayChannelHistogram {
+	if x != nil {
+		return x.Channels
+	}
+	return nil
+}
+
+type HoldDelayChannelHistogram struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Channel       uint32                 `protobuf:"varint,1,opt,name=channel,proto3" json:"channel,omitempty"`
+	HighGainBins  []uint32               `protobuf:"varint,2,rep,packed,name=high_gain_bins,json=highGainBins,proto3" json:"high_gain_bins,omitempty"`
+	MissingEvents uint32                 `protobuf:"varint,3,opt,name=missing_events,json=missingEvents,proto3" json:"missing_events,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HoldDelayChannelHistogram) Reset() {
+	*x = HoldDelayChannelHistogram{}
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HoldDelayChannelHistogram) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HoldDelayChannelHistogram) ProtoMessage() {}
+
+func (x *HoldDelayChannelHistogram) ProtoReflect() protoreflect.Message {
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HoldDelayChannelHistogram.ProtoReflect.Descriptor instead.
+func (*HoldDelayChannelHistogram) Descriptor() ([]byte, []int) {
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *HoldDelayChannelHistogram) GetChannel() uint32 {
+	if x != nil {
+		return x.Channel
+	}
+	return 0
+}
+
+func (x *HoldDelayChannelHistogram) GetHighGainBins() []uint32 {
+	if x != nil {
+		return x.HighGainBins
+	}
+	return nil
+}
+
+func (x *HoldDelayChannelHistogram) GetMissingEvents() uint32 {
+	if x != nil {
+		return x.MissingEvents
+	}
+	return 0
+}
+
 type Concentrator struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	SoftwareRevision string                 `protobuf:"bytes,1,opt,name=software_revision,json=softwareRevision,proto3" json:"software_revision,omitempty"`
@@ -3548,7 +4092,7 @@ type Concentrator struct {
 
 func (x *Concentrator) Reset() {
 	*x = Concentrator{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[49]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3560,7 +4104,7 @@ func (x *Concentrator) String() string {
 func (*Concentrator) ProtoMessage() {}
 
 func (x *Concentrator) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[49]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3573,7 +4117,7 @@ func (x *Concentrator) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Concentrator.ProtoReflect.Descriptor instead.
 func (*Concentrator) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{49}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *Concentrator) GetSoftwareRevision() string {
@@ -3609,7 +4153,7 @@ type StatisticsTelemetry struct {
 
 func (x *StatisticsTelemetry) Reset() {
 	*x = StatisticsTelemetry{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[50]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3621,7 +4165,7 @@ func (x *StatisticsTelemetry) String() string {
 func (*StatisticsTelemetry) ProtoMessage() {}
 
 func (x *StatisticsTelemetry) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[50]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3634,7 +4178,7 @@ func (x *StatisticsTelemetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatisticsTelemetry.ProtoReflect.Descriptor instead.
 func (*StatisticsTelemetry) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{50}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *StatisticsTelemetry) GetElapsedMilliseconds() uint64 {
@@ -3675,7 +4219,7 @@ type BoardStatistics struct {
 
 func (x *BoardStatistics) Reset() {
 	*x = BoardStatistics{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[51]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3687,7 +4231,7 @@ func (x *BoardStatistics) String() string {
 func (*BoardStatistics) ProtoMessage() {}
 
 func (x *BoardStatistics) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[51]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3700,7 +4244,7 @@ func (x *BoardStatistics) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BoardStatistics.ProtoReflect.Descriptor instead.
 func (*BoardStatistics) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{51}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *BoardStatistics) GetChain() uint32 {
@@ -3803,7 +4347,7 @@ type RunSummary struct {
 
 func (x *RunSummary) Reset() {
 	*x = RunSummary{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[52]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3815,7 +4359,7 @@ func (x *RunSummary) String() string {
 func (*RunSummary) ProtoMessage() {}
 
 func (x *RunSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[52]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3828,7 +4372,7 @@ func (x *RunSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunSummary.ProtoReflect.Descriptor instead.
 func (*RunSummary) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{52}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *RunSummary) GetRunId() string {
@@ -3934,7 +4478,7 @@ type Artifact struct {
 
 func (x *Artifact) Reset() {
 	*x = Artifact{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[53]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3946,7 +4490,7 @@ func (x *Artifact) String() string {
 func (*Artifact) ProtoMessage() {}
 
 func (x *Artifact) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[53]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3959,7 +4503,7 @@ func (x *Artifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Artifact.ProtoReflect.Descriptor instead.
 func (*Artifact) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{53}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *Artifact) GetKind() string {
@@ -4002,7 +4546,7 @@ type Chain struct {
 
 func (x *Chain) Reset() {
 	*x = Chain{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[54]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4014,7 +4558,7 @@ func (x *Chain) String() string {
 func (*Chain) ProtoMessage() {}
 
 func (x *Chain) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[54]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4027,7 +4571,7 @@ func (x *Chain) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Chain.ProtoReflect.Descriptor instead.
 func (*Chain) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{54}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *Chain) GetIndex() uint32 {
@@ -4088,7 +4632,7 @@ type Board struct {
 
 func (x *Board) Reset() {
 	*x = Board{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[55]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4100,7 +4644,7 @@ func (x *Board) String() string {
 func (*Board) ProtoMessage() {}
 
 func (x *Board) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[55]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4113,7 +4657,7 @@ func (x *Board) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Board.ProtoReflect.Descriptor instead.
 func (*Board) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{55}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *Board) GetNode() uint32 {
@@ -4263,7 +4807,7 @@ type PipelineTelemetry struct {
 
 func (x *PipelineTelemetry) Reset() {
 	*x = PipelineTelemetry{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[56]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4275,7 +4819,7 @@ func (x *PipelineTelemetry) String() string {
 func (*PipelineTelemetry) ProtoMessage() {}
 
 func (x *PipelineTelemetry) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[56]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4288,7 +4832,7 @@ func (x *PipelineTelemetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PipelineTelemetry.ProtoReflect.Descriptor instead.
 func (*PipelineTelemetry) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{56}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *PipelineTelemetry) GetQueueCapacity() uint64 {
@@ -4346,7 +4890,7 @@ type StorageTelemetry struct {
 
 func (x *StorageTelemetry) Reset() {
 	*x = StorageTelemetry{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[57]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4358,7 +4902,7 @@ func (x *StorageTelemetry) String() string {
 func (*StorageTelemetry) ProtoMessage() {}
 
 func (x *StorageTelemetry) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[57]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4371,7 +4915,7 @@ func (x *StorageTelemetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StorageTelemetry.ProtoReflect.Descriptor instead.
 func (*StorageTelemetry) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{57}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *StorageTelemetry) GetHealth() HealthStatus {
@@ -4423,7 +4967,7 @@ type Diagnostic struct {
 
 func (x *Diagnostic) Reset() {
 	*x = Diagnostic{}
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[58]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4435,7 +4979,7 @@ func (x *Diagnostic) String() string {
 func (*Diagnostic) ProtoMessage() {}
 
 func (x *Diagnostic) ProtoReflect() protoreflect.Message {
-	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[58]
+	mi := &file_pet_caen_daq_v1_system_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4448,7 +4992,7 @@ func (x *Diagnostic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Diagnostic.ProtoReflect.Descriptor instead.
 func (*Diagnostic) Descriptor() ([]byte, []int) {
-	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{58}
+	return file_pet_caen_daq_v1_system_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *Diagnostic) GetSeverity() DiagnosticSeverity {
@@ -4650,7 +5194,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x04bins\x18\x06 \x03(\rR\x04bins\x12\x18\n" +
 	"\aentries\x18\a \x01(\x04R\aentries\x12\x1c\n" +
 	"\tunderflow\x18\b \x01(\x04R\tunderflow\x12\x1a\n" +
-	"\boverflow\x18\t \x01(\x04R\boverflow\"\xe2\x06\n" +
+	"\boverflow\x18\t \x01(\x04R\boverflow\"\xb9\a\n" +
 	"\x11TelemetrySnapshot\x12\x1f\n" +
 	"\vinstance_id\x18\x01 \x01(\tR\n" +
 	"instanceId\x12\x1a\n" +
@@ -4671,7 +5215,8 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x14latest_completed_run\x18\v \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x12latestCompletedRun\x12A\n" +
 	"\fconcentrator\x18\f \x01(\v2\x1d.pet.caen.daq.v1.ConcentratorR\fconcentrator\x12K\n" +
 	"\x11current_staircase\x18\r \x01(\v2\x1e.pet.caen.daq.v1.StaircaseScanR\x10currentStaircase\x12P\n" +
-	"\x15latest_completed_scan\x18\x0e \x01(\v2\x1c.pet.caen.daq.v1.ScanSummaryR\x13latestCompletedScan\"\xed\x01\n" +
+	"\x15latest_completed_scan\x18\x0e \x01(\v2\x1c.pet.caen.daq.v1.ScanSummaryR\x13latestCompletedScan\x12U\n" +
+	"\x17current_hold_delay_scan\x18\x0f \x01(\v2\x1e.pet.caen.daq.v1.HoldDelayScanR\x14currentHoldDelayScan\"\xed\x01\n" +
 	"\x15StartStaircaseRequest\x12\x14\n" +
 	"\x05board\x18\x01 \x01(\rR\x05board\x12+\n" +
 	"\x11minimum_threshold\x18\x02 \x01(\rR\x10minimumThreshold\x12+\n" +
@@ -4681,17 +5226,30 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\frequested_by\x18\x06 \x01(\tR\vrequestedBy\"\x8c\x01\n" +
 	"\x16StartStaircaseResponse\x122\n" +
 	"\x04scan\x18\x01 \x01(\v2\x1e.pet.caen.daq.v1.StaircaseScanR\x04scan\x12>\n" +
+	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\x9f\x02\n" +
+	"\x19StartHoldDelayScanRequest\x12\x14\n" +
+	"\x05board\x18\x01 \x01(\rR\x05board\x12(\n" +
+	"\x10minimum_delay_ns\x18\x02 \x01(\rR\x0eminimumDelayNs\x12(\n" +
+	"\x10maximum_delay_ns\x18\x03 \x01(\rR\x0emaximumDelayNs\x12\x17\n" +
+	"\astep_ns\x18\x04 \x01(\rR\x06stepNs\x12(\n" +
+	"\x10events_per_delay\x18\x05 \x01(\rR\x0eeventsPerDelay\x122\n" +
+	"\x15point_timeout_seconds\x18\x06 \x01(\rR\x13pointTimeoutSeconds\x12!\n" +
+	"\frequested_by\x18\a \x01(\tR\vrequestedBy\"\x90\x01\n" +
+	"\x1aStartHoldDelayScanResponse\x122\n" +
+	"\x04scan\x18\x01 \x01(\v2\x1e.pet.caen.daq.v1.HoldDelayScanR\x04scan\x12>\n" +
 	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"O\n" +
 	"\x11CancelScanRequest\x12\x17\n" +
 	"\ascan_id\x18\x01 \x01(\tR\x06scanId\x12!\n" +
-	"\frequested_by\x18\x02 \x01(\tR\vrequestedBy\"\x88\x01\n" +
+	"\frequested_by\x18\x02 \x01(\tR\vrequestedBy\"\xd0\x01\n" +
 	"\x12CancelScanResponse\x122\n" +
 	"\x04scan\x18\x01 \x01(\v2\x1e.pet.caen.daq.v1.StaircaseScanR\x04scan\x12>\n" +
-	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"e\n" +
+	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\x12F\n" +
+	"\x0fhold_delay_scan\x18\x03 \x01(\v2\x1e.pet.caen.daq.v1.HoldDelayScanR\rholdDelayScan\"\x9d\x01\n" +
 	"\x10ListScansRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\rR\x05limit\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\rR\x06offset\x12\x19\n" +
-	"\x05board\x18\x03 \x01(\rH\x00R\x05board\x88\x01\x01B\b\n" +
+	"\x05board\x18\x03 \x01(\rH\x00R\x05board\x88\x01\x01\x126\n" +
+	"\tscan_type\x18\x04 \x01(\x0e2\x19.pet.caen.daq.v1.ScanTypeR\bscanTypeB\b\n" +
 	"\x06_board\"h\n" +
 	"\x11ListScansResponse\x122\n" +
 	"\x05scans\x18\x01 \x03(\v2\x1c.pet.caen.daq.v1.ScanSummaryR\x05scans\x12\x1f\n" +
@@ -4700,7 +5258,11 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x13GetStaircaseRequest\x12\x17\n" +
 	"\ascan_id\x18\x01 \x01(\tR\x06scanId\"J\n" +
 	"\x14GetStaircaseResponse\x122\n" +
-	"\x04scan\x18\x01 \x01(\v2\x1e.pet.caen.daq.v1.StaircaseScanR\x04scan\"\x9c\x03\n" +
+	"\x04scan\x18\x01 \x01(\v2\x1e.pet.caen.daq.v1.StaircaseScanR\x04scan\"2\n" +
+	"\x17GetHoldDelayScanRequest\x12\x17\n" +
+	"\ascan_id\x18\x01 \x01(\tR\x06scanId\"N\n" +
+	"\x18GetHoldDelayScanResponse\x122\n" +
+	"\x04scan\x18\x01 \x01(\v2\x1e.pet.caen.daq.v1.HoldDelayScanR\x04scan\"\xd4\x03\n" +
 	"\vScanSummary\x12\x17\n" +
 	"\ascan_id\x18\x01 \x01(\tR\x06scanId\x12\x14\n" +
 	"\x05board\x18\x02 \x01(\rR\x05board\x129\n" +
@@ -4711,7 +5273,9 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x12termination_reason\x18\x06 \x01(\tR\x11terminationReason\x12)\n" +
 	"\x10completed_points\x18\a \x01(\rR\x0fcompletedPoints\x12!\n" +
 	"\ftotal_points\x18\b \x01(\rR\vtotalPoints\x125\n" +
-	"\bartifact\x18\t \x01(\v2\x19.pet.caen.daq.v1.ArtifactR\bartifact\"\xc4\x02\n" +
+	"\bartifact\x18\t \x01(\v2\x19.pet.caen.daq.v1.ArtifactR\bartifact\x126\n" +
+	"\tscan_type\x18\n" +
+	" \x01(\x0e2\x19.pet.caen.daq.v1.ScanTypeR\bscanType\"\xc4\x02\n" +
 	"\rStaircaseScan\x126\n" +
 	"\asummary\x18\x01 \x01(\v2\x1c.pet.caen.daq.v1.ScanSummaryR\asummary\x12+\n" +
 	"\x11minimum_threshold\x18\x02 \x01(\rR\x10minimumThreshold\x12+\n" +
@@ -4732,7 +5296,25 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\rt_or_rate_cps\x18\a \x01(\x01R\n" +
 	"tOrRateCps\x12!\n" +
 	"\rq_or_rate_cps\x18\b \x01(\x01R\n" +
-	"qOrRateCps\"\x7f\n" +
+	"qOrRateCps\"\xcb\x02\n" +
+	"\rHoldDelayScan\x126\n" +
+	"\asummary\x18\x01 \x01(\v2\x1c.pet.caen.daq.v1.ScanSummaryR\asummary\x12(\n" +
+	"\x10minimum_delay_ns\x18\x02 \x01(\rR\x0eminimumDelayNs\x12(\n" +
+	"\x10maximum_delay_ns\x18\x03 \x01(\rR\x0emaximumDelayNs\x12\x17\n" +
+	"\astep_ns\x18\x04 \x01(\rR\x06stepNs\x12(\n" +
+	"\x10events_per_delay\x18\x05 \x01(\rR\x0eeventsPerDelay\x122\n" +
+	"\x15point_timeout_seconds\x18\x06 \x01(\rR\x13pointTimeoutSeconds\x127\n" +
+	"\x06points\x18\a \x03(\v2\x1f.pet.caen.daq.v1.HoldDelayPointR\x06points\"\xfd\x01\n" +
+	"\x0eHoldDelayPoint\x12\x19\n" +
+	"\bdelay_ns\x18\x01 \x01(\rR\adelayNs\x12,\n" +
+	"\x12effective_delay_ns\x18\x02 \x01(\rR\x10effectiveDelayNs\x12)\n" +
+	"\x10events_collected\x18\x03 \x01(\rR\x0feventsCollected\x12/\n" +
+	"\x13elapsed_nanoseconds\x18\x04 \x01(\x04R\x12elapsedNanoseconds\x12F\n" +
+	"\bchannels\x18\x05 \x03(\v2*.pet.caen.daq.v1.HoldDelayChannelHistogramR\bchannels\"\x82\x01\n" +
+	"\x19HoldDelayChannelHistogram\x12\x18\n" +
+	"\achannel\x18\x01 \x01(\rR\achannel\x12$\n" +
+	"\x0ehigh_gain_bins\x18\x02 \x03(\rR\fhighGainBins\x12%\n" +
+	"\x0emissing_events\x18\x03 \x01(\rR\rmissingEvents\"\x7f\n" +
 	"\fConcentrator\x12+\n" +
 	"\x11software_revision\x18\x01 \x01(\tR\x10softwareRevision\x12#\n" +
 	"\rfpga_revision\x18\x02 \x01(\tR\ffpgaRevision\x12\x1d\n" +
@@ -4860,7 +5442,11 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x14SCAN_STATE_RESTORING\x10\x03\x12\x18\n" +
 	"\x14SCAN_STATE_COMPLETED\x10\x04\x12\x18\n" +
 	"\x14SCAN_STATE_CANCELLED\x10\x05\x12\x15\n" +
-	"\x11SCAN_STATE_FAILED\x10\x06*\xef\x02\n" +
+	"\x11SCAN_STATE_FAILED\x10\x06*X\n" +
+	"\bScanType\x12\x19\n" +
+	"\x15SCAN_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13SCAN_TYPE_STAIRCASE\x10\x01\x12\x18\n" +
+	"\x14SCAN_TYPE_HOLD_DELAY\x10\x02*\xef\x02\n" +
 	"\vSystemState\x12\x1c\n" +
 	"\x18SYSTEM_STATE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19SYSTEM_STATE_DISCONNECTED\x10\x01\x12\x15\n" +
@@ -4875,11 +5461,12 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x15SYSTEM_STATE_DRAINING\x10\n" +
 	"\x12\x1b\n" +
 	"\x17SYSTEM_STATE_RECOVERING\x10\v\x12\x19\n" +
-	"\x15SYSTEM_STATE_SCANNING\x10\f*N\n" +
+	"\x15SYSTEM_STATE_SCANNING\x10\f*l\n" +
 	"\aRunType\x12\x18\n" +
 	"\x14RUN_TYPE_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rRUN_TYPE_DATA\x10\x01\x12\x16\n" +
-	"\x12RUN_TYPE_STAIRCASE\x10\x02*\x93\x01\n" +
+	"\x12RUN_TYPE_STAIRCASE\x10\x02\x12\x1c\n" +
+	"\x18RUN_TYPE_HOLD_DELAY_SCAN\x10\x03*\x93\x01\n" +
 	"\fHealthStatus\x12\x1d\n" +
 	"\x19HEALTH_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15HEALTH_STATUS_UNKNOWN\x10\x01\x12\x14\n" +
@@ -4908,13 +5495,15 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"SearchRuns\x12\".pet.caen.daq.v1.SearchRunsRequest\x1a#.pet.caen.daq.v1.SearchRunsResponse\"\x00\x12r\n" +
 	"\x13GetRunConfiguration\x12+.pet.caen.daq.v1.GetRunConfigurationRequest\x1a,.pet.caen.daq.v1.GetRunConfigurationResponse\"\x00\x12k\n" +
 	"\x10DownloadArtifact\x12(.pet.caen.daq.v1.DownloadArtifactRequest\x1a).pet.caen.daq.v1.DownloadArtifactResponse\"\x000\x01\x12`\n" +
-	"\rGetHistograms\x12%.pet.caen.daq.v1.GetHistogramsRequest\x1a&.pet.caen.daq.v1.GetHistogramsResponse\"\x002\x80\x03\n" +
+	"\rGetHistograms\x12%.pet.caen.daq.v1.GetHistogramsRequest\x1a&.pet.caen.daq.v1.GetHistogramsResponse\"\x002\xdc\x04\n" +
 	"\vScanService\x12c\n" +
-	"\x0eStartStaircase\x12&.pet.caen.daq.v1.StartStaircaseRequest\x1a'.pet.caen.daq.v1.StartStaircaseResponse\"\x00\x12W\n" +
+	"\x0eStartStaircase\x12&.pet.caen.daq.v1.StartStaircaseRequest\x1a'.pet.caen.daq.v1.StartStaircaseResponse\"\x00\x12o\n" +
+	"\x12StartHoldDelayScan\x12*.pet.caen.daq.v1.StartHoldDelayScanRequest\x1a+.pet.caen.daq.v1.StartHoldDelayScanResponse\"\x00\x12W\n" +
 	"\n" +
 	"CancelScan\x12\".pet.caen.daq.v1.CancelScanRequest\x1a#.pet.caen.daq.v1.CancelScanResponse\"\x00\x12T\n" +
 	"\tListScans\x12!.pet.caen.daq.v1.ListScansRequest\x1a\".pet.caen.daq.v1.ListScansResponse\"\x00\x12]\n" +
-	"\fGetStaircase\x12$.pet.caen.daq.v1.GetStaircaseRequest\x1a%.pet.caen.daq.v1.GetStaircaseResponse\"\x00BFZDgithub.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1;daqv1b\x06proto3"
+	"\fGetStaircase\x12$.pet.caen.daq.v1.GetStaircaseRequest\x1a%.pet.caen.daq.v1.GetStaircaseResponse\"\x00\x12i\n" +
+	"\x10GetHoldDelayScan\x12(.pet.caen.daq.v1.GetHoldDelayScanRequest\x1a).pet.caen.daq.v1.GetHoldDelayScanResponse\"\x00BFZDgithub.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1;daqv1b\x06proto3"
 
 var (
 	file_pet_caen_daq_v1_system_proto_rawDescOnce sync.Once
@@ -4928,186 +5517,208 @@ func file_pet_caen_daq_v1_system_proto_rawDescGZIP() []byte {
 	return file_pet_caen_daq_v1_system_proto_rawDescData
 }
 
-var file_pet_caen_daq_v1_system_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_pet_caen_daq_v1_system_proto_msgTypes = make([]protoimpl.MessageInfo, 59)
+var file_pet_caen_daq_v1_system_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
+var file_pet_caen_daq_v1_system_proto_msgTypes = make([]protoimpl.MessageInfo, 66)
 var file_pet_caen_daq_v1_system_proto_goTypes = []any{
 	(ValidationSeverity)(0),                  // 0: pet.caen.daq.v1.ValidationSeverity
 	(ConfigurationLayer)(0),                  // 1: pet.caen.daq.v1.ConfigurationLayer
 	(HistogramKind)(0),                       // 2: pet.caen.daq.v1.HistogramKind
 	(ScanState)(0),                           // 3: pet.caen.daq.v1.ScanState
-	(SystemState)(0),                         // 4: pet.caen.daq.v1.SystemState
-	(RunType)(0),                             // 5: pet.caen.daq.v1.RunType
-	(HealthStatus)(0),                        // 6: pet.caen.daq.v1.HealthStatus
-	(DiagnosticSeverity)(0),                  // 7: pet.caen.daq.v1.DiagnosticSeverity
-	(*GetSystemSnapshotRequest)(nil),         // 8: pet.caen.daq.v1.GetSystemSnapshotRequest
-	(*GetConfigurationTemplateRequest)(nil),  // 9: pet.caen.daq.v1.GetConfigurationTemplateRequest
-	(*GetConfigurationTemplateResponse)(nil), // 10: pet.caen.daq.v1.GetConfigurationTemplateResponse
-	(*GetSystemSnapshotResponse)(nil),        // 11: pet.caen.daq.v1.GetSystemSnapshotResponse
-	(*ValidateConfigurationRequest)(nil),     // 12: pet.caen.daq.v1.ValidateConfigurationRequest
-	(*ValidateConfigurationResponse)(nil),    // 13: pet.caen.daq.v1.ValidateConfigurationResponse
-	(*ValidationIssue)(nil),                  // 14: pet.caen.daq.v1.ValidationIssue
-	(*StreamTelemetryRequest)(nil),           // 15: pet.caen.daq.v1.StreamTelemetryRequest
-	(*StreamTelemetryResponse)(nil),          // 16: pet.caen.daq.v1.StreamTelemetryResponse
-	(*ConnectHardwareRequest)(nil),           // 17: pet.caen.daq.v1.ConnectHardwareRequest
-	(*ConnectHardwareResponse)(nil),          // 18: pet.caen.daq.v1.ConnectHardwareResponse
-	(*DisconnectHardwareRequest)(nil),        // 19: pet.caen.daq.v1.DisconnectHardwareRequest
-	(*DisconnectHardwareResponse)(nil),       // 20: pet.caen.daq.v1.DisconnectHardwareResponse
-	(*SetHighVoltageRequest)(nil),            // 21: pet.caen.daq.v1.SetHighVoltageRequest
-	(*SetHighVoltageResponse)(nil),           // 22: pet.caen.daq.v1.SetHighVoltageResponse
-	(*StartRunRequest)(nil),                  // 23: pet.caen.daq.v1.StartRunRequest
-	(*StartRunResponse)(nil),                 // 24: pet.caen.daq.v1.StartRunResponse
-	(*StopRunRequest)(nil),                   // 25: pet.caen.daq.v1.StopRunRequest
-	(*StopRunResponse)(nil),                  // 26: pet.caen.daq.v1.StopRunResponse
-	(*ListRunsRequest)(nil),                  // 27: pet.caen.daq.v1.ListRunsRequest
-	(*ListRunsResponse)(nil),                 // 28: pet.caen.daq.v1.ListRunsResponse
-	(*SearchRunsRequest)(nil),                // 29: pet.caen.daq.v1.SearchRunsRequest
-	(*SearchRunsResponse)(nil),               // 30: pet.caen.daq.v1.SearchRunsResponse
-	(*GetRunConfigurationRequest)(nil),       // 31: pet.caen.daq.v1.GetRunConfigurationRequest
-	(*GetRunConfigurationResponse)(nil),      // 32: pet.caen.daq.v1.GetRunConfigurationResponse
-	(*ConfigurationPredicate)(nil),           // 33: pet.caen.daq.v1.ConfigurationPredicate
-	(*ConfigurationScope)(nil),               // 34: pet.caen.daq.v1.ConfigurationScope
-	(*BoardChannelScope)(nil),                // 35: pet.caen.daq.v1.BoardChannelScope
-	(*IntegerComparison)(nil),                // 36: pet.caen.daq.v1.IntegerComparison
-	(*RealComparison)(nil),                   // 37: pet.caen.daq.v1.RealComparison
-	(*TextComparison)(nil),                   // 38: pet.caen.daq.v1.TextComparison
-	(*DownloadArtifactRequest)(nil),          // 39: pet.caen.daq.v1.DownloadArtifactRequest
-	(*DownloadArtifactResponse)(nil),         // 40: pet.caen.daq.v1.DownloadArtifactResponse
-	(*GetHistogramsRequest)(nil),             // 41: pet.caen.daq.v1.GetHistogramsRequest
-	(*HistogramSelection)(nil),               // 42: pet.caen.daq.v1.HistogramSelection
-	(*GetHistogramsResponse)(nil),            // 43: pet.caen.daq.v1.GetHistogramsResponse
-	(*HistogramDataset)(nil),                 // 44: pet.caen.daq.v1.HistogramDataset
-	(*TelemetrySnapshot)(nil),                // 45: pet.caen.daq.v1.TelemetrySnapshot
-	(*StartStaircaseRequest)(nil),            // 46: pet.caen.daq.v1.StartStaircaseRequest
-	(*StartStaircaseResponse)(nil),           // 47: pet.caen.daq.v1.StartStaircaseResponse
-	(*CancelScanRequest)(nil),                // 48: pet.caen.daq.v1.CancelScanRequest
-	(*CancelScanResponse)(nil),               // 49: pet.caen.daq.v1.CancelScanResponse
-	(*ListScansRequest)(nil),                 // 50: pet.caen.daq.v1.ListScansRequest
-	(*ListScansResponse)(nil),                // 51: pet.caen.daq.v1.ListScansResponse
-	(*GetStaircaseRequest)(nil),              // 52: pet.caen.daq.v1.GetStaircaseRequest
-	(*GetStaircaseResponse)(nil),             // 53: pet.caen.daq.v1.GetStaircaseResponse
-	(*ScanSummary)(nil),                      // 54: pet.caen.daq.v1.ScanSummary
-	(*StaircaseScan)(nil),                    // 55: pet.caen.daq.v1.StaircaseScan
-	(*StaircasePoint)(nil),                   // 56: pet.caen.daq.v1.StaircasePoint
-	(*Concentrator)(nil),                     // 57: pet.caen.daq.v1.Concentrator
-	(*StatisticsTelemetry)(nil),              // 58: pet.caen.daq.v1.StatisticsTelemetry
-	(*BoardStatistics)(nil),                  // 59: pet.caen.daq.v1.BoardStatistics
-	(*RunSummary)(nil),                       // 60: pet.caen.daq.v1.RunSummary
-	(*Artifact)(nil),                         // 61: pet.caen.daq.v1.Artifact
-	(*Chain)(nil),                            // 62: pet.caen.daq.v1.Chain
-	(*Board)(nil),                            // 63: pet.caen.daq.v1.Board
-	(*PipelineTelemetry)(nil),                // 64: pet.caen.daq.v1.PipelineTelemetry
-	(*StorageTelemetry)(nil),                 // 65: pet.caen.daq.v1.StorageTelemetry
-	(*Diagnostic)(nil),                       // 66: pet.caen.daq.v1.Diagnostic
-	(*timestamppb.Timestamp)(nil),            // 67: google.protobuf.Timestamp
+	(ScanType)(0),                            // 4: pet.caen.daq.v1.ScanType
+	(SystemState)(0),                         // 5: pet.caen.daq.v1.SystemState
+	(RunType)(0),                             // 6: pet.caen.daq.v1.RunType
+	(HealthStatus)(0),                        // 7: pet.caen.daq.v1.HealthStatus
+	(DiagnosticSeverity)(0),                  // 8: pet.caen.daq.v1.DiagnosticSeverity
+	(*GetSystemSnapshotRequest)(nil),         // 9: pet.caen.daq.v1.GetSystemSnapshotRequest
+	(*GetConfigurationTemplateRequest)(nil),  // 10: pet.caen.daq.v1.GetConfigurationTemplateRequest
+	(*GetConfigurationTemplateResponse)(nil), // 11: pet.caen.daq.v1.GetConfigurationTemplateResponse
+	(*GetSystemSnapshotResponse)(nil),        // 12: pet.caen.daq.v1.GetSystemSnapshotResponse
+	(*ValidateConfigurationRequest)(nil),     // 13: pet.caen.daq.v1.ValidateConfigurationRequest
+	(*ValidateConfigurationResponse)(nil),    // 14: pet.caen.daq.v1.ValidateConfigurationResponse
+	(*ValidationIssue)(nil),                  // 15: pet.caen.daq.v1.ValidationIssue
+	(*StreamTelemetryRequest)(nil),           // 16: pet.caen.daq.v1.StreamTelemetryRequest
+	(*StreamTelemetryResponse)(nil),          // 17: pet.caen.daq.v1.StreamTelemetryResponse
+	(*ConnectHardwareRequest)(nil),           // 18: pet.caen.daq.v1.ConnectHardwareRequest
+	(*ConnectHardwareResponse)(nil),          // 19: pet.caen.daq.v1.ConnectHardwareResponse
+	(*DisconnectHardwareRequest)(nil),        // 20: pet.caen.daq.v1.DisconnectHardwareRequest
+	(*DisconnectHardwareResponse)(nil),       // 21: pet.caen.daq.v1.DisconnectHardwareResponse
+	(*SetHighVoltageRequest)(nil),            // 22: pet.caen.daq.v1.SetHighVoltageRequest
+	(*SetHighVoltageResponse)(nil),           // 23: pet.caen.daq.v1.SetHighVoltageResponse
+	(*StartRunRequest)(nil),                  // 24: pet.caen.daq.v1.StartRunRequest
+	(*StartRunResponse)(nil),                 // 25: pet.caen.daq.v1.StartRunResponse
+	(*StopRunRequest)(nil),                   // 26: pet.caen.daq.v1.StopRunRequest
+	(*StopRunResponse)(nil),                  // 27: pet.caen.daq.v1.StopRunResponse
+	(*ListRunsRequest)(nil),                  // 28: pet.caen.daq.v1.ListRunsRequest
+	(*ListRunsResponse)(nil),                 // 29: pet.caen.daq.v1.ListRunsResponse
+	(*SearchRunsRequest)(nil),                // 30: pet.caen.daq.v1.SearchRunsRequest
+	(*SearchRunsResponse)(nil),               // 31: pet.caen.daq.v1.SearchRunsResponse
+	(*GetRunConfigurationRequest)(nil),       // 32: pet.caen.daq.v1.GetRunConfigurationRequest
+	(*GetRunConfigurationResponse)(nil),      // 33: pet.caen.daq.v1.GetRunConfigurationResponse
+	(*ConfigurationPredicate)(nil),           // 34: pet.caen.daq.v1.ConfigurationPredicate
+	(*ConfigurationScope)(nil),               // 35: pet.caen.daq.v1.ConfigurationScope
+	(*BoardChannelScope)(nil),                // 36: pet.caen.daq.v1.BoardChannelScope
+	(*IntegerComparison)(nil),                // 37: pet.caen.daq.v1.IntegerComparison
+	(*RealComparison)(nil),                   // 38: pet.caen.daq.v1.RealComparison
+	(*TextComparison)(nil),                   // 39: pet.caen.daq.v1.TextComparison
+	(*DownloadArtifactRequest)(nil),          // 40: pet.caen.daq.v1.DownloadArtifactRequest
+	(*DownloadArtifactResponse)(nil),         // 41: pet.caen.daq.v1.DownloadArtifactResponse
+	(*GetHistogramsRequest)(nil),             // 42: pet.caen.daq.v1.GetHistogramsRequest
+	(*HistogramSelection)(nil),               // 43: pet.caen.daq.v1.HistogramSelection
+	(*GetHistogramsResponse)(nil),            // 44: pet.caen.daq.v1.GetHistogramsResponse
+	(*HistogramDataset)(nil),                 // 45: pet.caen.daq.v1.HistogramDataset
+	(*TelemetrySnapshot)(nil),                // 46: pet.caen.daq.v1.TelemetrySnapshot
+	(*StartStaircaseRequest)(nil),            // 47: pet.caen.daq.v1.StartStaircaseRequest
+	(*StartStaircaseResponse)(nil),           // 48: pet.caen.daq.v1.StartStaircaseResponse
+	(*StartHoldDelayScanRequest)(nil),        // 49: pet.caen.daq.v1.StartHoldDelayScanRequest
+	(*StartHoldDelayScanResponse)(nil),       // 50: pet.caen.daq.v1.StartHoldDelayScanResponse
+	(*CancelScanRequest)(nil),                // 51: pet.caen.daq.v1.CancelScanRequest
+	(*CancelScanResponse)(nil),               // 52: pet.caen.daq.v1.CancelScanResponse
+	(*ListScansRequest)(nil),                 // 53: pet.caen.daq.v1.ListScansRequest
+	(*ListScansResponse)(nil),                // 54: pet.caen.daq.v1.ListScansResponse
+	(*GetStaircaseRequest)(nil),              // 55: pet.caen.daq.v1.GetStaircaseRequest
+	(*GetStaircaseResponse)(nil),             // 56: pet.caen.daq.v1.GetStaircaseResponse
+	(*GetHoldDelayScanRequest)(nil),          // 57: pet.caen.daq.v1.GetHoldDelayScanRequest
+	(*GetHoldDelayScanResponse)(nil),         // 58: pet.caen.daq.v1.GetHoldDelayScanResponse
+	(*ScanSummary)(nil),                      // 59: pet.caen.daq.v1.ScanSummary
+	(*StaircaseScan)(nil),                    // 60: pet.caen.daq.v1.StaircaseScan
+	(*StaircasePoint)(nil),                   // 61: pet.caen.daq.v1.StaircasePoint
+	(*HoldDelayScan)(nil),                    // 62: pet.caen.daq.v1.HoldDelayScan
+	(*HoldDelayPoint)(nil),                   // 63: pet.caen.daq.v1.HoldDelayPoint
+	(*HoldDelayChannelHistogram)(nil),        // 64: pet.caen.daq.v1.HoldDelayChannelHistogram
+	(*Concentrator)(nil),                     // 65: pet.caen.daq.v1.Concentrator
+	(*StatisticsTelemetry)(nil),              // 66: pet.caen.daq.v1.StatisticsTelemetry
+	(*BoardStatistics)(nil),                  // 67: pet.caen.daq.v1.BoardStatistics
+	(*RunSummary)(nil),                       // 68: pet.caen.daq.v1.RunSummary
+	(*Artifact)(nil),                         // 69: pet.caen.daq.v1.Artifact
+	(*Chain)(nil),                            // 70: pet.caen.daq.v1.Chain
+	(*Board)(nil),                            // 71: pet.caen.daq.v1.Board
+	(*PipelineTelemetry)(nil),                // 72: pet.caen.daq.v1.PipelineTelemetry
+	(*StorageTelemetry)(nil),                 // 73: pet.caen.daq.v1.StorageTelemetry
+	(*Diagnostic)(nil),                       // 74: pet.caen.daq.v1.Diagnostic
+	(*timestamppb.Timestamp)(nil),            // 75: google.protobuf.Timestamp
 }
 var file_pet_caen_daq_v1_system_proto_depIdxs = []int32{
-	4,  // 0: pet.caen.daq.v1.GetSystemSnapshotResponse.state:type_name -> pet.caen.daq.v1.SystemState
-	62, // 1: pet.caen.daq.v1.GetSystemSnapshotResponse.chains:type_name -> pet.caen.daq.v1.Chain
-	45, // 2: pet.caen.daq.v1.GetSystemSnapshotResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	14, // 3: pet.caen.daq.v1.ValidateConfigurationResponse.issues:type_name -> pet.caen.daq.v1.ValidationIssue
+	5,  // 0: pet.caen.daq.v1.GetSystemSnapshotResponse.state:type_name -> pet.caen.daq.v1.SystemState
+	70, // 1: pet.caen.daq.v1.GetSystemSnapshotResponse.chains:type_name -> pet.caen.daq.v1.Chain
+	46, // 2: pet.caen.daq.v1.GetSystemSnapshotResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	15, // 3: pet.caen.daq.v1.ValidateConfigurationResponse.issues:type_name -> pet.caen.daq.v1.ValidationIssue
 	0,  // 4: pet.caen.daq.v1.ValidationIssue.severity:type_name -> pet.caen.daq.v1.ValidationSeverity
-	45, // 5: pet.caen.daq.v1.StreamTelemetryResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	45, // 6: pet.caen.daq.v1.ConnectHardwareResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	45, // 7: pet.caen.daq.v1.DisconnectHardwareResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	45, // 8: pet.caen.daq.v1.SetHighVoltageResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	60, // 9: pet.caen.daq.v1.StartRunResponse.run:type_name -> pet.caen.daq.v1.RunSummary
-	45, // 10: pet.caen.daq.v1.StartRunResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	60, // 11: pet.caen.daq.v1.StopRunResponse.run:type_name -> pet.caen.daq.v1.RunSummary
-	45, // 12: pet.caen.daq.v1.StopRunResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	60, // 13: pet.caen.daq.v1.ListRunsResponse.runs:type_name -> pet.caen.daq.v1.RunSummary
-	33, // 14: pet.caen.daq.v1.SearchRunsRequest.configuration:type_name -> pet.caen.daq.v1.ConfigurationPredicate
-	67, // 15: pet.caen.daq.v1.SearchRunsRequest.started_after:type_name -> google.protobuf.Timestamp
-	67, // 16: pet.caen.daq.v1.SearchRunsRequest.started_before:type_name -> google.protobuf.Timestamp
-	5,  // 17: pet.caen.daq.v1.SearchRunsRequest.run_type:type_name -> pet.caen.daq.v1.RunType
-	60, // 18: pet.caen.daq.v1.SearchRunsResponse.runs:type_name -> pet.caen.daq.v1.RunSummary
+	46, // 5: pet.caen.daq.v1.StreamTelemetryResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	46, // 6: pet.caen.daq.v1.ConnectHardwareResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	46, // 7: pet.caen.daq.v1.DisconnectHardwareResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	46, // 8: pet.caen.daq.v1.SetHighVoltageResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	68, // 9: pet.caen.daq.v1.StartRunResponse.run:type_name -> pet.caen.daq.v1.RunSummary
+	46, // 10: pet.caen.daq.v1.StartRunResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	68, // 11: pet.caen.daq.v1.StopRunResponse.run:type_name -> pet.caen.daq.v1.RunSummary
+	46, // 12: pet.caen.daq.v1.StopRunResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	68, // 13: pet.caen.daq.v1.ListRunsResponse.runs:type_name -> pet.caen.daq.v1.RunSummary
+	34, // 14: pet.caen.daq.v1.SearchRunsRequest.configuration:type_name -> pet.caen.daq.v1.ConfigurationPredicate
+	75, // 15: pet.caen.daq.v1.SearchRunsRequest.started_after:type_name -> google.protobuf.Timestamp
+	75, // 16: pet.caen.daq.v1.SearchRunsRequest.started_before:type_name -> google.protobuf.Timestamp
+	6,  // 17: pet.caen.daq.v1.SearchRunsRequest.run_type:type_name -> pet.caen.daq.v1.RunType
+	68, // 18: pet.caen.daq.v1.SearchRunsResponse.runs:type_name -> pet.caen.daq.v1.RunSummary
 	1,  // 19: pet.caen.daq.v1.ConfigurationPredicate.layer:type_name -> pet.caen.daq.v1.ConfigurationLayer
-	34, // 20: pet.caen.daq.v1.ConfigurationPredicate.scope:type_name -> pet.caen.daq.v1.ConfigurationScope
-	36, // 21: pet.caen.daq.v1.ConfigurationPredicate.integer:type_name -> pet.caen.daq.v1.IntegerComparison
-	37, // 22: pet.caen.daq.v1.ConfigurationPredicate.real:type_name -> pet.caen.daq.v1.RealComparison
-	38, // 23: pet.caen.daq.v1.ConfigurationPredicate.text:type_name -> pet.caen.daq.v1.TextComparison
-	35, // 24: pet.caen.daq.v1.ConfigurationScope.channel:type_name -> pet.caen.daq.v1.BoardChannelScope
+	35, // 20: pet.caen.daq.v1.ConfigurationPredicate.scope:type_name -> pet.caen.daq.v1.ConfigurationScope
+	37, // 21: pet.caen.daq.v1.ConfigurationPredicate.integer:type_name -> pet.caen.daq.v1.IntegerComparison
+	38, // 22: pet.caen.daq.v1.ConfigurationPredicate.real:type_name -> pet.caen.daq.v1.RealComparison
+	39, // 23: pet.caen.daq.v1.ConfigurationPredicate.text:type_name -> pet.caen.daq.v1.TextComparison
+	36, // 24: pet.caen.daq.v1.ConfigurationScope.channel:type_name -> pet.caen.daq.v1.BoardChannelScope
 	2,  // 25: pet.caen.daq.v1.GetHistogramsRequest.kind:type_name -> pet.caen.daq.v1.HistogramKind
-	42, // 26: pet.caen.daq.v1.GetHistogramsRequest.selections:type_name -> pet.caen.daq.v1.HistogramSelection
+	43, // 26: pet.caen.daq.v1.GetHistogramsRequest.selections:type_name -> pet.caen.daq.v1.HistogramSelection
 	2,  // 27: pet.caen.daq.v1.GetHistogramsResponse.kind:type_name -> pet.caen.daq.v1.HistogramKind
-	44, // 28: pet.caen.daq.v1.GetHistogramsResponse.datasets:type_name -> pet.caen.daq.v1.HistogramDataset
-	67, // 29: pet.caen.daq.v1.TelemetrySnapshot.observed_at:type_name -> google.protobuf.Timestamp
-	4,  // 30: pet.caen.daq.v1.TelemetrySnapshot.state:type_name -> pet.caen.daq.v1.SystemState
-	60, // 31: pet.caen.daq.v1.TelemetrySnapshot.current_run:type_name -> pet.caen.daq.v1.RunSummary
-	62, // 32: pet.caen.daq.v1.TelemetrySnapshot.chains:type_name -> pet.caen.daq.v1.Chain
-	64, // 33: pet.caen.daq.v1.TelemetrySnapshot.pipeline:type_name -> pet.caen.daq.v1.PipelineTelemetry
-	65, // 34: pet.caen.daq.v1.TelemetrySnapshot.storage:type_name -> pet.caen.daq.v1.StorageTelemetry
-	66, // 35: pet.caen.daq.v1.TelemetrySnapshot.diagnostics:type_name -> pet.caen.daq.v1.Diagnostic
-	58, // 36: pet.caen.daq.v1.TelemetrySnapshot.statistics:type_name -> pet.caen.daq.v1.StatisticsTelemetry
-	60, // 37: pet.caen.daq.v1.TelemetrySnapshot.latest_completed_run:type_name -> pet.caen.daq.v1.RunSummary
-	57, // 38: pet.caen.daq.v1.TelemetrySnapshot.concentrator:type_name -> pet.caen.daq.v1.Concentrator
-	55, // 39: pet.caen.daq.v1.TelemetrySnapshot.current_staircase:type_name -> pet.caen.daq.v1.StaircaseScan
-	54, // 40: pet.caen.daq.v1.TelemetrySnapshot.latest_completed_scan:type_name -> pet.caen.daq.v1.ScanSummary
-	55, // 41: pet.caen.daq.v1.StartStaircaseResponse.scan:type_name -> pet.caen.daq.v1.StaircaseScan
-	45, // 42: pet.caen.daq.v1.StartStaircaseResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	55, // 43: pet.caen.daq.v1.CancelScanResponse.scan:type_name -> pet.caen.daq.v1.StaircaseScan
-	45, // 44: pet.caen.daq.v1.CancelScanResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
-	54, // 45: pet.caen.daq.v1.ListScansResponse.scans:type_name -> pet.caen.daq.v1.ScanSummary
-	55, // 46: pet.caen.daq.v1.GetStaircaseResponse.scan:type_name -> pet.caen.daq.v1.StaircaseScan
-	67, // 47: pet.caen.daq.v1.ScanSummary.started_at:type_name -> google.protobuf.Timestamp
-	67, // 48: pet.caen.daq.v1.ScanSummary.completed_at:type_name -> google.protobuf.Timestamp
-	3,  // 49: pet.caen.daq.v1.ScanSummary.state:type_name -> pet.caen.daq.v1.ScanState
-	61, // 50: pet.caen.daq.v1.ScanSummary.artifact:type_name -> pet.caen.daq.v1.Artifact
-	54, // 51: pet.caen.daq.v1.StaircaseScan.summary:type_name -> pet.caen.daq.v1.ScanSummary
-	56, // 52: pet.caen.daq.v1.StaircaseScan.points:type_name -> pet.caen.daq.v1.StaircasePoint
-	59, // 53: pet.caen.daq.v1.StatisticsTelemetry.boards:type_name -> pet.caen.daq.v1.BoardStatistics
-	67, // 54: pet.caen.daq.v1.RunSummary.started_at:type_name -> google.protobuf.Timestamp
-	67, // 55: pet.caen.daq.v1.RunSummary.completed_at:type_name -> google.protobuf.Timestamp
-	61, // 56: pet.caen.daq.v1.RunSummary.artifacts:type_name -> pet.caen.daq.v1.Artifact
-	58, // 57: pet.caen.daq.v1.RunSummary.final_statistics:type_name -> pet.caen.daq.v1.StatisticsTelemetry
-	5,  // 58: pet.caen.daq.v1.RunSummary.run_type:type_name -> pet.caen.daq.v1.RunType
-	6,  // 59: pet.caen.daq.v1.Chain.health:type_name -> pet.caen.daq.v1.HealthStatus
-	63, // 60: pet.caen.daq.v1.Chain.boards:type_name -> pet.caen.daq.v1.Board
-	6,  // 61: pet.caen.daq.v1.Board.health:type_name -> pet.caen.daq.v1.HealthStatus
-	67, // 62: pet.caen.daq.v1.Board.telemetry_observed_at:type_name -> google.protobuf.Timestamp
-	6,  // 63: pet.caen.daq.v1.StorageTelemetry.health:type_name -> pet.caen.daq.v1.HealthStatus
-	7,  // 64: pet.caen.daq.v1.Diagnostic.severity:type_name -> pet.caen.daq.v1.DiagnosticSeverity
-	67, // 65: pet.caen.daq.v1.Diagnostic.observed_at:type_name -> google.protobuf.Timestamp
-	8,  // 66: pet.caen.daq.v1.SystemService.GetSystemSnapshot:input_type -> pet.caen.daq.v1.GetSystemSnapshotRequest
-	9,  // 67: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:input_type -> pet.caen.daq.v1.GetConfigurationTemplateRequest
-	12, // 68: pet.caen.daq.v1.SystemService.ValidateConfiguration:input_type -> pet.caen.daq.v1.ValidateConfigurationRequest
-	15, // 69: pet.caen.daq.v1.SystemService.StreamTelemetry:input_type -> pet.caen.daq.v1.StreamTelemetryRequest
-	17, // 70: pet.caen.daq.v1.SystemService.ConnectHardware:input_type -> pet.caen.daq.v1.ConnectHardwareRequest
-	19, // 71: pet.caen.daq.v1.SystemService.DisconnectHardware:input_type -> pet.caen.daq.v1.DisconnectHardwareRequest
-	21, // 72: pet.caen.daq.v1.SystemService.SetHighVoltage:input_type -> pet.caen.daq.v1.SetHighVoltageRequest
-	23, // 73: pet.caen.daq.v1.RunService.StartRun:input_type -> pet.caen.daq.v1.StartRunRequest
-	25, // 74: pet.caen.daq.v1.RunService.StopRun:input_type -> pet.caen.daq.v1.StopRunRequest
-	27, // 75: pet.caen.daq.v1.RunService.ListRuns:input_type -> pet.caen.daq.v1.ListRunsRequest
-	29, // 76: pet.caen.daq.v1.RunService.SearchRuns:input_type -> pet.caen.daq.v1.SearchRunsRequest
-	31, // 77: pet.caen.daq.v1.RunService.GetRunConfiguration:input_type -> pet.caen.daq.v1.GetRunConfigurationRequest
-	39, // 78: pet.caen.daq.v1.RunService.DownloadArtifact:input_type -> pet.caen.daq.v1.DownloadArtifactRequest
-	41, // 79: pet.caen.daq.v1.RunService.GetHistograms:input_type -> pet.caen.daq.v1.GetHistogramsRequest
-	46, // 80: pet.caen.daq.v1.ScanService.StartStaircase:input_type -> pet.caen.daq.v1.StartStaircaseRequest
-	48, // 81: pet.caen.daq.v1.ScanService.CancelScan:input_type -> pet.caen.daq.v1.CancelScanRequest
-	50, // 82: pet.caen.daq.v1.ScanService.ListScans:input_type -> pet.caen.daq.v1.ListScansRequest
-	52, // 83: pet.caen.daq.v1.ScanService.GetStaircase:input_type -> pet.caen.daq.v1.GetStaircaseRequest
-	11, // 84: pet.caen.daq.v1.SystemService.GetSystemSnapshot:output_type -> pet.caen.daq.v1.GetSystemSnapshotResponse
-	10, // 85: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:output_type -> pet.caen.daq.v1.GetConfigurationTemplateResponse
-	13, // 86: pet.caen.daq.v1.SystemService.ValidateConfiguration:output_type -> pet.caen.daq.v1.ValidateConfigurationResponse
-	16, // 87: pet.caen.daq.v1.SystemService.StreamTelemetry:output_type -> pet.caen.daq.v1.StreamTelemetryResponse
-	18, // 88: pet.caen.daq.v1.SystemService.ConnectHardware:output_type -> pet.caen.daq.v1.ConnectHardwareResponse
-	20, // 89: pet.caen.daq.v1.SystemService.DisconnectHardware:output_type -> pet.caen.daq.v1.DisconnectHardwareResponse
-	22, // 90: pet.caen.daq.v1.SystemService.SetHighVoltage:output_type -> pet.caen.daq.v1.SetHighVoltageResponse
-	24, // 91: pet.caen.daq.v1.RunService.StartRun:output_type -> pet.caen.daq.v1.StartRunResponse
-	26, // 92: pet.caen.daq.v1.RunService.StopRun:output_type -> pet.caen.daq.v1.StopRunResponse
-	28, // 93: pet.caen.daq.v1.RunService.ListRuns:output_type -> pet.caen.daq.v1.ListRunsResponse
-	30, // 94: pet.caen.daq.v1.RunService.SearchRuns:output_type -> pet.caen.daq.v1.SearchRunsResponse
-	32, // 95: pet.caen.daq.v1.RunService.GetRunConfiguration:output_type -> pet.caen.daq.v1.GetRunConfigurationResponse
-	40, // 96: pet.caen.daq.v1.RunService.DownloadArtifact:output_type -> pet.caen.daq.v1.DownloadArtifactResponse
-	43, // 97: pet.caen.daq.v1.RunService.GetHistograms:output_type -> pet.caen.daq.v1.GetHistogramsResponse
-	47, // 98: pet.caen.daq.v1.ScanService.StartStaircase:output_type -> pet.caen.daq.v1.StartStaircaseResponse
-	49, // 99: pet.caen.daq.v1.ScanService.CancelScan:output_type -> pet.caen.daq.v1.CancelScanResponse
-	51, // 100: pet.caen.daq.v1.ScanService.ListScans:output_type -> pet.caen.daq.v1.ListScansResponse
-	53, // 101: pet.caen.daq.v1.ScanService.GetStaircase:output_type -> pet.caen.daq.v1.GetStaircaseResponse
-	84, // [84:102] is the sub-list for method output_type
-	66, // [66:84] is the sub-list for method input_type
-	66, // [66:66] is the sub-list for extension type_name
-	66, // [66:66] is the sub-list for extension extendee
-	0,  // [0:66] is the sub-list for field type_name
+	45, // 28: pet.caen.daq.v1.GetHistogramsResponse.datasets:type_name -> pet.caen.daq.v1.HistogramDataset
+	75, // 29: pet.caen.daq.v1.TelemetrySnapshot.observed_at:type_name -> google.protobuf.Timestamp
+	5,  // 30: pet.caen.daq.v1.TelemetrySnapshot.state:type_name -> pet.caen.daq.v1.SystemState
+	68, // 31: pet.caen.daq.v1.TelemetrySnapshot.current_run:type_name -> pet.caen.daq.v1.RunSummary
+	70, // 32: pet.caen.daq.v1.TelemetrySnapshot.chains:type_name -> pet.caen.daq.v1.Chain
+	72, // 33: pet.caen.daq.v1.TelemetrySnapshot.pipeline:type_name -> pet.caen.daq.v1.PipelineTelemetry
+	73, // 34: pet.caen.daq.v1.TelemetrySnapshot.storage:type_name -> pet.caen.daq.v1.StorageTelemetry
+	74, // 35: pet.caen.daq.v1.TelemetrySnapshot.diagnostics:type_name -> pet.caen.daq.v1.Diagnostic
+	66, // 36: pet.caen.daq.v1.TelemetrySnapshot.statistics:type_name -> pet.caen.daq.v1.StatisticsTelemetry
+	68, // 37: pet.caen.daq.v1.TelemetrySnapshot.latest_completed_run:type_name -> pet.caen.daq.v1.RunSummary
+	65, // 38: pet.caen.daq.v1.TelemetrySnapshot.concentrator:type_name -> pet.caen.daq.v1.Concentrator
+	60, // 39: pet.caen.daq.v1.TelemetrySnapshot.current_staircase:type_name -> pet.caen.daq.v1.StaircaseScan
+	59, // 40: pet.caen.daq.v1.TelemetrySnapshot.latest_completed_scan:type_name -> pet.caen.daq.v1.ScanSummary
+	62, // 41: pet.caen.daq.v1.TelemetrySnapshot.current_hold_delay_scan:type_name -> pet.caen.daq.v1.HoldDelayScan
+	60, // 42: pet.caen.daq.v1.StartStaircaseResponse.scan:type_name -> pet.caen.daq.v1.StaircaseScan
+	46, // 43: pet.caen.daq.v1.StartStaircaseResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	62, // 44: pet.caen.daq.v1.StartHoldDelayScanResponse.scan:type_name -> pet.caen.daq.v1.HoldDelayScan
+	46, // 45: pet.caen.daq.v1.StartHoldDelayScanResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	60, // 46: pet.caen.daq.v1.CancelScanResponse.scan:type_name -> pet.caen.daq.v1.StaircaseScan
+	46, // 47: pet.caen.daq.v1.CancelScanResponse.snapshot:type_name -> pet.caen.daq.v1.TelemetrySnapshot
+	62, // 48: pet.caen.daq.v1.CancelScanResponse.hold_delay_scan:type_name -> pet.caen.daq.v1.HoldDelayScan
+	4,  // 49: pet.caen.daq.v1.ListScansRequest.scan_type:type_name -> pet.caen.daq.v1.ScanType
+	59, // 50: pet.caen.daq.v1.ListScansResponse.scans:type_name -> pet.caen.daq.v1.ScanSummary
+	60, // 51: pet.caen.daq.v1.GetStaircaseResponse.scan:type_name -> pet.caen.daq.v1.StaircaseScan
+	62, // 52: pet.caen.daq.v1.GetHoldDelayScanResponse.scan:type_name -> pet.caen.daq.v1.HoldDelayScan
+	75, // 53: pet.caen.daq.v1.ScanSummary.started_at:type_name -> google.protobuf.Timestamp
+	75, // 54: pet.caen.daq.v1.ScanSummary.completed_at:type_name -> google.protobuf.Timestamp
+	3,  // 55: pet.caen.daq.v1.ScanSummary.state:type_name -> pet.caen.daq.v1.ScanState
+	69, // 56: pet.caen.daq.v1.ScanSummary.artifact:type_name -> pet.caen.daq.v1.Artifact
+	4,  // 57: pet.caen.daq.v1.ScanSummary.scan_type:type_name -> pet.caen.daq.v1.ScanType
+	59, // 58: pet.caen.daq.v1.StaircaseScan.summary:type_name -> pet.caen.daq.v1.ScanSummary
+	61, // 59: pet.caen.daq.v1.StaircaseScan.points:type_name -> pet.caen.daq.v1.StaircasePoint
+	59, // 60: pet.caen.daq.v1.HoldDelayScan.summary:type_name -> pet.caen.daq.v1.ScanSummary
+	63, // 61: pet.caen.daq.v1.HoldDelayScan.points:type_name -> pet.caen.daq.v1.HoldDelayPoint
+	64, // 62: pet.caen.daq.v1.HoldDelayPoint.channels:type_name -> pet.caen.daq.v1.HoldDelayChannelHistogram
+	67, // 63: pet.caen.daq.v1.StatisticsTelemetry.boards:type_name -> pet.caen.daq.v1.BoardStatistics
+	75, // 64: pet.caen.daq.v1.RunSummary.started_at:type_name -> google.protobuf.Timestamp
+	75, // 65: pet.caen.daq.v1.RunSummary.completed_at:type_name -> google.protobuf.Timestamp
+	69, // 66: pet.caen.daq.v1.RunSummary.artifacts:type_name -> pet.caen.daq.v1.Artifact
+	66, // 67: pet.caen.daq.v1.RunSummary.final_statistics:type_name -> pet.caen.daq.v1.StatisticsTelemetry
+	6,  // 68: pet.caen.daq.v1.RunSummary.run_type:type_name -> pet.caen.daq.v1.RunType
+	7,  // 69: pet.caen.daq.v1.Chain.health:type_name -> pet.caen.daq.v1.HealthStatus
+	71, // 70: pet.caen.daq.v1.Chain.boards:type_name -> pet.caen.daq.v1.Board
+	7,  // 71: pet.caen.daq.v1.Board.health:type_name -> pet.caen.daq.v1.HealthStatus
+	75, // 72: pet.caen.daq.v1.Board.telemetry_observed_at:type_name -> google.protobuf.Timestamp
+	7,  // 73: pet.caen.daq.v1.StorageTelemetry.health:type_name -> pet.caen.daq.v1.HealthStatus
+	8,  // 74: pet.caen.daq.v1.Diagnostic.severity:type_name -> pet.caen.daq.v1.DiagnosticSeverity
+	75, // 75: pet.caen.daq.v1.Diagnostic.observed_at:type_name -> google.protobuf.Timestamp
+	9,  // 76: pet.caen.daq.v1.SystemService.GetSystemSnapshot:input_type -> pet.caen.daq.v1.GetSystemSnapshotRequest
+	10, // 77: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:input_type -> pet.caen.daq.v1.GetConfigurationTemplateRequest
+	13, // 78: pet.caen.daq.v1.SystemService.ValidateConfiguration:input_type -> pet.caen.daq.v1.ValidateConfigurationRequest
+	16, // 79: pet.caen.daq.v1.SystemService.StreamTelemetry:input_type -> pet.caen.daq.v1.StreamTelemetryRequest
+	18, // 80: pet.caen.daq.v1.SystemService.ConnectHardware:input_type -> pet.caen.daq.v1.ConnectHardwareRequest
+	20, // 81: pet.caen.daq.v1.SystemService.DisconnectHardware:input_type -> pet.caen.daq.v1.DisconnectHardwareRequest
+	22, // 82: pet.caen.daq.v1.SystemService.SetHighVoltage:input_type -> pet.caen.daq.v1.SetHighVoltageRequest
+	24, // 83: pet.caen.daq.v1.RunService.StartRun:input_type -> pet.caen.daq.v1.StartRunRequest
+	26, // 84: pet.caen.daq.v1.RunService.StopRun:input_type -> pet.caen.daq.v1.StopRunRequest
+	28, // 85: pet.caen.daq.v1.RunService.ListRuns:input_type -> pet.caen.daq.v1.ListRunsRequest
+	30, // 86: pet.caen.daq.v1.RunService.SearchRuns:input_type -> pet.caen.daq.v1.SearchRunsRequest
+	32, // 87: pet.caen.daq.v1.RunService.GetRunConfiguration:input_type -> pet.caen.daq.v1.GetRunConfigurationRequest
+	40, // 88: pet.caen.daq.v1.RunService.DownloadArtifact:input_type -> pet.caen.daq.v1.DownloadArtifactRequest
+	42, // 89: pet.caen.daq.v1.RunService.GetHistograms:input_type -> pet.caen.daq.v1.GetHistogramsRequest
+	47, // 90: pet.caen.daq.v1.ScanService.StartStaircase:input_type -> pet.caen.daq.v1.StartStaircaseRequest
+	49, // 91: pet.caen.daq.v1.ScanService.StartHoldDelayScan:input_type -> pet.caen.daq.v1.StartHoldDelayScanRequest
+	51, // 92: pet.caen.daq.v1.ScanService.CancelScan:input_type -> pet.caen.daq.v1.CancelScanRequest
+	53, // 93: pet.caen.daq.v1.ScanService.ListScans:input_type -> pet.caen.daq.v1.ListScansRequest
+	55, // 94: pet.caen.daq.v1.ScanService.GetStaircase:input_type -> pet.caen.daq.v1.GetStaircaseRequest
+	57, // 95: pet.caen.daq.v1.ScanService.GetHoldDelayScan:input_type -> pet.caen.daq.v1.GetHoldDelayScanRequest
+	12, // 96: pet.caen.daq.v1.SystemService.GetSystemSnapshot:output_type -> pet.caen.daq.v1.GetSystemSnapshotResponse
+	11, // 97: pet.caen.daq.v1.SystemService.GetConfigurationTemplate:output_type -> pet.caen.daq.v1.GetConfigurationTemplateResponse
+	14, // 98: pet.caen.daq.v1.SystemService.ValidateConfiguration:output_type -> pet.caen.daq.v1.ValidateConfigurationResponse
+	17, // 99: pet.caen.daq.v1.SystemService.StreamTelemetry:output_type -> pet.caen.daq.v1.StreamTelemetryResponse
+	19, // 100: pet.caen.daq.v1.SystemService.ConnectHardware:output_type -> pet.caen.daq.v1.ConnectHardwareResponse
+	21, // 101: pet.caen.daq.v1.SystemService.DisconnectHardware:output_type -> pet.caen.daq.v1.DisconnectHardwareResponse
+	23, // 102: pet.caen.daq.v1.SystemService.SetHighVoltage:output_type -> pet.caen.daq.v1.SetHighVoltageResponse
+	25, // 103: pet.caen.daq.v1.RunService.StartRun:output_type -> pet.caen.daq.v1.StartRunResponse
+	27, // 104: pet.caen.daq.v1.RunService.StopRun:output_type -> pet.caen.daq.v1.StopRunResponse
+	29, // 105: pet.caen.daq.v1.RunService.ListRuns:output_type -> pet.caen.daq.v1.ListRunsResponse
+	31, // 106: pet.caen.daq.v1.RunService.SearchRuns:output_type -> pet.caen.daq.v1.SearchRunsResponse
+	33, // 107: pet.caen.daq.v1.RunService.GetRunConfiguration:output_type -> pet.caen.daq.v1.GetRunConfigurationResponse
+	41, // 108: pet.caen.daq.v1.RunService.DownloadArtifact:output_type -> pet.caen.daq.v1.DownloadArtifactResponse
+	44, // 109: pet.caen.daq.v1.RunService.GetHistograms:output_type -> pet.caen.daq.v1.GetHistogramsResponse
+	48, // 110: pet.caen.daq.v1.ScanService.StartStaircase:output_type -> pet.caen.daq.v1.StartStaircaseResponse
+	50, // 111: pet.caen.daq.v1.ScanService.StartHoldDelayScan:output_type -> pet.caen.daq.v1.StartHoldDelayScanResponse
+	52, // 112: pet.caen.daq.v1.ScanService.CancelScan:output_type -> pet.caen.daq.v1.CancelScanResponse
+	54, // 113: pet.caen.daq.v1.ScanService.ListScans:output_type -> pet.caen.daq.v1.ListScansResponse
+	56, // 114: pet.caen.daq.v1.ScanService.GetStaircase:output_type -> pet.caen.daq.v1.GetStaircaseResponse
+	58, // 115: pet.caen.daq.v1.ScanService.GetHoldDelayScan:output_type -> pet.caen.daq.v1.GetHoldDelayScanResponse
+	96, // [96:116] is the sub-list for method output_type
+	76, // [76:96] is the sub-list for method input_type
+	76, // [76:76] is the sub-list for extension type_name
+	76, // [76:76] is the sub-list for extension extendee
+	0,  // [0:76] is the sub-list for field type_name
 }
 
 func init() { file_pet_caen_daq_v1_system_proto_init() }
@@ -5128,14 +5739,14 @@ func file_pet_caen_daq_v1_system_proto_init() {
 	}
 	file_pet_caen_daq_v1_system_proto_msgTypes[28].OneofWrappers = []any{}
 	file_pet_caen_daq_v1_system_proto_msgTypes[29].OneofWrappers = []any{}
-	file_pet_caen_daq_v1_system_proto_msgTypes[42].OneofWrappers = []any{}
+	file_pet_caen_daq_v1_system_proto_msgTypes[44].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pet_caen_daq_v1_system_proto_rawDesc), len(file_pet_caen_daq_v1_system_proto_rawDesc)),
-			NumEnums:      8,
-			NumMessages:   59,
+			NumEnums:      9,
+			NumMessages:   66,
 			NumExtensions: 0,
 			NumServices:   3,
 		},

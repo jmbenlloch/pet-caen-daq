@@ -66,6 +66,15 @@ func discriminatorMask(board *Board, lowReg, highReg dt5202.Register) (uint64, b
 
 func pulseEnergy(board *Board, channel uint8, sequence uint64, low bool) uint16 {
 	base := uint32(100 + sequence)
+	// Make spectroscopy spectra move with the programmed hold delay. This gives
+	// hold-delay scans a deterministic rising edge and plateau in simulation.
+	if delay, configured := board.Registers[uint32(dt5202.HoldDelay)]; configured {
+		rise := delay
+		if rise > 24 {
+			rise = 24
+		}
+		base += rise * 20
+	}
 	gainBase := dt5202.HighGain
 	calibration := board.Pedestal.HighGain[channel]
 	if low {

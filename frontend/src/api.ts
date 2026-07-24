@@ -16,7 +16,10 @@ import {
   type SearchRunsRequest,
   type SearchRunsResponse,
   type StaircaseScan,
+  type HoldDelayScan,
   type ScanSummary,
+  type ScanType,
+  type StartHoldDelayScanRequest,
   type StartStaircaseRequest,
 } from './gen/pet/caen/daq/v1/system_pb'
 
@@ -44,9 +47,11 @@ export interface DaqApi {
     selections: HistogramSelection[],
   ): Promise<HistogramDataset[]>
   startStaircase(request: StartStaircaseRequest): Promise<StaircaseScan | undefined>
+  startHoldDelay(request: StartHoldDelayScanRequest): Promise<HoldDelayScan | undefined>
   cancelScan(scanId: string, requestedBy: string): Promise<StaircaseScan | undefined>
-  listScans(limit?: number, offset?: number, board?: number): Promise<ScanHistoryPage>
+  listScans(limit?: number, offset?: number, board?: number, scanType?: ScanType): Promise<ScanHistoryPage>
   staircase(scanId: string): Promise<StaircaseScan | undefined>
+  holdDelay(scanId: string): Promise<HoldDelayScan | undefined>
 }
 
 export interface RunCommandResult {
@@ -134,14 +139,20 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     async startStaircase(request) {
       return (await scans.startStaircase(request)).scan
     },
+    async startHoldDelay(request) {
+      return (await scans.startHoldDelayScan(request)).scan
+    },
     async cancelScan(scanId, requestedBy) {
       return (await scans.cancelScan({ scanId, requestedBy })).scan
     },
-    async listScans(limit = 50, offset = 0, board) {
-      return await scans.listScans({ limit, offset, board })
+    async listScans(limit = 50, offset = 0, board, scanType) {
+      return await scans.listScans({ limit, offset, board, scanType })
     },
     async staircase(scanId) {
       return (await scans.getStaircase({ scanId })).scan
+    },
+    async holdDelay(scanId) {
+      return (await scans.getHoldDelayScan({ scanId })).scan
     },
   }
 }

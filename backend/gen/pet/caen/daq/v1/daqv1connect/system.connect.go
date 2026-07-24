@@ -78,6 +78,9 @@ const (
 	// ScanServiceStartStaircaseProcedure is the fully-qualified name of the ScanService's
 	// StartStaircase RPC.
 	ScanServiceStartStaircaseProcedure = "/pet.caen.daq.v1.ScanService/StartStaircase"
+	// ScanServiceStartHoldDelayScanProcedure is the fully-qualified name of the ScanService's
+	// StartHoldDelayScan RPC.
+	ScanServiceStartHoldDelayScanProcedure = "/pet.caen.daq.v1.ScanService/StartHoldDelayScan"
 	// ScanServiceCancelScanProcedure is the fully-qualified name of the ScanService's CancelScan RPC.
 	ScanServiceCancelScanProcedure = "/pet.caen.daq.v1.ScanService/CancelScan"
 	// ScanServiceListScansProcedure is the fully-qualified name of the ScanService's ListScans RPC.
@@ -85,6 +88,9 @@ const (
 	// ScanServiceGetStaircaseProcedure is the fully-qualified name of the ScanService's GetStaircase
 	// RPC.
 	ScanServiceGetStaircaseProcedure = "/pet.caen.daq.v1.ScanService/GetStaircase"
+	// ScanServiceGetHoldDelayScanProcedure is the fully-qualified name of the ScanService's
+	// GetHoldDelayScan RPC.
+	ScanServiceGetHoldDelayScanProcedure = "/pet.caen.daq.v1.ScanService/GetHoldDelayScan"
 )
 
 // SystemServiceClient is a client for the pet.caen.daq.v1.SystemService service.
@@ -542,9 +548,11 @@ func (UnimplementedRunServiceHandler) GetHistograms(context.Context, *connect.Re
 // ScanServiceClient is a client for the pet.caen.daq.v1.ScanService service.
 type ScanServiceClient interface {
 	StartStaircase(context.Context, *connect.Request[v1.StartStaircaseRequest]) (*connect.Response[v1.StartStaircaseResponse], error)
+	StartHoldDelayScan(context.Context, *connect.Request[v1.StartHoldDelayScanRequest]) (*connect.Response[v1.StartHoldDelayScanResponse], error)
 	CancelScan(context.Context, *connect.Request[v1.CancelScanRequest]) (*connect.Response[v1.CancelScanResponse], error)
 	ListScans(context.Context, *connect.Request[v1.ListScansRequest]) (*connect.Response[v1.ListScansResponse], error)
 	GetStaircase(context.Context, *connect.Request[v1.GetStaircaseRequest]) (*connect.Response[v1.GetStaircaseResponse], error)
+	GetHoldDelayScan(context.Context, *connect.Request[v1.GetHoldDelayScanRequest]) (*connect.Response[v1.GetHoldDelayScanResponse], error)
 }
 
 // NewScanServiceClient constructs a client for the pet.caen.daq.v1.ScanService service. By default,
@@ -562,6 +570,12 @@ func NewScanServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			httpClient,
 			baseURL+ScanServiceStartStaircaseProcedure,
 			connect.WithSchema(scanServiceMethods.ByName("StartStaircase")),
+			connect.WithClientOptions(opts...),
+		),
+		startHoldDelayScan: connect.NewClient[v1.StartHoldDelayScanRequest, v1.StartHoldDelayScanResponse](
+			httpClient,
+			baseURL+ScanServiceStartHoldDelayScanProcedure,
+			connect.WithSchema(scanServiceMethods.ByName("StartHoldDelayScan")),
 			connect.WithClientOptions(opts...),
 		),
 		cancelScan: connect.NewClient[v1.CancelScanRequest, v1.CancelScanResponse](
@@ -582,20 +596,33 @@ func NewScanServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(scanServiceMethods.ByName("GetStaircase")),
 			connect.WithClientOptions(opts...),
 		),
+		getHoldDelayScan: connect.NewClient[v1.GetHoldDelayScanRequest, v1.GetHoldDelayScanResponse](
+			httpClient,
+			baseURL+ScanServiceGetHoldDelayScanProcedure,
+			connect.WithSchema(scanServiceMethods.ByName("GetHoldDelayScan")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // scanServiceClient implements ScanServiceClient.
 type scanServiceClient struct {
-	startStaircase *connect.Client[v1.StartStaircaseRequest, v1.StartStaircaseResponse]
-	cancelScan     *connect.Client[v1.CancelScanRequest, v1.CancelScanResponse]
-	listScans      *connect.Client[v1.ListScansRequest, v1.ListScansResponse]
-	getStaircase   *connect.Client[v1.GetStaircaseRequest, v1.GetStaircaseResponse]
+	startStaircase     *connect.Client[v1.StartStaircaseRequest, v1.StartStaircaseResponse]
+	startHoldDelayScan *connect.Client[v1.StartHoldDelayScanRequest, v1.StartHoldDelayScanResponse]
+	cancelScan         *connect.Client[v1.CancelScanRequest, v1.CancelScanResponse]
+	listScans          *connect.Client[v1.ListScansRequest, v1.ListScansResponse]
+	getStaircase       *connect.Client[v1.GetStaircaseRequest, v1.GetStaircaseResponse]
+	getHoldDelayScan   *connect.Client[v1.GetHoldDelayScanRequest, v1.GetHoldDelayScanResponse]
 }
 
 // StartStaircase calls pet.caen.daq.v1.ScanService.StartStaircase.
 func (c *scanServiceClient) StartStaircase(ctx context.Context, req *connect.Request[v1.StartStaircaseRequest]) (*connect.Response[v1.StartStaircaseResponse], error) {
 	return c.startStaircase.CallUnary(ctx, req)
+}
+
+// StartHoldDelayScan calls pet.caen.daq.v1.ScanService.StartHoldDelayScan.
+func (c *scanServiceClient) StartHoldDelayScan(ctx context.Context, req *connect.Request[v1.StartHoldDelayScanRequest]) (*connect.Response[v1.StartHoldDelayScanResponse], error) {
+	return c.startHoldDelayScan.CallUnary(ctx, req)
 }
 
 // CancelScan calls pet.caen.daq.v1.ScanService.CancelScan.
@@ -613,12 +640,19 @@ func (c *scanServiceClient) GetStaircase(ctx context.Context, req *connect.Reque
 	return c.getStaircase.CallUnary(ctx, req)
 }
 
+// GetHoldDelayScan calls pet.caen.daq.v1.ScanService.GetHoldDelayScan.
+func (c *scanServiceClient) GetHoldDelayScan(ctx context.Context, req *connect.Request[v1.GetHoldDelayScanRequest]) (*connect.Response[v1.GetHoldDelayScanResponse], error) {
+	return c.getHoldDelayScan.CallUnary(ctx, req)
+}
+
 // ScanServiceHandler is an implementation of the pet.caen.daq.v1.ScanService service.
 type ScanServiceHandler interface {
 	StartStaircase(context.Context, *connect.Request[v1.StartStaircaseRequest]) (*connect.Response[v1.StartStaircaseResponse], error)
+	StartHoldDelayScan(context.Context, *connect.Request[v1.StartHoldDelayScanRequest]) (*connect.Response[v1.StartHoldDelayScanResponse], error)
 	CancelScan(context.Context, *connect.Request[v1.CancelScanRequest]) (*connect.Response[v1.CancelScanResponse], error)
 	ListScans(context.Context, *connect.Request[v1.ListScansRequest]) (*connect.Response[v1.ListScansResponse], error)
 	GetStaircase(context.Context, *connect.Request[v1.GetStaircaseRequest]) (*connect.Response[v1.GetStaircaseResponse], error)
+	GetHoldDelayScan(context.Context, *connect.Request[v1.GetHoldDelayScanRequest]) (*connect.Response[v1.GetHoldDelayScanResponse], error)
 }
 
 // NewScanServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -632,6 +666,12 @@ func NewScanServiceHandler(svc ScanServiceHandler, opts ...connect.HandlerOption
 		ScanServiceStartStaircaseProcedure,
 		svc.StartStaircase,
 		connect.WithSchema(scanServiceMethods.ByName("StartStaircase")),
+		connect.WithHandlerOptions(opts...),
+	)
+	scanServiceStartHoldDelayScanHandler := connect.NewUnaryHandler(
+		ScanServiceStartHoldDelayScanProcedure,
+		svc.StartHoldDelayScan,
+		connect.WithSchema(scanServiceMethods.ByName("StartHoldDelayScan")),
 		connect.WithHandlerOptions(opts...),
 	)
 	scanServiceCancelScanHandler := connect.NewUnaryHandler(
@@ -652,16 +692,26 @@ func NewScanServiceHandler(svc ScanServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(scanServiceMethods.ByName("GetStaircase")),
 		connect.WithHandlerOptions(opts...),
 	)
+	scanServiceGetHoldDelayScanHandler := connect.NewUnaryHandler(
+		ScanServiceGetHoldDelayScanProcedure,
+		svc.GetHoldDelayScan,
+		connect.WithSchema(scanServiceMethods.ByName("GetHoldDelayScan")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/pet.caen.daq.v1.ScanService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ScanServiceStartStaircaseProcedure:
 			scanServiceStartStaircaseHandler.ServeHTTP(w, r)
+		case ScanServiceStartHoldDelayScanProcedure:
+			scanServiceStartHoldDelayScanHandler.ServeHTTP(w, r)
 		case ScanServiceCancelScanProcedure:
 			scanServiceCancelScanHandler.ServeHTTP(w, r)
 		case ScanServiceListScansProcedure:
 			scanServiceListScansHandler.ServeHTTP(w, r)
 		case ScanServiceGetStaircaseProcedure:
 			scanServiceGetStaircaseHandler.ServeHTTP(w, r)
+		case ScanServiceGetHoldDelayScanProcedure:
+			scanServiceGetHoldDelayScanHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -675,6 +725,10 @@ func (UnimplementedScanServiceHandler) StartStaircase(context.Context, *connect.
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.StartStaircase is not implemented"))
 }
 
+func (UnimplementedScanServiceHandler) StartHoldDelayScan(context.Context, *connect.Request[v1.StartHoldDelayScanRequest]) (*connect.Response[v1.StartHoldDelayScanResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.StartHoldDelayScan is not implemented"))
+}
+
 func (UnimplementedScanServiceHandler) CancelScan(context.Context, *connect.Request[v1.CancelScanRequest]) (*connect.Response[v1.CancelScanResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.CancelScan is not implemented"))
 }
@@ -685,4 +739,8 @@ func (UnimplementedScanServiceHandler) ListScans(context.Context, *connect.Reque
 
 func (UnimplementedScanServiceHandler) GetStaircase(context.Context, *connect.Request[v1.GetStaircaseRequest]) (*connect.Response[v1.GetStaircaseResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.GetStaircase is not implemented"))
+}
+
+func (UnimplementedScanServiceHandler) GetHoldDelayScan(context.Context, *connect.Request[v1.GetHoldDelayScanRequest]) (*connect.Response[v1.GetHoldDelayScanResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.GetHoldDelayScan is not implemented"))
 }

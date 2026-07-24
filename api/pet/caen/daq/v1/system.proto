@@ -34,9 +34,11 @@ service RunService {
 // cannot overlap run control, configuration, or other scans.
 service ScanService {
   rpc StartStaircase(StartStaircaseRequest) returns (StartStaircaseResponse) {}
+  rpc StartHoldDelayScan(StartHoldDelayScanRequest) returns (StartHoldDelayScanResponse) {}
   rpc CancelScan(CancelScanRequest) returns (CancelScanResponse) {}
   rpc ListScans(ListScansRequest) returns (ListScansResponse) {}
   rpc GetStaircase(GetStaircaseRequest) returns (GetStaircaseResponse) {}
+  rpc GetHoldDelayScan(GetHoldDelayScanRequest) returns (GetHoldDelayScanResponse) {}
 }
 
 message GetSystemSnapshotRequest {}
@@ -302,6 +304,7 @@ message TelemetrySnapshot {
   Concentrator concentrator = 12;
   StaircaseScan current_staircase = 13;
   ScanSummary latest_completed_scan = 14;
+  HoldDelayScan current_hold_delay_scan = 15;
 }
 
 message StartStaircaseRequest {
@@ -318,6 +321,21 @@ message StartStaircaseResponse {
   TelemetrySnapshot snapshot = 2;
 }
 
+message StartHoldDelayScanRequest {
+  uint32 board = 1;
+  uint32 minimum_delay_ns = 2;
+  uint32 maximum_delay_ns = 3;
+  uint32 step_ns = 4;
+  uint32 events_per_delay = 5;
+  uint32 point_timeout_seconds = 6;
+  string requested_by = 7;
+}
+
+message StartHoldDelayScanResponse {
+  HoldDelayScan scan = 1;
+  TelemetrySnapshot snapshot = 2;
+}
+
 message CancelScanRequest {
   string scan_id = 1;
   string requested_by = 2;
@@ -326,12 +344,14 @@ message CancelScanRequest {
 message CancelScanResponse {
   StaircaseScan scan = 1;
   TelemetrySnapshot snapshot = 2;
+  HoldDelayScan hold_delay_scan = 3;
 }
 
 message ListScansRequest {
   uint32 limit = 1;
   uint32 offset = 2;
   optional uint32 board = 3;
+  ScanType scan_type = 4;
 }
 
 message ListScansResponse {
@@ -345,6 +365,14 @@ message GetStaircaseRequest {
 
 message GetStaircaseResponse {
   StaircaseScan scan = 1;
+}
+
+message GetHoldDelayScanRequest {
+  string scan_id = 1;
+}
+
+message GetHoldDelayScanResponse {
+  HoldDelayScan scan = 1;
 }
 
 enum ScanState {
@@ -367,6 +395,13 @@ message ScanSummary {
   uint32 completed_points = 7;
   uint32 total_points = 8;
   Artifact artifact = 9;
+  ScanType scan_type = 10;
+}
+
+enum ScanType {
+  SCAN_TYPE_UNSPECIFIED = 0;
+  SCAN_TYPE_STAIRCASE = 1;
+  SCAN_TYPE_HOLD_DELAY = 2;
 }
 
 message StaircaseScan {
@@ -389,6 +424,30 @@ message StaircasePoint {
   uint64 q_or_count = 6;
   double t_or_rate_cps = 7;
   double q_or_rate_cps = 8;
+}
+
+message HoldDelayScan {
+  ScanSummary summary = 1;
+  uint32 minimum_delay_ns = 2;
+  uint32 maximum_delay_ns = 3;
+  uint32 step_ns = 4;
+  uint32 events_per_delay = 5;
+  uint32 point_timeout_seconds = 6;
+  repeated HoldDelayPoint points = 7;
+}
+
+message HoldDelayPoint {
+  uint32 delay_ns = 1;
+  uint32 effective_delay_ns = 2;
+  uint32 events_collected = 3;
+  uint64 elapsed_nanoseconds = 4;
+  repeated HoldDelayChannelHistogram channels = 5;
+}
+
+message HoldDelayChannelHistogram {
+  uint32 channel = 1;
+  repeated uint32 high_gain_bins = 2;
+  uint32 missing_events = 3;
 }
 
 message Concentrator {
@@ -463,6 +522,7 @@ enum RunType {
   RUN_TYPE_UNSPECIFIED = 0;
   RUN_TYPE_DATA = 1;
   RUN_TYPE_STAIRCASE = 2;
+  RUN_TYPE_HOLD_DELAY_SCAN = 3;
 }
 
 message Artifact {

@@ -145,7 +145,12 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		Controller: runtime, Telemetry: publisher, HardwareMetadata: runtime, RunParent: *runParent,
 		Configure: runtime.Configure,
 	}
-	scanService := &service.ScanService{Controller: runtime, Telemetry: publisher, ScanParent: *runParent}
+	scanService := &service.ScanService{
+		Controller:          runtime,
+		HoldDelayController: runtime,
+		Telemetry:           publisher,
+		ScanParent:          *runParent,
+	}
 	if catalog != nil {
 		runService.Catalog = catalog
 		runService.AllocateRunID = catalog.AllocateRunID

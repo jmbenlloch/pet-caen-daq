@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +13,8 @@ import (
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1/daqv1connect"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelaystore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircase"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircasestore"
 	"google.golang.org/protobuf/proto"
@@ -23,12 +26,18 @@ type StaircaseController interface {
 	StateSnapshot() acquisition.StateSnapshot
 }
 
+type HoldDelayController interface {
+	RunHoldDelay(context.Context, holddelay.Request, string, func(holddelay.Point) error) (bool, error)
+	StateSnapshot() acquisition.StateSnapshot
+}
+
 type ScanService struct {
 	daqv1connect.UnimplementedScanServiceHandler
-	Controller StaircaseController
-	Telemetry  SnapshotPublisher
-	ScanParent string
-	Now        func() time.Time
+	Controller          StaircaseController
+	HoldDelayController HoldDelayController
+	Telemetry           SnapshotPublisher
+	ScanParent          string
+	Now                 func() time.Time
 	// AllocateRunID shares the acquisition run catalog's monotonically
 	// increasing identity sequence with diagnostic scans.
 	AllocateRunID func(context.Context) (string, error)
@@ -38,9 +47,10 @@ type ScanService struct {
 }
 
 type activeScan struct {
-	id     string
-	cancel context.CancelFunc
-	scan   *daqv1.StaircaseScan
+	id        string
+	cancel    context.CancelFunc
+	scan      *daqv1.StaircaseScan
+	holdDelay *daqv1.HoldDelayScan
 }
 
 func (s *ScanService) StartStaircase(ctx context.Context, request *connect.Request[daqv1.StartStaircaseRequest]) (*connect.Response[daqv1.StartStaircaseResponse], error) {
@@ -156,7 +166,10 @@ func (s *ScanService) CancelScan(_ context.Context, request *connect.Request[daq
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("active scan not found"))
 	}
 	s.active.cancel()
-	return connect.NewResponse(&daqv1.CancelScanResponse{Scan: cloneScan(s.active.scan), Snapshot: s.Telemetry.Snapshot()}), nil
+	return connect.NewResponse(&daqv1.CancelScanResponse{
+		Scan: cloneScan(s.active.scan), HoldDelayScan: cloneHoldDelayScan(s.active.holdDelay),
+		Snapshot: s.Telemetry.Snapshot(),
+	}), nil
 }
 
 func (s *ScanService) ListScans(_ context.Context, request *connect.Request[daqv1.ListScansRequest]) (*connect.Response[daqv1.ListScansResponse], error) {
@@ -173,14 +186,42 @@ func (s *ScanService) ListScans(_ context.Context, request *connect.Request[daqv
 		value := request.Msg.GetBoard()
 		board = &value
 	}
-	manifests, total, err := staircasestore.ListPage(s.ScanParent, limit, offset, board)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+	var summaries []*daqv1.ScanSummary
+	if request.Msg.GetScanType() == daqv1.ScanType_SCAN_TYPE_UNSPECIFIED || request.Msg.GetScanType() == daqv1.ScanType_SCAN_TYPE_STAIRCASE {
+		manifests, err := staircasestore.List(s.ScanParent, 0)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		for _, manifest := range manifests {
+			if board == nil || manifest.Board == *board {
+				summaries = append(summaries, protoSummary(manifest))
+			}
+		}
 	}
-	response := &daqv1.ListScansResponse{TotalCount: uint32(total)}
-	for _, manifest := range manifests {
-		response.Scans = append(response.Scans, protoSummary(manifest))
+	if request.Msg.GetScanType() == daqv1.ScanType_SCAN_TYPE_UNSPECIFIED || request.Msg.GetScanType() == daqv1.ScanType_SCAN_TYPE_HOLD_DELAY {
+		manifests, err := holddelaystore.List(s.ScanParent, 0)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		for _, manifest := range manifests {
+			if board == nil || manifest.Board == *board {
+				summaries = append(summaries, protoHoldDelaySummary(manifest))
+			}
+		}
 	}
+	sort.Slice(summaries, func(i, j int) bool {
+		return summaries[i].GetStartedAt().AsTime().After(summaries[j].GetStartedAt().AsTime())
+	})
+	total := len(summaries)
+	if offset >= total {
+		summaries = nil
+	} else {
+		summaries = summaries[offset:]
+	}
+	if len(summaries) > limit {
+		summaries = summaries[:limit]
+	}
+	response := &daqv1.ListScansResponse{TotalCount: uint32(total), Scans: summaries}
 	return connect.NewResponse(response), nil
 }
 
@@ -263,6 +304,7 @@ func protoSummary(manifest staircasestore.Manifest) *daqv1.ScanSummary {
 		ScanId: manifest.ScanID, Board: manifest.Board, StartedAt: timestamppb.New(started),
 		CompletedAt: timestamppb.New(completed), State: state, TerminationReason: manifest.TerminationReason,
 		CompletedPoints: manifest.CompletedPoints, TotalPoints: manifest.Request.PointCount(),
+		ScanType: daqv1.ScanType_SCAN_TYPE_STAIRCASE,
 	}
 	if manifest.Artifact != nil {
 		summary.Artifact = &daqv1.Artifact{
