@@ -151,8 +151,18 @@ const kindLabel = computed(
         <header>
           <strong>Board {{ board.chain }} · node {{ board.node }}</strong>
           <span>
-            <button type="button" @click="selectBoard(board.chain, board.node, true)">All</button>
-            <button type="button" @click="selectBoard(board.chain, board.node, false)">
+            <button
+              type="button"
+              class="secondary"
+              @click="selectBoard(board.chain, board.node, true)"
+            >
+              All
+            </button>
+            <button
+              type="button"
+              class="secondary"
+              @click="selectBoard(board.chain, board.node, false)"
+            >
               Clear
             </button>
           </span>
