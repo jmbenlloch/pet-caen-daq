@@ -6,9 +6,15 @@ import (
 	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 )
 
-const ChannelCount = 64
+const (
+	ChannelCount      = 64
+	prepareSettle     = 100 * time.Millisecond
+	citirocLoadSettle = 20 * time.Millisecond
+	counterReadMargin = 200 * time.Millisecond
+)
 
 type Hardware interface {
 	WriteRegister(context.Context, uint16, uint16, uint32, uint32) error
@@ -85,6 +91,9 @@ func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Req
 			return fmt.Errorf("prepare register %#08x: %w", write.Address, err)
 		}
 	}
+	if err := wait(ctx, prepareSettle); err != nil {
+		return err
+	}
 	for threshold := request.Maximum; ; {
 		if err := scanPoint(ctx, hardware, chain, node, request, threshold, observe); err != nil {
 			return err
@@ -107,18 +116,21 @@ func scanPoint(ctx context.Context, hardware Hardware, chain, node uint16, reque
 		if err := hardware.WriteRegister(ctx, chain, node, uint32(dt5202.CitirocSlowControl), chip); err != nil {
 			return fmt.Errorf("threshold %d select Citiroc: %w", threshold, err)
 		}
-		if err := hardware.SendCommand(ctx, chain, node, uint32(dt5202.CommandConfigureASIC), 0); err != nil {
+		if err := hardware.SendCommand(ctx, chain, node, uint32(dt5202.CommandConfigureASIC), dt5215.TDLCommandDelay); err != nil {
 			return fmt.Errorf("threshold %d configure Citiroc: %w", threshold, err)
+		}
+		if err := wait(ctx, citirocLoadSettle); err != nil {
+			return err
 		}
 	}
 	if err := hardware.WriteRegister(ctx, chain, node, uint32(dt5202.TriggerMask), 0x20); err != nil {
 		return fmt.Errorf("threshold %d enable periodic trigger: %w", threshold, err)
 	}
 	started := time.Now()
-	if err := hardware.SendCommand(ctx, chain, node, uint32(dt5202.CommandResetPeriodicTrigger), 0); err != nil {
+	if err := hardware.SendCommand(ctx, chain, node, uint32(dt5202.CommandResetPeriodicTrigger), dt5215.TDLCommandDelay); err != nil {
 		return fmt.Errorf("threshold %d reset periodic trigger: %w", threshold, err)
 	}
-	timer := time.NewTimer(request.Dwell + 200*time.Millisecond)
+	timer := time.NewTimer(request.Dwell + counterReadMargin)
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
@@ -145,6 +157,17 @@ func scanPoint(ctx context.Context, hardware Hardware, chain, node uint16, reque
 		point.ChannelRatesCPS[channel] = float64(count) / seconds
 	}
 	return observe(point)
+}
+
+func wait(ctx context.Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func readCounter(ctx context.Context, hardware Hardware, chain, node uint16, register dt5202.Register) (uint32, error) {

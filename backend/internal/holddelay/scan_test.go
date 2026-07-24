@@ -14,6 +14,7 @@ type fakeHardware struct {
 	registers    map[uint32]uint32
 	events       []dt5215.StreamEvent
 	commands     []uint32
+	delays       []uint32
 	synchronized bool
 }
 
@@ -24,8 +25,9 @@ func (f *fakeHardware) WriteRegister(_ context.Context, _, _ uint16, address, va
 func (f *fakeHardware) ReadRegister(_ context.Context, _, _ uint16, address uint32) (uint32, error) {
 	return f.registers[address], nil
 }
-func (f *fakeHardware) SendCommand(_ context.Context, _, _ uint16, command, _ uint32) error {
+func (f *fakeHardware) SendCommand(_ context.Context, _, _ uint16, command, delay uint32) error {
 	f.commands = append(f.commands, command)
+	f.delays = append(f.delays, delay)
 	return nil
 }
 func (f *fakeHardware) Synchronize(context.Context) error {
@@ -82,6 +84,11 @@ func TestRunCollectsHighGainDistributionsAtEveryDelay(t *testing.T) {
 	}
 	if len(hardware.commands) != 4 || hardware.commands[0] != dt5215.CommandAcquisitionStart || hardware.commands[1] != dt5215.CommandAcquisitionStop {
 		t.Fatalf("commands = %v", hardware.commands)
+	}
+	for index, delay := range hardware.delays {
+		if delay != dt5215.TDLCommandDelay {
+			t.Fatalf("command %d delay = %d, want %d", index, delay, dt5215.TDLCommandDelay)
+		}
 	}
 	if !hardware.synchronized {
 		t.Fatal("hold-delay scan did not synchronize before acquisition")
