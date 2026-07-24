@@ -68,11 +68,28 @@ function channelValue(board: DeepReadonly<BoardStatistics>, channel: number) {
   return compact(value)
 }
 
-function boardRate(board: DeepReadonly<BoardStatistics>, field: 'triggerCount' | 'dataBytes') {
+function boardRate(
+  board: DeepReadonly<BoardStatistics>,
+  field: 'triggerCount' | 'dataBytes' | 'tOrCount',
+) {
   const seconds = elapsedSeconds()
   if (seconds <= 0) return '—'
   const value = difference(board[field], prior(board)?.[field])
   return field === 'dataBytes' ? `${bytes(value)}/s` : `${(Number(value) / seconds).toFixed(1)} Hz`
+}
+
+function timestampSeconds(timestamp: bigint) {
+  return `${(Number(timestamp) * 8e-9).toFixed(3)} s`
+}
+
+function lostTriggerCount(board: DeepReadonly<BoardStatistics>) {
+  return difference(board.lostTriggerCount, prior(board)?.lostTriggerCount)
+}
+
+function lostTriggerPercent(board: DeepReadonly<BoardStatistics>) {
+  const lost = lostTriggerCount(board)
+  const received = difference(board.triggerCount, prior(board)?.triggerCount)
+  return percent(lost, received + lost)
 }
 
 function percent(numerator: bigint, denominator: bigint) {
@@ -166,24 +183,20 @@ const metricLabel = computed(
             <th>Board</th>
             <th>Timestamp</th>
             <th>Trigger ID</th>
-            <th>Trigger rate</th>
-            <th>Lost trigger</th>
-            <th>Event build</th>
-            <th>Data rate</th>
+            <th>Received event rate</th>
+            <th>Estimated lost triggers</th>
+            <th>T-OR rate</th>
+            <th>Decoded payload rate</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="board in boards" :key="`${board.chain}-${board.node}`">
             <th>B{{ board.chain }}</th>
-            <td>{{ compact(board.timestamp) }}</td>
+            <td>{{ timestampSeconds(board.timestamp) }}</td>
             <td>{{ compact(board.triggerId) }}</td>
             <td>{{ boardRate(board, 'triggerCount') }}</td>
-            <td>
-              {{ percent(board.lostTriggerCount, board.triggerCount + board.lostTriggerCount) }}
-            </td>
-            <td>
-              {{ percent(board.eventBuildCount, board.eventBuildCount + board.lostTriggerCount) }}
-            </td>
+            <td>{{ compact(lostTriggerCount(board)) }} · {{ lostTriggerPercent(board) }}</td>
+            <td>{{ boardRate(board, 'tOrCount') }}</td>
             <td>{{ boardRate(board, 'dataBytes') }}</td>
           </tr>
           <tr v-if="!boards.length">

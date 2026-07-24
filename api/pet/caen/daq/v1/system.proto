@@ -259,15 +259,22 @@ message StatisticsTelemetry {
 message BoardStatistics {
   uint32 chain = 1;
   uint32 node = 2;
+  // DT5202 event timestamp in source-confirmed 8 ns clock ticks.
   uint64 timestamp = 3;
   uint64 trigger_id = 4;
+  // Number of received, decoded non-service events.
   uint64 trigger_count = 5;
+  // Estimate derived from forward gaps in event trigger IDs.
   uint64 lost_trigger_count = 6;
-  uint64 event_build_count = 7;
+  reserved 7;
+  reserved "event_build_count";
+  // Decoded event payload bytes, excluding transport and descriptor overhead.
   uint64 data_bytes = 8;
   repeated uint64 channel_trigger_counts = 9;
   repeated uint64 timestamp_counts = 10;
   repeated uint64 pha_counts = 11;
+  // Sum of T-OR interval counters reported by counting and service events.
+  uint64 t_or_count = 12;
 }
 
 enum SystemState {

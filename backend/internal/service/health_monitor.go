@@ -137,7 +137,7 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 				snapshot.Statistics.Boards = append(snapshot.Statistics.Boards, &daqv1.BoardStatistics{
 					Chain: observationChain(observation), Node: uint32(observation.Node), Timestamp: observation.Timestamp,
 					TriggerId: observation.TriggerID, TriggerCount: observation.TriggerCount, LostTriggerCount: observation.LostTriggerCount,
-					EventBuildCount: observation.EventBuildCount, DataBytes: observation.DataBytes,
+					DataBytes: observation.DataBytes, TOrCount: observation.TORCount,
 					ChannelTriggerCounts: observation.ChannelTriggerCount[:], TimestampCounts: observation.TimestampCount[:], PhaCounts: observation.PHACount[:],
 				})
 			}
