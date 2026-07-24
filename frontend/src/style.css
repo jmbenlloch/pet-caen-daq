@@ -700,6 +700,110 @@ select:focus {
   display: flex;
   gap: 8px;
 }
+.hv-global-actions button {
+  min-width: 126px;
+  min-height: 42px;
+  padding: 10px 16px;
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  box-shadow: 0 5px 14px rgb(2 8 19 / 22%);
+}
+.hv-global-actions .primary {
+  border-color: #59ddb6;
+}
+.hv-global-actions .primary:hover:not(:disabled) {
+  background: #55d9b2;
+}
+.hv-global-actions .danger {
+  margin-left: 0;
+}
+.hv-monitor {
+  min-width: 190px;
+  padding-left: 24px;
+  border-left: 1px solid #30425a;
+}
+.hv-monitor-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #7f93ac;
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.hv-monitor-summary strong {
+  letter-spacing: 0;
+}
+.hv-led {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border: 1px solid #526172;
+  border-radius: 50%;
+  background: #526172;
+  box-shadow:
+    inset 0 0 0 3px rgb(9 20 33 / 55%),
+    0 0 0 2px rgb(82 97 114 / 12%);
+}
+.on .hv-led {
+  border-color: #75ebc3;
+  background: #42d5a5;
+  box-shadow:
+    inset 0 0 0 2px rgb(225 255 245 / 35%),
+    0 0 9px rgb(66 213 165 / 70%);
+}
+.ramping .hv-led {
+  border-color: #ffd98f;
+  background: #efb85b;
+  box-shadow:
+    inset 0 0 0 2px rgb(255 246 211 / 35%),
+    0 0 9px rgb(239 184 91 / 70%);
+}
+.fault .hv-led {
+  border-color: #ff9ca4;
+  background: #ff6b75;
+  box-shadow:
+    inset 0 0 0 2px rgb(255 226 229 / 35%),
+    0 0 9px rgb(255 107 117 / 70%);
+}
+.hv-monitor-summary .on {
+  color: #72dcb9;
+}
+.hv-monitor-summary .ramping {
+  color: #f7cb83;
+}
+.hv-monitor-summary .fault {
+  color: #ff9a9a;
+}
+.hv-monitor-summary .off {
+  color: #8294a8;
+}
+.hv-led-strip {
+  display: flex;
+  gap: 11px;
+  margin-top: 9px;
+}
+.hv-board-led {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #8294a8;
+  font-size: 0.62rem;
+  font-weight: 750;
+}
+.hv-unavailable {
+  display: block;
+  margin-top: 8px;
+  color: #71859d;
+  font-size: 0.65rem;
+}
 .hv-state {
   display: flex;
   align-items: center;
@@ -885,6 +989,16 @@ textarea {
   color: #ffc4c4;
   background: #3a1d28;
   border-color: #6d3040 !important;
+}
+.board-card > button {
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 .issues {
   padding: 0;
@@ -1347,6 +1461,21 @@ textarea {
   background: linear-gradient(145deg, #ffffff, #f7f9fc);
   box-shadow: 0 14px 42px #47627b18;
 }
+[data-theme='light'] .danger {
+  color: #9d263c;
+  border-color: #dba5af !important;
+  background: #fbe9ed;
+}
+[data-theme='light'] .danger:hover:not(:disabled) {
+  color: #7e172a;
+  border-color: #c97888 !important;
+  background: #f7d9df;
+}
+[data-theme='light'] .secondary {
+  color: #344c66;
+  border-color: #b8c7d8 !important;
+  background: #e8eef5;
+}
 [data-theme='light'] .eyebrow,
 [data-theme='light'] .muted,
 [data-theme='light'] .connection small,
@@ -1470,6 +1599,18 @@ textarea {
 }
 [data-theme='light'] .health-pill {
   background: #e5ebf2;
+}
+[data-theme='light'] .hv-monitor {
+  border-color: #c8d5e3;
+}
+[data-theme='light'] .hv-monitor-summary .on {
+  color: #087054;
+}
+[data-theme='light'] .hv-monitor-summary .ramping {
+  color: #80580b;
+}
+[data-theme='light'] .hv-monitor-summary .fault {
+  color: #a92e43;
 }
 [data-theme='light'] .health-pill.healthy,
 [data-theme='light'] .hv-state.on,
@@ -1598,6 +1739,12 @@ textarea {
   }
 }
 @media (max-width: 620px) {
+  .hv-global-actions {
+    width: 100%;
+  }
+  .hv-global-actions button {
+    flex: 1;
+  }
   .workspace-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1637,6 +1784,15 @@ textarea {
     padding: 0 0 12px;
     border-right: 0;
     border-bottom: 1px solid #30425a;
+  }
+  .hv-monitor {
+    width: 100%;
+    padding: 12px 0 0;
+    border-top: 1px solid #30425a;
+    border-left: 0;
+  }
+  [data-theme='light'] .hv-monitor {
+    border-top-color: #cbd7e5;
   }
   [data-theme='light'] .product-identity {
     border-bottom-color: #cbd7e5;

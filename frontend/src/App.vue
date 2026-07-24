@@ -5,6 +5,7 @@ import defaultConfiguration from '../../test/fixtures/janus/config_same4_v3_good
 import { createDaqApi, type DaqApi } from './api'
 import BoardOverrides from './BoardOverrides.vue'
 import ChannelOverrides from './ChannelOverrides.vue'
+import HvStatusPanel from './HvStatusPanel.vue'
 import MaskEditor from './MaskEditor.vue'
 import NumericField from './NumericField.vue'
 import PlotWorkspace from './PlotWorkspace.vue'
@@ -547,6 +548,7 @@ onMounted(() => daq.connect())
               {{ enabledLinkLabel }}
             </p>
           </div>
+          <HvStatusPanel :boards="boards" />
         </div>
         <div class="hero-control">
           <div class="system-utilities">
@@ -1296,7 +1298,7 @@ onMounted(() => daq.connect())
           <div class="hv-global-actions">
             <button
               type="button"
-              class="secondary"
+              class="primary"
               :disabled="!daq.canSwitchHV.value"
               @click="daq.setHighVoltage([], true)"
             >

@@ -25,6 +25,10 @@ type Board struct {
 	CitirocLoads     [2]uint32
 	HVRegisters      map[uint32]uint32
 	hvSelector       uint32
+	hvRampStartedAt  time.Time
+	hvRampFrom       uint32
+	hvRampTo         uint32
+	hvTargetOn       bool
 	CommonPedestal   uint16
 	Pedestal         dt5202.PedestalCalibration
 	protectedFlash   map[uint16][]byte
@@ -34,7 +38,12 @@ type Board struct {
 type Topology struct {
 	Chains       [dt5215.MaxChains][]Board
 	LinkStatuses [dt5215.MaxChains]uint16
+	// HVRampDuration controls simulated A7585 ramp-up and ramp-down time.
+	// Zero selects DefaultHVRampDuration.
+	HVRampDuration time.Duration
 }
+
+const DefaultHVRampDuration = 2 * time.Second
 
 // ProductionTopology returns deterministic equivalents of the four production
 // boards, one on each of chains 0-3.
@@ -64,18 +73,20 @@ func ProductionTopology() Topology {
 }
 
 type Server struct {
-	control       net.Listener
-	stream        net.Listener
-	topology      Topology
-	done          chan struct{}
-	wg            sync.WaitGroup
-	once          sync.Once
-	mu            sync.Mutex
-	synchronized  bool
-	streamData    chan streamItem
-	eventSequence uint64
-	periodicOnce  sync.Once
-	faults        []Fault
+	control        net.Listener
+	stream         net.Listener
+	topology       Topology
+	done           chan struct{}
+	wg             sync.WaitGroup
+	once           sync.Once
+	mu             sync.Mutex
+	synchronized   bool
+	streamData     chan streamItem
+	eventSequence  uint64
+	periodicOnce   sync.Once
+	faults         []Fault
+	hvRampDuration time.Duration
+	now            func() time.Time
 }
 
 func Start(controlAddress, streamAddress string, topology Topology) (*Server, error) {
@@ -88,7 +99,15 @@ func Start(controlAddress, streamAddress string, topology Topology) (*Server, er
 		control.Close()
 		return nil, fmt.Errorf("listen stream: %w", err)
 	}
-	server := &Server{control: control, stream: stream, topology: topology, done: make(chan struct{}), streamData: make(chan streamItem, 16)}
+	hvRampDuration := topology.HVRampDuration
+	if hvRampDuration <= 0 {
+		hvRampDuration = DefaultHVRampDuration
+	}
+	server := &Server{
+		control: control, stream: stream, topology: topology,
+		done: make(chan struct{}), streamData: make(chan streamItem, 16),
+		hvRampDuration: hvRampDuration, now: time.Now,
+	}
 	server.wg.Add(2)
 	go server.acceptControl()
 	go server.acceptStream()
@@ -164,6 +183,7 @@ func (s *Server) BoardSnapshot(chain, node int) (Board, error) {
 		return Board{}, fmt.Errorf("invalid board %d:%d", chain, node)
 	}
 	board := s.topology.Chains[chain][node]
+	board.updateHVRamp(s.now(), s.hvRampDuration)
 	board.Registers = make(map[uint32]uint32, len(s.topology.Chains[chain][node].Registers))
 	for address, value := range s.topology.Chains[chain][node].Registers {
 		board.Registers[address] = value
@@ -478,6 +498,7 @@ func (s *Server) handleReadRegister(connection net.Conn) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	board := &s.topology.Chains[chain][node]
+	board.updateHVRamp(s.now(), s.hvRampDuration)
 	var value uint32
 	switch address {
 	case dt5215.RegisterProductID:
@@ -536,14 +557,8 @@ func (s *Server) handleWriteRegister(connection net.Conn) error {
 		}
 		board.HVRegisters[board.hvSelector] = value
 		if board.hvSelector == 0x200 {
-			status := board.Registers[uint32(dt5202.HVStatus)] &^ (uint32(1) << 26)
-			if value != 0 {
-				status |= 1 << 26
-				board.Registers[uint32(dt5202.HVVoltageMonitor)] = board.HVRegisters[0x102]
-			} else {
-				board.Registers[uint32(dt5202.HVVoltageMonitor)] = 0
-			}
-			board.Registers[uint32(dt5202.HVStatus)] = status
+			board.updateHVRamp(s.now(), s.hvRampDuration)
+			board.beginHVRamp(value != 0, s.now(), s.hvRampDuration)
 		}
 	}
 	return writeStatus(connection, 0)
@@ -621,6 +636,10 @@ func (s *Server) handleCommand(connection net.Conn) error {
 			board.CitirocLoads = [2]uint32{}
 			board.HVRegisters = make(map[uint32]uint32)
 			board.hvSelector = 0
+			board.hvRampStartedAt = time.Time{}
+			board.hvRampFrom = 0
+			board.hvRampTo = 0
+			board.hvTargetOn = false
 			board.spi = flashReadState{}
 		case dt5215.CommandTestPulse:
 			if !dt5202.Status(board.Status).Has(dt5202.StatusRunning) {
@@ -671,6 +690,56 @@ func monitorRegisters() map[uint32]uint32 {
 		uint32(dt5202.BoardTemperature): 100,
 		uint32(dt5202.HVStatus):         1000 | 1200<<13,
 	}
+}
+
+func (b *Board) beginHVRamp(enabled bool, now time.Time, duration time.Duration) {
+	target := uint32(0)
+	if enabled {
+		target = b.HVRegisters[0x102]
+	}
+	current := b.Registers[uint32(dt5202.HVVoltageMonitor)]
+	b.hvTargetOn = enabled
+	if current == target || duration <= 0 {
+		b.finishHVRamp(enabled, target)
+		return
+	}
+	b.hvRampStartedAt = now
+	b.hvRampFrom = current
+	b.hvRampTo = target
+	status := b.Registers[uint32(dt5202.HVStatus)] | 1<<27
+	// The A7585 ON bit remains asserted while ramping down and is asserted
+	// immediately while ramping up.
+	status |= 1 << 26
+	b.Registers[uint32(dt5202.HVStatus)] = status
+}
+
+func (b *Board) updateHVRamp(now time.Time, duration time.Duration) {
+	if b.hvRampStartedAt.IsZero() {
+		return
+	}
+	elapsed := now.Sub(b.hvRampStartedAt)
+	if elapsed >= duration {
+		b.finishHVRamp(b.hvTargetOn, b.hvRampTo)
+		return
+	}
+	if elapsed <= 0 {
+		return
+	}
+	delta := int64(b.hvRampTo) - int64(b.hvRampFrom)
+	voltage := int64(b.hvRampFrom) + delta*elapsed.Nanoseconds()/duration.Nanoseconds()
+	b.Registers[uint32(dt5202.HVVoltageMonitor)] = uint32(voltage)
+}
+
+func (b *Board) finishHVRamp(enabled bool, voltage uint32) {
+	status := b.Registers[uint32(dt5202.HVStatus)] &^ (uint32(1)<<26 | uint32(1)<<27)
+	if enabled {
+		status |= 1 << 26
+	}
+	b.Registers[uint32(dt5202.HVStatus)] = status
+	b.Registers[uint32(dt5202.HVVoltageMonitor)] = voltage
+	b.hvRampStartedAt = time.Time{}
+	b.hvRampFrom = voltage
+	b.hvRampTo = voltage
 }
 
 func writeStatus(w io.Writer, status uint32) error {
