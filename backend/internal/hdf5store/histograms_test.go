@@ -12,6 +12,7 @@ import (
 )
 
 func TestSaveHistogramsWritesIndependentUint32Artifact(t *testing.T) {
+	t.Setenv(CompressionEnvironment, "")
 	path := filepath.Join(t.TempDir(), "histograms.h5")
 	input := []runstore.HistogramDataset{{
 		Kind: "toa", Chain: 1, Node: 2, Channel: 3,
@@ -37,6 +38,20 @@ func TestSaveHistogramsWritesIndependentUint32Artifact(t *testing.T) {
 	}
 	if got[0] != 4 || got[2] != 6 {
 		t.Fatalf("bins = %v", got)
+	}
+	if compression, err := histogramCompressionName(); err != nil || compression != CompressionBloscLZ4 {
+		t.Fatalf("histogram compression = %q, %v", compression, err)
+	}
+}
+
+func TestHistogramCompressionCanBeExplicitlyDisabled(t *testing.T) {
+	t.Setenv(CompressionEnvironment, CompressionNone)
+	compression, err := histogramCompressionName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if compression != CompressionNone {
+		t.Fatalf("histogram compression = %q", compression)
 	}
 }
 

@@ -350,7 +350,7 @@ describe('operator dashboard', () => {
     const segmentSize = wrapper.get('input[aria-label="HDF5 file size in MiB"]')
     expect(segmentSize.element).toHaveProperty('value', '500')
     await segmentSize.setValue('128')
-    await wrapper.get('#persist-histograms').setValue(true)
+    expect(wrapper.get<HTMLInputElement>('#persist-histograms').element.checked).toBe(true)
     await wrapper.get('button.primary').trigger('click')
     await flushPromises()
 

@@ -57,7 +57,7 @@ const configuration = computed({
 })
 const captureRaw = ref(false)
 const journalTransport = ref(false)
-const persistHistograms = ref(false)
+const persistHistograms = ref(true)
 const hdf5SegmentSizeMb = ref(500)
 const configFile = ref<HTMLInputElement>()
 type WorkspaceTab = 'acquisition' | 'statistics' | 'plots' | 'scans' | 'hardware' | 'runs'

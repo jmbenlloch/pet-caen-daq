@@ -20,8 +20,18 @@ var registerBloscOnce sync.Once
 var registerBloscErr error
 
 func compressionName() (string, error) {
+	return compressionNameWithDefault(CompressionNone)
+}
+
+func histogramCompressionName() (string, error) {
+	return compressionNameWithDefault(CompressionBloscLZ4)
+}
+
+func compressionNameWithDefault(defaultName string) (string, error) {
 	switch value := os.Getenv(CompressionEnvironment); value {
-	case "", CompressionNone:
+	case "":
+		return defaultName, nil
+	case CompressionNone:
 		return CompressionNone, nil
 	case CompressionBloscLZ4:
 		return value, nil
@@ -32,6 +42,15 @@ func compressionName() (string, error) {
 
 func configureCompression(properties *hdf5.PropList) error {
 	name, err := compressionName()
+	return configureNamedCompression(properties, name, err)
+}
+
+func configureHistogramCompression(properties *hdf5.PropList) error {
+	name, err := histogramCompressionName()
+	return configureNamedCompression(properties, name, err)
+}
+
+func configureNamedCompression(properties *hdf5.PropList, name string, err error) error {
 	if err != nil {
 		return err
 	}
