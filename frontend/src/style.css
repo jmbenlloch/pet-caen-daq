@@ -1645,6 +1645,18 @@ textarea {
 .statistics-title {
   align-items: center;
 }
+.statistics-source {
+  display: grid;
+  gap: 6px;
+  min-width: min(22rem, 45vw);
+}
+.statistics-source label {
+  color: #8194ac;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 .statistics-board-tabs,
 .statistics-summary {
   display: flex;

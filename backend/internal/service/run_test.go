@@ -45,6 +45,12 @@ func (p *serviceHealthPipeline) Stats() runpipeline.StorageStats {
 func (*serviceHealthPipeline) Artifacts() []runstore.Artifact {
 	return []runstore.Artifact{{Kind: "decoded_events", Name: "events.jsonl", SizeBytes: 123, SHA256: "abc"}}
 }
+func (*serviceHealthPipeline) FinalStatistics() runstore.RunStatistics {
+	return runstore.RunStatistics{
+		ElapsedMilliseconds: 12_000,
+		Boards:              []runstore.BoardStatistics{{Chain: 1, Node: 2, TriggerCount: 7}},
+	}
+}
 
 func (c *fakeRunController) Start(_ context.Context, runID, _ string, options acquisition.RunOptions) error {
 	if c.startErr != nil {
@@ -108,6 +114,11 @@ func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
 	}
 	if len(stop.Msg.Run.Artifacts) != 1 || stop.Msg.Run.Artifacts[0].GetName() != "events.jsonl" || stop.Msg.Run.Artifacts[0].GetSizeBytes() != 123 || stop.Msg.Run.Artifacts[0].GetSha256() != "abc" {
 		t.Fatalf("artifacts = %+v", stop.Msg.Run.Artifacts)
+	}
+	if stop.Msg.Run.GetFinalStatistics().GetElapsedMilliseconds() != 12_000 ||
+		stop.Msg.Run.GetFinalStatistics().GetBoards()[0].GetTriggerCount() != 7 ||
+		stop.Msg.Snapshot.GetLatestCompletedRun().GetFinalStatistics().GetBoards()[0].GetChain() != 1 {
+		t.Fatalf("final statistics = %+v", stop.Msg.Run.GetFinalStatistics())
 	}
 }
 

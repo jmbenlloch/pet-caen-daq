@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
@@ -42,6 +43,7 @@ type Manifest struct {
 	ConfigurationIdentity  ConfigurationIdentity      `json:"configuration_identity"`
 	ExecutionIdentity      ExecutionIdentity          `json:"execution_identity"`
 	Concentrator           *dt5215.ConcentratorInfo   `json:"concentrator,omitempty"`
+	Statistics             *RunStatistics             `json:"statistics,omitempty"`
 	Artifacts              []Artifact                 `json:"artifacts,omitempty"`
 }
 
@@ -128,6 +130,50 @@ type HistogramDataset struct {
 	Underflow, Overflow  uint64
 }
 
+type RunStatistics struct {
+	ElapsedMilliseconds uint64            `json:"elapsed_milliseconds,string"`
+	Boards              []BoardStatistics `json:"boards"`
+}
+
+type BoardStatistics struct {
+	Chain                uint8                           `json:"chain"`
+	Node                 uint8                           `json:"node"`
+	Timestamp            uint64                          `json:"timestamp,string"`
+	TriggerID            uint64                          `json:"trigger_id,string"`
+	TriggerCount         uint64                          `json:"trigger_count,string"`
+	LostTriggerCount     uint64                          `json:"lost_trigger_count,string"`
+	DataBytes            uint64                          `json:"data_bytes,string"`
+	ChannelTriggerCounts [dt5202.ChannelCount]JSONUint64 `json:"channel_trigger_counts"`
+	TimestampCounts      [dt5202.ChannelCount]JSONUint64 `json:"timestamp_counts"`
+	PHACounts            [dt5202.ChannelCount]JSONUint64 `json:"pha_counts"`
+	TORCount             uint64                          `json:"t_or_count,string"`
+}
+
+// JSONUint64 preserves the full counter range in manifests that may also be
+// inspected by JavaScript tooling.
+type JSONUint64 uint64
+
+func (value JSONUint64) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.Quote(strconv.FormatUint(uint64(value), 10))), nil
+}
+
+func (value *JSONUint64) UnmarshalJSON(data []byte) error {
+	text := string(data)
+	if len(text) >= 2 && text[0] == '"' && text[len(text)-1] == '"' {
+		unquoted, err := strconv.Unquote(text)
+		if err != nil {
+			return err
+		}
+		text = unquoted
+	}
+	parsed, err := strconv.ParseUint(text, 10, 64)
+	if err != nil {
+		return err
+	}
+	*value = JSONUint64(parsed)
+	return nil
+}
+
 type Envelope struct {
 	SchemaVersion int             `json:"schema_version"`
 	Kind          string          `json:"kind"`
@@ -175,6 +221,22 @@ func (w *Writer) Artifacts() []Artifact { return append([]Artifact(nil), w.manif
 
 func (w *Writer) SaveHistograms([]HistogramDataset) error {
 	return fmt.Errorf("histogram HDF5 persistence requires an HDF5-enabled build")
+}
+func (w *Writer) SaveStatistics(statistics RunStatistics) error {
+	if w.closed {
+		return errors.New("run writer is closed")
+	}
+	if w.manifest.Statistics != nil {
+		return errors.New("run statistics are already saved")
+	}
+	w.manifest.Statistics = cloneStatistics(statistics)
+	return nil
+}
+
+func cloneStatistics(statistics RunStatistics) *RunStatistics {
+	copy := statistics
+	copy.Boards = append([]BoardStatistics(nil), statistics.Boards...)
+	return &copy
 }
 func (w *Writer) EnableTransportJournal() error {
 	if w.closed {

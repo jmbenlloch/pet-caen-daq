@@ -33,7 +33,7 @@ func TestSessionPersistsFinalHistogramSnapshotWhenSelected(t *testing.T) {
 	if err := session.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := session.Finalize("later", "operator_stop"); err != nil {
+	if err := session.Finalize(time.Now().UTC().Format(time.RFC3339Nano), "operator_stop"); err != nil {
 		t.Fatal(err)
 	}
 	manifest, err := runstore.ReadManifest(session.Directory(), "histogram-session")

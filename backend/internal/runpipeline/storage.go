@@ -16,6 +16,7 @@ type runWriter interface {
 	AppendRaw([]byte) error
 	AppendEvent(dt5215.StreamEvent, dt5202.Event) error
 	SaveHistograms([]runstore.HistogramDataset) error
+	SaveStatistics(runstore.RunStatistics) error
 	Finalize(completedAt, reason string) error
 	Abort() error
 }

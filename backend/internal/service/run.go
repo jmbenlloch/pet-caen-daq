@@ -21,6 +21,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1/daqv1connect"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runcatalog"
@@ -378,7 +379,33 @@ func manifestSummary(parent string, manifest runstore.Manifest) *daqv1.RunSummar
 	for _, artifact := range manifest.Artifacts {
 		run.Artifacts = append(run.Artifacts, &daqv1.Artifact{Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256})
 	}
+	run.FinalStatistics = statisticsTelemetry(manifest.Statistics)
 	return run
+}
+
+func statisticsTelemetry(statistics *runstore.RunStatistics) *daqv1.StatisticsTelemetry {
+	if statistics == nil {
+		return nil
+	}
+	result := &daqv1.StatisticsTelemetry{
+		ElapsedMilliseconds: statistics.ElapsedMilliseconds,
+		Boards:              make([]*daqv1.BoardStatistics, 0, len(statistics.Boards)),
+	}
+	for _, board := range statistics.Boards {
+		converted := &daqv1.BoardStatistics{
+			Chain: uint32(board.Chain), Node: uint32(board.Node), Timestamp: board.Timestamp,
+			TriggerId: board.TriggerID, TriggerCount: board.TriggerCount,
+			LostTriggerCount: board.LostTriggerCount, DataBytes: board.DataBytes,
+			TOrCount: board.TORCount,
+		}
+		for channel := range dt5202.ChannelCount {
+			converted.ChannelTriggerCounts = append(converted.ChannelTriggerCounts, uint64(board.ChannelTriggerCounts[channel]))
+			converted.TimestampCounts = append(converted.TimestampCounts, uint64(board.TimestampCounts[channel]))
+			converted.PhaCounts = append(converted.PhaCounts, uint64(board.PHACounts[channel]))
+		}
+		result.Boards = append(result.Boards, converted)
+	}
+	return result
 }
 
 func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest]) (*connect.Response[daqv1.StartRunResponse], error) {
@@ -531,6 +558,12 @@ func (s *RunService) stopActive(ctx context.Context, runID, requestedBy, reason 
 		for _, artifact := range source.Artifacts() {
 			run.Artifacts = append(run.Artifacts, &daqv1.Artifact{Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256})
 		}
+	}
+	if source, ok := pipeline.(interface {
+		FinalStatistics() runstore.RunStatistics
+	}); ok {
+		statistics := source.FinalStatistics()
+		run.FinalStatistics = statisticsTelemetry(&statistics)
 	}
 	s.reconcileCatalog(ctx)
 	s.mu.Lock()
