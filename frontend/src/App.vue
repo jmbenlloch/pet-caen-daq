@@ -275,6 +275,26 @@ const configuredStopPolicy = computed(() => {
 })
 
 const state = computed(() => stateLabel[daq.snapshot.value?.state ?? 0])
+const hardwareDisconnected = computed(() => daq.snapshot.value?.state === SystemState.DISCONNECTED)
+const hardwareConnecting = computed(() => daq.snapshot.value?.state === SystemState.CONNECTING)
+const hardwareActionLabel = computed(() => {
+  if (hardwareConnecting.value) return 'Connecting hardware…'
+  return hardwareDisconnected.value ? 'Connect hardware' : 'Disconnect hardware'
+})
+const hardwareActionDisabled = computed(() => {
+  if (hardwareConnecting.value) return true
+  return hardwareDisconnected.value
+    ? !daq.canConnectHardware.value
+    : !daq.canDisconnectHardware.value
+})
+
+function toggleHardwareConnection() {
+  if (hardwareDisconnected.value) {
+    void daq.connectHardware()
+  } else {
+    void daq.disconnectHardware()
+  }
+}
 const enabledLinkCount = computed(
   () => daq.snapshot.value?.chains.filter((chain) => chain.enabled).length ?? 0,
 )
@@ -561,22 +581,15 @@ onMounted(() => daq.connect())
               <span>{{ daq.stale.value ? 'Telemetry stale' : 'Live telemetry' }}</span>
               <small>{{ daq.snapshot.value?.instanceId || 'No backend' }}</small>
             </div>
-            <div class="actions hardware-connection-actions">
-              <button
-                type="button"
-                :disabled="!daq.canConnectHardware.value"
-                @click="daq.connectHardware()"
-              >
-                Connect hardware
-              </button>
-              <button
-                type="button"
-                :disabled="!daq.canDisconnectHardware.value"
-                @click="daq.disconnectHardware()"
-              >
-                Disconnect hardware
-              </button>
-            </div>
+            <button
+              type="button"
+              class="hardware-connection-action"
+              :class="{ connect: hardwareDisconnected, disconnect: !hardwareDisconnected }"
+              :disabled="hardwareActionDisabled"
+              @click="toggleHardwareConnection"
+            >
+              {{ hardwareActionLabel }}
+            </button>
           </div>
           <div class="run-control">
             <div v-if="daq.snapshot.value?.currentRun" class="run-now">
