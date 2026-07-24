@@ -39,9 +39,10 @@ type RunOptions struct {
 }
 
 type HistogramOptions struct {
-	EnergyBins int
-	ToABins    int
-	ToTBins    int
+	EnergyBins     int
+	EnergyChannels int
+	ToABins        int
+	ToTBins        int
 }
 
 type PipelineFactory func(runID string, options RunOptions) (RunPipeline, error)

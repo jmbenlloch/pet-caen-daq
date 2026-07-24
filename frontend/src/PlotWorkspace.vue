@@ -23,6 +23,7 @@ const selectorOpen = ref(false)
 const autoRefresh = ref(true)
 const logarithmic = ref(false)
 const selectionError = ref('')
+const selectionLimit = 64
 let timer: number | undefined
 
 watch(
@@ -45,8 +46,16 @@ function selectionKey(chain: number, node: number, channel: number) {
 function toggleSelection(chain: number, node: number, channel: number) {
   const next = new Set(selected.value)
   const key = selectionKey(chain, node, channel)
-  if (next.has(key)) next.delete(key)
-  else next.add(key)
+  if (next.has(key)) {
+    next.delete(key)
+    selectionError.value = ''
+  } else {
+    if (next.size >= selectionLimit) {
+      selectionError.value = `Select no more than ${selectionLimit} channels at a time`
+      return
+    }
+    next.add(key)
+  }
   selected.value = next
 }
 
@@ -54,9 +63,13 @@ function selectBoard(chain: number, node: number, value: boolean) {
   const next = new Set(selected.value)
   for (let channel = 0; channel < 64; channel++) {
     const key = selectionKey(chain, node, channel)
-    if (value) next.add(key)
-    else next.delete(key)
+    if (!value) next.delete(key)
+    else if (next.size < selectionLimit) next.add(key)
   }
+  selectionError.value =
+    value && next.size === selectionLimit
+      ? `Selection is limited to ${selectionLimit} channels; clear another board to choose different channels`
+      : ''
   selected.value = next
 }
 
@@ -64,6 +77,10 @@ function request() {
   if (!props.running) return
   if (!selected.value.size) {
     selectionError.value = 'Select at least one channel'
+    return
+  }
+  if (selected.value.size > selectionLimit) {
+    selectionError.value = `Select no more than ${selectionLimit} channels at a time`
     return
   }
   const selections = [...selected.value]
@@ -80,6 +97,14 @@ function request() {
     }))
   selectionError.value = ''
   emit('request', kind.value, selections)
+}
+
+function populatedBins(dataset: DeepReadonly<HistogramDataset>) {
+  return dataset.bins.reduce((count, value) => count + (value > 0n ? 1 : 0), 0)
+}
+
+function peakCount(dataset: DeepReadonly<HistogramDataset>) {
+  return dataset.bins.reduce((peak, value) => (value > peak ? value : peak), 0n)
 }
 
 function updateTimer() {
@@ -129,7 +154,7 @@ const kindLabel = computed(
           :aria-expanded="selectorOpen"
           @click="selectorOpen = !selectorOpen"
         >
-          {{ selected.size }} selected
+          {{ selected.size }} / {{ selectionLimit }} selected
         </button>
       </label>
       <label class="switch compact-switch"
@@ -138,8 +163,14 @@ const kindLabel = computed(
       <label class="switch compact-switch"
         ><input v-model="logarithmic" type="checkbox" /><span>Log Y</span></label
       >
-      <button type="button" class="secondary" :disabled="!running || loading" @click="request">
-        {{ loading ? 'Loading…' : 'Request data' }}
+      <button
+        type="button"
+        class="secondary"
+        :disabled="!running"
+        :aria-busy="loading"
+        @click="request"
+      >
+        Request data
       </button>
     </div>
     <section v-if="selectorOpen" class="histogram-channel-selector" aria-label="Histogram channels">
@@ -173,6 +204,10 @@ const kindLabel = computed(
             :key="channel - 1"
             type="button"
             :class="{ active: selected.has(selectionKey(board.chain, board.node, channel - 1)) }"
+            :disabled="
+              selected.size >= selectionLimit &&
+              !selected.has(selectionKey(board.chain, board.node, channel - 1))
+            "
             :aria-pressed="selected.has(selectionKey(board.chain, board.node, channel - 1))"
             :aria-label="`Board ${board.chain} node ${board.node} channel ${channel - 1}`"
             @click="toggleSelection(board.chain, board.node, channel - 1)"
@@ -205,8 +240,11 @@ const kindLabel = computed(
           <strong>B{{ dataset.chain }} · CH {{ dataset.channel }}</strong
           ><span>{{ kindLabel }} · {{ dataset.bins.length }} bins</span
           ><span
-            >{{ compact(dataset.entries) }} entries · width
+            >{{ compact(dataset.entries) }} entries · bin width
             {{ dataset.binWidth.toPrecision(4) }}</span
+          ><span
+            >{{ populatedBins(dataset) }} populated bins · peak
+            {{ compact(peakCount(dataset)) }}</span
           ><span v-if="dataset.underflow || dataset.overflow"
             >Underflow {{ compact(dataset.underflow) }} · overflow
             {{ compact(dataset.overflow) }}</span

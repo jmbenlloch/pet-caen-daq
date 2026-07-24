@@ -14,7 +14,7 @@ import (
 )
 
 func parseHistogramOptions(document *janusconfig.Document) (acquisition.HistogramOptions, error) {
-	values := map[string]string{"EHistoNbin": "4K", "ToAHistoNbin": "4K"}
+	values := map[string]string{"EHistoNbin": "4K", "ToAHistoNbin": "4K", "Range_14bit": "0"}
 	for _, assignment := range document.Assignments {
 		if assignment.Index == nil && assignment.Channel == nil {
 			values[assignment.Name] = assignment.Value
@@ -28,7 +28,15 @@ func parseHistogramOptions(document *janusconfig.Document) (acquisition.Histogra
 	if err != nil {
 		return acquisition.HistogramOptions{}, fmt.Errorf("ToAHistoNbin: %w", err)
 	}
-	return acquisition.HistogramOptions{EnergyBins: energy, ToABins: toa, ToTBins: 512}, nil
+	range14, err := strconv.ParseUint(strings.TrimSpace(values["Range_14bit"]), 0, 1)
+	if err != nil {
+		return acquisition.HistogramOptions{}, fmt.Errorf("Range_14bit: must be 0 or 1")
+	}
+	energyChannels := 1 << 13
+	if range14 == 1 {
+		energyChannels = 1 << 14
+	}
+	return acquisition.HistogramOptions{EnergyBins: energy, EnergyChannels: energyChannels, ToABins: toa, ToTBins: 512}, nil
 }
 
 func parseHistogramBins(value string, maximum int) (int, error) {

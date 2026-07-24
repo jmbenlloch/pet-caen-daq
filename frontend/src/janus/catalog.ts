@@ -133,6 +133,7 @@ function parseDefinitions(source: string): JanusParameter[] {
 }
 
 export const excludedJanusParameters = new Set([
+  'Range_14bit',
   'EventBuildingMode',
   'TstampCoincWindow',
   'JobFirstRun',

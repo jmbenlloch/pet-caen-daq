@@ -5,10 +5,11 @@ import { HistogramDatasetSchema } from './gen/pet/caen/daq/v1/system_pb'
 import HistogramPlot from './HistogramPlot.vue'
 
 const setData = vi.hoisted(() => vi.fn())
+const bars = vi.hoisted(() => vi.fn(() => () => null))
 
 vi.mock('uplot', () => {
   class MockPlot {
-    static paths = { stepped: () => () => null }
+    static paths = { bars }
     setData = setData
     setSize = vi.fn()
     destroy = vi.fn()
@@ -30,6 +31,7 @@ describe('HistogramPlot', () => {
       props: { datasets: [dataset], theme: 'dark', logarithmic: false },
     })
 
+    expect(bars).toHaveBeenCalledWith({ size: [0.9, 8, 1] })
     setData.mockClear()
     await wrapper.get('button').trigger('click')
     expect(setData).toHaveBeenCalledWith(

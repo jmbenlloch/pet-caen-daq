@@ -53,14 +53,19 @@ function datasetStructure() {
 function series(): Series[] {
   return [
     {},
-    ...props.datasets.map((dataset, index) => ({
-      label: `B${dataset.chain} · CH ${dataset.channel}`,
-      stroke: colors[index % colors.length],
-      width: 1.5,
-      paths: uPlot.paths.stepped!({ align: 1 }),
-      points: { show: false },
-      value: (_plot: uPlot, value: number | null) => (value == null ? '0' : value.toLocaleString()),
-    })),
+    ...props.datasets.map((dataset, index) => {
+      const color = colors[index % colors.length]
+      return {
+        label: `B${dataset.chain} · CH ${dataset.channel}`,
+        stroke: color,
+        fill: `${color}38`,
+        width: 1,
+        paths: uPlot.paths.bars!({ size: [0.9, 8, 1] }),
+        points: { show: false },
+        value: (_plot: uPlot, value: number | null) =>
+          value == null ? '0' : value.toLocaleString(),
+      }
+    }),
   ]
 }
 
