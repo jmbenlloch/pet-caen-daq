@@ -64,15 +64,14 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await page.getByRole('button', { name: 'Stop and drain' }).click()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await page.getByRole('tab', { name: /Runs/ }).click()
-  await expect(page.getByRole('heading', { name: runId })).toBeVisible()
-  const storedRun = page
-    .getByLabel('Stored runs')
-    .locator('.history-run')
-    .filter({ has: page.getByText(runId, { exact: true }) })
-  await expect(storedRun.getByText(runId, { exact: true })).toBeVisible()
+  const storedRuns = page.getByLabel('Stored runs')
+  await expect(storedRuns.getByRole('button', { name: runId, exact: true })).toBeVisible()
+  await storedRuns.getByRole('button', { name: runId, exact: true }).click()
+  const runDetails = page.getByRole('region', { name: `Details for run ${runId}` })
+  await expect(runDetails).toBeVisible()
 
   const downloadPromise = page.waitForEvent('download')
-  await storedRun.getByRole('button', { name: /events\.jsonl/ }).click()
+  await runDetails.getByRole('button', { name: /events\.jsonl/ }).click()
   const download = await downloadPromise
   expect(download.suggestedFilename()).toBe('events.jsonl')
   expect((await readFile(await download.path())).byteLength).toBeGreaterThan(0)
@@ -109,8 +108,9 @@ test('backend automatically stops runs at time and event presets while manual st
   await page.getByRole('tab', { name: /Runs/ }).click()
   const timedRun = (await page.locator('#completed-heading').textContent())!
   expect(timedRun).toMatch(/^\d+$/)
-  await expect(page.getByRole('heading', { name: timedRun })).toBeVisible()
-  await expect(page.getByText('preset_time', { exact: true })).toBeVisible()
+  const timedRunSummary = page.getByRole('region', { name: timedRun })
+  await expect(timedRunSummary).toBeVisible()
+  await expect(timedRunSummary.getByText('preset_time', { exact: true })).toBeVisible()
 
   await page.getByRole('tab', { name: /Acquisition/ }).click()
   await page
@@ -124,8 +124,9 @@ test('backend automatically stops runs at time and event presets while manual st
   const countedRun = (await completedHeading.textContent())!
   expect(countedRun).toMatch(/^\d+$/)
   expect(Number(countedRun)).toBeGreaterThan(Number(timedRun))
-  await expect(page.getByRole('heading', { name: countedRun })).toBeVisible()
-  await expect(page.getByText('preset_counts', { exact: true })).toBeVisible()
+  const countedRunSummary = page.getByRole('region', { name: countedRun })
+  await expect(countedRunSummary).toBeVisible()
+  await expect(countedRunSummary.getByText('preset_counts', { exact: true })).toBeVisible()
 })
 
 test('operator configures bounded values and channel masks without editing text', async ({

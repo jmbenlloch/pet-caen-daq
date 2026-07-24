@@ -86,7 +86,7 @@ export function useDaq(api: DaqApi) {
 
   async function refreshHistory() {
     try {
-      runHistory.value = await api.listRuns(50)
+      runHistory.value = await api.listRuns(100)
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     }
