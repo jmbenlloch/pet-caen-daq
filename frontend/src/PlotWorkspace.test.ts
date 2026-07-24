@@ -52,16 +52,84 @@ describe('PlotWorkspace', () => {
           channel: 0,
           binWidth: 4,
           entries: 3n,
-          bins: [0n, 3n],
+          bins: [0n, 3n, 0n],
         }),
       ],
     })
     expect(wrapper.get('[aria-label="Histogram datasets"]').text()).toContain('3 entries')
+    expect(wrapper.get('[aria-label="Histogram datasets"]').text()).toContain(
+      '1 populated bins · peak 3',
+    )
     wrapper.get('[aria-label="Live selected-channel histogram plot"]')
     expect(wrapper.text()).not.toContain('First populated bins')
 
     await wrapper.setProps({ running: false })
     expect(wrapper.text()).toContain('Showing the last requested histogram from the completed run.')
     wrapper.get('[aria-label="Live selected-channel histogram plot"]')
+  })
+
+  it('keeps the manual request button stable during automatic refresh', async () => {
+    const wrapper = mount(PlotWorkspace, {
+      props: {
+        boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
+        running: true,
+        loading: false,
+        datasets: [],
+        theme: 'dark',
+      },
+      global: {
+        stubs: {
+          HistogramPlot: { template: '<div />' },
+        },
+      },
+    })
+    const requestButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Request data')!
+
+    await wrapper.setProps({ loading: true })
+
+    expect(requestButton.text()).toBe('Request data')
+    expect(requestButton.attributes('disabled')).toBeUndefined()
+    expect(requestButton.attributes('aria-busy')).toBe('true')
+  })
+
+  it('enforces the 64-channel request limit in the selector', async () => {
+    const wrapper = mount(PlotWorkspace, {
+      props: {
+        boards: [
+          { chain: 0, ...create(BoardSchema, { node: 0 }) },
+          { chain: 1, ...create(BoardSchema, { node: 0 }) },
+        ],
+        running: true,
+        loading: false,
+        datasets: [],
+        theme: 'light',
+      },
+      global: {
+        stubs: {
+          HistogramPlot: { template: '<div />' },
+        },
+      },
+    })
+
+    await wrapper.get('[aria-haspopup="true"]').trigger('click')
+    const allButtons = wrapper
+      .findAll('.histogram-board-selector header button')
+      .filter((button) => button.text() === 'All')
+    await allButtons[0].trigger('click')
+
+    expect(wrapper.get('[aria-haspopup="true"]').text()).toContain('64 / 64 selected')
+    expect(wrapper.get('[role="alert"]').text()).toContain('limited to 64 channels')
+    expect(
+      wrapper.get('[aria-label="Board 1 node 0 channel 0"]').attributes('disabled'),
+    ).toBeDefined()
+
+    await allButtons[1].trigger('click')
+    const requestButton = wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Request data')
+    await requestButton!.trigger('click')
+    expect(wrapper.emitted('request')?.[0]?.[1]).toHaveLength(64)
   })
 })

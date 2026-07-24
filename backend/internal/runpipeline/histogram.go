@@ -43,7 +43,10 @@ type histogramAccumulator struct {
 func histogramSpec(options acquisition.HistogramOptions, kind HistogramKind) (int, float64, float64, error) {
 	switch kind {
 	case HistogramPHAHigh, HistogramPHALow:
-		return options.EnergyBins, 0, float64(dt5202.MaxEnergy+1) / float64(options.EnergyBins), nil
+		if options.EnergyChannels != 1<<13 && options.EnergyChannels != 1<<14 {
+			return 0, 0, 0, fmt.Errorf("unsupported energy range %d", options.EnergyChannels)
+		}
+		return options.EnergyBins, 0, float64(options.EnergyChannels) / float64(options.EnergyBins), nil
 	case HistogramToA:
 		return options.ToABins, 0, float64(uint64(1)<<25) / float64(options.ToABins), nil
 	case HistogramToT:

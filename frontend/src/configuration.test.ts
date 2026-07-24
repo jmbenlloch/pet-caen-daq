@@ -16,6 +16,7 @@ const source = [
   '# ------------------------------------------------------------------------------------------',
   'AcquisitionMode SPECT_TIMING # Acquisition mode. Options: SPECTROSCOPY, SPECT_TIMING, COUNTING',
   'EnableToT 0 # Enable ToT',
+  'Range_14bit 0 # Internal ADC range compatibility setting',
   'EventBuildingMode DISABLED # Event building mode',
   'TstampCoincWindow 0 # Coincidence window',
   'JobFirstRun 1 # First run',
@@ -63,6 +64,7 @@ describe('JANUS configuration editor', () => {
     expect(document.fields[2].options).toEqual(['4.5', '2.5', 'DISABLED'])
     expect(document.fields[3]).toMatchObject({ name: 'TD_CoarseThreshold', index: '2' })
     for (const name of [
+      'Range_14bit',
       'EventBuildingMode',
       'TstampCoincWindow',
       'JobFirstRun',

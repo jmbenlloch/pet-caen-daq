@@ -43,8 +43,13 @@ func TestRunServiceReturnsSelectedActiveHistogramData(t *testing.T) {
 func TestParseHistogramOptionsUsesJANUSBinsAndDisabledMode(t *testing.T) {
 	document, _ := janusconfig.Parse(strings.NewReader("EHistoNbin 8K\nToAHistoNbin DISABLED\n"))
 	options, err := parseHistogramOptions(document)
-	if err != nil || options.EnergyBins != 8192 || options.ToABins != 0 || options.ToTBins != 512 {
+	if err != nil || options.EnergyBins != 8192 || options.EnergyChannels != 8192 || options.ToABins != 0 || options.ToTBins != 512 {
 		t.Fatalf("options=%+v error=%v", options, err)
+	}
+	document, _ = janusconfig.Parse(strings.NewReader("EHistoNbin 4K\nRange_14bit 1\n"))
+	options, err = parseHistogramOptions(document)
+	if err != nil || options.EnergyChannels != 16384 {
+		t.Fatalf("14-bit options=%+v error=%v", options, err)
 	}
 	document, _ = janusconfig.Parse(strings.NewReader("EHistoNbin 300\n"))
 	if _, err := parseHistogramOptions(document); err == nil {

@@ -232,6 +232,14 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 	if err != nil {
 		return ConfigurationPlan{}, err
 	}
+	range14 := uint32(0)
+	if assignment, ok := values["Range_14bit"]; ok {
+		parsed, parseErr := strconv.ParseUint(strings.TrimSpace(assignment.Value), 0, 1)
+		if parseErr != nil {
+			return ConfigurationPlan{}, fmt.Errorf("line %d: Range_14bit must be 0 or 1", assignment.Line)
+		}
+		range14 = uint32(parsed)
+	}
 	// JANUS/FERSlib defaults DT5202 service events to 3: HV monitoring and
 	// counters. Preserve that behavior when older configuration files omit the
 	// setting, while allowing an explicit operator override.
@@ -254,7 +262,7 @@ func PlanProductionConfiguration(doc *janusconfig.Document, board int) (Configur
 		// FERSlib restricts counting mode to the HV service section.
 		serviceEvents &= 1
 	}
-	acqControl := acqMode | tot<<8 | gainSelect<<12 | serviceEvents<<18 | validationMode<<24 | trgID<<26 | countingMode<<27 | cntZS<<30
+	acqControl := acqMode | tot<<8 | gainSelect<<12 | serviceEvents<<18 | range14<<21 | validationMode<<24 | trgID<<26 | countingMode<<27 | cntZS<<30
 
 	mask0, err := u32("ChEnableMask0", 32)
 	if err != nil {

@@ -119,6 +119,35 @@ func TestPlanProductionConfigurationServiceEventModes(t *testing.T) {
 	}
 }
 
+func TestPlanProductionConfigurationProgramsEnergyRange(t *testing.T) {
+	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		setting string
+		want    uint32
+	}{
+		{"", 0},
+		{"Range_14bit 0", 0},
+		{"Range_14bit 1", 1},
+	} {
+		document, parseErr := janusconfig.Parse(strings.NewReader(string(fixture) + "\n" + test.setting + "\n"))
+		if parseErr != nil {
+			t.Fatal(parseErr)
+		}
+		plan, planErr := PlanProductionConfiguration(document, 0)
+		if planErr != nil {
+			t.Fatal(planErr)
+		}
+		for _, write := range plan.Writes {
+			if write.Address == AcquisitionControl && (write.Value>>21)&1 != test.want {
+				t.Fatalf("%q energy-range bit = %d, want %d", test.setting, (write.Value>>21)&1, test.want)
+			}
+		}
+	}
+}
+
 func TestPlanProductionConfigurationAppliesPerChannelOverrides(t *testing.T) {
 	fixture, err := os.ReadFile(filepath.Join("..", "..", "..", "test", "fixtures", "janus", "config_same4_v3_good.txt"))
 	if err != nil {

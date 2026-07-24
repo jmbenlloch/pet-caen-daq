@@ -81,8 +81,12 @@ func pulseEnergy(board *Board, channel uint8, sequence uint64, low bool) uint16 
 	if raw < 0 {
 		return 0
 	}
-	if raw > int64(dt5202.MaxEnergy) {
-		return dt5202.MaxEnergy
+	maximum := uint16((1 << 13) - 1)
+	if board.Registers[uint32(dt5202.AcquisitionControl)]&(1<<21) != 0 {
+		maximum = dt5202.MaxEnergy
+	}
+	if raw > int64(maximum) {
+		return maximum
 	}
 	return uint16(raw)
 }

@@ -18,11 +18,13 @@ the first qualifying hit, so quiet channels cost no bin storage.
 ## Data and concurrency model
 
 Each accumulator stores fixed minimum/bin-width metadata, unsigned 64-bit bins,
-entries, underflow, and overflow. PHA maps the 14-bit ADC domain into the
-configured energy bins. ToA maps the decoded 25-bit domain into its configured
-bins, and ToT maps the 9-bit domain exactly. Updates share the session's event
-accounting lock. Requests copy selected arrays while holding that lock, so API
-responses cannot alias or race live acquisition memory.
+entries, underflow, and overflow. PHA maps the configured ADC domain into the
+energy bins: `Range_14bit 0` uses the default 13-bit range (0–8191), while
+`Range_14bit 1` uses the full 14-bit range (0–16383). ToA maps the decoded
+25-bit domain into its configured bins, and ToT maps the 9-bit domain exactly.
+Updates share the session's event accounting lock. Requests copy selected arrays
+while holding that lock, so API responses cannot alias or race live acquisition
+memory.
 
 The endpoint accepts only the active run identity and validates histogram kind,
 hardware coordinates, and a maximum of 64 datasets. A completed run's histogram
@@ -34,10 +36,10 @@ queries are a later milestone.
 The plot workspace selects a family, board, and comma/range channel expression
 (for example `0, 2, 8-15`). It can request on demand or once per second. Stale
 responses from older selections/runs are discarded. uPlot renders selected
-channels as stepped overlays with cursor inspection, horizontal drag-to-zoom,
+channels as bar overlays with cursor inspection, horizontal drag-to-zoom,
 linear/logarithmic Y scales, responsive sizing, and both application themes.
-One-second data updates preserve the operator's current zoom. Metadata and a
-short populated-bin preview remain available beside the canvas.
+One-second data updates preserve the operator's current zoom. Metadata reports
+the bin width, populated-bin count, and peak count beside the canvas.
 
 ## Next extensions
 

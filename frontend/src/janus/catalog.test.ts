@@ -6,6 +6,7 @@ describe('JANUS 5202 5.0.0 parameter catalog', () => {
     expect(janusParameters).toHaveLength(73)
     expect(new Set(janusParameters.map((parameter) => parameter.name)).size).toBe(73)
     for (const name of [
+      'Range_14bit',
       'EventBuildingMode',
       'TstampCoincWindow',
       'JobFirstRun',

@@ -9,7 +9,7 @@ import (
 
 func TestHistogramAccumulatorStoresSelectedChannelSpectra(t *testing.T) {
 	sink := &sink{
-		histogramOptions: acquisition.HistogramOptions{EnergyBins: 256, ToABins: 256, ToTBins: 512},
+		histogramOptions: acquisition.HistogramOptions{EnergyBins: 256, EnergyChannels: 16384, ToABins: 256, ToTBins: 512},
 		histograms:       make(map[histogramKey]*histogramAccumulator),
 		boards:           make(map[boardKey]BoardStats),
 	}
@@ -46,5 +46,22 @@ func TestHistogramAccumulatorRejectsDisabledAndInvalidSelections(t *testing.T) {
 	sink.histogramOptions.EnergyBins = 256
 	if _, err := sink.Histograms(HistogramPHAHigh, []HistogramSelection{{Channel: 64}}); err == nil {
 		t.Fatal("accepted channel 64")
+	}
+}
+
+func TestHistogramSpecUsesConfiguredEnergyRange(t *testing.T) {
+	for _, test := range []struct {
+		channels int
+		width    float64
+	}{
+		{1 << 13, 2},
+		{1 << 14, 4},
+	} {
+		_, _, width, err := histogramSpec(acquisition.HistogramOptions{
+			EnergyBins: 4096, EnergyChannels: test.channels,
+		}, HistogramPHAHigh)
+		if err != nil || width != test.width {
+			t.Fatalf("%d-channel energy width = %v, %v; want %v", test.channels, width, err, test.width)
+		}
 	}
 }

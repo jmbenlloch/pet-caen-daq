@@ -121,6 +121,17 @@ func TestGeneratedSpectroscopyUsesConfigurationAndPedestal(t *testing.T) {
 	}
 }
 
+func TestGeneratedEnergyUsesConfiguredADCRange(t *testing.T) {
+	board := configuredBoard(3|3<<12, 1)
+	if got := pulseEnergy(&board, 0, 20_000, false); got != (1<<13)-1 {
+		t.Fatalf("default 13-bit energy = %d", got)
+	}
+	board.Registers[uint32(dt5202.AcquisitionControl)] |= 1 << 21
+	if got := pulseEnergy(&board, 0, 20_000, false); got != dt5202.MaxEnergy {
+		t.Fatalf("configured 14-bit energy = %d", got)
+	}
+}
+
 func TestGeneratedTimingModesUseEnablesAndThresholds(t *testing.T) {
 	for _, qualifier := range []uint8{dt5202.QualifierTiming, dt5202.QualifierCommonStop} {
 		board := configuredBoard(uint32(qualifier), 1<<4|1<<5)
