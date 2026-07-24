@@ -51,4 +51,29 @@ describe('StaircasePlot', () => {
       true,
     )
   })
+
+  it('updates the data and scale as live staircase points arrive', async () => {
+    const wrapper = mount(StaircasePlot, {
+      props: {
+        points: [create(StaircasePointSchema, { threshold: 500, channelRatesCps: [2] })],
+        seriesKey: 'channel:0',
+        theme: 'light',
+      },
+    })
+
+    await wrapper.setProps({
+      points: [
+        create(StaircasePointSchema, { threshold: 500, channelRatesCps: [2] }),
+        create(StaircasePointSchema, { threshold: 495, channelRatesCps: [2_000] }),
+      ],
+    })
+
+    expect(setData).toHaveBeenCalledWith(
+      [
+        [495, 500],
+        [2_000, 2],
+      ],
+      true,
+    )
+  })
 })
