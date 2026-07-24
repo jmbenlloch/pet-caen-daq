@@ -12,6 +12,7 @@ import PlotWorkspace from './PlotWorkspace.vue'
 import RunHistoryTable from './RunHistoryTable.vue'
 import StatisticsTab from './StatisticsTab.vue'
 import StaircaseWorkspace from './StaircaseWorkspace.vue'
+import HoldDelayWorkspace from './HoldDelayWorkspace.vue'
 import {
   isBooleanField,
   isMaskField,
@@ -1498,6 +1499,12 @@ onMounted(() => daq.connect())
           :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
           :theme="theme"
           :live="daq.snapshot.value?.currentStaircase"
+        />
+        <HoldDelayWorkspace
+          :api="api"
+          :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
+          :theme="theme"
+          :live="daq.snapshot.value?.currentHoldDelayScan"
         />
       </div>
 

@@ -12,6 +12,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/service"
@@ -39,6 +40,7 @@ type hardwareRuntime struct {
 	coordinator   *acquisition.Coordinator
 	configurator  *acquisition.Configurator
 	staircase     *acquisition.StaircaseCoordinator
+	holdDelay     *acquisition.HoldDelayCoordinator
 	hv            *service.NativeHVController
 	monitorCancel context.CancelFunc
 	topology      dt5215.Topology
@@ -129,6 +131,11 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 		r.publishConnectFailure(err)
 		return err
 	}
+	holdDelayCoordinator, err := acquisition.NewHoldDelayCoordinator(states, client, scanTargets)
+	if err != nil {
+		r.publishConnectFailure(err)
+		return err
+	}
 	hv := &service.NativeHVController{Hardware: client, States: states, Publisher: r.publisher, Targets: hvTargets, Authorized: r.authorizeHV}
 	monitorCtx, monitorCancel := context.WithCancel(context.Background())
 	go func() {
@@ -137,7 +144,7 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 		}
 	}()
 	r.mu.Lock()
-	r.client, r.coordinator, r.configurator, r.staircase, r.hv = client, coordinator, configurator, staircaseCoordinator, hv
+	r.client, r.coordinator, r.configurator, r.staircase, r.holdDelay, r.hv = client, coordinator, configurator, staircaseCoordinator, holdDelayCoordinator, hv
 	r.monitorCancel, r.topology = monitorCancel, topology
 	r.mu.Unlock()
 	failed = false
@@ -158,7 +165,7 @@ func (r *hardwareRuntime) Disconnect(_ context.Context, actor string) error {
 		return fmt.Errorf("stop active run %q before disconnecting hardware", runID)
 	}
 	client, cancel := r.client, r.monitorCancel
-	r.client, r.coordinator, r.configurator, r.staircase, r.hv, r.monitorCancel = nil, nil, nil, nil, nil, nil
+	r.client, r.coordinator, r.configurator, r.staircase, r.holdDelay, r.hv, r.monitorCancel = nil, nil, nil, nil, nil, nil, nil
 	r.topology = dt5215.Topology{}
 	r.mu.Unlock()
 	if cancel != nil {
@@ -179,7 +186,7 @@ func (r *hardwareRuntime) Close() error {
 	defer r.opMu.Unlock()
 	r.mu.Lock()
 	client, cancel := r.client, r.monitorCancel
-	r.client, r.coordinator, r.configurator, r.staircase, r.hv, r.monitorCancel = nil, nil, nil, nil, nil, nil
+	r.client, r.coordinator, r.configurator, r.staircase, r.holdDelay, r.hv, r.monitorCancel = nil, nil, nil, nil, nil, nil, nil
 	r.topology = dt5215.Topology{}
 	r.mu.Unlock()
 	if cancel != nil {
@@ -273,7 +280,11 @@ func (r *hardwareRuntime) Configure(ctx context.Context, document *janusconfig.D
 	}
 	result, err := r.configurator.Configure(ctx, document, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: r.authorizeHV})
 	if err == nil && r.staircase != nil {
-		r.staircase.SetTargets(staircaseTargets(targets, result.Plans))
+		scanTargets := staircaseTargets(targets, result.Plans)
+		r.staircase.SetTargets(scanTargets)
+		if r.holdDelay != nil {
+			r.holdDelay.SetTargets(scanTargets)
+		}
 	}
 	return result, err
 }
@@ -285,6 +296,15 @@ func (r *hardwareRuntime) Run(ctx context.Context, request staircase.Request, ac
 		return false, fmt.Errorf("hardware is disconnected")
 	}
 	return r.staircase.Run(ctx, request, actor, observe)
+}
+
+func (r *hardwareRuntime) RunHoldDelay(ctx context.Context, request holddelay.Request, actor string, observe func(holddelay.Point) error) (bool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.holdDelay == nil {
+		return false, fmt.Errorf("hardware is disconnected")
+	}
+	return r.holdDelay.Run(ctx, request, actor, observe)
 }
 
 func staircaseTargets(targets []acquisition.ConfigurationTarget, plans []dt5202.ConfigurationPlan) []acquisition.StaircaseTarget {
