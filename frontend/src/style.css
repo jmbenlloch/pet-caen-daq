@@ -361,10 +361,6 @@ select:focus {
   border-color: #286b5a;
   background: #11342d;
 }
-.parameter-list {
-  max-height: 560px;
-  overflow-y: auto;
-}
 .parameter-row {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(170px, 0.42fr);
