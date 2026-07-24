@@ -1,6 +1,17 @@
 import { expect, test } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
 
+test('operator workspace tabs fit on one desktop row', async ({ page }) => {
+  await page.goto('/')
+  const tabs = page.getByRole('tablist', { name: 'Operator workspace' }).getByRole('tab')
+  await expect(tabs).toHaveCount(6)
+
+  const topEdges = await tabs.evaluateAll((elements) =>
+    elements.map((element) => element.getBoundingClientRect().top),
+  )
+  expect(new Set(topEdges).size).toBe(1)
+})
+
 test('operator selects a persistent light or dark interface theme', async ({ page }) => {
   await page.goto('/')
   const darkBackground = await page
