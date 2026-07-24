@@ -43,6 +43,7 @@ type ConfigurationApplier func(context.Context, *janusconfig.Document, string) (
 type SnapshotPublisher interface {
 	Snapshot() *daqv1.TelemetrySnapshot
 	Publish(*daqv1.TelemetrySnapshot) *daqv1.TelemetrySnapshot
+	Update(func(*daqv1.TelemetrySnapshot)) *daqv1.TelemetrySnapshot
 }
 
 type RunCatalog interface {
@@ -617,10 +618,10 @@ func (s *RunService) stopPresetMonitor() {
 }
 
 func (s *RunService) publish(run *daqv1.RunSummary) *daqv1.TelemetrySnapshot {
-	snapshot := s.Telemetry.Snapshot()
-	snapshot.State = protobufState(s.Controller.StateSnapshot().State)
-	snapshot.CurrentRun = run
-	return s.Telemetry.Publish(snapshot)
+	return s.Telemetry.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		snapshot.State = protobufState(s.Controller.StateSnapshot().State)
+		snapshot.CurrentRun = run
+	})
 }
 
 func (s *RunService) currentRun() *daqv1.RunSummary {

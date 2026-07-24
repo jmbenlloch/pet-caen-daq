@@ -113,35 +113,46 @@ func (c *NativeHVController) refresh(ctx context.Context, targets []HVTarget) {
 	if c.Publisher == nil || c.Hardware == nil {
 		return
 	}
-	snapshot := c.Publisher.Snapshot()
+	type observation struct {
+		target  HVTarget
+		reading dt5202.HVTelemetry
+		err     error
+	}
+	observations := make([]observation, 0, len(targets))
 	for _, target := range targets {
 		reading, err := dt5202.ReadHVTelemetry(ctx, c.Hardware, target.Chain, target.Node)
-		board := findBoard(snapshot, uint32(target.Chain), uint32(target.Node))
-		if board == nil {
-			continue
-		}
-		if err != nil {
-			board.Health = daqv1.HealthStatus_HEALTH_STATUS_DEGRADED
-			continue
-		}
-		board.FpgaTemperatureC = reading.FPGATemperatureC
-		board.BoardTemperatureC = reading.BoardTemperatureC
-		board.DetectorTemperatureC = reading.DetectorTemperatureC
-		board.HvTemperatureC = reading.HVTemperatureC
-		board.HvVoltageV = reading.VoltageV
-		board.HvCurrentA = reading.CurrentA
-		board.HvOn = reading.On
-		board.HvRamping = reading.Ramping
-		board.HvOverCurrent = reading.OverCurrent
-		board.HvOverVoltage = reading.OverVoltage
-		board.TelemetryObservedAt = timestamppb.New(c.now())
-		if reading.OverCurrent || reading.OverVoltage {
-			board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
-		} else {
-			board.Health = daqv1.HealthStatus_HEALTH_STATUS_OK
-		}
+		observations = append(observations, observation{target: target, reading: reading, err: err})
 	}
-	c.Publisher.Publish(snapshot)
+	observedAt := timestamppb.New(c.now())
+	c.Publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		for _, observation := range observations {
+			board := findBoard(snapshot, uint32(observation.target.Chain), uint32(observation.target.Node))
+			if board == nil {
+				continue
+			}
+			if observation.err != nil {
+				board.Health = daqv1.HealthStatus_HEALTH_STATUS_DEGRADED
+				continue
+			}
+			reading := observation.reading
+			board.FpgaTemperatureC = reading.FPGATemperatureC
+			board.BoardTemperatureC = reading.BoardTemperatureC
+			board.DetectorTemperatureC = reading.DetectorTemperatureC
+			board.HvTemperatureC = reading.HVTemperatureC
+			board.HvVoltageV = reading.VoltageV
+			board.HvCurrentA = reading.CurrentA
+			board.HvOn = reading.On
+			board.HvRamping = reading.Ramping
+			board.HvOverCurrent = reading.OverCurrent
+			board.HvOverVoltage = reading.OverVoltage
+			board.TelemetryObservedAt = observedAt
+			if reading.OverCurrent || reading.OverVoltage {
+				board.Health = daqv1.HealthStatus_HEALTH_STATUS_FAULT
+			} else {
+				board.Health = daqv1.HealthStatus_HEALTH_STATUS_OK
+			}
+		}
+	})
 }
 
 func (c *NativeHVController) now() time.Time {

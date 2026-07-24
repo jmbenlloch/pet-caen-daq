@@ -559,13 +559,51 @@ onMounted(() => daq.connect())
             {{ enabledLinkLabel }}
           </p>
         </div>
-        <div v-if="daq.snapshot.value?.currentRun" class="run-now">
-          <span>Active run</span>
-          <strong>{{ daq.snapshot.value.currentRun.runId }}</strong>
-          <span>{{ compact(daq.snapshot.value.currentRun.eventCount) }} events</span>
-          <small>{{ activeStopPolicy() }}</small>
+        <div class="hero-control">
+          <div v-if="daq.snapshot.value?.currentRun" class="run-now">
+            <span>Active run</span>
+            <strong>{{ daq.snapshot.value.currentRun.runId }}</strong>
+            <span>{{ compact(daq.snapshot.value.currentRun.eventCount) }} events</span>
+            <small>{{ activeStopPolicy() }}</small>
+          </div>
+          <div v-else class="run-now quiet" role="status">
+            <span>No active run</span>
+            <small>{{ configuredStopPolicy }}</small>
+          </div>
+          <div class="actions hero-actions">
+            <button
+              class="primary"
+              type="button"
+              :disabled="
+                !daq.canStart.value ||
+                !configuration ||
+                configurationErrors.length > 0 ||
+                !!stopPolicyError ||
+                !Number.isInteger(hdf5SegmentSizeMb) ||
+                hdf5SegmentSizeMb < 1 ||
+                hdf5SegmentSizeMb > 1048576
+              "
+              @click="
+                daq.startRun({
+                  configuration,
+                  captureRaw,
+                  journalTransport,
+                  hdf5SegmentSizeMb,
+                })
+              "
+            >
+              Start run
+            </button>
+            <button
+              class="danger"
+              type="button"
+              :disabled="!daq.canStop.value"
+              @click="daq.stopRun()"
+            >
+              Stop and drain
+            </button>
+          </div>
         </div>
-        <div v-else class="run-now quiet"><span>No active run</span></div>
       </section>
 
       <div v-if="daq.error.value" class="alert error" role="alert">
@@ -887,42 +925,6 @@ onMounted(() => daq.connect())
               {{ issue.message }}
             </li>
           </ul>
-
-          <p class="stop-policy-summary" role="status">{{ configuredStopPolicy }}</p>
-
-          <div class="actions">
-            <button
-              class="primary"
-              type="button"
-              :disabled="
-                !daq.canStart.value ||
-                !configuration ||
-                configurationErrors.length > 0 ||
-                !!stopPolicyError ||
-                !Number.isInteger(hdf5SegmentSizeMb) ||
-                hdf5SegmentSizeMb < 1 ||
-                hdf5SegmentSizeMb > 1048576
-              "
-              @click="
-                daq.startRun({
-                  configuration,
-                  captureRaw,
-                  journalTransport,
-                  hdf5SegmentSizeMb,
-                })
-              "
-            >
-              Start run
-            </button>
-            <button
-              class="danger"
-              type="button"
-              :disabled="!daq.canStop.value"
-              @click="daq.stopRun()"
-            >
-              Stop and drain
-            </button>
-          </div>
         </div>
 
         <aside class="side-column">

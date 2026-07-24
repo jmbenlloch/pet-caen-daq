@@ -47,6 +47,24 @@ func (p *Publisher) Publish(snapshot *daqv1.TelemetrySnapshot) *daqv1.TelemetryS
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.current = p.prepare(snapshot)
+	return p.notifyLocked()
+}
+
+// Update atomically clones, mutates, and publishes the current snapshot.
+// Producers that own only part of telemetry should use this instead of a
+// Snapshot/Publish pair so concurrent updates cannot restore stale fields.
+func (p *Publisher) Update(update func(*daqv1.TelemetrySnapshot)) *daqv1.TelemetrySnapshot {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	next := clone(p.current)
+	if update != nil {
+		update(next)
+	}
+	p.current = p.prepare(next)
+	return p.notifyLocked()
+}
+
+func (p *Publisher) notifyLocked() *daqv1.TelemetrySnapshot {
 	for _, subscriber := range p.subscribers {
 		value := clone(p.current)
 		select {

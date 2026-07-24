@@ -155,6 +155,17 @@ main {
 .run-now.quiet {
   color: #60738b;
 }
+.hero-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.hero-actions {
+  margin-top: 13px;
+}
+.hero-actions .danger {
+  margin-left: 0;
+}
 .alert {
   margin-top: 18px;
   display: flex;
@@ -1191,13 +1202,6 @@ textarea {
   color: #8194ac;
   font-size: 0.72rem;
 }
-.stop-policy-summary {
-  border-left: 3px solid #3acb9f;
-  margin: 14px 0 0;
-  padding: 8px 12px;
-  color: #a9bad0;
-  font-size: 0.78rem;
-}
 .plots {
   margin-top: 32px;
   padding: 24px;
@@ -1573,6 +1577,9 @@ textarea {
     padding-bottom: 24px;
   }
   .run-now {
+    align-items: flex-start;
+  }
+  .hero-control {
     align-items: flex-start;
   }
   .fields,
