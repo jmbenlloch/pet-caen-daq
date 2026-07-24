@@ -47,7 +47,10 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	identity.Runtime = runstore.RuntimeIdentity{
 		PipelineCapacity: options.Capacity, BackpressurePolicy: backpressureName(options.Backpressure),
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
+		PersistHistograms:   runOptions.PersistHistograms,
 		EnergyHistogramBins: runOptions.Histograms.EnergyBins, ToAHistogramBins: runOptions.Histograms.ToABins,
+		EnergyHistogramChannels: runOptions.Histograms.EnergyChannels,
+		ToAHistogramRebin:       runOptions.Histograms.ToARebin, ToAHistogramMinNS: runOptions.Histograms.ToAMinNS,
 		ToTHistogramBins:     runOptions.Histograms.ToTBins,
 		HDF5SegmentSizeBytes: runOptions.HDF5SegmentSizeBytes,
 	}
@@ -55,9 +58,13 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	if err != nil {
 		return nil, err
 	}
+	if runOptions.PersistHistograms && !histogramPersistenceSupported() {
+		return nil, fmt.Errorf("histogram persistence requires an HDF5-enabled build")
+	}
 	writer, err := createRunWriter(options.Parent, runstore.Manifest{
 		RunID: runID, StartedAt: options.Now().UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
+		PersistHistograms:      runOptions.PersistHistograms,
 		HDF5SegmentSizeBytes:   runOptions.HDF5SegmentSizeBytes,
 		RequestedConfiguration: runOptions.RequestedConfiguration, EffectiveConfiguration: runOptions.EffectiveConfiguration,
 		ConfigurationAudit: runOptions.ConfigurationAudit, Concentrator: runOptions.Concentrator,
@@ -78,7 +85,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 			return nil, err
 		}
 	}
-	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: options.Now(), histogramOptions: runOptions.Histograms, histograms: make(map[histogramKey]*histogramAccumulator)}
+	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, persistHistograms: runOptions.PersistHistograms, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: options.Now(), histogramOptions: runOptions.Histograms, histograms: make(map[histogramKey]*histogramAccumulator)}
 	pipeline, err := acquisition.NewPipeline(options.Capacity, options.Backpressure, sink)
 	if err != nil {
 		_ = writer.Abort()
@@ -151,6 +158,12 @@ func (s *Session) Close() error {
 }
 
 func (s *Session) Finalize(completedAt, reason string) error {
+	if s.sink.persistHistograms {
+		if err := s.writer.SaveHistograms(s.sink.HistogramSnapshot()); err != nil {
+			s.recordError(err)
+			return err
+		}
+	}
 	err := s.writer.Finalize(completedAt, reason)
 	s.mu.Lock()
 	if err != nil {
@@ -209,16 +222,17 @@ func (s *Session) recordError(err error) {
 }
 
 type sink struct {
-	writer           runWriter
-	captureRaw       bool
-	events           atomic.Uint64
-	rawBatches       atomic.Uint64
-	mu               sync.Mutex
-	boards           map[boardKey]BoardStats
-	now              func() time.Time
-	startedAt        time.Time
-	histogramOptions acquisition.HistogramOptions
-	histograms       map[histogramKey]*histogramAccumulator
+	writer            runWriter
+	captureRaw        bool
+	persistHistograms bool
+	events            atomic.Uint64
+	rawBatches        atomic.Uint64
+	mu                sync.Mutex
+	boards            map[boardKey]BoardStats
+	now               func() time.Time
+	startedAt         time.Time
+	histogramOptions  acquisition.HistogramOptions
+	histograms        map[histogramKey]*histogramAccumulator
 }
 
 type boardKey struct{ chain, node uint8 }

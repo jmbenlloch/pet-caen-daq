@@ -345,6 +345,7 @@ describe('operator dashboard', () => {
     const segmentSize = wrapper.get('input[aria-label="HDF5 file size in MiB"]')
     expect(segmentSize.element).toHaveProperty('value', '500')
     await segmentSize.setValue('128')
+    await wrapper.get('#persist-histograms').setValue(true)
     await wrapper.get('button.primary').trigger('click')
     await flushPromises()
 
@@ -355,6 +356,7 @@ describe('operator dashboard', () => {
         requestedBy: 'operator',
         captureRaw: false,
         journalTransport: false,
+        persistHistograms: true,
         hdf5SegmentSizeMb: 128,
       }),
     )

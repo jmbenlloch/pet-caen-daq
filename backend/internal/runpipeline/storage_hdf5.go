@@ -15,6 +15,7 @@ func createRunWriter(parent string, manifest runstore.Manifest) (runWriter, erro
 
 func decodedArtifactName(runID string) string { return "run_" + runID + ".0000.h5" }
 func expectedStorageFormat() string           { return "hdf5" }
+func histogramPersistenceSupported() bool     { return true }
 
 func storageIdentity() runstore.StorageIdentity {
 	compression := "none"

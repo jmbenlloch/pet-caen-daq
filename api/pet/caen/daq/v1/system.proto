@@ -116,6 +116,8 @@ message StartRunRequest {
   string requested_by = 5;
   // Zero selects the server default of 500 MiB.
   uint32 hdf5_segment_size_mb = 6;
+  // Write a standalone run-wide HDF5 histogram artifact after draining.
+  bool persist_histograms = 7;
 }
 
 message StartRunResponse {
@@ -261,7 +263,7 @@ message HistogramDataset {
   uint32 channel = 3;
   double minimum = 4;
   double bin_width = 5;
-  repeated uint64 bins = 6;
+  repeated uint32 bins = 6;
   uint64 entries = 7;
   uint64 underflow = 8;
   uint64 overflow = 9;

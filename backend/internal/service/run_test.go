@@ -88,14 +88,14 @@ func newRunService(t *testing.T, controller *fakeRunController) *RunService {
 func TestRunServiceStartAndStopPublishesSnapshots(t *testing.T) {
 	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
 	service := newRunService(t, controller)
-	start, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology, CaptureRaw: true, JournalTransport: true}))
+	start, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology, CaptureRaw: true, JournalTransport: true, PersistHistograms: true}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if start.Msg.Snapshot.State != daqv1.SystemState_SYSTEM_STATE_RUNNING || start.Msg.Snapshot.CurrentRun.GetRunId() != "42" || !start.Msg.Run.Incomplete {
 		t.Fatalf("start response = %+v", start.Msg)
 	}
-	if !controller.options.CaptureRaw || !controller.options.JournalTransport || controller.options.RequestedConfiguration != validTopology || controller.options.ConfigurationAudit == nil ||
+	if !controller.options.CaptureRaw || !controller.options.JournalTransport || !controller.options.PersistHistograms || controller.options.RequestedConfiguration != validTopology || controller.options.ConfigurationAudit == nil ||
 		controller.options.HDF5SegmentSizeBytes != 500*bytesPerMiB {
 		t.Fatalf("run options = %+v", controller.options)
 	}

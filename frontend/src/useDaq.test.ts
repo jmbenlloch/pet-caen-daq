@@ -97,6 +97,7 @@ describe('useDaq', () => {
       configuration: 'invalid',
       captureRaw: true,
       journalTransport: true,
+      persistHistograms: true,
       hdf5SegmentSizeMb: 500,
     })
 
@@ -182,14 +183,14 @@ describe('useDaq', () => {
     void store.connect()
     await vi.waitFor(() => expect(store.snapshot.value?.currentRun?.runId).toBe('run-55'))
 
-    const histogramRequest = store.loadHistograms(HistogramKind.PHA_HIGH_GAIN, [])
+    const histogramRequest = store.loadHistograms('42', HistogramKind.PHA_HIGH_GAIN, [])
     const stopRequest = store.stopRun()
     rejectHistograms(new Error('[failed_precondition] requested run is not active'))
     await histogramRequest
 
     expect(store.error.value).toBe('')
     expect(store.histogramsLoading.value).toBe(false)
-    await store.loadHistograms(HistogramKind.PHA_HIGH_GAIN, [])
+    await store.loadHistograms('42', HistogramKind.PHA_HIGH_GAIN, [])
     expect(histograms).toHaveBeenCalledTimes(1)
 
     resolveStop({})

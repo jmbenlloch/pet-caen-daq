@@ -65,3 +65,34 @@ func TestHistogramSpecUsesConfiguredEnergyRange(t *testing.T) {
 		}
 	}
 }
+
+func TestHistogramAccumulatorUsesJANUSToARebinAndMinimum(t *testing.T) {
+	sink := &sink{
+		histogramOptions: acquisition.HistogramOptions{ToABins: 256, ToARebin: 4, ToAMinNS: 10},
+		histograms:       make(map[histogramKey]*histogramAccumulator),
+	}
+	key := histogramKey{chain: 1, node: 2, channel: 3, kind: HistogramToA}
+	sink.incrementHistogram(key, 9.5)
+	sink.incrementHistogram(key, 10)
+	sink.incrementHistogram(key, 11.9)
+	sink.incrementHistogram(key, 12)
+	histogram := sink.histograms[key]
+	if histogram.minimum != 10 || histogram.width != 2 || histogram.underflow != 1 ||
+		histogram.bins[0] != 2 || histogram.bins[1] != 1 {
+		t.Fatalf("rebinned ToA histogram = %+v", histogram)
+	}
+}
+
+func TestHistogramUint32CounterSaturatesInsteadOfWrapping(t *testing.T) {
+	key := histogramKey{kind: HistogramToT}
+	sink := &sink{
+		histogramOptions: acquisition.HistogramOptions{ToTBins: 512},
+		histograms: map[histogramKey]*histogramAccumulator{
+			key: {width: 1, bins: []uint32{^uint32(0)}},
+		},
+	}
+	sink.incrementHistogram(key, 0)
+	if sink.histograms[key].bins[0] != ^uint32(0) || sink.histograms[key].overflow != 1 {
+		t.Fatalf("saturated histogram = %+v", sink.histograms[key])
+	}
+}

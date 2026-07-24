@@ -34,6 +34,7 @@ type Manifest struct {
 	RawBatchCount          uint64                     `json:"raw_batch_count,string,omitempty"`
 	CaptureRaw             bool                       `json:"capture_raw"`
 	JournalTransport       bool                       `json:"journal_transport"`
+	PersistHistograms      bool                       `json:"persist_histograms"`
 	HDF5SegmentSizeBytes   uint64                     `json:"hdf5_segment_size_bytes,omitempty"`
 	RequestedConfiguration string                     `json:"requested_configuration,omitempty"`
 	EffectiveConfiguration []dt5202.ConfigurationPlan `json:"effective_configuration,omitempty"`
@@ -97,14 +98,18 @@ type StorageIdentity struct {
 }
 
 type RuntimeIdentity struct {
-	PipelineCapacity     int    `json:"pipeline_capacity"`
-	BackpressurePolicy   string `json:"backpressure_policy"`
-	CaptureRaw           bool   `json:"capture_raw"`
-	JournalTransport     bool   `json:"journal_transport"`
-	EnergyHistogramBins  int    `json:"energy_histogram_bins"`
-	ToAHistogramBins     int    `json:"toa_histogram_bins"`
-	ToTHistogramBins     int    `json:"tot_histogram_bins"`
-	HDF5SegmentSizeBytes uint64 `json:"hdf5_segment_size_bytes"`
+	PipelineCapacity        int     `json:"pipeline_capacity"`
+	BackpressurePolicy      string  `json:"backpressure_policy"`
+	CaptureRaw              bool    `json:"capture_raw"`
+	JournalTransport        bool    `json:"journal_transport"`
+	PersistHistograms       bool    `json:"persist_histograms"`
+	EnergyHistogramBins     int     `json:"energy_histogram_bins"`
+	EnergyHistogramChannels int     `json:"energy_histogram_channels"`
+	ToAHistogramBins        int     `json:"toa_histogram_bins"`
+	ToAHistogramRebin       int     `json:"toa_histogram_rebin"`
+	ToAHistogramMinNS       float64 `json:"toa_histogram_min_ns"`
+	ToTHistogramBins        int     `json:"tot_histogram_bins"`
+	HDF5SegmentSizeBytes    uint64  `json:"hdf5_segment_size_bytes"`
 }
 
 type Artifact struct {
@@ -112,6 +117,15 @@ type Artifact struct {
 	Name      string `json:"name"`
 	SizeBytes uint64 `json:"size_bytes"`
 	SHA256    string `json:"sha256"`
+}
+
+type HistogramDataset struct {
+	Kind                 string
+	Chain, Node, Channel uint8
+	Minimum, BinWidth    float64
+	Bins                 []uint32
+	Entries              uint64
+	Underflow, Overflow  uint64
 }
 
 type Envelope struct {
@@ -158,6 +172,10 @@ func Create(parent string, manifest Manifest) (*Writer, error) {
 }
 func (w *Writer) Directory() string     { return w.dir }
 func (w *Writer) Artifacts() []Artifact { return append([]Artifact(nil), w.manifest.Artifacts...) }
+
+func (w *Writer) SaveHistograms([]HistogramDataset) error {
+	return fmt.Errorf("histogram HDF5 persistence requires an HDF5-enabled build")
+}
 func (w *Writer) EnableTransportJournal() error {
 	if w.closed {
 		return errors.New("run writer is closed")
