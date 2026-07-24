@@ -2,7 +2,7 @@ import { create, fromJson } from '@bufbuild/protobuf'
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import RunHistoryTable from './RunHistoryTable.vue'
-import { RunSummarySchema } from './gen/pet/caen/daq/v1/system_pb'
+import { RunSummarySchema, RunType } from './gen/pet/caen/daq/v1/system_pb'
 import { TimestampSchema } from '@bufbuild/protobuf/wkt'
 
 function timestamp(value: string) {
@@ -73,5 +73,31 @@ describe('run history table', () => {
     expect(masks).toHaveLength(2)
     expect(masks[0].text()).toContain('Channels: 0, 2')
     expect(masks[1].text()).toContain('Channels: 32, 63')
+  })
+
+  it('labels staircase scans and does not request a run configuration', async () => {
+    const configuration = vi.fn()
+    const downloadArtifact = vi.fn()
+    const wrapper = mount(RunHistoryTable, {
+      props: {
+        runs: [
+          create(RunSummarySchema, {
+            runId: 'scan-1',
+            runType: RunType.STAIRCASE,
+            terminationReason: 'completed',
+            artifacts: [{ name: 'staircase.h5', kind: 'staircase-hdf5', sizeBytes: 1024n }],
+          }),
+        ],
+        configuration,
+        downloadArtifact,
+      },
+    })
+    expect(wrapper.get('.run-type').text()).toBe('Staircase scan')
+    expect(wrapper.get('.run-row').text()).toContain('—')
+    await wrapper.get('.run-link').trigger('click')
+    expect(configuration).not.toHaveBeenCalled()
+    expect(wrapper.get('[aria-label="Details for run scan-1"]').text()).toContain('Scans workspace')
+    await wrapper.get('.artifact-download').trigger('click')
+    expect(downloadArtifact).toHaveBeenCalledWith('scan-1', 'staircase.h5')
   })
 })

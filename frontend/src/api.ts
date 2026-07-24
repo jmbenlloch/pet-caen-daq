@@ -2,6 +2,7 @@ import { createClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import {
   RunService,
+  ScanService,
   SystemService,
   type StartRunRequest,
   type StopRunRequest,
@@ -13,6 +14,9 @@ import {
   type HistogramSelection,
   type SearchRunsRequest,
   type SearchRunsResponse,
+  type StaircaseScan,
+  type ScanSummary,
+  type StartStaircaseRequest,
 } from './gen/pet/caen/daq/v1/system_pb'
 
 export interface DaqApi {
@@ -38,6 +42,10 @@ export interface DaqApi {
     kind: HistogramKind,
     selections: HistogramSelection[],
   ): Promise<HistogramDataset[]>
+  startStaircase(request: StartStaircaseRequest): Promise<StaircaseScan | undefined>
+  cancelScan(scanId: string, requestedBy: string): Promise<StaircaseScan | undefined>
+  listScans(limit?: number): Promise<ScanSummary[]>
+  staircase(scanId: string): Promise<StaircaseScan | undefined>
 }
 
 export interface RunCommandResult {
@@ -49,6 +57,7 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
   const transport = createConnectTransport({ baseUrl })
   const system = createClient(SystemService, transport)
   const runs = createClient(RunService, transport)
+  const scans = createClient(ScanService, transport)
 
   return {
     async snapshot() {
@@ -115,6 +124,18 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     },
     async histograms(runId, kind, selections) {
       return (await runs.getHistograms({ runId, kind, selections })).datasets
+    },
+    async startStaircase(request) {
+      return (await scans.startStaircase(request)).scan
+    },
+    async cancelScan(scanId, requestedBy) {
+      return (await scans.cancelScan({ scanId, requestedBy })).scan
+    },
+    async listScans(limit = 50) {
+      return (await scans.listScans({ limit })).scans
+    },
+    async staircase(scanId) {
+      return (await scans.getStaircase({ scanId })).scan
     },
   }
 }

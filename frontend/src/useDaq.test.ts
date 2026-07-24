@@ -62,6 +62,10 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
     runConfiguration: vi.fn().mockResolvedValue(''),
     downloadArtifact: vi.fn().mockResolvedValue(new Blob()),
     histograms: vi.fn().mockResolvedValue([]),
+    startStaircase: vi.fn().mockResolvedValue(undefined),
+    cancelScan: vi.fn().mockResolvedValue(undefined),
+    listScans: vi.fn().mockResolvedValue([]),
+    staircase: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }

@@ -13,6 +13,7 @@ export const stateLabel: Record<SystemState, string> = {
   [SystemState.STOPPING]: 'Stopping',
   [SystemState.DRAINING]: 'Draining',
   [SystemState.RECOVERING]: 'Recovering',
+  [SystemState.SCANNING]: 'Scanning',
 }
 
 export const healthLabel: Record<HealthStatus, string> = {

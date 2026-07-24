@@ -25,6 +25,8 @@ const (
 	SystemServiceName = "pet.caen.daq.v1.SystemService"
 	// RunServiceName is the fully-qualified name of the RunService service.
 	RunServiceName = "pet.caen.daq.v1.RunService"
+	// ScanServiceName is the fully-qualified name of the ScanService service.
+	ScanServiceName = "pet.caen.daq.v1.ScanService"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -73,6 +75,16 @@ const (
 	// RunServiceGetHistogramsProcedure is the fully-qualified name of the RunService's GetHistograms
 	// RPC.
 	RunServiceGetHistogramsProcedure = "/pet.caen.daq.v1.RunService/GetHistograms"
+	// ScanServiceStartStaircaseProcedure is the fully-qualified name of the ScanService's
+	// StartStaircase RPC.
+	ScanServiceStartStaircaseProcedure = "/pet.caen.daq.v1.ScanService/StartStaircase"
+	// ScanServiceCancelScanProcedure is the fully-qualified name of the ScanService's CancelScan RPC.
+	ScanServiceCancelScanProcedure = "/pet.caen.daq.v1.ScanService/CancelScan"
+	// ScanServiceListScansProcedure is the fully-qualified name of the ScanService's ListScans RPC.
+	ScanServiceListScansProcedure = "/pet.caen.daq.v1.ScanService/ListScans"
+	// ScanServiceGetStaircaseProcedure is the fully-qualified name of the ScanService's GetStaircase
+	// RPC.
+	ScanServiceGetStaircaseProcedure = "/pet.caen.daq.v1.ScanService/GetStaircase"
 )
 
 // SystemServiceClient is a client for the pet.caen.daq.v1.SystemService service.
@@ -525,4 +537,152 @@ func (UnimplementedRunServiceHandler) DownloadArtifact(context.Context, *connect
 
 func (UnimplementedRunServiceHandler) GetHistograms(context.Context, *connect.Request[v1.GetHistogramsRequest]) (*connect.Response[v1.GetHistogramsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.GetHistograms is not implemented"))
+}
+
+// ScanServiceClient is a client for the pet.caen.daq.v1.ScanService service.
+type ScanServiceClient interface {
+	StartStaircase(context.Context, *connect.Request[v1.StartStaircaseRequest]) (*connect.Response[v1.StartStaircaseResponse], error)
+	CancelScan(context.Context, *connect.Request[v1.CancelScanRequest]) (*connect.Response[v1.CancelScanResponse], error)
+	ListScans(context.Context, *connect.Request[v1.ListScansRequest]) (*connect.Response[v1.ListScansResponse], error)
+	GetStaircase(context.Context, *connect.Request[v1.GetStaircaseRequest]) (*connect.Response[v1.GetStaircaseResponse], error)
+}
+
+// NewScanServiceClient constructs a client for the pet.caen.daq.v1.ScanService service. By default,
+// it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses, and
+// sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the connect.WithGRPC()
+// or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewScanServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ScanServiceClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	scanServiceMethods := v1.File_pet_caen_daq_v1_system_proto.Services().ByName("ScanService").Methods()
+	return &scanServiceClient{
+		startStaircase: connect.NewClient[v1.StartStaircaseRequest, v1.StartStaircaseResponse](
+			httpClient,
+			baseURL+ScanServiceStartStaircaseProcedure,
+			connect.WithSchema(scanServiceMethods.ByName("StartStaircase")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelScan: connect.NewClient[v1.CancelScanRequest, v1.CancelScanResponse](
+			httpClient,
+			baseURL+ScanServiceCancelScanProcedure,
+			connect.WithSchema(scanServiceMethods.ByName("CancelScan")),
+			connect.WithClientOptions(opts...),
+		),
+		listScans: connect.NewClient[v1.ListScansRequest, v1.ListScansResponse](
+			httpClient,
+			baseURL+ScanServiceListScansProcedure,
+			connect.WithSchema(scanServiceMethods.ByName("ListScans")),
+			connect.WithClientOptions(opts...),
+		),
+		getStaircase: connect.NewClient[v1.GetStaircaseRequest, v1.GetStaircaseResponse](
+			httpClient,
+			baseURL+ScanServiceGetStaircaseProcedure,
+			connect.WithSchema(scanServiceMethods.ByName("GetStaircase")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// scanServiceClient implements ScanServiceClient.
+type scanServiceClient struct {
+	startStaircase *connect.Client[v1.StartStaircaseRequest, v1.StartStaircaseResponse]
+	cancelScan     *connect.Client[v1.CancelScanRequest, v1.CancelScanResponse]
+	listScans      *connect.Client[v1.ListScansRequest, v1.ListScansResponse]
+	getStaircase   *connect.Client[v1.GetStaircaseRequest, v1.GetStaircaseResponse]
+}
+
+// StartStaircase calls pet.caen.daq.v1.ScanService.StartStaircase.
+func (c *scanServiceClient) StartStaircase(ctx context.Context, req *connect.Request[v1.StartStaircaseRequest]) (*connect.Response[v1.StartStaircaseResponse], error) {
+	return c.startStaircase.CallUnary(ctx, req)
+}
+
+// CancelScan calls pet.caen.daq.v1.ScanService.CancelScan.
+func (c *scanServiceClient) CancelScan(ctx context.Context, req *connect.Request[v1.CancelScanRequest]) (*connect.Response[v1.CancelScanResponse], error) {
+	return c.cancelScan.CallUnary(ctx, req)
+}
+
+// ListScans calls pet.caen.daq.v1.ScanService.ListScans.
+func (c *scanServiceClient) ListScans(ctx context.Context, req *connect.Request[v1.ListScansRequest]) (*connect.Response[v1.ListScansResponse], error) {
+	return c.listScans.CallUnary(ctx, req)
+}
+
+// GetStaircase calls pet.caen.daq.v1.ScanService.GetStaircase.
+func (c *scanServiceClient) GetStaircase(ctx context.Context, req *connect.Request[v1.GetStaircaseRequest]) (*connect.Response[v1.GetStaircaseResponse], error) {
+	return c.getStaircase.CallUnary(ctx, req)
+}
+
+// ScanServiceHandler is an implementation of the pet.caen.daq.v1.ScanService service.
+type ScanServiceHandler interface {
+	StartStaircase(context.Context, *connect.Request[v1.StartStaircaseRequest]) (*connect.Response[v1.StartStaircaseResponse], error)
+	CancelScan(context.Context, *connect.Request[v1.CancelScanRequest]) (*connect.Response[v1.CancelScanResponse], error)
+	ListScans(context.Context, *connect.Request[v1.ListScansRequest]) (*connect.Response[v1.ListScansResponse], error)
+	GetStaircase(context.Context, *connect.Request[v1.GetStaircaseRequest]) (*connect.Response[v1.GetStaircaseResponse], error)
+}
+
+// NewScanServiceHandler builds an HTTP handler from the service implementation. It returns the path
+// on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewScanServiceHandler(svc ScanServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	scanServiceMethods := v1.File_pet_caen_daq_v1_system_proto.Services().ByName("ScanService").Methods()
+	scanServiceStartStaircaseHandler := connect.NewUnaryHandler(
+		ScanServiceStartStaircaseProcedure,
+		svc.StartStaircase,
+		connect.WithSchema(scanServiceMethods.ByName("StartStaircase")),
+		connect.WithHandlerOptions(opts...),
+	)
+	scanServiceCancelScanHandler := connect.NewUnaryHandler(
+		ScanServiceCancelScanProcedure,
+		svc.CancelScan,
+		connect.WithSchema(scanServiceMethods.ByName("CancelScan")),
+		connect.WithHandlerOptions(opts...),
+	)
+	scanServiceListScansHandler := connect.NewUnaryHandler(
+		ScanServiceListScansProcedure,
+		svc.ListScans,
+		connect.WithSchema(scanServiceMethods.ByName("ListScans")),
+		connect.WithHandlerOptions(opts...),
+	)
+	scanServiceGetStaircaseHandler := connect.NewUnaryHandler(
+		ScanServiceGetStaircaseProcedure,
+		svc.GetStaircase,
+		connect.WithSchema(scanServiceMethods.ByName("GetStaircase")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/pet.caen.daq.v1.ScanService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case ScanServiceStartStaircaseProcedure:
+			scanServiceStartStaircaseHandler.ServeHTTP(w, r)
+		case ScanServiceCancelScanProcedure:
+			scanServiceCancelScanHandler.ServeHTTP(w, r)
+		case ScanServiceListScansProcedure:
+			scanServiceListScansHandler.ServeHTTP(w, r)
+		case ScanServiceGetStaircaseProcedure:
+			scanServiceGetStaircaseHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedScanServiceHandler returns CodeUnimplemented from all methods.
+type UnimplementedScanServiceHandler struct{}
+
+func (UnimplementedScanServiceHandler) StartStaircase(context.Context, *connect.Request[v1.StartStaircaseRequest]) (*connect.Response[v1.StartStaircaseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.StartStaircase is not implemented"))
+}
+
+func (UnimplementedScanServiceHandler) CancelScan(context.Context, *connect.Request[v1.CancelScanRequest]) (*connect.Response[v1.CancelScanResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.CancelScan is not implemented"))
+}
+
+func (UnimplementedScanServiceHandler) ListScans(context.Context, *connect.Request[v1.ListScansRequest]) (*connect.Response[v1.ListScansResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.ListScans is not implemented"))
+}
+
+func (UnimplementedScanServiceHandler) GetStaircase(context.Context, *connect.Request[v1.GetStaircaseRequest]) (*connect.Response[v1.GetStaircaseResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.ScanService.GetStaircase is not implemented"))
 }
