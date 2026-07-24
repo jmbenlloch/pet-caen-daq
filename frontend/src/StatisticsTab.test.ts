@@ -1,8 +1,19 @@
 import { create } from '@bufbuild/protobuf'
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
-import { RunSummarySchema, StatisticsTelemetrySchema } from './gen/pet/caen/daq/v1/system_pb'
+import { flushPromises, mount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+import type { DaqApi } from './api'
+import {
+  RunSummarySchema,
+  StatisticsTelemetrySchema,
+  type RunSummary,
+} from './gen/pet/caen/daq/v1/system_pb'
 import StatisticsTab from './StatisticsTab.vue'
+
+function apiWithRuns(...runs: RunSummary[]): DaqApi {
+  return {
+    searchRuns: vi.fn().mockResolvedValue({ runs, nextPageToken: '' }),
+  } as unknown as DaqApi
+}
 
 function sample(elapsed: bigint, triggerCount: bigint, channelCount: bigint, chain = 0) {
   return create(StatisticsTelemetrySchema, {
@@ -26,7 +37,9 @@ function sample(elapsed: bigint, triggerCount: bigint, channelCount: bigint, cha
 
 describe('StatisticsTab', () => {
   it('switches between all-board, per-channel, interval, and integral views', async () => {
-    const wrapper = mount(StatisticsTab, { props: { statistics: sample(1000n, 10n, 4n) } })
+    const wrapper = mount(StatisticsTab, {
+      props: { api: apiWithRuns(), statistics: sample(1000n, 10n, 4n) },
+    })
     expect(wrapper.text()).toContain('Trigger ID')
     expect(wrapper.text()).toContain('1.000 s')
     expect(wrapper.text()).toContain('Estimated lost triggers')
@@ -51,7 +64,9 @@ describe('StatisticsTab', () => {
   })
 
   it('keeps the last measured rate when a final snapshot has the same elapsed time', async () => {
-    const wrapper = mount(StatisticsTab, { props: { statistics: sample(1000n, 10n, 4n) } })
+    const wrapper = mount(StatisticsTab, {
+      props: { api: apiWithRuns(), statistics: sample(1000n, 10n, 4n) },
+    })
     await wrapper.setProps({ statistics: sample(2000n, 15n, 7n) })
     expect(wrapper.text()).toContain('5.0 Hz')
 
@@ -60,7 +75,9 @@ describe('StatisticsTab', () => {
   })
 
   it('returns to all boards when the selected board disappears from telemetry', async () => {
-    const wrapper = mount(StatisticsTab, { props: { statistics: sample(1000n, 10n, 4n) } })
+    const wrapper = mount(StatisticsTab, {
+      props: { api: apiWithRuns(), statistics: sample(1000n, 10n, 4n) },
+    })
     await wrapper.findAll('[role="tab"]')[1].trigger('click')
     expect(wrapper.get('[aria-label="Board 0 channel statistics"]').isVisible()).toBe(true)
 
@@ -73,27 +90,26 @@ describe('StatisticsTab', () => {
 
   it('selects a completed run and presents its fixed final statistics', async () => {
     const historical = sample(10_000n, 40n, 12n)
+    const historicalRun = create(RunSummarySchema, {
+      runId: '42',
+      eventCount: 40n,
+      finalStatistics: historical,
+    })
     const wrapper = mount(StatisticsTab, {
       props: {
+        api: apiWithRuns(historicalRun, create(RunSummarySchema, { runId: '41' })),
         statistics: sample(2_000n, 15n, 7n),
         liveRunId: '43',
-        runs: [
-          create(RunSummarySchema, {
-            runId: '42',
-            eventCount: 40n,
-            finalStatistics: historical,
-          }),
-          create(RunSummarySchema, { runId: 'legacy' }),
-        ],
       },
     })
+    await flushPromises()
 
-    const source = wrapper.get('#statistics-run')
-    expect(source.findAll('option')).toHaveLength(2)
-    expect(source.text()).toContain('Live · Run 43')
-    expect(source.text()).toContain('Run 42 · final')
+    const picker = wrapper.get('[aria-label="Select run with final statistics"]')
+    expect(picker.findAll('.run-data-row')).toHaveLength(2)
+    expect(wrapper.get('.statistics-live-source').text()).toContain('Run 43')
+    expect(picker.text()).toContain('No final statistics')
 
-    await source.setValue('42')
+    await picker.findAll('.run-data-row')[0].trigger('click')
     expect(wrapper.text()).toContain('Final run snapshot')
     expect(wrapper.text()).toContain('40 decoded events')
     expect(wrapper.text()).toContain('4.0 Hz')
@@ -106,5 +122,30 @@ describe('StatisticsTab', () => {
     await wrapper.get('input[type="checkbox"]').setValue(true)
     expect(wrapper.get('.channel-statistic').text()).toBe('CH 012')
     expect(wrapper.text()).toContain('integrated count')
+  })
+
+  it('returns to live statistics when a new run starts', async () => {
+    const historicalRun = create(RunSummarySchema, {
+      runId: '42',
+      eventCount: 40n,
+      finalStatistics: sample(10_000n, 40n, 12n),
+    })
+    const wrapper = mount(StatisticsTab, {
+      props: {
+        api: apiWithRuns(historicalRun),
+        statistics: sample(2_000n, 15n, 7n),
+      },
+    })
+    await flushPromises()
+
+    await wrapper.get('.run-data-row').trigger('click')
+    expect(wrapper.text()).toContain('Final run snapshot')
+    expect(wrapper.get('.statistics-live-source').attributes('aria-pressed')).toBe('false')
+
+    await wrapper.setProps({ liveRunId: '43', statistics: sample(1_000n, 2n, 1n) })
+
+    expect(wrapper.text()).toContain('Live runtime view')
+    expect(wrapper.get('.statistics-live-source').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('.statistics-live-source').text()).toContain('Run 43')
   })
 })

@@ -1462,11 +1462,12 @@ onMounted(() => daq.connect())
         aria-labelledby="workspace-tab-statistics"
       >
         <StatisticsTab
+          :api="api"
           :statistics="daq.snapshot.value?.statistics"
           :pipeline="daq.snapshot.value?.pipeline"
           :storage="daq.snapshot.value?.storage"
-          :runs="daq.runHistory.value"
           :live-run-id="daq.snapshot.value?.currentRun?.runId"
+          :run-picker-enabled="activeWorkspaceTab === 'statistics'"
         />
       </div>
 
@@ -1477,13 +1478,14 @@ onMounted(() => daq.connect())
         aria-labelledby="workspace-tab-plots"
       >
         <PlotWorkspace
+          :api="api"
           :boards="boards"
-          :runs="daq.runHistory.value"
           :active-run-id="daq.snapshot.value?.currentRun?.runId"
           :running="daq.snapshot.value?.state === SystemState.RUNNING"
           :loading="daq.histogramsLoading.value"
           :datasets="daq.histogramDatasets.value"
           :theme="theme"
+          :run-picker-enabled="activeWorkspaceTab === 'plots'"
           @request="daq.loadHistograms"
         />
       </div>

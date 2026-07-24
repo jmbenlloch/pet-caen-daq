@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, type DeepReadonly } from 'vue'
+import type { DaqApi } from './api'
 import type {
   BoardStatistics,
   PipelineTelemetry,
@@ -8,27 +9,33 @@ import type {
   StorageTelemetry,
 } from './gen/pet/caen/daq/v1/system_pb'
 import { bytes, compact } from './presentation'
+import RunDataPicker from './RunDataPicker.vue'
 
-const props = defineProps<{
-  statistics?: DeepReadonly<StatisticsTelemetry>
-  pipeline?: DeepReadonly<PipelineTelemetry>
-  storage?: DeepReadonly<StorageTelemetry>
-  runs?: readonly DeepReadonly<RunSummary>[]
-  liveRunId?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    api: DaqApi
+    statistics?: DeepReadonly<StatisticsTelemetry>
+    pipeline?: DeepReadonly<PipelineTelemetry>
+    storage?: DeepReadonly<StorageTelemetry>
+    liveRunId?: string
+    runPickerEnabled?: boolean
+  }>(),
+  {
+    statistics: undefined,
+    pipeline: undefined,
+    storage: undefined,
+    liveRunId: undefined,
+    runPickerEnabled: true,
+  },
+)
 
 type Metric = 'channelTriggerCounts' | 'timestampCounts' | 'phaCounts'
 const metric = ref<Metric>('channelTriggerCounts')
 const integral = ref(false)
 const selectedBoard = ref<number | 'all'>('all')
 const selectedRunId = ref('live')
+const selectedRun = ref<DeepReadonly<RunSummary>>()
 const previous = ref<DeepReadonly<StatisticsTelemetry>>()
-const historicalRuns = computed(() => props.runs?.filter((run) => run.finalStatistics) ?? [])
-const selectedRun = computed(() =>
-  selectedRunId.value === 'live'
-    ? undefined
-    : historicalRuns.value.find((run) => run.runId === selectedRunId.value),
-)
 const viewingHistorical = computed(() => selectedRunId.value !== 'live')
 const displayedStatistics = computed(() =>
   viewingHistorical.value ? selectedRun.value?.finalStatistics : props.statistics,
@@ -41,13 +48,22 @@ watch(displayedStatistics, (next, old) => {
     previous.value = undefined
 })
 
-watch(historicalRuns, (runs) => {
-  if (
-    selectedRunId.value !== 'live' &&
-    !runs.some((candidate) => candidate.runId === selectedRunId.value)
-  )
-    selectedRunId.value = 'live'
-})
+function selectHistoricalRun(run: DeepReadonly<RunSummary>) {
+  selectedRun.value = run
+  selectedRunId.value = run.runId
+}
+
+function selectLive() {
+  selectedRun.value = undefined
+  selectedRunId.value = 'live'
+}
+
+watch(
+  () => props.liveRunId,
+  (next, previous) => {
+    if (next && next !== previous) selectLive()
+  },
+)
 
 const boards = computed(() => displayedStatistics.value?.boards ?? [])
 const active = computed(() =>
@@ -159,15 +175,16 @@ const metricDescription = computed(
         <p class="eyebrow">{{ viewingHistorical ? 'Final run snapshot' : 'Live runtime view' }}</p>
         <h2 id="statistics-heading">Statistics</h2>
       </div>
-      <div class="statistics-source">
-        <label for="statistics-run">Data source</label>
-        <select id="statistics-run" v-model="selectedRunId">
-          <option value="live">Live{{ liveRunId ? ` · Run ${liveRunId}` : '' }}</option>
-          <option v-for="run in historicalRuns" :key="run.runId" :value="run.runId">
-            Run {{ run.runId }} · final
-          </option>
-        </select>
-      </div>
+      <button
+        type="button"
+        class="statistics-live-source"
+        :class="{ selected: !viewingHistorical }"
+        :aria-pressed="!viewingHistorical"
+        @click="selectLive"
+      >
+        <span>Live source</span>
+        <strong>{{ liveRunId ? `Run ${liveRunId}` : 'No active run' }}</strong>
+      </button>
     </div>
     <p class="statistics-controls-hint">
       {{
@@ -202,6 +219,9 @@ const metricDescription = computed(
         >
       </div>
       <div v-else class="statistics-summary" aria-label="Historical run statistics">
+        <span class="statistics-run-identity"
+          ><strong>Run {{ selectedRun?.runId }}</strong> finalized snapshot</span
+        >
         <span
           ><strong>{{ compact(selectedRun?.eventCount) }}</strong> decoded events</span
         >
@@ -213,9 +233,6 @@ const metricDescription = computed(
             s</strong
           >
           elapsed</span
-        >
-        <span
-          ><strong>Run {{ selectedRun?.runId }}</strong> finalized snapshot</span
         >
       </div>
 
@@ -316,6 +333,15 @@ const metricDescription = computed(
         }}
       </p>
     </div>
+
+    <RunDataPicker
+      :api="api"
+      capability="statistics"
+      :selected-run-id="viewingHistorical ? selectedRunId : undefined"
+      :active-run-id="liveRunId"
+      :enabled="runPickerEnabled"
+      @select="selectHistoricalRun"
+    />
 
     <details class="statistics-guide">
       <summary>How to read and configure this panel</summary>
