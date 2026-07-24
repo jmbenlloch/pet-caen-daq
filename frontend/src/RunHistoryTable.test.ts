@@ -55,4 +55,23 @@ describe('run history table', () => {
     expect(wrapper.get('[aria-label="Stored runs"]').findAll('.run-row')).toHaveLength(2)
     expect(wrapper.text()).toContain('Page 2 of 2 · 12 runs')
   })
+
+  it('expands hexadecimal masks into decimal channel numbers', async () => {
+    const wrapper = mount(RunHistoryTable, {
+      props: {
+        runs: [create(RunSummarySchema, { runId: '7' })],
+        configuration: vi
+          .fn()
+          .mockResolvedValue('# Data analysis\nChEnableMask0 0x00000005\nChEnableMask1 0x80000001'),
+        downloadArtifact: vi.fn(),
+      },
+    })
+
+    await wrapper.get('.run-link').trigger('click')
+    await flushPromises()
+    const masks = wrapper.findAll('.mask-value')
+    expect(masks).toHaveLength(2)
+    expect(masks[0].text()).toContain('Channels: 0, 2')
+    expect(masks[1].text()).toContain('Channels: 32, 63')
+  })
 })

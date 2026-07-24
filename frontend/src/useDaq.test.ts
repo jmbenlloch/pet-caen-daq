@@ -227,4 +227,18 @@ describe('useDaq', () => {
     expect(store.searchResults.value.map((run) => run.runId)).toEqual(['newest', 'next'])
     wrapper.unmount()
   })
+
+  it('rejects an unfiltered response to a run-number search', async () => {
+    const searchRuns = vi.fn().mockResolvedValue({
+      runs: [create(RunSummarySchema, { runId: '32' })],
+      nextPageToken: '',
+    })
+    const { store, wrapper } = mountStore(fakeApi({ searchRuns }))
+
+    await store.searchRuns(create(SearchRunsRequestSchema, { runNumber: 28n }))
+
+    expect(store.searchResults.value).toEqual([])
+    expect(store.searchError.value).toContain('did not apply the run-number filter')
+    wrapper.unmount()
+  })
 })

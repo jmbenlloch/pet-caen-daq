@@ -153,6 +153,10 @@ message SearchRunsRequest {
   uint32 limit = 6;
   // Opaque cursor returned by the preceding response.
   string page_token = 7;
+  // Exact run number, or the inclusive lower bound when maximum_run_number is set.
+  optional uint64 run_number = 8;
+  // Inclusive upper bound. Requires run_number.
+  optional uint64 maximum_run_number = 9;
 }
 
 message SearchRunsResponse {

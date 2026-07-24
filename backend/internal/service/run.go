@@ -112,6 +112,24 @@ func (s *RunService) SearchRuns(ctx context.Context, request *connect.Request[da
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_SEARCH_LIMIT", fmt.Errorf("limit must be between 1 and 100"))
 	}
 	query := runcatalog.Query{Limit: limit + 1, TerminationReason: message.GetTerminationReason(), MinimumEventCount: message.GetMinimumEventCount()}
+	if message.RunNumber != nil {
+		if message.GetRunNumber() > math.MaxInt64 {
+			return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_NUMBER_RANGE", fmt.Errorf("run_number is too large"))
+		}
+		query.RunNumber = message.RunNumber
+	}
+	if message.MaximumRunNumber != nil {
+		if message.RunNumber == nil {
+			return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_NUMBER_RANGE", fmt.Errorf("maximum_run_number requires run_number"))
+		}
+		if message.GetRunNumber() > message.GetMaximumRunNumber() {
+			return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_NUMBER_RANGE", fmt.Errorf("run_number must not exceed maximum_run_number"))
+		}
+		if message.GetMaximumRunNumber() > math.MaxInt64 {
+			return nil, serviceError(connect.CodeInvalidArgument, "INVALID_RUN_NUMBER_RANGE", fmt.Errorf("maximum_run_number is too large"))
+		}
+		query.MaximumRunNumber = message.MaximumRunNumber
+	}
 	if value := message.GetStartedAfter(); value != nil {
 		if err := value.CheckValid(); err != nil {
 			return nil, serviceError(connect.CodeInvalidArgument, "INVALID_SEARCH_TIME", err)
@@ -196,8 +214,8 @@ func catalogPredicate(predicate *daqv1.ConfigurationPredicate) (runcatalog.Predi
 			if value.Board >= 4 {
 				return result, fmt.Errorf("board must be between 0 and 3")
 			}
-			board, noChannel := int(value.Board), -1
-			result.Board, result.Channel = &board, &noChannel
+			board := int(value.Board)
+			result.Board = &board
 		case *daqv1.ConfigurationScope_Channel:
 			if value.Channel == nil || value.Channel.Board >= 4 || value.Channel.Channel >= 64 {
 				return result, fmt.Errorf("channel scope requires board 0-3 and channel 0-63")

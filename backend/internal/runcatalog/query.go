@@ -16,6 +16,7 @@ type Run struct {
 type Query struct {
 	StartedAfter, StartedBefore, TerminationReason string
 	MinimumEventCount                              uint64
+	RunNumber, MaximumRunNumber                    *uint64
 	Configuration                                  []Predicate
 	Limit                                          int
 	IncludeUnavailable                             bool
@@ -65,6 +66,16 @@ func (c *Catalog) List(ctx context.Context, query Query) ([]Run, error) {
 	if query.MinimumEventCount > 0 {
 		where = append(where, "r.event_count >= ?")
 		args = append(args, query.MinimumEventCount)
+	}
+	if query.RunNumber != nil {
+		where = append(where, "r.run_id <> '' AND r.run_id NOT GLOB '*[^0-9]*'")
+		if query.MaximumRunNumber == nil {
+			where = append(where, "CAST(r.run_id AS INTEGER) = ?")
+			args = append(args, int64(*query.RunNumber))
+		} else {
+			where = append(where, "CAST(r.run_id AS INTEGER) BETWEEN ? AND ?")
+			args = append(args, int64(*query.RunNumber), int64(*query.MaximumRunNumber))
+		}
 	}
 	if query.BeforeStartedAt != "" {
 		where = append(where, "(r.started_at < ? OR (r.started_at = ? AND r.run_id < ?))")
@@ -118,11 +129,19 @@ func predicateSQL(index int, p Predicate) (string, []any, error) {
 		args = append(args, p.Layer)
 	}
 	if p.Board != nil {
-		conditions = append(conditions, "c.board_index = ?")
+		if p.Layer == layerResolved {
+			conditions = append(conditions, "(c.board_index = ? OR c.board_index = -1)")
+		} else {
+			conditions = append(conditions, "c.board_index = ?")
+		}
 		args = append(args, *p.Board)
 	}
 	if p.Channel != nil {
-		conditions = append(conditions, "c.channel_index = ?")
+		if p.Layer == layerResolved {
+			conditions = append(conditions, "(c.channel_index = ? OR c.channel_index = -1)")
+		} else {
+			conditions = append(conditions, "c.channel_index = ?")
+		}
 		args = append(args, *p.Channel)
 	}
 	comparisons := 0

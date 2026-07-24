@@ -104,6 +104,22 @@ export function useDaq(api: DaqApi) {
     try {
       const response = await api.searchRuns(request)
       if (sequence !== searchRequestSequence) return
+      if (request.runNumber !== undefined) {
+        const minimum = request.runNumber
+        const maximum = request.maximumRunNumber ?? minimum
+        const invalidRun = response.runs.find((run) => {
+          try {
+            const runNumber = BigInt(run.runId)
+            return runNumber < minimum || runNumber > maximum
+          } catch {
+            return true
+          }
+        })
+        if (invalidRun)
+          throw new Error(
+            'The server did not apply the run-number filter. Restart it with the updated backend.',
+          )
+      }
       searchResults.value = append ? [...searchResults.value, ...response.runs] : response.runs
       searchNextPageToken.value = response.nextPageToken
     } catch (reason) {

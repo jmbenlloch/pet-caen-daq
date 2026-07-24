@@ -1424,9 +1424,13 @@ type SearchRunsRequest struct {
 	// Zero uses the server default. The maximum is 100.
 	Limit uint32 `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
 	// Opaque cursor returned by the preceding response.
-	PageToken     string `protobuf:"bytes,7,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	PageToken string `protobuf:"bytes,7,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Exact run number, or the inclusive lower bound when maximum_run_number is set.
+	RunNumber *uint64 `protobuf:"varint,8,opt,name=run_number,json=runNumber,proto3,oneof" json:"run_number,omitempty"`
+	// Inclusive upper bound. Requires run_number.
+	MaximumRunNumber *uint64 `protobuf:"varint,9,opt,name=maximum_run_number,json=maximumRunNumber,proto3,oneof" json:"maximum_run_number,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *SearchRunsRequest) Reset() {
@@ -1506,6 +1510,20 @@ func (x *SearchRunsRequest) GetPageToken() string {
 		return x.PageToken
 	}
 	return ""
+}
+
+func (x *SearchRunsRequest) GetRunNumber() uint64 {
+	if x != nil && x.RunNumber != nil {
+		return *x.RunNumber
+	}
+	return 0
+}
+
+func (x *SearchRunsRequest) GetMaximumRunNumber() uint64 {
+	if x != nil && x.MaximumRunNumber != nil {
+		return *x.MaximumRunNumber
+	}
+	return 0
 }
 
 type SearchRunsResponse struct {
@@ -3604,7 +3622,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x0fListRunsRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\rR\x05limit\"C\n" +
 	"\x10ListRunsResponse\x12/\n" +
-	"\x04runs\x18\x01 \x03(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x04runs\"\xfa\x02\n" +
+	"\x04runs\x18\x01 \x03(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x04runs\"\xf7\x03\n" +
 	"\x11SearchRunsRequest\x12M\n" +
 	"\rconfiguration\x18\x01 \x03(\v2'.pet.caen.daq.v1.ConfigurationPredicateR\rconfiguration\x12?\n" +
 	"\rstarted_after\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\fstartedAfter\x12A\n" +
@@ -3613,7 +3631,12 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x13minimum_event_count\x18\x05 \x01(\x04R\x11minimumEventCount\x12\x14\n" +
 	"\x05limit\x18\x06 \x01(\rR\x05limit\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\a \x01(\tR\tpageToken\"m\n" +
+	"page_token\x18\a \x01(\tR\tpageToken\x12\"\n" +
+	"\n" +
+	"run_number\x18\b \x01(\x04H\x00R\trunNumber\x88\x01\x01\x121\n" +
+	"\x12maximum_run_number\x18\t \x01(\x04H\x01R\x10maximumRunNumber\x88\x01\x01B\r\n" +
+	"\v_run_numberB\x15\n" +
+	"\x13_maximum_run_number\"m\n" +
 	"\x12SearchRunsResponse\x12/\n" +
 	"\x04runs\x18\x01 \x03(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x04runs\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"3\n" +
@@ -4029,6 +4052,7 @@ func file_pet_caen_daq_v1_system_proto_init() {
 	if File_pet_caen_daq_v1_system_proto != nil {
 		return
 	}
+	file_pet_caen_daq_v1_system_proto_msgTypes[21].OneofWrappers = []any{}
 	file_pet_caen_daq_v1_system_proto_msgTypes[25].OneofWrappers = []any{
 		(*ConfigurationPredicate_Integer)(nil),
 		(*ConfigurationPredicate_Real)(nil),
