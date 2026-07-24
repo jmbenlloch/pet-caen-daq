@@ -39,6 +39,7 @@ type RunController interface {
 }
 
 type ConfigurationApplier func(context.Context, *janusconfig.Document, string) (acquisition.ConfigurationResult, error)
+type HistoricalHistogramLoader func(string, string, runpipeline.HistogramKind, []runpipeline.HistogramSelection) ([]runpipeline.HistogramDataset, error)
 
 type HardwareMetadataProvider interface {
 	HardwareMetadata() ([]configaudit.BoardEvidence, *dt5215.ConcentratorInfo)
@@ -69,6 +70,7 @@ type RunService struct {
 	CatalogError     func(error)
 	Catalog          RunCatalog
 	AllocateRunID    func(context.Context) (string, error)
+	LoadHistograms   HistoricalHistogramLoader
 
 	opMu          sync.Mutex
 	mu            sync.Mutex
@@ -448,6 +450,7 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
 		Histograms:           histogramOptions,
+		PersistHistograms:    message.GetPersistHistograms(),
 		HDF5SegmentSizeBytes: uint64(segmentSizeMB) * bytesPerMiB,
 		Concentrator:         concentrator,
 	}

@@ -35,6 +35,7 @@ type RunOptions struct {
 	ConfigurationAudit     *configaudit.Report
 	Concentrator           *dt5215.ConcentratorInfo
 	Histograms             HistogramOptions
+	PersistHistograms      bool
 	HDF5SegmentSizeBytes   uint64
 }
 
@@ -42,6 +43,8 @@ type HistogramOptions struct {
 	EnergyBins     int
 	EnergyChannels int
 	ToABins        int
+	ToARebin       int
+	ToAMinNS       float64
 	ToTBins        int
 }
 

@@ -445,6 +445,12 @@ and `first_event_sequence`, while `/events/index.sequence` remains globally
 contiguous across ordered segments. Dataset names and numeric enum values are
 part of the schema and must be golden-tested.
 
+When selected at run start, finalized channel histograms are stored separately
+as `run_<run-id>.histograms.h5`. This run-wide artifact is not rotated with the
+decoded-event stream: its maximum current four-board payload is approximately
+32.5 MiB of uint32 bins before compression. Keeping it separate avoids
+duplicating a run-wide snapshot in each 500 MiB event segment.
+
 ```text
 /
   attributes:

@@ -1099,6 +1099,8 @@ type StartRunRequest struct {
 	RequestedBy        string                 `protobuf:"bytes,5,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
 	// Zero selects the server default of 500 MiB.
 	Hdf5SegmentSizeMb uint32 `protobuf:"varint,6,opt,name=hdf5_segment_size_mb,json=hdf5SegmentSizeMb,proto3" json:"hdf5_segment_size_mb,omitempty"`
+	// Write a standalone run-wide HDF5 histogram artifact after draining.
+	PersistHistograms bool `protobuf:"varint,7,opt,name=persist_histograms,json=persistHistograms,proto3" json:"persist_histograms,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1166,6 +1168,13 @@ func (x *StartRunRequest) GetHdf5SegmentSizeMb() uint32 {
 		return x.Hdf5SegmentSizeMb
 	}
 	return 0
+}
+
+func (x *StartRunRequest) GetPersistHistograms() bool {
+	if x != nil {
+		return x.PersistHistograms
+	}
+	return false
 }
 
 type StartRunResponse struct {
@@ -2388,7 +2397,7 @@ type HistogramDataset struct {
 	Channel       uint32                 `protobuf:"varint,3,opt,name=channel,proto3" json:"channel,omitempty"`
 	Minimum       float64                `protobuf:"fixed64,4,opt,name=minimum,proto3" json:"minimum,omitempty"`
 	BinWidth      float64                `protobuf:"fixed64,5,opt,name=bin_width,json=binWidth,proto3" json:"bin_width,omitempty"`
-	Bins          []uint64               `protobuf:"varint,6,rep,packed,name=bins,proto3" json:"bins,omitempty"`
+	Bins          []uint32               `protobuf:"varint,6,rep,packed,name=bins,proto3" json:"bins,omitempty"`
 	Entries       uint64                 `protobuf:"varint,7,opt,name=entries,proto3" json:"entries,omitempty"`
 	Underflow     uint64                 `protobuf:"varint,8,opt,name=underflow,proto3" json:"underflow,omitempty"`
 	Overflow      uint64                 `protobuf:"varint,9,opt,name=overflow,proto3" json:"overflow,omitempty"`
@@ -2461,7 +2470,7 @@ func (x *HistogramDataset) GetBinWidth() float64 {
 	return 0
 }
 
-func (x *HistogramDataset) GetBins() []uint64 {
+func (x *HistogramDataset) GetBins() []uint32 {
 	if x != nil {
 		return x.Bins
 	}
@@ -3602,14 +3611,15 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x12!\n" +
 	"\frequested_by\x18\x03 \x01(\tR\vrequestedBy\"X\n" +
 	"\x16SetHighVoltageResponse\x12>\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xf2\x01\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\xa1\x02\n" +
 	"\x0fStartRunRequest\x12/\n" +
 	"\x13janus_configuration\x18\x02 \x01(\tR\x12janusConfiguration\x12\x1f\n" +
 	"\vcapture_raw\x18\x03 \x01(\bR\n" +
 	"captureRaw\x12+\n" +
 	"\x11journal_transport\x18\x04 \x01(\bR\x10journalTransport\x12!\n" +
 	"\frequested_by\x18\x05 \x01(\tR\vrequestedBy\x12/\n" +
-	"\x14hdf5_segment_size_mb\x18\x06 \x01(\rR\x11hdf5SegmentSizeMbJ\x04\b\x01\x10\x02R\x06run_id\"\x81\x01\n" +
+	"\x14hdf5_segment_size_mb\x18\x06 \x01(\rR\x11hdf5SegmentSizeMb\x12-\n" +
+	"\x12persist_histograms\x18\a \x01(\bR\x11persistHistogramsJ\x04\b\x01\x10\x02R\x06run_id\"\x81\x01\n" +
 	"\x10StartRunResponse\x12-\n" +
 	"\x03run\x18\x01 \x01(\v2\x1b.pet.caen.daq.v1.RunSummaryR\x03run\x12>\n" +
 	"\bsnapshot\x18\x02 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"J\n" +
@@ -3706,7 +3716,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\achannel\x18\x03 \x01(\rR\achannel\x12\x18\n" +
 	"\aminimum\x18\x04 \x01(\x01R\aminimum\x12\x1b\n" +
 	"\tbin_width\x18\x05 \x01(\x01R\bbinWidth\x12\x12\n" +
-	"\x04bins\x18\x06 \x03(\x04R\x04bins\x12\x18\n" +
+	"\x04bins\x18\x06 \x03(\rR\x04bins\x12\x18\n" +
 	"\aentries\x18\a \x01(\x04R\aentries\x12\x1c\n" +
 	"\tunderflow\x18\b \x01(\x04R\tunderflow\x12\x1a\n" +
 	"\boverflow\x18\t \x01(\x04R\boverflow\"\xc3\x05\n" +

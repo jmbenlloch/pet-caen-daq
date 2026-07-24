@@ -8,8 +8,9 @@ func createRunWriter(parent string, manifest runstore.Manifest) (runWriter, erro
 	return runstore.Create(parent, manifest)
 }
 
-func decodedArtifactName(string) string { return "events.jsonl" }
-func expectedStorageFormat() string     { return "jsonl" }
+func decodedArtifactName(string) string   { return "events.jsonl" }
+func expectedStorageFormat() string       { return "jsonl" }
+func histogramPersistenceSupported() bool { return false }
 
 func storageIdentity() runstore.StorageIdentity {
 	return runstore.StorageIdentity{Format: "jsonl", WriterVersion: runstore.SchemaVersion, Compression: "none"}

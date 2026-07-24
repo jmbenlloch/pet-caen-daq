@@ -1,7 +1,12 @@
 import { create } from '@bufbuild/protobuf'
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
-import { BoardSchema, HistogramDatasetSchema, HistogramKind } from './gen/pet/caen/daq/v1/system_pb'
+import {
+  BoardSchema,
+  HistogramDatasetSchema,
+  HistogramKind,
+  RunSummarySchema,
+} from './gen/pet/caen/daq/v1/system_pb'
 import PlotWorkspace from './PlotWorkspace.vue'
 
 describe('PlotWorkspace', () => {
@@ -12,6 +17,8 @@ describe('PlotWorkspace', () => {
           { chain: 1, ...create(BoardSchema, { node: 2 }) },
           { chain: 3, ...create(BoardSchema, { node: 0 }) },
         ],
+        runs: [],
+        activeRunId: '42',
         running: true,
         loading: false,
         datasets: [],
@@ -35,8 +42,9 @@ describe('PlotWorkspace', () => {
     expect(requestButton).toBeDefined()
     await requestButton!.trigger('click')
     const request = wrapper.emitted('request')?.[0]
-    expect(request?.[0]).toBe(HistogramKind.PHA_HIGH_GAIN)
-    expect(request?.[1]).toEqual([
+    expect(request?.[0]).toBe('42')
+    expect(request?.[1]).toBe(HistogramKind.PHA_HIGH_GAIN)
+    expect(request?.[2]).toEqual([
       expect.objectContaining({ chain: 1, node: 2, channel: 0 }),
       expect.objectContaining({ channel: 2 }),
       expect.objectContaining({ channel: 8 }),
@@ -52,7 +60,7 @@ describe('PlotWorkspace', () => {
           channel: 0,
           binWidth: 4,
           entries: 3n,
-          bins: [0n, 3n, 0n],
+          bins: [0, 3, 0],
         }),
       ],
     })
@@ -63,8 +71,26 @@ describe('PlotWorkspace', () => {
     wrapper.get('[aria-label="Live selected-channel histogram plot"]')
     expect(wrapper.text()).not.toContain('First populated bins')
 
-    await wrapper.setProps({ running: false })
-    expect(wrapper.text()).toContain('Showing the last requested histogram from the completed run.')
+    await wrapper.setProps({
+      activeRunId: undefined,
+      running: false,
+      runs: [
+        create(RunSummarySchema, {
+          runId: '41',
+          artifacts: [
+            {
+              $typeName: 'pet.caen.daq.v1.Artifact',
+              kind: 'histograms',
+              name: 'run_41.histograms.h5',
+              sizeBytes: 1n,
+              sha256: 'hash',
+            },
+          ],
+        }),
+      ],
+    })
+    expect(wrapper.get('[aria-label="Histogram run"]').element).toHaveProperty('value', '41')
+    expect(wrapper.text()).toContain('Viewing persisted histograms from run 41.')
     wrapper.get('[aria-label="Live selected-channel histogram plot"]')
   })
 
@@ -72,6 +98,8 @@ describe('PlotWorkspace', () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
         boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
+        runs: [],
+        activeRunId: '42',
         running: true,
         loading: false,
         datasets: [],
@@ -101,6 +129,8 @@ describe('PlotWorkspace', () => {
           { chain: 0, ...create(BoardSchema, { node: 0 }) },
           { chain: 1, ...create(BoardSchema, { node: 0 }) },
         ],
+        runs: [],
+        activeRunId: '42',
         running: true,
         loading: false,
         datasets: [],
@@ -130,6 +160,6 @@ describe('PlotWorkspace', () => {
       .findAll('button')
       .find((button) => button.text() === 'Request data')
     await requestButton!.trigger('click')
-    expect(wrapper.emitted('request')?.[0]?.[1]).toHaveLength(64)
+    expect(wrapper.emitted('request')?.[0]?.[2]).toHaveLength(64)
   })
 })

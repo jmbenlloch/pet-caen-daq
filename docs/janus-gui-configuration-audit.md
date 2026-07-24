@@ -158,10 +158,10 @@ High-priority frontend gaps after the current milestones are:
 | `LG_ShapingTime` | Low-gain slow-shaper peaking time. | Global select: 12.5–87.5 ns. | **Complete.** |
 | `HoldDelay` | Delay from bunch trigger to peak-detector hold. | Global time. | **Complete in backend.** Frontend lacks a specific range/8 ns step. |
 | `MuxClkPeriod` | Analog multiplexer readout period. | Global time; JANUS recommends 300 ns. | **Complete in backend.** Frontend lacks a dedicated legal-range constraint. |
-| `EHistoNbin` | PHA histogram bin count. | Global combo: disabled, 256–8K. | **Complete for live accumulation.** The active run lazily stores bounded HG/LG arrays per board/channel and selected sets are requestable. Durable histogram artifacts remain missing. |
+| `EHistoNbin` | PHA histogram bin count. | Global combo: disabled, 256–8K. | **Complete.** The active run lazily stores bounded HG/LG arrays and can persist the drained snapshot as a run artifact. |
 | `ToAHistoNbin` | ToA histogram bin count. | Global combo: disabled, 256–16K. | **Complete for the initial live domain.** Per-channel ToA arrays are accumulated and requested independently of telemetry. |
-| `ToARebin` | ToA histogram rebin factor. | Global integer. | **Partial.** Editable/audited, but the initial accumulator maps the full decoded 25-bit domain and does not yet apply JANUS rebinning. |
-| `ToAHistoMin` | ToA histogram lower edge. | Global time. | **Partial.** Editable/audited but not yet applied to the initial live domain. |
+| `ToARebin` | ToA histogram rebin factor. | Global integer, 1–127. | **Complete.** The accumulator applies JANUS's 0.5 ns tick conversion and integer rebinning. |
+| `ToAHistoMin` | ToA histogram lower edge. | Global non-negative time. | **Complete.** Values below the configured lower edge are counted as underflow. |
 | `MCSHistoNbin` | Counting-mode MCS bin count. | Global combo: disabled, 256–16K. | **Inactive by design.** |
 
 ## Test-Probe tab

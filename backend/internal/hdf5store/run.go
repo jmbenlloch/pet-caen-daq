@@ -29,6 +29,7 @@ type RunWriter struct {
 	segmentSize    uint64
 	segmentIndex   uint32
 	segmentNames   []string
+	histogramName  string
 	raw            *rawcapture.Writer
 	rawFile        *os.File
 	rawEnabled     bool
@@ -104,6 +105,27 @@ func (w *RunWriter) Directory() string { return w.dir }
 
 func (w *RunWriter) Artifacts() []runstore.Artifact {
 	return append([]runstore.Artifact(nil), w.manifest.Artifacts...)
+}
+
+func (w *RunWriter) SaveHistograms(histograms []runstore.HistogramDataset) error {
+	if w.closed {
+		return errors.New("run writer is closed")
+	}
+	if w.histogramName != "" {
+		return errors.New("histograms are already saved")
+	}
+	name := fmt.Sprintf("run_%s.histograms.h5", w.manifest.RunID)
+	temporary := filepath.Join(w.dir, name+".tmp")
+	if err := SaveHistograms(temporary, w.manifest.RunID, histograms); err != nil {
+		_ = os.Remove(temporary)
+		return err
+	}
+	if err := os.Rename(temporary, filepath.Join(w.dir, name)); err != nil {
+		_ = os.Remove(temporary)
+		return fmt.Errorf("publish histogram artifact: %w", err)
+	}
+	w.histogramName = name
+	return nil
 }
 
 func (w *RunWriter) EnableRawCapture() error {
@@ -229,6 +251,9 @@ func (w *RunWriter) finalizedArtifacts() ([]runstore.Artifact, error) {
 	names := make([]struct{ name, kind string }, 0, len(w.segmentNames)+2)
 	for _, name := range w.segmentNames {
 		names = append(names, struct{ name, kind string }{name, "decoded_events"})
+	}
+	if w.histogramName != "" {
+		names = append(names, struct{ name, kind string }{w.histogramName, "histograms"})
 	}
 	if w.rawEnabled {
 		names = append(names, struct{ name, kind string }{"wire.raw", "raw_capture"})

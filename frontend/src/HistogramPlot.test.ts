@@ -25,7 +25,7 @@ describe('HistogramPlot', () => {
       channel: 4,
       minimum: 0,
       binWidth: 1,
-      bins: [0n, 3n, 1n],
+      bins: [0, 3, 1],
     })
     const wrapper = mount(HistogramPlot, {
       props: { datasets: [dataset], theme: 'dark', logarithmic: false },

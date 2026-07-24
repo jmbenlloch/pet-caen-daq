@@ -55,6 +55,7 @@ const configuration = computed({
 })
 const captureRaw = ref(false)
 const journalTransport = ref(false)
+const persistHistograms = ref(false)
 const hdf5SegmentSizeMb = ref(500)
 const configFile = ref<HTMLInputElement>()
 type WorkspaceTab = 'acquisition' | 'statistics' | 'plots' | 'hardware' | 'runs'
@@ -706,6 +707,7 @@ onMounted(() => daq.connect())
                     configuration,
                     captureRaw,
                     journalTransport,
+                    persistHistograms,
                     hdf5SegmentSizeMb,
                   })
                 "
@@ -979,6 +981,19 @@ onMounted(() => daq.connect())
                 </div>
               </article>
               <template v-if="selectedSection === 'RunCtrl'">
+                <article class="parameter-row">
+                  <div class="parameter-copy">
+                    <label for="persist-histograms">Store run histograms</label>
+                    <p>
+                      Write a standalone run_&lt;run-id&gt;.histograms.h5 artifact for later
+                      viewing.
+                    </p>
+                  </div>
+                  <label class="switch">
+                    <input id="persist-histograms" v-model="persistHistograms" type="checkbox" />
+                    <span>{{ persistHistograms ? 'Enabled' : 'Disabled' }}</span>
+                  </label>
+                </article>
                 <article class="parameter-row">
                   <div class="parameter-copy">
                     <label for="capture-raw">Preserve complete raw batches</label>
@@ -1428,6 +1443,8 @@ onMounted(() => daq.connect())
       >
         <PlotWorkspace
           :boards="boards"
+          :runs="daq.runHistory.value"
+          :active-run-id="daq.snapshot.value?.currentRun?.runId"
           :running="daq.snapshot.value?.state === SystemState.RUNNING"
           :loading="daq.histogramsLoading.value"
           :datasets="daq.histogramDatasets.value"

@@ -299,7 +299,7 @@ ToAHistoNbin					4K					g		c		# Number of channels (bins) in the ToA histogram
 	- 4K
 	- 8K
 	- 16K
-ToARebin						1					g		d		# Rebin factor for the ToA histogram
+ToARebin						1					g		d		# ToA histogram rebin factor (1 to 127). Bin width is 0.5 ns times this value
 ToAHistoMin						"0 ns"				g		du		# Minimum value of ToA (in ns) in the ToA histogram
 MCSHistoNbin					4K					g		c		# Number of channels (bins) in the MCS histogram (active in counting mode)
 	- DISABLED
@@ -460,5 +460,4 @@ TestPulsePreamp					BOTH				g		c		# Test pulse can feed both HG and LG preamps o
 [Log]
 #---------------------------------------------------------------------------------------
 # Empty section (Tab used by GUI)
-
 

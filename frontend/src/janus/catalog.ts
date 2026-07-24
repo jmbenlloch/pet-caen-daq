@@ -48,7 +48,7 @@ const constraints: Record<string, Pick<JanusParameter, 'min' | 'max' | 'step' | 
   ZS_Threshold_HG: { min: 0, max: 65535, step: 1 },
   HoldDelay: { min: 0, step: 1, units: ['ns', 'us'] },
   MuxClkPeriod: { min: 0, step: 1, units: ['ns', 'us'] },
-  ToARebin: { min: 1, step: 1 },
+  ToARebin: { min: 1, max: 127, step: 1 },
   ToAHistoMin: { step: 1, units: ['ns', 'us', 'ms', 's'] },
   ProbeChannel0: { min: 0, max: 31, step: 1 },
   ProbeChannel1: { min: 32, max: 63, step: 1 },

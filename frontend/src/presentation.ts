@@ -23,8 +23,8 @@ export const healthLabel: Record<HealthStatus, string> = {
   [HealthStatus.FAULT]: 'Fault',
 }
 
-export function compact(value: bigint | undefined) {
-  return new Intl.NumberFormat().format(value ?? 0n)
+export function compact(value: bigint | number | undefined) {
+  return new Intl.NumberFormat().format(value ?? 0)
 }
 
 export function bytes(value: bigint | undefined) {

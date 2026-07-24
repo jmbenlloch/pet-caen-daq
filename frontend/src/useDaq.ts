@@ -48,9 +48,7 @@ export function useDaq(api: DaqApi) {
 
   function accept(next: TelemetrySnapshot | undefined) {
     if (!next) return
-    const activeRunChanged =
-      snapshot.value?.currentRun?.runId !== next.currentRun?.runId ||
-      next.state !== SystemState.RUNNING
+    const activeRunChanged = snapshot.value?.currentRun?.runId !== next.currentRun?.runId
     if (activeRunChanged) invalidateHistogramRequests()
     snapshot.value = next
     if (next.latestCompletedRun) latestCompletedRun.value = next.latestCompletedRun
@@ -176,6 +174,7 @@ export function useDaq(api: DaqApi) {
     configuration: string
     captureRaw: boolean
     journalTransport: boolean
+    persistHistograms: boolean
     hdf5SegmentSizeMb: number
   }) {
     busy.value = true
@@ -190,6 +189,7 @@ export function useDaq(api: DaqApi) {
           janusConfiguration: input.configuration,
           captureRaw: input.captureRaw,
           journalTransport: input.journalTransport,
+          persistHistograms: input.persistHistograms,
           hdf5SegmentSizeMb: input.hdf5SegmentSizeMb,
         }),
       )
@@ -257,9 +257,12 @@ export function useDaq(api: DaqApi) {
     }
   }
 
-  async function loadHistograms(kind: HistogramKind, selections: HistogramSelection[]) {
-    const runId = snapshot.value?.currentRun?.runId
-    if (!runId || snapshot.value?.state !== SystemState.RUNNING) {
+  async function loadHistograms(
+    runId: string,
+    kind: HistogramKind,
+    selections: HistogramSelection[],
+  ) {
+    if (!runId) {
       histogramDatasets.value = []
       return
     }
@@ -268,14 +271,9 @@ export function useDaq(api: DaqApi) {
     const sequence = ++histogramRequestSequence
     try {
       const datasets = await api.histograms(runId, kind, selections)
-      if (sequence === histogramRequestSequence && snapshot.value?.currentRun?.runId === runId)
-        histogramDatasets.value = datasets
+      if (sequence === histogramRequestSequence) histogramDatasets.value = datasets
     } catch (reason) {
-      if (
-        sequence === histogramRequestSequence &&
-        snapshot.value?.state === SystemState.RUNNING &&
-        snapshot.value?.currentRun?.runId === runId
-      )
+      if (sequence === histogramRequestSequence)
         error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {
       if (sequence === histogramRequestSequence) histogramsLoading.value = false
