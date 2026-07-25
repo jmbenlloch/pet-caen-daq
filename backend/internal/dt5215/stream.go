@@ -43,13 +43,13 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 		}
 		_ = c.stream.SetReadDeadline(time.Time{})
 	}()
-	header := make([]byte, 12)
-	if err := c.readStreamEvidence(ctx, "header", header); err != nil {
+	if err := c.fillStreamBuffer(ctx, "header", 12); err != nil {
 		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
 		return nil, nil, fmt.Errorf("read stream batch header: %w", err)
 	}
+	header := c.streamBuffer[:12]
 	w2 := binary.LittleEndian.Uint32(header[8:])
 	rows := int(w2 >> 8)
 	if binary.LittleEndian.Uint32(header) != 0xffffffff || binary.LittleEndian.Uint32(header[4:]) != 0xffffffff {
@@ -60,13 +60,14 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 		err := c.recordFramingFailure("header", fmt.Errorf("invalid descriptor row count %d", rows))
 		return nil, nil, err
 	}
-	table := make([]byte, rows*32)
-	if err := c.readStreamEvidence(ctx, "descriptor", table); err != nil {
+	tableEnd := 12 + rows*32
+	if err := c.fillStreamBuffer(ctx, "descriptor", tableEnd); err != nil {
 		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
 		return nil, nil, fmt.Errorf("read stream descriptor table: %w", err)
 	}
+	table := c.streamBuffer[12:tableEnd]
 	var extent uint64
 	for i := 0; i < rows; i++ {
 		p := table[i*32:]
@@ -86,15 +87,15 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 		err := c.recordFramingFailure("descriptor", fmt.Errorf("stream batch payload extent %d is too large", extent))
 		return nil, nil, err
 	}
-	payload := make([]byte, int(extent))
-	if err := c.readStreamEvidence(ctx, "payload", payload); err != nil {
+	batchEnd := tableEnd + int(extent)
+	if err := c.fillStreamBuffer(ctx, "payload", batchEnd); err != nil {
 		if ctxErr := operationContextError(ctx); ctxErr != nil {
 			return nil, nil, ctxErr
 		}
 		return nil, nil, fmt.Errorf("read stream payload: %w", err)
 	}
-	batch := append(header, table...)
-	batch = append(batch, payload...)
+	batch := append([]byte(nil), c.streamBuffer[:batchEnd]...)
+	c.streamBuffer = nil
 	events, err := DecodeStreamBatch(batch)
 	if err != nil {
 		err = c.recordFramingFailure("decode", err)
@@ -103,11 +104,21 @@ func (c *Client) ReadRawStreamBatch(ctx context.Context) ([]byte, []StreamEvent,
 	return batch, events, nil
 }
 
-func (c *Client) readStreamEvidence(ctx context.Context, stage string, target []byte) error {
-	for len(target) > 0 {
+// fillStreamBuffer retains every byte until a complete batch has been framed.
+// A context cancellation may interrupt any socket read during the run-to-drain
+// handoff; retaining the partial header/table/payload lets the next caller
+// resume the same batch instead of interpreting its remainder as a new header.
+func (c *Client) fillStreamBuffer(ctx context.Context, stage string, size int) error {
+	for len(c.streamBuffer) < size {
+		remaining := size - len(c.streamBuffer)
+		if remaining > 64*1024 {
+			remaining = 64 * 1024
+		}
+		target := make([]byte, remaining)
 		n, err := c.stream.Read(target)
 		if n > 0 {
 			data := append([]byte(nil), target[:n]...)
+			c.streamBuffer = append(c.streamBuffer, data...)
 			if c.journal != nil {
 				record := transportjournal.Record{Kind: transportjournal.Data, Offset: c.streamOffset, TimestampUnixNano: c.journalTime().UnixNano(), ConnectionID: c.streamConnectionID, Stage: stage, Data: data}
 				if journalErr := c.journal.AppendRecord(record); journalErr != nil {
@@ -115,7 +126,6 @@ func (c *Client) readStreamEvidence(ctx context.Context, stage string, target []
 				}
 			}
 			c.streamOffset += uint64(n)
-			target = target[n:]
 		}
 		if err != nil {
 			if c.journal != nil {

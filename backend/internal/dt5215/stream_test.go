@@ -100,6 +100,65 @@ func TestReadRawStreamBatchCancellationInterruptsStalledRead(t *testing.T) {
 		t.Fatalf("cancellation took %s", time.Since(started))
 	}
 }
+
+func TestReadRawStreamBatchResumesPartialPayloadAfterCancellation(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	client := &Client{stream: clientConn}
+	var capture bytes.Buffer
+	journal, err := transportjournal.NewWriter(&capture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetStreamJournal(journal, "resume-stream", nil)
+	batch := make([]byte, 12+32+12)
+	binary.LittleEndian.PutUint32(batch, 0xffffffff)
+	binary.LittleEndian.PutUint32(batch[4:], 0xffffffff)
+	binary.LittleEndian.PutUint32(batch[8:], 1<<8)
+	binary.LittleEndian.PutUint32(batch[12:], 3)
+	binary.LittleEndian.PutUint32(batch[12+28:], 3<<8)
+	copy(batch[44:], []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
+
+	partialWritten := make(chan struct{})
+	continueWrite := make(chan struct{})
+	go func() {
+		_, _ = serverConn.Write(batch[:49])
+		close(partialWritten)
+		<-continueWrite
+		_, _ = serverConn.Write(batch[49:])
+	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-partialWritten
+		cancel()
+	}()
+	if _, _, err := client.ReadRawStreamBatch(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("partial read error = %v, want context canceled", err)
+	}
+	close(continueWrite)
+	raw, events, err := client.ReadRawStreamBatch(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(raw, batch) || len(events) != 1 || !bytes.Equal(events[0].Payload, batch[44:]) {
+		t.Fatalf("raw=%x events=%#v", raw, events)
+	}
+	if err := journal.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reader, err := transportjournal.NewReader(bytes.NewReader(capture.Bytes()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	journalData, failures, err := transportjournal.Replay(reader, "resume-stream")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(journalData, batch) || len(failures) != 1 || failures[0].Kind != transportjournal.Termination || failures[0].Stage != "payload" || failures[0].Reason != context.Canceled.Error() {
+		t.Fatalf("journal data=%x failures=%#v", journalData, failures)
+	}
+}
 func TestDecodeStreamBatchRejectsMalformed(t *testing.T) {
 	for _, b := range [][]byte{{}, make([]byte, 12)} {
 		if _, err := DecodeStreamBatch(b); err == nil {
