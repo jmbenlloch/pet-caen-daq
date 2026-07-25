@@ -1,6 +1,6 @@
 # Acquisition backpressure and batched HDF5 report
 
-Status: measured on real runs 44 and 48 on 2026-07-25
+Status: measured on real runs 44, 48–55 on 2026-07-25
 
 ## Summary
 
@@ -71,8 +71,8 @@ available.
 ## Remaining stop latency
 
 Run 48 proved that the acquisition pipeline itself can be almost empty at
-stop. Remaining operator-visible latency can still occur after the hardware
-stops because the synchronous finalization path may:
+stop. The original synchronous finalization path performed all of the
+following before making the next run available:
 
 1. stop the read loop;
 2. send `ACQ_STOP` and wait for the 100 ms idle drain condition;
@@ -81,7 +81,8 @@ stops because the synchronous finalization path may:
 5. flush and close raw capture and the transport journal;
 6. flush and close the current HDF5 segment;
 7. read every artifact again to calculate SHA-256;
-8. publish the final manifest and transition to ready.
+8. reconcile the complete run catalog;
+9. publish the final manifest and transition to ready.
 
 Run 49 measured 23.519 seconds from stop request to ready. Artifact hashing
 consumed 20.779 seconds (88.3%): 10.316 seconds for the 461 MB event HDF5,
@@ -101,11 +102,55 @@ datasets. Histogram schema version 2 replaces those objects and their 8,192
 attributes with one bins dataset and one spectrum table per kind (eight
 datasets total), using grouped writes and per-channel hyperslab reads.
 
+### Storage-path comparison
+
+Runs 51–53 used a Docker bind mount backed by `D:`, a 2 TB external Seagate
+USB disk. Run 54 moved the same run directory back to `C:`, an internal NVMe
+SSD. The acquisition configuration and event volume were comparable.
+
+| Stage | D: USB, runs 51–53 | C: NVMe, run 54 |
+| --- | ---: | ---: |
+| Persisted events | 790,711–800,970 | 799,949 |
+| Histogram write | 362–554 ms | 107 ms |
+| HDF5 segment finalize | 2,240–2,851 ms | 34 ms |
+| Session finalize | 2,758–3,430 ms | 225 ms |
+| Stop request to coordinator ready | 2,974–3,652 ms | 486 ms |
+
+The USB path sustained live acquisition without pipeline rejection, but its
+flush latency dominated run closure. The NVMe result demonstrates that this
+delay was storage-path dependent rather than deferred decoding or an HDF5
+schema regression. Run 54's manifest records 799,949 events, a 485,106,372-byte
+event HDF5 artifact, and an 816,660-byte histogram artifact.
+
+### Browser-visible completion and catalog work
+
 Run completion no longer performs a synchronous full catalog reconciliation.
 The browser-visible ready snapshot is published immediately after storage
 finalization, and only the newly completed manifest is indexed in the
 background. Full catalog comparison and repair are explicit offline
 maintenance operations.
+
+Run 55 measured the resulting end-to-end behavior on the NVMe path:
+
+| Stage | Run 55 |
+| --- | ---: |
+| Hardware drain | 208 ms |
+| Pipeline close | 0 ms |
+| Histogram snapshot | 2 ms |
+| Histogram write | 88 ms |
+| Pending-event flush | 1 ms |
+| HDF5 segment finalize | 123 ms |
+| Storage finalize | 201 ms |
+| Session/run finalize | 292 ms |
+| Coordinator ready | 509 ms |
+| Completion published to telemetry | **538 ms** |
+| Asynchronous single-run catalog index | 1,227 ms |
+
+All 4,157 received batches were accepted, and all 802,046 decoded events were
+persisted. Catalog indexing remained relatively expensive because the
+316 KiB-class manifest contains the requested configuration, effective
+configuration audit, and final statistics, but its 1.227-second duration no
+longer delayed the ready snapshot or the stop response.
 
 The instrumented build emits one `run_timing` log record for every remaining
 stage. Capture the server log from
