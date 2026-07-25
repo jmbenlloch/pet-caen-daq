@@ -89,7 +89,7 @@ describe('PlotWorkspace', () => {
     expect(wrapper.text()).not.toContain('Viewing persisted histograms')
   })
 
-  it('requests selected channel sets and presents returned bins to the live plot', async () => {
+  it('requests channel changes immediately for a live run', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
         api: apiWithRuns(createRun('41')),
@@ -116,12 +116,19 @@ describe('PlotWorkspace', () => {
     await wrapper.get('[aria-label="Board 1 node 2 channel 8"]').trigger('click')
     await wrapper.get('[aria-label="Board 1 node 2 channel 9"]').trigger('click')
     await wrapper.get('[aria-label="Board 3 node 0 channel 4"]').trigger('click')
+    expect(wrapper.emitted('request')?.at(-1)?.[2]).toEqual([
+      expect.objectContaining({ chain: 1, node: 2, channel: 0 }),
+      expect.objectContaining({ channel: 2 }),
+      expect.objectContaining({ channel: 8 }),
+      expect.objectContaining({ channel: 9 }),
+      expect.objectContaining({ chain: 3, node: 0, channel: 4 }),
+    ])
     const requestButton = wrapper
       .findAll('button')
       .find((button) => button.text() === 'Request data')
     expect(requestButton).toBeDefined()
     await requestButton!.trigger('click')
-    const request = wrapper.emitted('request')?.[0]
+    const request = wrapper.emitted('request')?.at(-1)
     expect(request?.[0]).toBe('42')
     expect(request?.[1]).toBe(HistogramKind.PHA_HIGH_GAIN)
     expect(request?.[2]).toEqual([
@@ -156,9 +163,51 @@ describe('PlotWorkspace', () => {
       running: false,
     })
     await flushPromises()
-    expect(wrapper.get('.plot-run-source').text()).toContain('Run 41')
-    expect(wrapper.text()).toContain('Viewing persisted histograms from run 41.')
+    expect(wrapper.get('.plot-run-source').text()).toContain('Run 42')
+    expect(wrapper.text()).toContain('Viewing persisted histograms from run 42.')
     wrapper.get('[aria-label="Live selected-channel histogram plot"]')
+
+    await wrapper.get('[aria-label="Board 1 node 2 channel 2"]').trigger('click')
+    expect(wrapper.emitted('request')?.at(-1)).toEqual([
+      '42',
+      HistogramKind.PHA_HIGH_GAIN,
+      [
+        expect.objectContaining({ chain: 1, node: 2, channel: 0 }),
+        expect.objectContaining({ channel: 8 }),
+        expect.objectContaining({ channel: 9 }),
+        expect.objectContaining({ chain: 3, node: 0, channel: 4 }),
+      ],
+    ])
+  })
+
+  it('requests channel changes immediately for a selected historical run', async () => {
+    const wrapper = mount(PlotWorkspace, {
+      props: {
+        api: apiWithRuns(createRun('41')),
+        boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
+        running: false,
+        loading: false,
+        datasets: [],
+        theme: 'light',
+      },
+      global: {
+        stubs: {
+          HistogramPlot: { template: '<div />' },
+        },
+      },
+    })
+    await flushPromises()
+    const requestsBeforeChange = wrapper.emitted('request')?.length ?? 0
+
+    await wrapper.get('[aria-haspopup="true"]').trigger('click')
+    await wrapper.get('[aria-label="Board 0 node 0 channel 3"]').trigger('click')
+
+    expect(wrapper.emitted('request')).toHaveLength(requestsBeforeChange + 1)
+    expect(wrapper.emitted('request')?.at(-1)).toEqual([
+      '41',
+      HistogramKind.PHA_HIGH_GAIN,
+      [expect.objectContaining({ channel: 0 }), expect.objectContaining({ channel: 3 })],
+    ])
   })
 
   it('keeps the manual request button stable during automatic refresh', async () => {
@@ -227,6 +276,6 @@ describe('PlotWorkspace', () => {
       .findAll('button')
       .find((button) => button.text() === 'Request data')
     await requestButton!.trigger('click')
-    expect(wrapper.emitted('request')?.[0]?.[2]).toHaveLength(64)
+    expect(wrapper.emitted('request')?.at(-1)?.[2]).toHaveLength(64)
   })
 })

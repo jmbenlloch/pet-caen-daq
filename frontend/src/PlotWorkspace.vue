@@ -30,7 +30,6 @@ const emit = defineEmits<{
 }>()
 const kind = ref(HistogramKind.PHA_HIGH_GAIN)
 const selectedRunId = ref('')
-const selectedRun = ref<DeepReadonly<RunSummary>>()
 const selected = ref(new Set<string>())
 const selectorOpen = ref(false)
 const autoRefresh = ref(true)
@@ -44,17 +43,13 @@ watch(
   () => props.activeRunId,
   (activeRunId, previousActiveRunId) => {
     if (activeRunId && activeRunId !== previousActiveRunId) {
-      selectedRun.value = undefined
       selectedRunId.value = activeRunId
-    } else if (!activeRunId && previousActiveRunId && selectedRunId.value === previousActiveRunId) {
-      selectedRunId.value = ''
     }
   },
   { immediate: true },
 )
 
 function selectRun(run: DeepReadonly<RunSummary>) {
-  selectedRun.value = run
   selectedRunId.value = run.runId
 }
 
@@ -105,17 +100,8 @@ function selectBoard(chain: number, node: number, value: boolean) {
   selected.value = next
 }
 
-function request() {
-  if (!selectedRunId.value) return
-  if (!selected.value.size) {
-    selectionError.value = 'Select at least one channel'
-    return
-  }
-  if (selected.value.size > selectionLimit) {
-    selectionError.value = `Select no more than ${selectionLimit} channels at a time`
-    return
-  }
-  const selections = [...selected.value]
+function histogramSelections() {
+  return [...selected.value]
     .map((key) => key.split(':').map(Number))
     .sort(
       ([chainA, nodeA, channelA], [chainB, nodeB, channelB]) =>
@@ -127,18 +113,36 @@ function request() {
       node,
       channel,
     }))
-  selectionError.value = ''
+}
+
+function requestSelections(selections: HistogramSelection[]) {
+  if (!selectedRunId.value) return
+  if (!selections.length) {
+    selectionError.value = 'Select at least one channel'
+    return
+  }
+  if (selections.length > selectionLimit) {
+    selectionError.value = `Select no more than ${selectionLimit} channels at a time`
+    return
+  }
   emit('request', selectedRunId.value, kind.value, selections)
 }
 
+function request() {
+  requestSelections(histogramSelections())
+}
+
 watch(
-  [selectedRunId, kind, selected, selectedRun],
-  ([runId, histogramKind, selections, historicalRun]) => {
-    if (!runId || !selections.size || !historicalRun || historicalRun.runId !== runId) return
-    const requestKey = `${runId}:${histogramKind}`
+  [selectedRunId, kind, selected],
+  ([runId, histogramKind, selectionKeys]) => {
+    if (!runId || !selectionKeys.size) return
+    const selections = histogramSelections()
+    const requestKey = `${runId}:${histogramKind}:${selections
+      .map(({ chain, node, channel }) => `${chain}:${node}:${channel}`)
+      .join(',')}`
     if (requestKey === lastAutomaticRequest) return
     lastAutomaticRequest = requestKey
-    request()
+    requestSelections(selections)
   },
   { immediate: true },
 )
