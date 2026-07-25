@@ -34,6 +34,7 @@ const scanBoards = [0, 1, 2, 3]
 const finalized = ref<StaircaseScan>()
 const busy = ref(false)
 const error = ref('')
+const expanded = ref(false)
 
 const displayed = computed(() => props.live ?? finalized.value)
 const canStart = computed(() => props.systemState === SystemState.READY && !busy.value)
@@ -158,131 +159,148 @@ onMounted(refresh)
       <span class="safety"
         >Changes TD and QD coarse thresholds · restores configuration afterward</span
       >
+      <button
+        type="button"
+        class="scan-card-toggle"
+        :aria-expanded="expanded"
+        aria-controls="staircase-content"
+        @click="expanded = !expanded"
+      >
+        {{ expanded ? 'Collapse' : 'Expand' }}
+      </button>
     </div>
 
-    <div class="plot-controls staircase-controls">
-      <label>Board<input v-model.number="board" type="number" min="0" max="3" /></label>
-      <label>Minimum<input v-model.number="minimum" type="number" min="0" max="2047" /></label>
-      <label>Maximum<input v-model.number="maximum" type="number" min="0" max="2047" /></label>
-      <label>Step<input v-model.number="step" type="number" min="1" /></label>
-      <label
-        >Dwell (ms)<input v-model.number="dwellMilliseconds" type="number" min="1" max="34000"
-      /></label>
-      <div class="actions staircase-actions">
+    <div v-if="expanded" id="staircase-content" class="scan-card-content">
+      <div class="plot-controls staircase-controls">
+        <label>Board<input v-model.number="board" type="number" min="0" max="3" /></label>
+        <label>Minimum<input v-model.number="minimum" type="number" min="0" max="2047" /></label>
+        <label>Maximum<input v-model.number="maximum" type="number" min="0" max="2047" /></label>
+        <label>Step<input v-model.number="step" type="number" min="1" /></label>
+        <label
+          >Dwell (ms)<input v-model.number="dwellMilliseconds" type="number" min="1" max="34000"
+        /></label>
+        <div class="actions staircase-actions">
+          <button
+            type="button"
+            class="primary"
+            :disabled="!canStart"
+            :aria-busy="busy"
+            @click="start"
+          >
+            Start scan
+          </button>
+          <button v-if="running" type="button" class="danger" :disabled="busy" @click="cancel">
+            Cancel
+          </button>
+        </div>
+      </div>
+      <p class="muted">
+        Dwell time is the counting interval at each threshold. A longer dwell collects more events
+        for steadier rate measurements, but increases the total scan duration.
+      </p>
+      <p class="muted">
+        For a dark-count staircase, turn the light source off and confirm the intended HV state
+        before starting.
+      </p>
+      <p v-if="error" class="field-error" role="alert">{{ error }}</p>
+
+      <div v-if="displayed" class="staircase-status">
+        <strong>{{ scanRunLabel(displayed.summary?.scanId ?? '') }}</strong>
+        <span>
+          {{ displayed.summary?.completedPoints }} / {{ displayed.summary?.totalPoints }} points ·
+          {{ ScanState[displayed.summary?.state ?? ScanState.UNSPECIFIED] }}
+        </span>
+        <progress
+          :value="displayed.summary?.completedPoints"
+          :max="displayed.summary?.totalPoints || 1"
+        />
+      </div>
+
+      <label class="staircase-series">
+        Curve
+        <select v-model="selectedSeries">
+          <option v-for="channel in 64" :key="channel - 1" :value="`channel:${channel - 1}`">
+            Channel {{ channel - 1 }} TD
+          </option>
+          <option value="tor">T-OR</option>
+          <option value="qor">Q-OR</option>
+        </select>
+      </label>
+      <StaircasePlot
+        v-if="displayed?.points.length"
+        :points="displayed.points"
+        :series-key="selectedSeries"
+        :theme="theme"
+      />
+      <p v-else class="empty">
+        Start a scan or select a finalized scan to plot its measured rates.
+      </p>
+
+      <div class="section-title scan-history-title">
+        <div>
+          <p class="eyebrow">Stored scan datasets</p>
+          <h3>Finalized staircases</h3>
+        </div>
+        <div class="scan-history-tools">
+          <label>
+            Board
+            <select v-model="historyBoard" aria-label="Filter scans by board">
+              <option value="any">Any board</option>
+              <option
+                v-for="boardNumber in scanBoards"
+                :key="boardNumber"
+                :value="String(boardNumber)"
+              >
+                Board {{ boardNumber }}
+              </option>
+            </select>
+          </label>
+          <button type="button" class="link-button" :disabled="busy" @click="refresh">
+            Refresh
+          </button>
+        </div>
+      </div>
+      <div class="scan-history">
+        <div v-if="history.length" class="scan-history-header" aria-hidden="true">
+          <span>Run</span>
+          <span>Started</span>
+          <span>Board</span>
+          <span>Points</span>
+          <span>Status</span>
+        </div>
+        <button
+          v-for="scan in history"
+          :key="scan.scanId"
+          type="button"
+          class="secondary"
+          @click="load(scan.scanId)"
+        >
+          <strong data-label="Run">{{ scanRunLabel(scan.scanId) }}</strong>
+          <span data-label="Started">{{ localDateTime(scan.startedAt) }}</span>
+          <span data-label="Board">{{ scan.board }}</span>
+          <span data-label="Points">{{ scan.completedPoints }} / {{ scan.totalPoints }}</span>
+          <span data-label="Status" class="scan-history-state">{{
+            scanStateLabel(scan.state)
+          }}</span>
+        </button>
+      </div>
+      <nav v-if="historyPageCount > 1" class="run-pagination" aria-label="Scan history pages">
         <button
           type="button"
-          class="primary"
-          :disabled="!canStart"
-          :aria-busy="busy"
-          @click="start"
+          :disabled="historyPage === 1"
+          @click="selectHistoryPage(historyPage - 1)"
         >
-          Start scan
+          Previous
         </button>
-        <button v-if="running" type="button" class="danger" :disabled="busy" @click="cancel">
-          Cancel
+        <span>Page {{ historyPage }} of {{ historyPageCount }}</span>
+        <button
+          type="button"
+          :disabled="historyPage === historyPageCount"
+          @click="selectHistoryPage(historyPage + 1)"
+        >
+          Next
         </button>
-      </div>
+      </nav>
     </div>
-    <p class="muted">
-      Dwell time is the counting interval at each threshold. A longer dwell collects more events for
-      steadier rate measurements, but increases the total scan duration.
-    </p>
-    <p class="muted">
-      For a dark-count staircase, turn the light source off and confirm the intended HV state before
-      starting.
-    </p>
-    <p v-if="error" class="field-error" role="alert">{{ error }}</p>
-
-    <div v-if="displayed" class="staircase-status">
-      <strong>{{ scanRunLabel(displayed.summary?.scanId ?? '') }}</strong>
-      <span>
-        {{ displayed.summary?.completedPoints }} / {{ displayed.summary?.totalPoints }} points ·
-        {{ ScanState[displayed.summary?.state ?? ScanState.UNSPECIFIED] }}
-      </span>
-      <progress
-        :value="displayed.summary?.completedPoints"
-        :max="displayed.summary?.totalPoints || 1"
-      />
-    </div>
-
-    <label class="staircase-series">
-      Curve
-      <select v-model="selectedSeries">
-        <option v-for="channel in 64" :key="channel - 1" :value="`channel:${channel - 1}`">
-          Channel {{ channel - 1 }} TD
-        </option>
-        <option value="tor">T-OR</option>
-        <option value="qor">Q-OR</option>
-      </select>
-    </label>
-    <StaircasePlot
-      v-if="displayed?.points.length"
-      :points="displayed.points"
-      :series-key="selectedSeries"
-      :theme="theme"
-    />
-    <p v-else class="empty">Start a scan or select a finalized scan to plot its measured rates.</p>
-
-    <div class="section-title scan-history-title">
-      <div>
-        <p class="eyebrow">Stored scan datasets</p>
-        <h3>Finalized staircases</h3>
-      </div>
-      <div class="scan-history-tools">
-        <label>
-          Board
-          <select v-model="historyBoard" aria-label="Filter scans by board">
-            <option value="any">Any board</option>
-            <option
-              v-for="boardNumber in scanBoards"
-              :key="boardNumber"
-              :value="String(boardNumber)"
-            >
-              Board {{ boardNumber }}
-            </option>
-          </select>
-        </label>
-        <button type="button" class="link-button" :disabled="busy" @click="refresh">Refresh</button>
-      </div>
-    </div>
-    <div class="scan-history">
-      <div v-if="history.length" class="scan-history-header" aria-hidden="true">
-        <span>Run</span>
-        <span>Started</span>
-        <span>Board</span>
-        <span>Points</span>
-        <span>Status</span>
-      </div>
-      <button
-        v-for="scan in history"
-        :key="scan.scanId"
-        type="button"
-        class="secondary"
-        @click="load(scan.scanId)"
-      >
-        <strong data-label="Run">{{ scanRunLabel(scan.scanId) }}</strong>
-        <span data-label="Started">{{ localDateTime(scan.startedAt) }}</span>
-        <span data-label="Board">{{ scan.board }}</span>
-        <span data-label="Points">{{ scan.completedPoints }} / {{ scan.totalPoints }}</span>
-        <span data-label="Status" class="scan-history-state">{{ scanStateLabel(scan.state) }}</span>
-      </button>
-    </div>
-    <nav v-if="historyPageCount > 1" class="run-pagination" aria-label="Scan history pages">
-      <button
-        type="button"
-        :disabled="historyPage === 1"
-        @click="selectHistoryPage(historyPage - 1)"
-      >
-        Previous
-      </button>
-      <span>Page {{ historyPage }} of {{ historyPageCount }}</span>
-      <button
-        type="button"
-        :disabled="historyPage === historyPageCount"
-        @click="selectHistoryPage(historyPage + 1)"
-      >
-        Next
-      </button>
-    </nav>
   </section>
 </template>

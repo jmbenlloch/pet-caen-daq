@@ -13,6 +13,32 @@
   gap: 1rem;
 }
 
+.staircase-workspace > .section-title {
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.scan-card-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.scan-card-toggle {
+  min-width: 6.5rem;
+  border: 1px solid #3d536d;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #c9d7e7;
+  background: #14243a;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.scan-card-toggle:hover {
+  border-color: #5f7896;
+  background: #1a2d46;
+}
+
 .staircase-controls input {
   width: 100%;
 }
@@ -46,6 +72,44 @@
 .staircase-plot-shell,
 .staircase-plot {
   min-width: 0;
+}
+
+.hold-delay-plot-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+}
+
+.hold-delay-plot {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.heatmap-scale {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  color: #a9bad0;
+  font-size: 0.7rem;
+}
+
+.heatmap-scale-body {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+}
+
+.heatmap-scale-gradient {
+  width: 1rem;
+  height: 19rem;
+  border: 1px solid #38516d;
+  border-radius: 999px;
+  background: linear-gradient(to top, rgb(20 184 255 / 12%), rgb(20 184 255));
+}
+
+.heatmap-scale small {
+  color: #8194ac;
 }
 
 .staircase-plot {
@@ -171,6 +235,16 @@
 [data-theme='light'] .staircase-plot .u-title,
 [data-theme='light'] .staircase-plot .u-legend {
   color: #344c66;
+}
+
+[data-theme='light'] .scan-card-toggle {
+  border-color: #b8c9dc;
+  color: #18334d;
+  background: #f1f6fb;
+}
+
+[data-theme='light'] .heatmap-scale {
+  color: #526b84;
 }
 
 [data-theme='light'] .scan-history {

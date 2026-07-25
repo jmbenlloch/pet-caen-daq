@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch, type DeepReadonly } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type DeepReadonly } from 'vue'
 import uPlot, { type AlignedData, type Options } from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import type { HoldDelayPoint } from './gen/pet/caen/daq/v1/system_pb'
@@ -18,6 +18,24 @@ function orderedPoints() {
   return [...props.points].sort((a, b) => a.effectiveDelayNs - b.effectiveDelayNs)
 }
 
+function delayStep(points = orderedPoints()) {
+  const differences = points
+    .slice(1)
+    .map((point, index) => point.effectiveDelayNs - points[index].effectiveDelayNs)
+    .filter((difference) => difference > 0)
+  return differences.length ? Math.min(...differences) : 8
+}
+
+function selectedHistograms() {
+  return orderedPoints().map(
+    (point) => point.channels.find((item) => item.channel === props.channel)?.highGainBins ?? [],
+  )
+}
+
+const maximumCount = computed(() =>
+  Math.max(0, ...selectedHistograms().flatMap((histogram) => histogram)),
+)
+
 function data(): AlignedData {
   const ordered = orderedPoints()
   return [ordered.map((point) => point.effectiveDelayNs), ordered.map(() => 0)]
@@ -26,13 +44,14 @@ function data(): AlignedData {
 function drawHeatmap(u: uPlot) {
   const ordered = orderedPoints()
   if (!ordered.length) return
-  const histograms = ordered.map(
-    (point) => point.channels.find((item) => item.channel === props.channel)?.highGainBins ?? [],
-  )
+  const histograms = selectedHistograms()
   const maximum = Math.max(1, ...histograms.flat())
-  const step = ordered.length > 1 ? ordered[1].effectiveDelayNs - ordered[0].effectiveDelayNs : 8
+  const step = delayStep(ordered)
   const { ctx } = u
   ctx.save()
+  ctx.beginPath()
+  ctx.rect(u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height)
+  ctx.clip()
   for (let x = 0; x < ordered.length; x++) {
     const left = u.valToPos(ordered[x].effectiveDelayNs - step / 2, 'x', true)
     const right = u.valToPos(ordered[x].effectiveDelayNs + step / 2, 'x', true)
@@ -58,7 +77,16 @@ function options(): Options {
     height: 420,
     title: `Channel ${props.channel} high-gain spectrum`,
     series: [{}, { show: false }],
-    scales: { x: { time: false }, y: { range: [0, 512] } },
+    scales: {
+      x: {
+        time: false,
+        range: (_plot, minimum, maximum) => {
+          const padding = delayStep() / 2
+          return [minimum - padding, maximum + padding]
+        },
+      },
+      y: { range: [0, 512] },
+    },
     axes: [
       { label: 'Effective hold delay (ns)', stroke: axis, grid: { stroke: grid } },
       { label: 'Pulse-height bin', stroke: axis, grid: { stroke: grid } },
@@ -77,7 +105,12 @@ function rebuild() {
   plot.setScale('y', { min: 0, max: 512 })
 }
 
-watch(() => props.points, rebuild, { deep: true })
+function render() {
+  if (!plot) rebuild()
+  else plot.setData(data(), true)
+}
+
+watch(() => props.points, render)
 watch([() => props.channel, () => props.theme], rebuild)
 onMounted(() => {
   rebuild()
@@ -94,7 +127,21 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="staircase-plot-shell">
-    <div ref="host" role="img" :aria-label="`Hold delay heatmap for channel ${channel}`"></div>
+  <div class="staircase-plot-shell hold-delay-plot-shell">
+    <div
+      ref="host"
+      class="hold-delay-plot"
+      role="img"
+      :aria-label="`Hold delay heatmap for channel ${channel}`"
+    ></div>
+    <div class="heatmap-scale" aria-label="Logarithmic events per bin color scale">
+      <strong>Events / bin</strong>
+      <div class="heatmap-scale-body">
+        <span>{{ maximumCount.toLocaleString() }}</span>
+        <div class="heatmap-scale-gradient" aria-hidden="true"></div>
+        <span>0</span>
+      </div>
+      <small>log scale</small>
+    </div>
   </div>
 </template>

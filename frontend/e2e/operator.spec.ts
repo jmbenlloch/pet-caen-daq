@@ -113,6 +113,16 @@ test('hold-delay scan plots spectra produced by the simulator', async ({ page })
   await page.getByRole('tab', { name: /Scans/ }).click()
 
   const scan = page.getByRole('region', { name: 'Hold delay scan' })
+  const staircase = page.getByRole('region', { name: 'Threshold staircase' })
+  await expect(scan.getByRole('button', { name: 'Expand' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+  await expect(staircase.getByRole('button', { name: 'Expand' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+  await scan.getByRole('button', { name: 'Expand' }).click()
   await expect(scan.getByRole('spinbutton', { name: 'Maximum (ns)' })).toHaveValue('256')
   await scan.getByRole('spinbutton', { name: 'Maximum (ns)' }).fill('8')
   await scan.getByRole('spinbutton', { name: 'Events / delay' }).fill('10')
@@ -124,10 +134,15 @@ test('hold-delay scan plots spectra produced by the simulator', async ({ page })
   await expect(scan.getByRole('img', { name: 'Hold delay heatmap for channel 0' })).toBeVisible({
     timeout: 10_000,
   })
+  await expect(scan.getByLabel('Logarithmic events per bin color scale')).toBeVisible()
+  const initialCanvas = scan.locator('canvas').first()
+  await initialCanvas.evaluate((canvas) => {
+    canvas.dataset.livePlotIdentity = 'initial'
+  })
   await expect(scan.getByRole('progressbar')).toHaveAttribute('value', '2', { timeout: 10_000 })
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await expect(scan.getByRole('img', { name: 'Hold delay heatmap for channel 0' })).toBeVisible()
-  await expect(scan.locator('canvas').first()).toBeVisible()
+  await expect(scan.locator('canvas').first()).toHaveAttribute('data-live-plot-identity', 'initial')
   const storedScan = scan.locator('.scan-history > button').filter({ hasText: runName })
   await expect(storedScan).toContainText('COMPLETED')
 })

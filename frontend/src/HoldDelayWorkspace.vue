@@ -30,6 +30,7 @@ const started = ref<HoldDelayScan>()
 const history = ref<ScanSummary[]>([])
 const busy = ref(false)
 const error = ref('')
+const expanded = ref(false)
 const displayed = computed(() => props.live ?? started.value)
 const running = computed(() => {
   const state = props.live?.summary?.state
@@ -97,7 +98,6 @@ watch(
   (next) => {
     if (next) started.value = next as HoldDelayScan
   },
-  { deep: true },
 )
 onMounted(refresh)
 </script>
@@ -110,80 +110,92 @@ onMounted(refresh)
         <h2 id="hold-delay-heading">Hold delay scan</h2>
       </div>
       <span class="safety">Collects high-gain spectra · restores configuration afterward</span>
-    </div>
-    <div class="plot-controls staircase-controls">
-      <label>Board<input v-model.number="board" type="number" min="0" max="3" /></label>
-      <label>Minimum (ns)<input v-model.number="minimum" type="number" min="0" step="8" /></label>
-      <label>Maximum (ns)<input v-model.number="maximum" type="number" min="0" step="8" /></label>
-      <label>Step (ns)<input v-model.number="step" type="number" min="8" step="8" /></label>
-      <label>Events / delay<input v-model.number="events" type="number" min="10" /></label>
-      <label>Timeout (s)<input v-model.number="timeout" type="number" min="1" /></label>
-      <div class="actions staircase-actions">
-        <button
-          type="button"
-          class="primary"
-          :disabled="systemState !== SystemState.READY || busy"
-          @click="start"
-        >
-          Start scan
-        </button>
-        <button v-if="running" type="button" class="danger" @click="cancel">Cancel</button>
-      </div>
-    </div>
-    <p class="muted">
-      JANUS defaults to 0–256 ns in 8 ns increments. Color intensity is logarithmic event count.
-    </p>
-    <p v-if="error" class="field-error" role="alert">{{ error }}</p>
-    <div v-if="displayed" class="staircase-status">
-      <strong>Run {{ displayed.summary?.scanId }}</strong>
-      <span
-        >{{ displayed.summary?.completedPoints }} /
-        {{ displayed.summary?.totalPoints }} points</span
-      >
-      <progress
-        :value="displayed.summary?.completedPoints"
-        :max="displayed.summary?.totalPoints || 1"
-      />
-    </div>
-    <label class="staircase-series">
-      Channel
-      <select v-model.number="channel">
-        <option v-for="number in 64" :key="number - 1" :value="number - 1">
-          Channel {{ number - 1 }}
-        </option>
-      </select>
-    </label>
-    <HoldDelayPlot
-      v-if="displayed?.points.length"
-      :points="displayed.points"
-      :channel="channel"
-      :theme="theme"
-    />
-    <p v-else class="empty">Start a scan or select a finalized scan to plot its spectra.</p>
-    <div class="section-title scan-history-title">
-      <div>
-        <p class="eyebrow">Stored scan datasets</p>
-        <h3>Finalized hold-delay scans</h3>
-      </div>
-      <button type="button" class="link-button" :disabled="busy" @click="refresh">Refresh</button>
-    </div>
-    <div class="scan-history">
-      <div v-if="history.length" class="scan-history-header" aria-hidden="true">
-        <span>Run</span><span>Started</span><span>Board</span><span>Points</span><span>Status</span>
-      </div>
       <button
-        v-for="scan in history"
-        :key="scan.scanId"
         type="button"
-        class="secondary"
-        @click="load(scan.scanId)"
+        class="scan-card-toggle"
+        :aria-expanded="expanded"
+        aria-controls="hold-delay-content"
+        @click="expanded = !expanded"
       >
-        <strong data-label="Run">Run {{ scan.scanId }}</strong>
-        <span data-label="Started">{{ localDateTime(scan.startedAt) }}</span>
-        <span data-label="Board">{{ scan.board }}</span>
-        <span data-label="Points">{{ scan.completedPoints }} / {{ scan.totalPoints }}</span>
-        <span data-label="Status" class="scan-history-state">{{ ScanState[scan.state] }}</span>
+        {{ expanded ? 'Collapse' : 'Expand' }}
       </button>
+    </div>
+    <div v-if="expanded" id="hold-delay-content" class="scan-card-content">
+      <div class="plot-controls staircase-controls">
+        <label>Board<input v-model.number="board" type="number" min="0" max="3" /></label>
+        <label>Minimum (ns)<input v-model.number="minimum" type="number" min="0" step="8" /></label>
+        <label>Maximum (ns)<input v-model.number="maximum" type="number" min="0" step="8" /></label>
+        <label>Step (ns)<input v-model.number="step" type="number" min="8" step="8" /></label>
+        <label>Events / delay<input v-model.number="events" type="number" min="10" /></label>
+        <label>Timeout (s)<input v-model.number="timeout" type="number" min="1" /></label>
+        <div class="actions staircase-actions">
+          <button
+            type="button"
+            class="primary"
+            :disabled="systemState !== SystemState.READY || busy"
+            @click="start"
+          >
+            Start scan
+          </button>
+          <button v-if="running" type="button" class="danger" @click="cancel">Cancel</button>
+        </div>
+      </div>
+      <p class="muted">
+        JANUS defaults to 0–256 ns in 8 ns increments. Color intensity is logarithmic event count.
+      </p>
+      <p v-if="error" class="field-error" role="alert">{{ error }}</p>
+      <div v-if="displayed" class="staircase-status">
+        <strong>Run {{ displayed.summary?.scanId }}</strong>
+        <span
+          >{{ displayed.summary?.completedPoints }} /
+          {{ displayed.summary?.totalPoints }} points</span
+        >
+        <progress
+          :value="displayed.summary?.completedPoints"
+          :max="displayed.summary?.totalPoints || 1"
+        />
+      </div>
+      <label class="staircase-series">
+        Channel
+        <select v-model.number="channel">
+          <option v-for="number in 64" :key="number - 1" :value="number - 1">
+            Channel {{ number - 1 }}
+          </option>
+        </select>
+      </label>
+      <HoldDelayPlot
+        v-if="displayed?.points.length"
+        :points="displayed.points"
+        :channel="channel"
+        :theme="theme"
+      />
+      <p v-else class="empty">Start a scan or select a finalized scan to plot its spectra.</p>
+      <div class="section-title scan-history-title">
+        <div>
+          <p class="eyebrow">Stored scan datasets</p>
+          <h3>Finalized hold-delay scans</h3>
+        </div>
+        <button type="button" class="link-button" :disabled="busy" @click="refresh">Refresh</button>
+      </div>
+      <div class="scan-history">
+        <div v-if="history.length" class="scan-history-header" aria-hidden="true">
+          <span>Run</span><span>Started</span><span>Board</span><span>Points</span
+          ><span>Status</span>
+        </div>
+        <button
+          v-for="scan in history"
+          :key="scan.scanId"
+          type="button"
+          class="secondary"
+          @click="load(scan.scanId)"
+        >
+          <strong data-label="Run">Run {{ scan.scanId }}</strong>
+          <span data-label="Started">{{ localDateTime(scan.startedAt) }}</span>
+          <span data-label="Board">{{ scan.board }}</span>
+          <span data-label="Points">{{ scan.completedPoints }} / {{ scan.totalPoints }}</span>
+          <span data-label="Status" class="scan-history-state">{{ ScanState[scan.state] }}</span>
+        </button>
+      </div>
     </div>
   </section>
 </template>
