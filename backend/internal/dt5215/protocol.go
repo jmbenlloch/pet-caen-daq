@@ -86,15 +86,24 @@ func DecodeConcentratorVersionResponse(response []byte) (ConcentratorInfo, error
 		return ConcentratorInfo{}, fmt.Errorf("VERS payload length = %d, want 64", size)
 	}
 	payload := response[4:]
-	trim := func(value []byte) string { return strings.TrimRight(string(value), "\x00 ") }
-	productText := trim(payload[48:64])
+	// VERS fields are C strings inside fixed-width regions. Real firmware may
+	// use bytes after the first NUL for other metadata, so stopping at the NUL
+	// is essential; trimming only trailing padding would merge that metadata
+	// into the revision or product ID.
+	cString := func(value []byte) string {
+		if end := strings.IndexByte(string(value), 0); end >= 0 {
+			value = value[:end]
+		}
+		return strings.TrimSpace(string(value))
+	}
+	productText := cString(payload[48:64])
 	productID, err := strconv.ParseUint(productText, 10, 32)
 	if err != nil {
 		return ConcentratorInfo{}, fmt.Errorf("VERS product ID %q: %w", productText, err)
 	}
 	info := ConcentratorInfo{
-		SoftwareRevision: trim(payload[0:16]),
-		FPGARevision:     trim(payload[16:48]),
+		SoftwareRevision: cString(payload[0:16]),
+		FPGARevision:     cString(payload[16:48]),
 		ProductID:        uint32(productID),
 	}
 	if info.SoftwareRevision == "" || info.FPGARevision == "" {
