@@ -109,6 +109,29 @@ function dashboardApi(state = SystemState.READY): DaqApi {
 }
 
 describe('operator dashboard', () => {
+  it('shows the storage error in the persistence card', async () => {
+    const api = dashboardApi()
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        instanceId: 'backend-test',
+        state: SystemState.FAULT,
+        storage: {
+          health: HealthStatus.FAULT,
+          runDirectory: '/var/lib/pet-caen/runs/run-36',
+          bytesWritten: 167540439n,
+          lastError: 'capture raw batch: no space left on device',
+        },
+      }),
+    )
+
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    const panel = wrapper.get('[aria-labelledby="storage-heading"]')
+    expect(panel.get('[role="alert"]').text()).toBe('capture raw batch: no space left on device')
+    wrapper.unmount()
+  })
+
   it('distinguishes acquisition input from persistence backlog while draining', async () => {
     const api = dashboardApi(SystemState.DRAINING)
     vi.mocked(api.snapshot).mockResolvedValue(
