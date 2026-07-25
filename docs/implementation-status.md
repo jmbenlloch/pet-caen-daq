@@ -206,19 +206,18 @@ as separate evidence artifacts. Finalization flushes the internal manifest
 snapshot, marks the HDF5 file complete, closes and hashes every artifact,
 atomically updates the external manifest, and only then removes `incomplete`.
 Aborted runs retain both the marker and an internally incomplete HDF5 file.
-Finalized files are rejected before manifest publication unless a read-only Go
-validator confirms the schema version, completion marker, contiguous event
-sequence, one-to-one kind routing, bounded child ranges, and child parent-row
-identity. The Docker suite independently repeats the physical-layout and
-reference checks with Python/h5py. Finalization error paths close remaining
-HDF5, raw-capture, journal, and underlying OS file handles while preserving the
-original error and `incomplete` evidence.
+The explicit offline Go validator confirms the schema version, completion
+marker, contiguous event sequence, one-to-one kind routing, bounded child
+ranges, and child parent-row identity. The Docker suite independently repeats
+the physical-layout and reference checks with Python/h5py. Finalization error
+paths close remaining HDF5, raw-capture, journal, and underlying OS file
+handles while preserving the original error and `incomplete` evidence.
 
 HDF5 segment rotation is now a per-run API and operator-UI setting. Zero from
 an older client resolves to the 500 MiB server default; the frontend presents
-500 MiB initially and validates a positive bounded integer. Rotation closes,
-marks complete, and validates the current file after the complete event that
-reaches the target, then lazily creates the next numbered file. Segment root
+500 MiB initially and validates a positive bounded integer. Rotation closes
+and marks complete the current file after the complete event that reaches the
+target, then lazily creates the next numbered file. Segment root
 attributes preserve the zero-based segment index and first global event
 sequence, and every finalized segment is separately sized, hashed, and listed
 as a downloadable `decoded_events` artifact.

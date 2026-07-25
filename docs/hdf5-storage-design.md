@@ -696,10 +696,12 @@ length attributes or a small checkpoint dataset. Recovery may truncate
 unreferenced tails to the last internally consistent checkpoint, but must never
 mark the run complete automatically.
 
-At successful finalization, flush all datasets, validate index references and
-counts, write final run/manifest metadata, set the internal `complete` marker,
-close the file, calculate its external size and SHA-256, atomically update
-`manifest.json`, and only then remove the run-directory `incomplete` marker.
+At successful finalization, flush all datasets, write final run/manifest
+metadata, set the internal `complete` marker, close the file, calculate its
+external size and SHA-256, atomically update `manifest.json`, and only then
+remove the run-directory `incomplete` marker. Full index/reference validation
+is an explicit offline and acceptance-test operation rather than a synchronous
+part of stopping a run.
 The external manifest remains authoritative for artifact discovery and hashes;
 the internal snapshot makes a copied HDF5 file intelligible by itself.
 
