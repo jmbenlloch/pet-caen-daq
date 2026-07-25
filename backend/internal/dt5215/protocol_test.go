@@ -70,6 +70,27 @@ func TestDecodeConcentratorVersionResponse(t *testing.T) {
 	}
 }
 
+func TestDecodeConcentratorVersionResponseCapturedMetadataAfterNUL(t *testing.T) {
+	// Capture-verified from pcap/version_error.pcap on 2026-07-25. Firmware
+	// 2025.11.24.1 returns non-padding metadata after the NUL terminators.
+	response, err := hex.DecodeString(
+		"40000000" +
+			"323032352e31312e32342e3100000000" +
+			"32352e31312e32342e30312d322d320000803b450000000030303b383b454e43" +
+			"3636363433002d3745562d5a55533b32",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := DecodeConcentratorVersionResponse(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.SoftwareRevision != "2025.11.24.1" || info.FPGARevision != "25.11.24.01-2-2" || info.ProductID != 66643 {
+		t.Fatalf("concentrator info = %#v", info)
+	}
+}
+
 func TestDecodeConcentratorVersionRejectsMalformedPID(t *testing.T) {
 	response := make([]byte, 68)
 	littleEndian.PutUint32(response[:4], 64)

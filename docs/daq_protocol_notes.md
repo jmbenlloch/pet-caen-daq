@@ -77,7 +77,7 @@ The four ASCII opcode bytes are followed by packed little-endian binary fields. 
 | Synchronize chains | `SNT0` (4 B) | u32 status |
 | Reset links | `RLNK` (4 B) | u32 status |
 | Clear concentrator stream | `CLRS` (4 B) | u32 status |
-| Version information | `VERS` (4 B) | u32 byte count (`64` in the supported layout), then software revision bytes 0–15, FPGA revision bytes 16–47, and decimal PID bytes 48–63 |
+| Version information | `VERS` (4 B) | u32 byte count (`64` in the supported layout), then NUL-terminated software revision in bytes 0–15, NUL-terminated FPGA revision starting at byte 16, and NUL-terminated decimal PID starting at byte 48. Bytes following each first NUL may contain firmware metadata and are not string padding. |
 | Board-information block | `RBIC` plus fields used in the source | variable; parsed by `LLtdl_GetCncInfo` |
 
 Broadcast addressing is chain `0x00ff`, node `0x00ff`. `FERS_SendCommand` uses `FCMD` for a board reached through TDlink. The default `TDL_COMMAND_DELAY` is 1,000,000 units, with the header documenting one unit as 10 ns. Delayed/broadcast synchronization uses `DCMD` and additional concentrator synchronization logic; use the source implementation as authoritative because this area has firmware-dependent paths and comments marking experimental behavior.
