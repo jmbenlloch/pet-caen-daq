@@ -45,7 +45,7 @@ function api(): DaqApi {
 }
 
 describe('StaircaseWorkspace', () => {
-  it('uses the standard plots panel treatment and primary scan action', () => {
+  it('is collapsed by default and exposes the scan controls when expanded', async () => {
     const wrapper = mount(StaircaseWorkspace, {
       props: { api: api(), systemState: SystemState.READY, theme: 'dark' },
     })
@@ -53,6 +53,12 @@ describe('StaircaseWorkspace', () => {
     expect(wrapper.get('section').classes()).toEqual(
       expect.arrayContaining(['panel', 'plots', 'staircase-workspace']),
     )
+    expect(wrapper.find('button.primary').exists()).toBe(false)
+    expect(wrapper.get('.scan-card-toggle').attributes('aria-expanded')).toBe('false')
+
+    await wrapper.get('.scan-card-toggle').trigger('click')
+
+    expect(wrapper.get('.scan-card-toggle').attributes('aria-expanded')).toBe('true')
     expect(wrapper.get('button.primary').text()).toBe('Start scan')
     expect(wrapper.get('.scan-history-title button').classes()).toContain('link-button')
     expect(wrapper.text()).toContain('Dwell time is the counting interval at each threshold')
@@ -64,6 +70,7 @@ describe('StaircaseWorkspace', () => {
       props: { api: client, systemState: SystemState.READY, theme: 'dark' },
     })
     await flushPromises()
+    await wrapper.get('.scan-card-toggle').trigger('click')
     await wrapper.get('.scan-history button').trigger('click')
     await flushPromises()
     expect(client.listScans).toHaveBeenCalledWith(8, 0, undefined)
@@ -95,6 +102,7 @@ describe('StaircaseWorkspace', () => {
       props: { api: client, systemState: SystemState.READY, theme: 'dark' },
     })
     await flushPromises()
+    await wrapper.get('.scan-card-toggle').trigger('click')
 
     expect(wrapper.findAll('.scan-history > button')).toHaveLength(8)
     expect(wrapper.text()).toContain('Page 1 of 2')
@@ -121,6 +129,7 @@ describe('StaircaseWorkspace', () => {
       props: { api: client, systemState: SystemState.READY, theme: 'dark' },
     })
     await flushPromises()
+    await wrapper.get('.scan-card-toggle').trigger('click')
 
     const filter = wrapper.get('[aria-label="Filter scans by board"]')
     expect(filter.findAll('option').map((option) => option.text())).toEqual([
@@ -139,7 +148,7 @@ describe('StaircaseWorkspace', () => {
     expect(wrapper.text()).not.toContain('Run 12')
   })
 
-  it('plots live telemetry points', () => {
+  it('plots live telemetry points after expansion', async () => {
     const live = create(StaircaseScanSchema, {
       summary: { scanId: 'live', state: ScanState.RUNNING, completedPoints: 1, totalPoints: 10 },
       points: [{ threshold: 250, channelRatesCps: [42] }],
@@ -147,6 +156,10 @@ describe('StaircaseWorkspace', () => {
     const wrapper = mount(StaircaseWorkspace, {
       props: { api: api(), systemState: SystemState.SCANNING, theme: 'dark', live },
     })
+    expect(wrapper.find('.staircase-plot').exists()).toBe(false)
+
+    await wrapper.get('.scan-card-toggle').trigger('click')
+
     expect(wrapper.find('.staircase-plot').exists()).toBe(true)
     expect(wrapper.text()).toContain('1 / 10 points')
   })
