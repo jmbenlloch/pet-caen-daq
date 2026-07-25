@@ -64,6 +64,20 @@ func TestHoldDelayScanCollectsEventsFromSimulator(t *testing.T) {
 			t.Fatalf("point %d high-gain spectrum contains %d events, want %d", index, highGainEvents, request.EventsPerDelay)
 		}
 	}
+	if peakBin(points[1].HighGainBins[0]) <= peakBin(points[0].HighGainBins[0]) {
+		t.Fatalf("hold-delay spectrum did not move: peaks %d then %d",
+			peakBin(points[0].HighGainBins[0]), peakBin(points[1].HighGainBins[0]))
+	}
+}
+
+func peakBin(bins [holddelay.BinCount]uint32) int {
+	peak, maximum := 0, uint32(0)
+	for bin, count := range bins {
+		if count > maximum {
+			peak, maximum = bin, count
+		}
+	}
+	return peak
 }
 
 func TestHoldDelayScanCollectsDefaultPointAtLocalSimulatorRate(t *testing.T) {
