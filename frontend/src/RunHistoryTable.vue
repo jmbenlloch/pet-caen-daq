@@ -167,9 +167,7 @@ function maskChannels(field: ConfigurationField) {
                 </button>
               </th>
               <td>
-                <span :class="['run-type', { scan: isScan(run) }]">{{
-                  typeLabel(run)
-                }}</span>
+                <span :class="['run-type', { scan: isScan(run) }]">{{ typeLabel(run) }}</span>
               </td>
               <td>{{ localDateTime(run.startedAt) }}</td>
               <td>{{ duration(run) }}</td>
