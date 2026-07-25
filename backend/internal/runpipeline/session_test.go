@@ -167,6 +167,55 @@ func TestSessionRetainsLatestBoardServiceTelemetry(t *testing.T) {
 	}
 }
 
+func TestSessionPreservesTelemetryAcrossUnknownServiceVersion(t *testing.T) {
+	observedAt := time.Date(2026, 7, 25, 19, 30, 0, 0, time.UTC)
+	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return observedAt }}}
+	created, err := factory.New("unknown-service", acquisition.RunOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := created.(*Session)
+
+	temperature, voltage, current := 38.25, 45.4, 0.00012
+	status := uint16(13)
+	valid := dt5202.Event{Kind: dt5202.EventService, Service: &dt5202.ServiceEvent{
+		FPGATemperature: &temperature,
+		HVVoltage:       &voltage,
+		HVCurrent:       &current,
+		HVOn:            true,
+		Status:          &status,
+	}}
+	wire := dt5215.StreamEvent{Chain: 2, Descriptor: dt5215.Descriptor{Node: 3}}
+	if err := session.sink.AppendEvent(wire, valid); err != nil {
+		t.Fatal(err)
+	}
+	unknown := dt5202.Event{Kind: dt5202.EventService, Service: &dt5202.ServiceEvent{
+		Version:        0xfe,
+		UnknownPayload: []byte{1, 2, 3, 4},
+	}}
+	if err := session.sink.AppendEvent(wire, unknown); err != nil {
+		t.Fatal(err)
+	}
+
+	board := session.BoardStats()[0]
+	if board.FPGATemperature == nil || *board.FPGATemperature != temperature ||
+		board.HVVoltage == nil || *board.HVVoltage != voltage ||
+		board.HVCurrent == nil || *board.HVCurrent != current ||
+		!board.HVOn || board.HVRamping || board.HVOverCurrent || board.HVOverVoltage ||
+		board.AcquisitionStatus == nil || *board.AcquisitionStatus != status {
+		t.Fatalf("telemetry changed after unknown service event: %+v", board)
+	}
+	if board.EventCount != 2 {
+		t.Fatalf("event count = %d, want 2", board.EventCount)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Abort(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSessionAccumulatesBoardAndChannelStatistics(t *testing.T) {
 	now := time.Unix(100, 0)
 	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return now }}}
