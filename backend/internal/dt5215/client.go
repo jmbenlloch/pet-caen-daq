@@ -18,6 +18,7 @@ const (
 	resetOperationTimeout   = 5 * time.Second
 	enumOperationTimeout    = 10 * time.Second
 	syncOperationTimeout    = 10 * time.Second
+	tdlCommandDelayUnit     = 10 * time.Nanosecond
 )
 
 // Client owns one DT5215 control connection and one stream connection.
@@ -71,7 +72,13 @@ func (c *Client) sendCommand(ctx context.Context, delayed bool, chain, node uint
 	if err != nil {
 		return err
 	}
-	response, err := c.exchange(ctx, request, 4)
+	// The DT5215 acknowledges an FCMD/DCMD request before the command's
+	// scheduled execution time. FERSlib keeps the control transaction
+	// serialized and waits for that delay before reading the reply. Without
+	// the wait, a following command can be submitted while the previous one
+	// is still pending; real hardware has returned CNC_STATUS_TIMEOUT in that
+	// situation on the second consecutive run.
+	response, err := c.exchangeAfterWriteDelay(ctx, request, 4, time.Duration(delay)*tdlCommandDelayUnit)
 	op := "FCMD"
 	if delayed {
 		op = "DCMD"
@@ -186,10 +193,18 @@ func (c *Client) ConcentratorInfo(ctx context.Context) (ConcentratorInfo, error)
 }
 
 func (c *Client) exchange(ctx context.Context, request []byte, responseSize int) ([]byte, error) {
-	return c.exchangeWithTimeout(ctx, request, responseSize, defaultOperationTimeout)
+	return c.exchangeAfterWriteDelay(ctx, request, responseSize, 0)
 }
 
 func (c *Client) exchangeWithTimeout(ctx context.Context, request []byte, responseSize int, timeout time.Duration) ([]byte, error) {
+	return c.exchangeAfterWriteDelayWithTimeout(ctx, request, responseSize, 0, timeout)
+}
+
+func (c *Client) exchangeAfterWriteDelay(ctx context.Context, request []byte, responseSize int, delay time.Duration) ([]byte, error) {
+	return c.exchangeAfterWriteDelayWithTimeout(ctx, request, responseSize, delay, defaultOperationTimeout)
+}
+
+func (c *Client) exchangeAfterWriteDelayWithTimeout(ctx context.Context, request []byte, responseSize int, delay, timeout time.Duration) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if err := ctx.Err(); err != nil {
@@ -214,6 +229,20 @@ func (c *Client) exchangeWithTimeout(ctx context.Context, request []byte, respon
 
 	if err := writeAll(c.control, request); err != nil {
 		return nil, fmt.Errorf("write request: %w", err)
+	}
+	if delay > 0 {
+		timer := time.NewTimer(delay)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return nil, ctx.Err()
+		}
 	}
 	response := make([]byte, responseSize)
 	if _, err := io.ReadFull(c.control, response); err != nil {
