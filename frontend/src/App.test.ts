@@ -136,11 +136,55 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     const panel = wrapper.get('.configuration-progress-panel')
+    const sideCards = wrapper.findAll('.side-column > .panel')
+    expect(sideCards[1].classes()).toContain('configuration-progress-panel')
     expect(panel.text()).toContain('Register readback')
+    expect(panel.text()).toContain('In progress')
     expect(panel.text()).toContain('Board 2 of 4')
     expect(panel.text()).toContain('150 / 627 registers')
     expect(panel.text()).toContain('Chain 1, node 0')
     expect(panel.get('[aria-label="Register readback progress"]').attributes('value')).toBe('150')
+    wrapper.unmount()
+  })
+
+  it('retains the latest completed configuration in the side card', async () => {
+    const api = dashboardApi(SystemState.READY)
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        state: SystemState.READY,
+        configurationProgress: {
+          operationId: 'configuration-3',
+          stage: ConfigurationStage.COMPLETE,
+          boardsCompleted: 4,
+          boardsTotal: 4,
+          completed: 4,
+          total: 4,
+          unit: 'boards',
+          message: 'configuration applied to 4 boards',
+          updatedAt: { seconds: 1_784_974_800n, nanos: 0 },
+        },
+      }),
+    )
+
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    const panel = wrapper.get('.configuration-progress-panel')
+    expect(panel.text()).toContain('Applied')
+    expect(panel.text()).toContain('Complete')
+    expect(panel.text()).toContain('Board 4 of 4')
+    expect(panel.text()).toContain('4 / 4 boards')
+    expect(panel.findAll('.configuration-progress-steps li.complete')).toHaveLength(6)
+    wrapper.unmount()
+  })
+
+  it('shows a persistent fallback when detailed configuration progress is unavailable', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi(SystemState.CONFIGURING) } })
+    await flushPromises()
+
+    const panel = wrapper.get('.configuration-progress-panel')
+    expect(panel.text()).toContain('Configuring')
+    expect(panel.text()).toContain('Detailed progress is unavailable')
     wrapper.unmount()
   })
 

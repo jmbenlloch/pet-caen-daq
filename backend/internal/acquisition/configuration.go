@@ -172,7 +172,7 @@ func (c *Configurator) Configure(ctx context.Context, document *janusconfig.Docu
 	if _, err := c.states.Move(StateReady, options.Actor); err != nil {
 		return ConfigurationResult{}, c.fail(nil, err, options.Actor)
 	}
-	c.publishProgress(ConfigurationComplete, nil, len(targets), len(targets), "boards", false, fmt.Sprintf("configuration applied to %d boards; HV authorized=%t", len(targets), options.AuthorizeHV), nil)
+	c.publishProgress(ConfigurationComplete, nil, len(targets), len(targets), "boards", false, fmt.Sprintf("configuration applied to %d boards", len(targets)), nil)
 	return result, nil
 }
 
