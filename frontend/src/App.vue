@@ -619,8 +619,48 @@ function loadDefaultConfiguration() {
   configuration.value = defaultConfiguration
 }
 
-function loadBackendConfiguration() {
-  if (daq.configurationTemplate.value) configuration.value = daq.configurationTemplate.value
+interface SaveFileHandle {
+  createWritable(): Promise<{
+    write(data: Blob): Promise<void>
+    close(): Promise<void>
+  }>
+}
+
+type SaveFilePicker = (options: {
+  suggestedName: string
+  types: { description: string; accept: Record<string, string[]> }[]
+}) => Promise<SaveFileHandle>
+
+async function saveConfiguration() {
+  const blob = new Blob([configuration.value], { type: 'text/plain;charset=utf-8' })
+  const saveFilePicker = (window as Window & { showSaveFilePicker?: SaveFilePicker })
+    .showSaveFilePicker
+  if (saveFilePicker) {
+    try {
+      const handle = await saveFilePicker({
+        suggestedName: 'pet-caen-daq-configuration.txt',
+        types: [{ description: 'Text file', accept: { 'text/plain': ['.txt'] } }],
+      })
+      const writable = await handle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+      return
+    } catch (reason) {
+      if (reason instanceof DOMException && reason.name === 'AbortError') return
+    }
+  }
+
+  const requestedName = window.prompt('Save configuration as', 'pet-caen-daq-configuration.txt')
+  if (requestedName === null || !requestedName.trim()) return
+  const fileName = requestedName.trim().toLowerCase().endsWith('.txt')
+    ? requestedName.trim()
+    : `${requestedName.trim()}.txt`
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fileName
+  anchor.click()
+  URL.revokeObjectURL(url)
 }
 
 function selectAdjacentWorkspaceTab(event: KeyboardEvent, index: number) {
@@ -819,13 +859,8 @@ onMounted(() => daq.connect())
               <button class="link-button" type="button" @click="loadDefaultConfiguration">
                 Reset sample
               </button>
-              <button
-                class="link-button"
-                type="button"
-                :disabled="!daq.configurationTemplate.value"
-                @click="loadBackendConfiguration"
-              >
-                Use backend config
+              <button class="link-button" type="button" @click="saveConfiguration">
+                Save config
               </button>
               <button
                 class="link-button"
