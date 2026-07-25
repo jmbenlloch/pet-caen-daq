@@ -61,6 +61,18 @@ the current hardware connection first needs it. Later configuration changes on
 that connection reuse the validated calibration; disconnecting or restarting
 creates a new hardware session and forces fresh pedestal reads.
 
+During a hard configuration, the operator UI reports the current board and
+stage: planning, pedestal loading, register writes, Citiroc programming,
+register readback, and high-voltage setup. Register stages include completed
+and total operation counts, while a separate bar reports progress across all
+boards. Pedestal reuse is identified explicitly. This information is part of
+the latest `TelemetrySnapshot`, rather than a transient log stream, so a
+browser that reconnects during configuration immediately receives the current
+operation, stage, counters, and original start time. Intermediate register
+updates are published every 50 operations and at stage boundaries to keep
+telemetry bounded without hiding exact completion totals. A failed operation
+remains visible with its last stage and error message.
+
 DT5215 `SNT0` synchronization is session-scoped. Run start skips it only when
 discovery verified the TDlink-synchronized acquisition-status bit on every
 board, or after `SNT0` has succeeded once on the current connection.

@@ -5,6 +5,7 @@ import App from './App.vue'
 import type { DaqApi } from './api'
 import {
   ConfigurationLayer,
+  ConfigurationStage,
   HealthStatus,
   RunType,
   RunSummarySchema,
@@ -108,6 +109,41 @@ function dashboardApi(state = SystemState.READY): DaqApi {
 }
 
 describe('operator dashboard', () => {
+  it('shows structured hardware configuration progress', async () => {
+    const api = dashboardApi(SystemState.CONFIGURING)
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        instanceId: 'backend-test',
+        state: SystemState.CONFIGURING,
+        configurationProgress: {
+          operationId: 'configuration-2',
+          stage: ConfigurationStage.READING_REGISTERS,
+          active: true,
+          board: 1,
+          chain: 1,
+          node: 0,
+          boardsCompleted: 1,
+          boardsTotal: 4,
+          completed: 150,
+          total: 627,
+          unit: 'registers',
+          message: 'reading back and validating registers',
+        },
+      }),
+    )
+
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    const panel = wrapper.get('.configuration-progress-panel')
+    expect(panel.text()).toContain('Register readback')
+    expect(panel.text()).toContain('Board 2 of 4')
+    expect(panel.text()).toContain('150 / 627 registers')
+    expect(panel.text()).toContain('Chain 1, node 0')
+    expect(panel.get('[aria-label="Register readback progress"]').attributes('value')).toBe('150')
+    wrapper.unmount()
+  })
+
   it('uses the native Save As picker when the browser supports it', async () => {
     const write = vi.fn().mockResolvedValue(undefined)
     const close = vi.fn().mockResolvedValue(undefined)

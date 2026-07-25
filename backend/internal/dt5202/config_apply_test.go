@@ -57,6 +57,35 @@ func TestApplyConfigurationWritesLoadsAndValidates(t *testing.T) {
 	}
 }
 
+func TestApplyConfigurationReportsStructuredProgress(t *testing.T) {
+	hardware := &applyHardware{}
+	plan := ConfigurationPlan{Board: 0, Writes: []RegisterWrite{
+		{TriggerMask, 0x41}, {RunMask, 1}, {TriggerMask, 0x42},
+	}}
+	var progress []ConfigurationApplyProgress
+	if err := ApplyConfigurationWithProgress(context.Background(), hardware, 0, 0, plan, false, func(update ConfigurationApplyProgress) {
+		progress = append(progress, update)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(progress) != 9 {
+		t.Fatalf("progress=%+v", progress)
+	}
+	assertProgress := func(index int, stage ConfigurationApplyStage, completed, total int) {
+		t.Helper()
+		update := progress[index]
+		if update.Stage != stage || update.Completed != completed || update.Total != total {
+			t.Fatalf("progress[%d]=%+v, want stage=%s completed=%d total=%d", index, update, stage, completed, total)
+		}
+	}
+	assertProgress(0, ConfigurationApplyWriting, 0, 3)
+	assertProgress(3, ConfigurationApplyWriting, 3, 3)
+	assertProgress(4, ConfigurationApplyCitiroc, 0, 2)
+	assertProgress(5, ConfigurationApplyCitiroc, 2, 2)
+	assertProgress(6, ConfigurationApplyReadback, 0, 2)
+	assertProgress(8, ConfigurationApplyReadback, 2, 2)
+}
+
 func TestApplyConfigurationStopsAtWriteFailure(t *testing.T) {
 	hardware := &applyHardware{failWrite: 2}
 	plan := ConfigurationPlan{Board: 0, Writes: []RegisterWrite{{TriggerMask, 0x41}, {RunMask, 1}, {DwellTime, 2}}}

@@ -603,10 +603,30 @@ func TestConfigurationOrchestratorReachesReadyWithExplicitHVAuthorization(t *tes
 	if states.Snapshot().State != acquisition.StateReady || len(result.Plans) != 4 || len(result.Calibrations) != 4 || !result.HVAuthorized {
 		t.Fatalf("state=%s result=%+v", states.Snapshot().State, result)
 	}
-	if len(updates) != 4*4+1 || updates[len(updates)-1].Stage != acquisition.ConfigurationComplete {
+	if len(updates) == 0 || updates[len(updates)-1].Stage != acquisition.ConfigurationComplete ||
+		updates[len(updates)-1].BoardsCompleted != 4 || updates[len(updates)-1].BoardsTotal != 4 {
 		t.Fatalf("updates=%#v", updates)
 	}
 	for board := range 4 {
+		var wroteRegisters, readRegisters, configuredCitiroc, configuredHV bool
+		for _, update := range updates {
+			if update.Target == nil || update.Target.Board != board {
+				continue
+			}
+			switch update.Stage {
+			case acquisition.ConfigurationWriting:
+				wroteRegisters = wroteRegisters || update.Total > 0 && update.Completed == update.Total
+			case acquisition.ConfigurationReadback:
+				readRegisters = readRegisters || update.Total > 0 && update.Completed == update.Total
+			case acquisition.ConfigurationCitiroc:
+				configuredCitiroc = configuredCitiroc || update.Completed == 2 && update.Total == 2
+			case acquisition.ConfigurationHV:
+				configuredHV = true
+			}
+		}
+		if !wroteRegisters || !readRegisters || !configuredCitiroc || !configuredHV {
+			t.Fatalf("board %d progress writes=%t readback=%t citiroc=%t hv=%t", board, wroteRegisters, readRegisters, configuredCitiroc, configuredHV)
+		}
 		snapshot, err := server.BoardSnapshot(board, 0)
 		if err != nil {
 			t.Fatal(err)

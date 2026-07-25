@@ -305,6 +305,39 @@ message TelemetrySnapshot {
   StaircaseScan current_staircase = 13;
   ScanSummary latest_completed_scan = 14;
   HoldDelayScan current_hold_delay_scan = 15;
+  ConfigurationProgress configuration_progress = 16;
+}
+
+// Reconnect-safe snapshot of the current or most recently completed hardware
+// configuration operation. Counter meaning is selected by stage.
+message ConfigurationProgress {
+  string operation_id = 1;
+  ConfigurationStage stage = 2;
+  bool active = 3;
+  optional uint32 board = 4;
+  optional uint32 chain = 5;
+  optional uint32 node = 6;
+  uint32 boards_completed = 7;
+  uint32 boards_total = 8;
+  uint32 completed = 9;
+  uint32 total = 10;
+  string unit = 11;
+  bool reused = 12;
+  string message = 13;
+  google.protobuf.Timestamp started_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+}
+
+enum ConfigurationStage {
+  CONFIGURATION_STAGE_UNSPECIFIED = 0;
+  CONFIGURATION_STAGE_PLANNING = 1;
+  CONFIGURATION_STAGE_PEDESTAL = 2;
+  CONFIGURATION_STAGE_WRITING_REGISTERS = 3;
+  CONFIGURATION_STAGE_CONFIGURING_CITIROC = 4;
+  CONFIGURATION_STAGE_READING_REGISTERS = 5;
+  CONFIGURATION_STAGE_HV = 6;
+  CONFIGURATION_STAGE_COMPLETE = 7;
+  CONFIGURATION_STAGE_FAILED = 8;
 }
 
 message StartStaircaseRequest {
