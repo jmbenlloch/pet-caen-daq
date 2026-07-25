@@ -451,6 +451,29 @@ decoded-event stream: its maximum current four-board payload is approximately
 32.5 MiB of uint32 bins before compression. Keeping it separate avoids
 duplicating a run-wide snapshot in each 500 MiB event segment.
 
+Histogram artifact schema version 2 groups spectra by kind instead of creating
+one HDF5 dataset per channel. Each kind has one concatenated `uint32` bins
+dataset and one compound spectrum table:
+
+```text
+/histograms/pha_high/bins
+/histograms/pha_high/spectra
+/histograms/pha_low/bins
+/histograms/pha_low/spectra
+/histograms/toa/bins
+/histograms/toa/spectra
+/histograms/tot/bins
+/histograms/tot/spectra
+```
+
+Each spectrum row records chain, node, channel, bin offset/count, entries,
+underflow, overflow, minimum, and bin width. The writer performs two grouped
+writes per enabled kind, reducing a full four-board snapshot from 1,024
+datasets and 8,192 scalar attributes to eight datasets. Historical reads select
+only the requested channel's bin range with an HDF5 hyperslab. The reader
+retains compatibility with schema-version-1 artifacts whose dataset names are
+`<kind>_<chain>_<node>_<channel>`.
+
 ```text
 /
   attributes:

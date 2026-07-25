@@ -5,18 +5,33 @@ package hdf5store
 import (
 	"errors"
 	"fmt"
+	"sort"
+	"unsafe"
 
 	hdf5 "github.com/next-exp/hdf5-go"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 )
 
-const HistogramSchemaVersion = 1
+const HistogramSchemaVersion = 2
+
+// HistogramSpectrumRow locates one channel spectrum in its kind's concatenated
+// bins dataset. Axis and counter metadata travel with the row so a copied
+// histogram artifact remains self-describing.
+type HistogramSpectrumRow struct {
+	BinOffset            uint64
+	Entries              uint64
+	Underflow            uint64
+	Overflow             uint64
+	Minimum              float64
+	BinWidth             float64
+	BinCount             uint32
+	Chain, Node, Channel uint8
+}
 
 // SaveHistograms creates one self-contained HDF5 artifact for a finalized run.
-// Each lazily allocated channel spectrum is stored as a compressed uint32
-// dataset; run-wide counters and axis information remain uint64/float64
-// attributes.
+// Each histogram kind uses one compressed bins dataset and one spectrum index
+// table, avoiding thousands of per-channel HDF5 objects and attributes.
 func SaveHistograms(path, runID string, histograms []runstore.HistogramDataset) (err error) {
 	compression, err := histogramCompressionName()
 	if err != nil {
@@ -57,24 +72,27 @@ func saveHistograms(path, runID string, histograms []runstore.HistogramDataset, 
 		return fmt.Errorf("create histograms group: %w", err)
 	}
 	defer group.Close()
-	for _, histogram := range histograms {
-		name := fmt.Sprintf("%s_%d_%d_%d", histogram.Kind, histogram.Chain, histogram.Node, histogram.Channel)
-		dataset, err := createPrimitiveNamed(group, name, hdf5.T_STD_U32LE, compression)
-		if err != nil {
+	sort.Slice(histograms, func(i, j int) bool {
+		if histograms[i].Kind != histograms[j].Kind {
+			return histograms[i].Kind < histograms[j].Kind
+		}
+		if histograms[i].Chain != histograms[j].Chain {
+			return histograms[i].Chain < histograms[j].Chain
+		}
+		if histograms[i].Node != histograms[j].Node {
+			return histograms[i].Node < histograms[j].Node
+		}
+		return histograms[i].Channel < histograms[j].Channel
+	})
+	for start := 0; start < len(histograms); {
+		end := start + 1
+		for end < len(histograms) && histograms[end].Kind == histograms[start].Kind {
+			end++
+		}
+		if err := writeHistogramKind(group, histograms[start:end], compression); err != nil {
 			return err
 		}
-		target := table{dataset: dataset}
-		if err := appendRows(&target, histogram.Bins); err != nil {
-			dataset.Close()
-			return fmt.Errorf("write histogram %s: %w", name, err)
-		}
-		if err := writeHistogramAttributes(dataset, histogram); err != nil {
-			dataset.Close()
-			return fmt.Errorf("describe histogram %s: %w", name, err)
-		}
-		if err := dataset.Close(); err != nil {
-			return fmt.Errorf("close histogram %s: %w", name, err)
-		}
+		start = end
 	}
 	value := uint8(1)
 	if err := complete.Write(&value, hdf5.T_STD_U8LE); err != nil {
@@ -86,63 +104,58 @@ func saveHistograms(path, runID string, histograms []runstore.HistogramDataset, 
 	return nil
 }
 
-func writeHistogramAttributes(dataset *hdf5.Dataset, value runstore.HistogramDataset) error {
-	for name, number := range map[string]uint64{
-		"entries": value.Entries, "underflow": value.Underflow, "overflow": value.Overflow,
-	} {
-		if err := writeDatasetUint64Attribute(dataset, name, number); err != nil {
-			return err
+func writeHistogramKind(parent *hdf5.Group, histograms []runstore.HistogramDataset, compression string) (err error) {
+	kind := histograms[0].Kind
+	group, err := parent.CreateGroup(kind)
+	if err != nil {
+		return fmt.Errorf("create histogram kind %s: %w", kind, err)
+	}
+	defer func() { err = errors.Join(err, group.Close()) }()
+	binDataset, err := createPrimitiveNamed(group, "bins", hdf5.T_STD_U32LE, compression)
+	if err != nil {
+		return err
+	}
+	defer binDataset.Close()
+	spectrumDataset, err := createTable(group, "spectra", compoundHistogramSpectrum(), compression)
+	if err != nil {
+		return err
+	}
+	defer spectrumDataset.Close()
+	var bins []uint32
+	rows := make([]HistogramSpectrumRow, 0, len(histograms))
+	for _, histogram := range histograms {
+		if uint64(len(histogram.Bins)) > uint64(^uint32(0)) {
+			return fmt.Errorf("histogram %s %d/%d/%d has too many bins", kind, histogram.Chain, histogram.Node, histogram.Channel)
 		}
+		rows = append(rows, HistogramSpectrumRow{
+			BinOffset: uint64(len(bins)), BinCount: uint32(len(histogram.Bins)),
+			Entries: histogram.Entries, Underflow: histogram.Underflow, Overflow: histogram.Overflow,
+			Minimum: histogram.Minimum, BinWidth: histogram.BinWidth,
+			Chain: histogram.Chain, Node: histogram.Node, Channel: histogram.Channel,
+		})
+		bins = append(bins, histogram.Bins...)
 	}
-	for name, number := range map[string]uint32{
-		"chain": uint32(value.Chain), "node": uint32(value.Node), "channel": uint32(value.Channel),
-	} {
-		if err := writeDatasetUint32Attribute(dataset, name, number); err != nil {
-			return err
-		}
+	if err := appendRows(&table{dataset: binDataset}, bins); err != nil {
+		return fmt.Errorf("write histogram %s bins: %w", kind, err)
 	}
-	if err := writeDatasetFloat64Attribute(dataset, "minimum", value.Minimum); err != nil {
-		return err
+	if err := appendRows(&table{dataset: spectrumDataset}, rows); err != nil {
+		return fmt.Errorf("write histogram %s spectra: %w", kind, err)
 	}
-	return writeDatasetFloat64Attribute(dataset, "bin_width", value.BinWidth)
+	return nil
 }
 
-func writeDatasetUint32Attribute(dataset *hdf5.Dataset, name string, value uint32) error {
-	attribute, err := createDatasetAttribute(dataset, name, hdf5.T_STD_U32LE)
-	if err != nil {
-		return err
-	}
-	defer attribute.Close()
-	return attribute.Write(&value, hdf5.T_STD_U32LE)
-}
-
-func writeDatasetUint64Attribute(dataset *hdf5.Dataset, name string, value uint64) error {
-	attribute, err := createDatasetAttribute(dataset, name, hdf5.T_STD_U64LE)
-	if err != nil {
-		return err
-	}
-	defer attribute.Close()
-	return attribute.Write(&value, hdf5.T_STD_U64LE)
-}
-
-func writeDatasetFloat64Attribute(dataset *hdf5.Dataset, name string, value float64) error {
-	attribute, err := createDatasetAttribute(dataset, name, hdf5.T_IEEE_F64LE)
-	if err != nil {
-		return err
-	}
-	defer attribute.Close()
-	return attribute.Write(&value, hdf5.T_IEEE_F64LE)
-}
-
-func createDatasetAttribute(dataset *hdf5.Dataset, name string, datatype *hdf5.Datatype) (*hdf5.Attribute, error) {
-	space, err := hdf5.CreateDataspace(hdf5.S_SCALAR)
-	if err != nil {
-		return nil, err
-	}
-	defer space.Close()
-	attribute, err := dataset.CreateAttribute(name, datatype, space)
-	if err != nil {
-		return nil, fmt.Errorf("create attribute %s: %w", name, err)
-	}
-	return attribute, nil
+func compoundHistogramSpectrum() *hdf5.CompoundType {
+	var value HistogramSpectrumRow
+	return mustCompound(unsafe.Sizeof(value), []field{
+		{"bin_offset", unsafe.Offsetof(value.BinOffset), hdf5.T_STD_U64LE},
+		{"entries", unsafe.Offsetof(value.Entries), hdf5.T_STD_U64LE},
+		{"underflow", unsafe.Offsetof(value.Underflow), hdf5.T_STD_U64LE},
+		{"overflow", unsafe.Offsetof(value.Overflow), hdf5.T_STD_U64LE},
+		{"minimum", unsafe.Offsetof(value.Minimum), hdf5.T_IEEE_F64LE},
+		{"bin_width", unsafe.Offsetof(value.BinWidth), hdf5.T_IEEE_F64LE},
+		{"bin_count", unsafe.Offsetof(value.BinCount), hdf5.T_STD_U32LE},
+		{"chain", unsafe.Offsetof(value.Chain), hdf5.T_STD_U8LE},
+		{"node", unsafe.Offsetof(value.Node), hdf5.T_STD_U8LE},
+		{"channel", unsafe.Offsetof(value.Channel), hdf5.T_STD_U8LE},
+	})
 }

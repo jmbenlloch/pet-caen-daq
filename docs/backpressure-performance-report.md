@@ -95,6 +95,12 @@ small catalog-manifest identity hashes are unaffected. This intentionally
 trades post-write content verification for prompt readiness and avoids
 rereading every large artifact immediately after writing it.
 
+Run 50 confirmed stop-to-ready latency of 2.504 seconds after hashing was
+removed. Of that time, 2.104 seconds wrote 1,024 individual channel histogram
+datasets. Histogram schema version 2 replaces those objects and their 8,192
+attributes with one bins dataset and one spectrum table per kind (eight
+datasets total), using grouped writes and per-channel hyperslab reads.
+
 The instrumented build emits one `run_timing` log record for every remaining
 stage. Capture the server log from
 the next representative run with:
