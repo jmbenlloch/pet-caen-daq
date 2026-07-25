@@ -421,11 +421,6 @@ const severeDiagnostics = computed(() =>
   ),
 )
 const configurationProgress = computed(() => daq.snapshot.value?.configurationProgress)
-const configurationProgressVisible = computed(
-  () =>
-    configurationProgress.value?.active ||
-    configurationProgress.value?.stage === ConfigurationStage.FAILED,
-)
 const configurationStageLabels: Partial<Record<ConfigurationStage, string>> = {
   [ConfigurationStage.PLANNING]: 'Planning',
   [ConfigurationStage.PEDESTAL]: 'Pedestal setup',
@@ -447,6 +442,21 @@ const configurationStageSteps = [
 const configurationStagePosition = computed(() =>
   configurationStageSteps.indexOf(configurationProgress.value?.stage ?? 0),
 )
+const configurationProgressStatus = computed(() => {
+  const progress = configurationProgress.value
+  if (!progress)
+    return daq.snapshot.value?.state === SystemState.CONFIGURING ? 'Configuring' : 'Unreported'
+  if (progress.active) return 'In progress'
+  if (progress.stage === ConfigurationStage.FAILED) return 'Failed'
+  if (progress.stage === ConfigurationStage.COMPLETE) return 'Applied'
+  return 'Reported'
+})
+function configurationStepComplete(index: number) {
+  return (
+    configurationProgress.value?.stage === ConfigurationStage.COMPLETE ||
+    index < configurationStagePosition.value
+  )
+}
 const configurationStageLabel = computed(
   () => configurationStageLabels[configurationProgress.value?.stage ?? 0] ?? 'Preparing',
 )
@@ -874,63 +884,6 @@ onMounted(() => daq.connect())
         </span>
       </div>
 
-      <section
-        v-if="configurationProgressVisible && configurationProgress"
-        class="configuration-progress-panel"
-        :class="{ failed: configurationProgress.stage === ConfigurationStage.FAILED }"
-        role="status"
-        aria-live="polite"
-      >
-        <div class="configuration-progress-heading">
-          <div>
-            <span class="eyebrow">Hardware configuration</span>
-            <strong>{{ configurationStageLabel }}</strong>
-          </div>
-          <span v-if="configurationBoardLabel" class="configuration-progress-board">
-            {{ configurationBoardLabel }}
-          </span>
-        </div>
-        <ol
-          v-if="configurationProgress.stage !== ConfigurationStage.FAILED"
-          class="configuration-progress-steps"
-          aria-label="Configuration stages"
-        >
-          <li
-            v-for="(stage, index) in configurationStageSteps"
-            :key="stage"
-            :class="{
-              current: index === configurationStagePosition,
-              complete: index < configurationStagePosition,
-            }"
-          >
-            {{ configurationStageLabels[stage] }}
-          </li>
-        </ol>
-        <progress
-          v-if="configurationProgress.boardsTotal"
-          class="configuration-overall-progress"
-          :value="configurationOverallValue"
-          :max="configurationProgress.boardsTotal"
-          aria-label="Overall configuration progress"
-        />
-        <div class="configuration-progress-detail">
-          <span>{{ configurationProgress.message || 'Applying configuration' }}</span>
-          <span v-if="configurationCounterLabel">{{ configurationCounterLabel }}</span>
-        </div>
-        <progress
-          v-if="configurationProgress.total"
-          :value="configurationProgress.completed"
-          :max="configurationProgress.total"
-          :aria-label="`${configurationStageLabel} progress`"
-        />
-        <div class="configuration-progress-meta">
-          <span v-if="configurationProgress.chain !== undefined">
-            Chain {{ configurationProgress.chain }}, node {{ configurationProgress.node }}
-          </span>
-          <span v-if="configurationProgress.reused">Cached pedestal data reused</span>
-        </div>
-      </section>
-
       <nav class="workspace-tabs" role="tablist" aria-label="Operator workspace">
         <button
           v-for="(tab, index) in workspaceTabs"
@@ -1289,6 +1242,95 @@ onMounted(() => daq.connect())
                 <dd>{{ compact(daq.snapshot.value?.pipeline?.decodeFailures) }}</dd>
               </div>
             </dl>
+          </section>
+
+          <section
+            class="panel configuration-progress-panel"
+            :class="{ failed: configurationProgress?.stage === ConfigurationStage.FAILED }"
+            aria-labelledby="configuration-progress-heading"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="configuration-card-title">
+              <div>
+                <p class="eyebrow">Latest configuration</p>
+                <h2 id="configuration-progress-heading">Configuration</h2>
+              </div>
+              <span
+                class="configuration-status"
+                :class="{
+                  active: configurationProgress?.active,
+                  failed: configurationProgress?.stage === ConfigurationStage.FAILED,
+                  complete: configurationProgress?.stage === ConfigurationStage.COMPLETE,
+                }"
+              >
+                {{ configurationProgressStatus }}
+              </span>
+            </div>
+            <template v-if="configurationProgress">
+              <div class="configuration-progress-heading">
+                <strong>{{ configurationStageLabel }}</strong>
+                <span v-if="configurationBoardLabel" class="configuration-progress-board">
+                  {{ configurationBoardLabel }}
+                </span>
+              </div>
+              <ol
+                v-if="configurationProgress.stage !== ConfigurationStage.FAILED"
+                class="configuration-progress-steps"
+                aria-label="Configuration stages"
+              >
+                <li
+                  v-for="(stage, index) in configurationStageSteps"
+                  :key="stage"
+                  :class="{
+                    current: configurationProgress.active && index === configurationStagePosition,
+                    complete: configurationStepComplete(index),
+                  }"
+                >
+                  {{ configurationStageLabels[stage] }}
+                </li>
+              </ol>
+              <progress
+                v-if="configurationProgress.boardsTotal"
+                class="configuration-overall-progress"
+                :value="configurationOverallValue"
+                :max="configurationProgress.boardsTotal"
+                aria-label="Overall configuration progress"
+              />
+              <div class="configuration-progress-detail">
+                <span>{{ configurationProgress.message || 'Configuration reported' }}</span>
+                <span v-if="configurationCounterLabel">{{ configurationCounterLabel }}</span>
+              </div>
+              <progress
+                v-if="configurationProgress.active && configurationProgress.total"
+                :value="configurationProgress.completed"
+                :max="configurationProgress.total"
+                :aria-label="`${configurationStageLabel} progress`"
+              />
+              <div class="configuration-progress-meta">
+                <span v-if="configurationProgress.chain !== undefined">
+                  Chain {{ configurationProgress.chain }}, node {{ configurationProgress.node }}
+                </span>
+                <span v-if="configurationProgress.reused">Cached pedestal data reused</span>
+                <span>Updated {{ localDateTime(configurationProgress.updatedAt) }}</span>
+              </div>
+            </template>
+            <div v-else class="configuration-empty">
+              <strong>
+                {{
+                  daq.snapshot.value?.state === SystemState.CONFIGURING
+                    ? 'Configuration is in progress'
+                    : 'No configuration reported'
+                }}
+              </strong>
+              <span>
+                {{
+                  daq.snapshot.value?.state === SystemState.CONFIGURING
+                    ? 'Detailed progress is unavailable from the connected backend.'
+                    : 'The latest result will remain here after hardware configuration.'
+                }}
+              </span>
+            </div>
           </section>
 
           <section class="panel" aria-labelledby="storage-heading">

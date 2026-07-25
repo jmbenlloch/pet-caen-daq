@@ -71,7 +71,11 @@ browser that reconnects during configuration immediately receives the current
 operation, stage, counters, and original start time. Intermediate register
 updates are published every 50 operations and at stage boundaries to keep
 telemetry bounded without hiding exact completion totals. A failed operation
-remains visible with its last stage and error message.
+remains visible with its last stage and error message. The Acquisition
+workspace keeps the latest configuration in a card between Pipeline and
+Storage, updating it during an active apply and retaining the completed or
+failed result afterward. If the connected backend does not provide structured
+progress, the card reports that explicitly instead of disappearing.
 
 DT5215 `SNT0` synchronization is session-scoped. Run start skips it only when
 discovery verified the TDlink-synchronized acquisition-status bit on every

@@ -550,10 +550,15 @@ main {
   color: #d9e8ee;
   background: linear-gradient(135deg, #102a35, #102332);
 }
+.side-column .configuration-progress-panel {
+  margin-top: 0;
+  padding: 24px;
+}
 .configuration-progress-panel.failed {
   border-color: #7c303b;
   background: #351923;
 }
+.configuration-card-title,
 .configuration-progress-heading,
 .configuration-progress-detail,
 .configuration-progress-meta {
@@ -561,6 +566,37 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+.configuration-card-title {
+  align-items: flex-start;
+}
+.configuration-card-title h2 {
+  margin-top: 5px;
+}
+.configuration-status {
+  padding: 4px 8px;
+  border: 1px solid #3b5062;
+  border-radius: 999px;
+  color: #8da2b2;
+  background: #142532;
+  font-size: 0.68rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.configuration-status.active {
+  color: #baffef;
+  border-color: #3fc5aa;
+  background: #175048;
+}
+.configuration-status.complete {
+  color: #9ed8c9;
+  border-color: #34796b;
+  background: #153a39;
+}
+.configuration-status.failed {
+  color: #ffc1c1;
+  border-color: #a84a59;
+  background: #511f2a;
 }
 .configuration-progress-heading > div {
   display: flex;
@@ -582,6 +618,9 @@ main {
   margin: 1px 0;
   padding: 0;
   list-style: none;
+}
+.side-column .configuration-progress-steps {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .configuration-progress-steps li {
   overflow: hidden;
@@ -639,6 +678,18 @@ main {
 }
 .configuration-progress-panel .configuration-overall-progress {
   height: 4px;
+}
+.configuration-empty {
+  display: grid;
+  gap: 7px;
+  padding-top: 4px;
+  color: #7894a7;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.configuration-empty strong {
+  color: #b7c8d5;
+  font-size: 0.86rem;
 }
 .workspace-tabs {
   display: grid;
@@ -2896,8 +2947,34 @@ textarea {
 [data-theme='light'] .configuration-progress-detail {
   color: #456c78;
 }
+[data-theme='light'] .configuration-status {
+  color: #607681;
+  border-color: #bdced1;
+  background: #edf4f4;
+}
+[data-theme='light'] .configuration-status.active {
+  color: #125a4b;
+  border-color: #57ae9c;
+  background: #d5f0e9;
+}
+[data-theme='light'] .configuration-status.complete {
+  color: #397368;
+  border-color: #a2d0c7;
+  background: #e4f4f0;
+}
+[data-theme='light'] .configuration-status.failed {
+  color: #92283a;
+  border-color: #e5aab5;
+  background: #fdecef;
+}
 [data-theme='light'] .configuration-progress-meta {
   color: #607d87;
+}
+[data-theme='light'] .configuration-empty {
+  color: #607d87;
+}
+[data-theme='light'] .configuration-empty strong {
+  color: #456c78;
 }
 [data-theme='light'] .configuration-progress-steps li {
   color: #70858f;
