@@ -709,7 +709,14 @@ func (s *RunService) stopActive(ctx context.Context, runID, requestedBy, reason 
 	if err != nil {
 		s.stopMonitor()
 		s.stopPresetMonitor()
-		s.publish(s.currentRun())
+		if s.Controller.StateSnapshot().State == acquisition.StateFault {
+			s.mu.Lock()
+			s.current = nil
+			s.mu.Unlock()
+			s.publish(nil)
+		} else {
+			s.publish(s.currentRun())
+		}
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_STOP_FAILED", err)
 	}
 	s.stopMonitor()

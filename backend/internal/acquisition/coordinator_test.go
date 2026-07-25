@@ -68,7 +68,7 @@ func (h *coordinatorHardware) ReadRawStreamBatch(ctx context.Context) ([]byte, [
 	if readErr != nil && count == 1 {
 		return nil, nil, readErr
 	}
-	if count == 1 {
+	if count == 1 || count > 2 {
 		<-ctx.Done()
 		return nil, nil, ctx.Err()
 	}

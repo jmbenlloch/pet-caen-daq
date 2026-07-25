@@ -18,10 +18,11 @@ type drainRead struct {
 	err    error
 }
 type scriptedDrainHardware struct {
-	reads   []drainRead
-	stopErr error
-	stops   int
-	stall   bool
+	reads           []drainRead
+	stopErr         error
+	stops           int
+	stall           bool
+	stallAfterReads bool
 }
 
 func (h *scriptedDrainHardware) SendCommand(context.Context, uint16, uint16, uint32, uint32) error {
@@ -34,6 +35,10 @@ func (h *scriptedDrainHardware) ReadRawStreamBatch(ctx context.Context) ([]byte,
 		return nil, nil, ctx.Err()
 	}
 	if len(h.reads) == 0 {
+		if h.stallAfterReads {
+			<-ctx.Done()
+			return nil, nil, ctx.Err()
+		}
 		return nil, nil, io.EOF
 	}
 	next := h.reads[0]
@@ -54,7 +59,7 @@ func completion(chain uint8, ready bool) dt5215.StreamEvent {
 
 func TestStopAndDrainDeliversPendingEventsBeforeCompletion(t *testing.T) {
 	pending := dt5215.StreamEvent{Chain: 0, Descriptor: dt5215.Descriptor{Qualifier: dt5202.QualifierSpectroscopy}}
-	hardware := &scriptedDrainHardware{reads: []drainRead{{raw: []byte("pending"), events: []dt5215.StreamEvent{pending}}, {raw: []byte("complete0"), events: []dt5215.StreamEvent{completion(0, true)}}, {raw: []byte("running"), events: []dt5215.StreamEvent{completion(1, false)}}, {raw: []byte("complete1"), events: []dt5215.StreamEvent{completion(1, true)}}}}
+	hardware := &scriptedDrainHardware{reads: []drainRead{{raw: []byte("pending"), events: []dt5215.StreamEvent{pending}}, {raw: []byte("complete0"), events: []dt5215.StreamEvent{completion(0, true)}}, {raw: []byte("running"), events: []dt5215.StreamEvent{completion(1, false)}}, {raw: []byte("complete1"), events: []dt5215.StreamEvent{completion(1, true)}}}, stallAfterReads: true}
 	var delivered []string
 	result, err := StopAndDrain(context.Background(), hardware, 2, func(raw []byte, _ []dt5215.StreamEvent) error { delivered = append(delivered, string(raw)); return nil })
 	if err != nil {
@@ -83,6 +88,40 @@ func TestStopAndDrainCompletesAfterCaptureVerifiedIdlePeriod(t *testing.T) {
 	result, err := StopAndDrain(context.Background(), &scriptedDrainHardware{stall: true}, 4, nil)
 	if err != nil || result.CompletedChains != 4 || result.Batches != 0 {
 		t.Fatalf("result=%#v error=%v", result, err)
+	}
+}
+
+func TestStopAndDrainPreservationTimeDoesNotConsumeIdleProbe(t *testing.T) {
+	hardware := &scriptedDrainHardware{
+		reads:           []drainRead{{raw: []byte("pending"), events: []dt5215.StreamEvent{{Chain: 0}}}},
+		stallAfterReads: true,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	result, err := StopAndDrain(ctx, hardware, 4, func([]byte, []dt5215.StreamEvent) error {
+		time.Sleep(20 * time.Millisecond)
+		return nil
+	})
+	if err != nil || result.Batches != 1 || result.CompletedChains != 4 {
+		t.Fatalf("result=%#v error=%v", result, err)
+	}
+}
+
+func TestStopAndDrainWaitsForSilenceAfterReadyEvidence(t *testing.T) {
+	hardware := &scriptedDrainHardware{
+		reads: []drainRead{
+			{events: []dt5215.StreamEvent{completion(0, true), completion(1, true)}},
+			{raw: []byte("after-ready"), events: []dt5215.StreamEvent{{Chain: 0}}},
+		},
+		stallAfterReads: true,
+	}
+	var delivered int
+	result, err := StopAndDrain(context.Background(), hardware, 2, func([]byte, []dt5215.StreamEvent) error {
+		delivered++
+		return nil
+	})
+	if err != nil || delivered != 2 || result.Batches != 2 {
+		t.Fatalf("result=%#v delivered=%d error=%v", result, delivered, err)
 	}
 }
 
