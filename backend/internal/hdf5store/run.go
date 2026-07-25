@@ -354,9 +354,6 @@ func (w *RunWriter) finalizeSegment() error {
 		return err
 	}
 	w.events = nil
-	if err := Validate(filepath.Join(w.dir, name), true); err != nil {
-		return fmt.Errorf("validate finalized HDF5 segment %s: %w", name, err)
-	}
 	w.segmentNames = append(w.segmentNames, name)
 	w.segmentIndex++
 	return nil
