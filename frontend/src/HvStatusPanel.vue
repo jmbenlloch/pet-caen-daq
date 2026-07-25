@@ -1,24 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { hvState, type HvState } from './hvStatus'
 
 type HvBoard = {
   chain: number
   node: number
+  hvVoltageV: number
+  hvTargetVoltageV: number
   hvOn: boolean
   hvRamping: boolean
   hvOverCurrent: boolean
   hvOverVoltage: boolean
 }
 
-type HvState = 'off' | 'on' | 'ramping' | 'fault'
-
 const props = defineProps<{ boards: readonly HvBoard[] }>()
-
-function boardState(board: HvBoard): HvState {
-  if (board.hvOverCurrent || board.hvOverVoltage) return 'fault'
-  if (board.hvRamping) return 'ramping'
-  return board.hvOn ? 'on' : 'off'
-}
 
 const stateLabel: Record<HvState, string> = {
   off: 'Off',
@@ -28,7 +23,7 @@ const stateLabel: Record<HvState, string> = {
 }
 
 const globalState = computed<HvState>(() => {
-  const states = props.boards.map(boardState)
+  const states = props.boards.map(hvState)
   if (states.includes('fault')) return 'fault'
   if (states.includes('ramping')) return 'ramping'
   if (states.includes('on')) return 'on'
@@ -38,7 +33,7 @@ const globalState = computed<HvState>(() => {
 const globalLabel = computed(() => {
   if (globalState.value === 'fault') return 'Fault'
   if (globalState.value === 'ramping') return 'Ramping'
-  const enabled = props.boards.filter((board) => boardState(board) === 'on').length
+  const enabled = props.boards.filter((board) => hvState(board) === 'on').length
   if (!enabled) return 'Off'
   if (enabled === props.boards.length) return 'On'
   return `${enabled}/${props.boards.length} on`
@@ -58,9 +53,9 @@ const globalLabel = computed(() => {
         v-for="board in boards"
         :key="`${board.chain}-${board.node}`"
         class="hv-board-led"
-        :class="boardState(board)"
-        :aria-label="`Chain ${board.chain} node ${board.node} HV: ${stateLabel[boardState(board)]}`"
-        :title="`Chain ${board.chain}: ${stateLabel[boardState(board)]}`"
+        :class="hvState(board)"
+        :aria-label="`Chain ${board.chain} node ${board.node} HV: ${stateLabel[hvState(board)]}`"
+        :title="`Chain ${board.chain}: ${stateLabel[hvState(board)]}`"
       >
         <span class="hv-led" aria-hidden="true" />
         <span>B{{ board.chain }}</span>
