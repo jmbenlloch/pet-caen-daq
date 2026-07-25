@@ -30,6 +30,7 @@ type Client struct {
 	journal            transportjournal.Sink
 	streamConnectionID string
 	streamOffset       uint64
+	streamBuffer       []byte
 	journalNow         func() time.Time
 }
 
