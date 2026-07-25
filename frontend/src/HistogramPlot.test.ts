@@ -4,13 +4,19 @@ import { describe, expect, it, vi } from 'vitest'
 import { HistogramDatasetSchema } from './gen/pet/caen/daq/v1/system_pb'
 import HistogramPlot from './HistogramPlot.vue'
 
+const constructed = vi.hoisted(() => vi.fn())
 const setData = vi.hoisted(() => vi.fn())
+const setScale = vi.hoisted(() => vi.fn())
 const bars = vi.hoisted(() => vi.fn(() => () => null))
 
 vi.mock('uplot', () => {
   class MockPlot {
     static paths = { bars }
+    constructor(options: unknown, data: unknown) {
+      constructed(options, data)
+    }
     setData = setData
+    setScale = setScale
     setSize = vi.fn()
     destroy = vi.fn()
   }
@@ -18,6 +24,41 @@ vi.mock('uplot', () => {
 })
 
 describe('HistogramPlot', () => {
+  it('adjusts the count scale when live or stored histogram data changes', async () => {
+    const initial = create(HistogramDatasetSchema, {
+      chain: 0,
+      node: 0,
+      channel: 4,
+      minimum: 0,
+      binWidth: 1,
+      bins: [0, 3, 1],
+    })
+    const wrapper = mount(HistogramPlot, {
+      props: { datasets: [initial], theme: 'dark', logarithmic: false },
+    })
+
+    setData.mockClear()
+    setScale.mockClear()
+    const updated = create(HistogramDatasetSchema, {
+      chain: 0,
+      node: 0,
+      channel: 4,
+      minimum: 0,
+      binWidth: 1,
+      bins: [0, 30, 1],
+    })
+    await wrapper.setProps({ datasets: [updated] })
+
+    expect(setData).toHaveBeenCalledWith(
+      [
+        [0.5, 1.5, 2.5],
+        [0, 30, 1],
+      ],
+      false,
+    )
+    expect(setScale).toHaveBeenCalledWith('y', { min: 0, max: 31.5 })
+  })
+
   it('resets both plot scales to the complete dataset', async () => {
     const dataset = create(HistogramDatasetSchema, {
       chain: 0,
