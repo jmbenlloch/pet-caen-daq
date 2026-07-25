@@ -108,6 +108,63 @@ function dashboardApi(state = SystemState.READY): DaqApi {
 }
 
 describe('operator dashboard', () => {
+  it('uses the native Save As picker when the browser supports it', async () => {
+    const write = vi.fn().mockResolvedValue(undefined)
+    const close = vi.fn().mockResolvedValue(undefined)
+    const showSaveFilePicker = vi.fn().mockResolvedValue({
+      createWritable: vi.fn().mockResolvedValue({ write, close }),
+    })
+    Object.defineProperty(window, 'showSaveFilePicker', {
+      configurable: true,
+      value: showSaveFilePicker,
+    })
+    const prompt = vi.spyOn(window, 'prompt')
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Save config')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(showSaveFilePicker).toHaveBeenCalledWith({
+      suggestedName: 'pet-caen-daq-configuration.txt',
+      types: [{ description: 'Text file', accept: { 'text/plain': ['.txt'] } }],
+    })
+    expect(write).toHaveBeenCalledOnce()
+    expect(await (write.mock.calls[0][0] as Blob).text()).toContain('Open[0]')
+    expect(close).toHaveBeenCalledOnce()
+    expect(prompt).not.toHaveBeenCalled()
+    delete (window as Window & { showSaveFilePicker?: unknown }).showSaveFilePicker
+    wrapper.unmount()
+  })
+
+  it('downloads the complete current configuration as a text file', async () => {
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('my-run-config')
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:configuration')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Save config')!
+      .trigger('click')
+
+    expect(wrapper.text()).not.toContain('Use backend config')
+    expect(prompt).toHaveBeenCalledWith('Save configuration as', 'pet-caen-daq-configuration.txt')
+    expect(createObjectURL).toHaveBeenCalledOnce()
+    const blob = createObjectURL.mock.calls[0][0] as Blob
+    expect(blob.type).toBe('text/plain;charset=utf-8')
+    expect(await blob.text()).toContain('Open[0]')
+    expect(click).toHaveBeenCalledOnce()
+    expect((click.mock.instances[0] as HTMLAnchorElement).download).toBe('my-run-config.txt')
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:configuration')
+    wrapper.unmount()
+  })
+
   it('shows one hardware action matching the current connection state', async () => {
     const connectedApi = dashboardApi(SystemState.READY)
     const connected = mount(App, { props: { api: connectedApi } })
