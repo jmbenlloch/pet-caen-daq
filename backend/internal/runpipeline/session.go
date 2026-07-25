@@ -352,14 +352,28 @@ func (s *sink) recordEvent(wire dt5215.StreamEvent, event dt5202.Event) {
 	if service := event.Service; service != nil {
 		observedAt := s.now()
 		board.TelemetryObservedAt = &observedAt
-		board.FPGATemperature = cloneFloat(service.FPGATemperature)
-		board.BoardTemperature = cloneFloat(service.BoardTemperature)
-		board.DetectorTemperature = cloneFloat(service.DetectorTemperature)
-		board.HVTemperature = cloneFloat(service.HVTemperature)
-		board.HVVoltage = cloneFloat(service.HVVoltage)
-		board.HVCurrent = cloneFloat(service.HVCurrent)
-		board.HVOn, board.HVRamping = service.HVOn, service.HVRamping
-		board.HVOverCurrent, board.HVOverVoltage = service.HVOverCurrent, service.HVOverVoltage
+		if service.FPGATemperature != nil {
+			board.FPGATemperature = cloneFloat(service.FPGATemperature)
+		}
+		if service.BoardTemperature != nil {
+			board.BoardTemperature = cloneFloat(service.BoardTemperature)
+		}
+		if service.DetectorTemperature != nil {
+			board.DetectorTemperature = cloneFloat(service.DetectorTemperature)
+		}
+		if service.HVTemperature != nil {
+			board.HVTemperature = cloneFloat(service.HVTemperature)
+		}
+		if service.HVVoltage != nil || service.HVCurrent != nil {
+			if service.HVVoltage != nil {
+				board.HVVoltage = cloneFloat(service.HVVoltage)
+			}
+			if service.HVCurrent != nil {
+				board.HVCurrent = cloneFloat(service.HVCurrent)
+			}
+			board.HVOn, board.HVRamping = service.HVOn, service.HVRamping
+			board.HVOverCurrent, board.HVOverVoltage = service.HVOverCurrent, service.HVOverVoltage
+		}
 		if service.Status != nil {
 			status := *service.Status
 			board.AcquisitionStatus = &status
