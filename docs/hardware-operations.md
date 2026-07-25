@@ -56,6 +56,11 @@ lines, and source line numbers do not force reconfiguration; assignment order,
 scope, or value changes do. Changed configurations still use the complete hard
 apply and readback validation.
 
+Protected-flash pedestal calibration is read and validated once per board when
+the current hardware connection first needs it. Later configuration changes on
+that connection reuse the validated calibration; disconnecting or restarting
+creates a new hardware session and forces fresh pedestal reads.
+
 DT5215 `SNT0` synchronization is session-scoped. Run start skips it only when
 discovery verified the TDlink-synchronized acquisition-status bit on every
 board, or after `SNT0` has succeeded once on the current connection.

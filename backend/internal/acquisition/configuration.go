@@ -61,17 +61,23 @@ type ConfigurationResult struct {
 // state machine. A partial hardware failure is a fault because the effective
 // board state is no longer known to match either the old or requested plan.
 type Configurator struct {
-	mu       sync.Mutex
-	states   *StateMachine
-	hardware ConfigurationHardware
-	observe  ConfigurationObserver
+	mu                      sync.Mutex
+	states                  *StateMachine
+	hardware                ConfigurationHardware
+	observe                 ConfigurationObserver
+	calibrations            map[ConfigurationTarget]dt5202.PedestalFlashCalibration
+	loadPedestalCalibration func(context.Context, dt5202.PedestalFlashReader, uint16, uint16) (dt5202.PedestalFlashCalibration, error)
 }
 
 func NewConfigurator(states *StateMachine, hardware ConfigurationHardware, observe ConfigurationObserver) (*Configurator, error) {
 	if states == nil || hardware == nil {
 		return nil, fmt.Errorf("state machine and configuration hardware are required")
 	}
-	return &Configurator{states: states, hardware: hardware, observe: observe}, nil
+	return &Configurator{
+		states: states, hardware: hardware, observe: observe,
+		calibrations:            make(map[ConfigurationTarget]dt5202.PedestalFlashCalibration),
+		loadPedestalCalibration: dt5202.LoadPedestalCalibration,
+	}, nil
 }
 
 func (c *Configurator) Configure(ctx context.Context, document *janusconfig.Document, targets []ConfigurationTarget, options ConfigureOptions) (ConfigurationResult, error) {
@@ -108,11 +114,15 @@ func (c *Configurator) Configure(ctx context.Context, document *janusconfig.Docu
 		if err != nil {
 			return ConfigurationResult{}, c.fail(target, fmt.Errorf("plan board %d: %w", target.Board, err), options.Actor)
 		}
-		c.publish(ConfigurationProgress{Stage: ConfigurationPedestal, Target: target, Message: "loading protected-flash pedestal calibration read-only"})
-		calibration, err := dt5202.LoadPedestalCalibration(ctx, c.hardware, target.Chain, target.Node)
+		calibration, reused, err := c.pedestalCalibration(ctx, *target)
 		if err != nil {
 			return ConfigurationResult{}, c.fail(target, fmt.Errorf("load pedestal board %d chain %d node %d: %w", target.Board, target.Chain, target.Node, err), options.Actor)
 		}
+		message := "loaded protected-flash pedestal calibration read-only"
+		if reused {
+			message = "reusing protected-flash pedestal calibration from current hardware session"
+		}
+		c.publish(ConfigurationProgress{Stage: ConfigurationPedestal, Target: target, Message: message})
 		plan, err = plan.WithPedestalCalibration(calibration.Calibration)
 		if err != nil {
 			return ConfigurationResult{}, c.fail(target, fmt.Errorf("complete pedestal plan board %d: %w", target.Board, err), options.Actor)
@@ -135,6 +145,18 @@ func (c *Configurator) Configure(ctx context.Context, document *janusconfig.Docu
 	}
 	c.publish(ConfigurationProgress{Stage: ConfigurationComplete, Message: fmt.Sprintf("configuration applied to %d boards; HV authorized=%t", len(targets), options.AuthorizeHV)})
 	return result, nil
+}
+
+func (c *Configurator) pedestalCalibration(ctx context.Context, target ConfigurationTarget) (dt5202.PedestalFlashCalibration, bool, error) {
+	if calibration, ok := c.calibrations[target]; ok {
+		return calibration, true, nil
+	}
+	calibration, err := c.loadPedestalCalibration(ctx, c.hardware, target.Chain, target.Node)
+	if err != nil {
+		return dt5202.PedestalFlashCalibration{}, false, err
+	}
+	c.calibrations[target] = calibration
+	return calibration, false, nil
 }
 
 func (c *Configurator) fail(target *ConfigurationTarget, err error, actor string) error {
