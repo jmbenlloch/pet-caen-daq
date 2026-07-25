@@ -3,15 +3,16 @@
 package hdf5store
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
@@ -21,6 +22,10 @@ import (
 
 // RunWriter owns the production run directory and its HDF5 decoded artifact.
 const DefaultSegmentSizeBytes uint64 = 500 << 20
+const (
+	bufferedAcquisitionBatches = 8
+	bufferedEventPayloadBytes  = 16 << 20
+)
 
 type RunWriter struct {
 	rawMu          sync.Mutex
@@ -40,6 +45,9 @@ type RunWriter struct {
 	journalFile    *os.File
 	journalEnabled bool
 	closed         bool
+	pendingEvents  []EventRecord
+	pendingBatches int
+	pendingBytes   uint64
 }
 
 func CreateRun(parent string, manifest runstore.Manifest) (_ *RunWriter, err error) {
@@ -210,6 +218,9 @@ func (w *RunWriter) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) err
 	if w.closed {
 		return errors.New("run writer is closed")
 	}
+	if err := w.flushEvents(); err != nil {
+		return err
+	}
 	if w.events == nil {
 		if err := w.openSegment(); err != nil {
 			return err
@@ -219,6 +230,49 @@ func (w *RunWriter) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) err
 		return err
 	}
 	w.manifest.EventCount++
+	return w.rotateIfNeeded()
+}
+
+// AppendEvents buffers several decoded acquisition batches so HDF5 dataset
+// extents and hyperslabs are updated in groups rather than once per event.
+func (w *RunWriter) AppendEvents(events []acquisition.DecodedEvent) error {
+	w.eventMu.Lock()
+	defer w.eventMu.Unlock()
+	if w.closed {
+		return errors.New("run writer is closed")
+	}
+	for _, item := range events {
+		w.pendingEvents = append(w.pendingEvents, EventRecord{Wire: item.Wire, Event: item.Event})
+		w.pendingBytes += uint64(len(item.Wire.Payload))
+	}
+	w.pendingBatches++
+	if w.pendingBatches < bufferedAcquisitionBatches && w.pendingBytes < bufferedEventPayloadBytes {
+		return nil
+	}
+	return w.flushEvents()
+}
+
+func (w *RunWriter) flushEvents() error {
+	if len(w.pendingEvents) == 0 {
+		w.pendingBatches = 0
+		return nil
+	}
+	if w.events == nil {
+		if err := w.openSegment(); err != nil {
+			return err
+		}
+	}
+	if err := w.events.AppendEvents(w.pendingEvents); err != nil {
+		return err
+	}
+	w.manifest.EventCount += uint64(len(w.pendingEvents))
+	w.pendingEvents = w.pendingEvents[:0]
+	w.pendingBatches = 0
+	w.pendingBytes = 0
+	return w.rotateIfNeeded()
+}
+
+func (w *RunWriter) rotateIfNeeded() error {
 	info, err := os.Stat(filepath.Join(w.dir, w.currentSegmentName()))
 	if err != nil {
 		return fmt.Errorf("stat HDF5 segment: %w", err)
@@ -232,6 +286,7 @@ func (w *RunWriter) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) err
 }
 
 func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
+	finalizeStarted := time.Now()
 	if w.closed {
 		return errors.New("run writer is closed")
 	}
@@ -241,29 +296,48 @@ func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
 			err = errors.Join(err, w.closeOpenArtifacts())
 		}
 	}()
+	w.eventMu.Lock()
+	stageStarted := time.Now()
+	err = w.flushEvents()
+	w.eventMu.Unlock()
+	w.logTiming("flush_pending_events", stageStarted, "events", w.manifest.EventCount)
+	if err != nil {
+		return err
+	}
+	stageStarted = time.Now()
 	if err = w.closeRaw(); err != nil {
 		return err
 	}
+	w.logTiming("close_raw", stageStarted, "batches", w.manifest.RawBatchCount)
+	stageStarted = time.Now()
 	if err = w.closeJournal(); err != nil {
 		return err
 	}
+	w.logTiming("close_journal", stageStarted)
 	w.manifest.CompletedAt = completedAt
 	w.manifest.TerminationReason = reason
 	if w.events != nil {
+		stageStarted = time.Now()
 		if err := w.finalizeSegment(); err != nil {
 			return err
 		}
+		w.logTiming("finalize_hdf5_segment", stageStarted, "segments", len(w.segmentNames))
 	}
+	stageStarted = time.Now()
 	w.manifest.Artifacts, err = w.finalizedArtifacts()
 	if err != nil {
 		return err
 	}
+	w.logTiming("catalog_artifacts", stageStarted, "artifacts", len(w.manifest.Artifacts))
+	stageStarted = time.Now()
 	if err := w.writeManifest(); err != nil {
 		return err
 	}
+	w.logTiming("write_manifest", stageStarted)
 	if err := os.Remove(filepath.Join(w.dir, "incomplete")); err != nil {
 		return fmt.Errorf("remove incomplete marker: %w", err)
 	}
+	w.logTiming("hdf5_run_finalize", finalizeStarted, "events", w.manifest.EventCount, "batches", w.manifest.RawBatchCount, "artifacts", len(w.manifest.Artifacts))
 	return nil
 }
 
@@ -283,24 +357,23 @@ func (w *RunWriter) finalizedArtifacts() ([]runstore.Artifact, error) {
 	}
 	artifacts := make([]runstore.Artifact, 0, len(names))
 	for _, candidate := range names {
-		file, err := os.Open(filepath.Join(w.dir, candidate.name))
+		info, err := os.Stat(filepath.Join(w.dir, candidate.name))
 		if err != nil {
-			return nil, fmt.Errorf("open artifact %s: %w", candidate.name, err)
-		}
-		hash := sha256.New()
-		size, copyErr := io.Copy(hash, file)
-		closeErr := file.Close()
-		if copyErr != nil {
-			return nil, fmt.Errorf("hash artifact %s: %w", candidate.name, copyErr)
-		}
-		if closeErr != nil {
-			return nil, fmt.Errorf("close artifact %s: %w", candidate.name, closeErr)
+			return nil, fmt.Errorf("stat artifact %s: %w", candidate.name, err)
 		}
 		artifacts = append(artifacts, runstore.Artifact{
-			Kind: candidate.kind, Name: candidate.name, SizeBytes: uint64(size), SHA256: fmt.Sprintf("%x", hash.Sum(nil)),
+			Kind: candidate.kind, Name: candidate.name, SizeBytes: uint64(info.Size()),
 		})
 	}
 	return artifacts, nil
+}
+
+func (w *RunWriter) logTiming(stage string, started time.Time, fields ...any) {
+	message := fmt.Sprintf("run_timing run_id=%s stage=%s duration_ms=%d", w.manifest.RunID, stage, time.Since(started).Milliseconds())
+	for index := 0; index+1 < len(fields); index += 2 {
+		message += fmt.Sprintf(" %v=%v", fields[index], fields[index+1])
+	}
+	log.Print(message)
 }
 
 func (w *RunWriter) Abort() error {
@@ -308,6 +381,12 @@ func (w *RunWriter) Abort() error {
 		return nil
 	}
 	w.closed = true
+	w.eventMu.Lock()
+	flushErr := w.flushEvents()
+	w.eventMu.Unlock()
+	if flushErr != nil {
+		return errors.Join(flushErr, w.closeOpenArtifacts())
+	}
 	return w.closeOpenArtifacts()
 }
 

@@ -71,6 +71,64 @@ func TestSpectroscopyWriterCreatesTypedAppendableDatasets(t *testing.T) {
 	}
 }
 
+func TestSpectroscopyBatchPreservesParentOffsetsAndIndexOrder(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "events.h5")
+	writer, err := Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records := make([]EventRecord, 2)
+	for i := range records {
+		trigger := uint64(i + 10)
+		records[i] = EventRecord{
+			Wire: dt5215.StreamEvent{Chain: uint8(i), Descriptor: dt5215.Descriptor{Node: 2, Qualifier: 0x33, TriggerID: trigger, Timestamp: trigger + 100}},
+			Event: dt5202.Event{Kind: dt5202.EventSpectroscopy, Spectroscopy: &dt5202.SpectroscopyEvent{
+				TriggerID: trigger, Timestamp: trigger + 100,
+				Energies: []dt5202.Energy{{Channel: uint8(i), HighGain: uint16(200 + i), HasHighGain: true}},
+				Timings:  []dt5202.Timing{{Channel: uint8(i), ToA: uint32(300 + i)}},
+			}},
+		}
+	}
+	if err := writer.AppendEvents(records); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	file, err := hdf5.OpenFile(path, hdf5.F_ACC_RDONLY)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	parents, err := file.OpenDataset("events/spectroscopy/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer parents.Close()
+	var parentRows [2]spectroscopyRow
+	if err := parents.Read(&parentRows); err != nil {
+		t.Fatal(err)
+	}
+	if parentRows[0].EnergyOffset != 0 || parentRows[1].EnergyOffset != 1 ||
+		parentRows[0].TimingOffset != 0 || parentRows[1].TimingOffset != 1 {
+		t.Fatalf("parent offsets = %+v", parentRows)
+	}
+	index, err := file.OpenDataset("events/index")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer index.Close()
+	var indexRows [2]indexRow
+	if err := index.Read(&indexRows); err != nil {
+		t.Fatal(err)
+	}
+	if indexRows[0].Sequence != 1 || indexRows[0].KindRow != 0 ||
+		indexRows[1].Sequence != 2 || indexRows[1].KindRow != 1 ||
+		indexRows[0].TriggerID != 10 || indexRows[1].TriggerID != 11 {
+		t.Fatalf("index rows = %+v", indexRows)
+	}
+}
+
 func TestWriterRoundTripsEveryEventFamily(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "events.h5")
 	writer, err := Create(path)

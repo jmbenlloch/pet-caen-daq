@@ -22,6 +22,36 @@ type ReconcileReport struct {
 	Problems                              []ReconcileProblem
 }
 
+// IndexRun reads and indexes one run manifest without inspecting any sibling
+// run directories. Normal acquisition completion uses this incremental path;
+// full reconciliation is reserved for the offline catalog maintenance tool.
+func (c *Catalog) IndexRun(ctx context.Context, parent, runID string) error {
+	directory := filepath.Join(parent, "run-"+runID)
+	manifest, err := runstore.ReadManifest(directory, runID)
+	if err != nil {
+		return err
+	}
+	hash, err := hashRegularManifest(filepath.Join(directory, "manifest.json"))
+	if err != nil {
+		return err
+	}
+	configuration, err := NormalizeConfiguration(manifest.RequestedConfiguration, manifest.ConfigurationAudit)
+	if err != nil {
+		return err
+	}
+	configurationDigest := sha256.Sum256([]byte(manifest.RequestedConfiguration))
+	_, markerErr := os.Stat(filepath.Join(directory, "incomplete"))
+	incomplete := markerErr == nil
+	if markerErr != nil && !errors.Is(markerErr, os.ErrNotExist) {
+		return fmt.Errorf("inspect incomplete marker: %w", markerErr)
+	}
+	return c.IndexManifest(ctx, IndexRequest{
+		Manifest: manifest, ManifestPath: filepath.Join(directory, "manifest.json"),
+		ManifestSHA256: hash, ConfigurationSHA256: hex.EncodeToString(configurationDigest[:]),
+		Incomplete: incomplete, Configuration: configuration,
+	})
+}
+
 // Reconcile makes the catalog agree with the run manifests under parent.
 // Invalid manifests are reported, while missing runs are retained but marked
 // unavailable so disappearance of acquisition evidence is never concealed.

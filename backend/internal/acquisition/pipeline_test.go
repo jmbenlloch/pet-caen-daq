@@ -53,6 +53,41 @@ type concurrentPipelineSink struct {
 	once     sync.Once
 }
 
+type batchPipelineSink struct {
+	pipelineSink
+	batches [][]DecodedEvent
+}
+
+func (s *batchPipelineSink) AppendEvents(events []DecodedEvent) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.batches = append(s.batches, append([]DecodedEvent(nil), events...))
+	return s.eventErr
+}
+
+func TestPipelineDeliversOneDecodedGroupPerAcquisitionBatch(t *testing.T) {
+	sink := &batchPipelineSink{}
+	pipeline, err := NewPipeline(1, BackpressureBlock, sink)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := make([]byte, 8)
+	binary.LittleEndian.PutUint32(payload, 0x11223344)
+	events := []dt5215.StreamEvent{
+		{Descriptor: dt5215.Descriptor{Qualifier: dt5202.QualifierTest}, Payload: payload},
+		{Descriptor: dt5215.Descriptor{Qualifier: dt5202.QualifierTest}, Payload: payload},
+	}
+	if err := pipeline.Submit(context.Background(), PipelineBatch{Raw: []byte{1}, Events: events}); err != nil {
+		t.Fatal(err)
+	}
+	if err := pipeline.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if len(sink.batches) != 1 || len(sink.batches[0]) != 2 || len(sink.events) != 0 {
+		t.Fatalf("batch delivery = %+v, individual events = %d", sink.batches, len(sink.events))
+	}
+}
+
 func (s *concurrentPipelineSink) AppendRaw(raw []byte) error {
 	s.raw <- raw[0]
 	return nil

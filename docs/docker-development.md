@@ -90,6 +90,17 @@ variable does not override a run's requested compression.
 `task docker:build` selects that target. The ordinary `task build` retains JSON
 development storage and does not require native HDF5.
 
+The packaged server and local Compose DAQ service set
+`-pipeline-capacity 512`; direct non-container execution retains the smaller
+command-line default unless the flag is supplied explicitly.
+
+Live HDF5 storage groups eight acquisition batches, capped at 16 MiB of event
+payload, before extending datasets. Consecutive spectroscopy events are
+written as combined energy, timing, parent, and index hyperslabs while
+preserving input order. The DT5215 framer independently caps one payload at
+64 MiB and its descriptor table at 65,536 32-byte rows, so one accepted wire
+batch can occupy at most 66 MiB plus its 12-byte header.
+
 The initially evaluated fork revision constructed values returned by
 `OpenDataset` without the internal datatype that `Close` expected, causing a
 panic during close. This was reported and fixed in

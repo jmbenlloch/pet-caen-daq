@@ -4,6 +4,11 @@ The SQLite catalog is a searchable, rebuildable index. The authoritative run
 evidence remains in each `run-*/manifest.json` and its referenced artifact
 files. Catalog maintenance never replaces or repairs those manifests.
 
+The backend opens the catalog without scanning all run directories. Each newly
+completed run is indexed independently after its ready snapshot is published,
+so catalog maintenance cannot delay the next acquisition. Full reconciliation
+is an explicit offline operator action.
+
 The examples below use the default `./runs/catalog.sqlite3`. Set `RUNS` and
 `CATALOG` when the deployment uses different paths. Keep the live catalog on
 local storage rather than a network filesystem.
@@ -67,8 +72,7 @@ usually safer than restoring an old backup and cannot lose newer indexed runs.
 
 - `manifest hash differs`: the manifest changed after indexing. Investigate why
   immutable finalized evidence changed, then rebuild only after resolving it.
-- `missing from catalog`: run reconciliation through a normal backend restart,
-  or perform a stopped-backend rebuild.
+- `missing from catalog`: stop the backend and perform a catalog rebuild.
 - `catalog says available but run directory is absent`: treat this as possible
   evidence loss. Locate or restore the run directory before rebuilding.
 - `invalid manifest`: retain the directory unchanged and inspect the reported

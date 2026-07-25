@@ -6,9 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -184,9 +182,8 @@ func TestGeneratedClientsCompleteSimulatedRunAndInspectArtifacts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		digest := sha256.Sum256(data)
-		if artifact.GetSizeBytes() != uint64(len(data)) || artifact.GetSha256() != fmt.Sprintf("%x", digest) {
-			t.Fatalf("artifact=%+v bytes=%d digest=%x", artifact, len(data), digest)
+		if artifact.GetSizeBytes() != uint64(len(data)) || artifact.GetSha256() != "" {
+			t.Fatalf("artifact=%+v bytes=%d", artifact, len(data))
 		}
 	}
 }

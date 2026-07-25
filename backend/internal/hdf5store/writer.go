@@ -74,6 +74,11 @@ type table struct {
 	length  uint64
 }
 
+type EventRecord struct {
+	Wire  dt5215.StreamEvent
+	Event dt5202.Event
+}
+
 // Writer appends spectroscopy events in the schema commit order: children,
 // kind-specific parent, then run-wide index.
 type Writer struct {
@@ -294,6 +299,86 @@ func (w *Writer) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error 
 	default:
 		return fmt.Errorf("HDF5 schema v%d does not implement event kind %q", SchemaVersion, event.Kind)
 	}
+}
+
+func (w *Writer) AppendEvents(events []EventRecord) error {
+	for len(events) > 0 {
+		if events[0].Event.Kind != dt5202.EventSpectroscopy {
+			if err := w.AppendEvent(events[0].Wire, events[0].Event); err != nil {
+				return err
+			}
+			events = events[1:]
+			continue
+		}
+		n := 1
+		for n < len(events) && events[n].Event.Kind == dt5202.EventSpectroscopy {
+			n++
+		}
+		if err := w.appendSpectroscopyBatch(events[:n]); err != nil {
+			return err
+		}
+		events = events[n:]
+	}
+	return nil
+}
+
+func (w *Writer) appendSpectroscopyBatch(events []EventRecord) error {
+	parents := make([]spectroscopyRow, 0, len(events))
+	indexes := make([]indexRow, 0, len(events))
+	var energies []energyRow
+	var timings []timingRow
+	energyBase, timingBase, parentBase := w.energies.length, w.timings.length, w.spectroscopy.length
+	indexBase := w.index.length
+	for i, item := range events {
+		value := item.Event.Spectroscopy
+		if value == nil {
+			return errors.New("spectroscopy event payload is missing")
+		}
+		if value.TriggerID != item.Wire.Descriptor.TriggerID || value.Timestamp != item.Wire.Descriptor.Timestamp {
+			return errors.New("typed spectroscopy identity does not match DT5215 descriptor")
+		}
+		energyCount, err := uint32Count("spectroscopy energies", len(value.Energies))
+		if err != nil {
+			return err
+		}
+		timingCount, err := uint32Count("spectroscopy timings", len(value.Timings))
+		if err != nil {
+			return err
+		}
+		parent := parentBase + uint64(i)
+		energyOffset, timingOffset := energyBase+uint64(len(energies)), timingBase+uint64(len(timings))
+		for _, value := range value.Energies {
+			energies = append(energies, energyRow{ParentRow: parent, Channel: value.Channel, LowGain: value.LowGain, HighGain: value.HighGain, HasLowGain: boolean(value.HasLowGain), HasHighGain: boolean(value.HasHighGain), Discriminator: boolean(value.Discriminator)})
+		}
+		for _, value := range value.Timings {
+			timings = append(timings, timingRow{ParentRow: parent, Channel: value.Channel, ToA: value.ToA, ToT: value.ToT})
+		}
+		row := spectroscopyRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, ChannelMask: value.ChannelMask, EnergyOffset: energyOffset, EnergyCount: energyCount, TimingOffset: timingOffset, TimingCount: timingCount}
+		if value.RelativeTimestampClock != nil {
+			row.Validity |= 1
+			row.RelativeTimestampClock = *value.RelativeTimestampClock
+		}
+		if value.TimeReference != nil {
+			row.Validity |= 2
+			row.TimeReference = *value.TimeReference
+		}
+		parents = append(parents, row)
+		wire := item.Wire
+		indexes = append(indexes, indexRow{Sequence: w.sequenceBase + indexBase + uint64(i) + 1, Kind: KindSpectroscopy, KindRow: parent, Chain: wire.Chain, Node: wire.Descriptor.Node, Qualifier: wire.Descriptor.Qualifier, TriggerID: wire.Descriptor.TriggerID, Timestamp: wire.Descriptor.Timestamp, PayloadOffsetWords: wire.Descriptor.PayloadOffsetWords, PayloadSizeWords: wire.Descriptor.PayloadSizeWords, CRCError: boolean(wire.Descriptor.CRCError)})
+	}
+	if err := appendRows(&w.energies, energies); err != nil {
+		return fmt.Errorf("append spectroscopy energies: %w", err)
+	}
+	if err := appendRows(&w.timings, timings); err != nil {
+		return fmt.Errorf("append spectroscopy timings: %w", err)
+	}
+	if err := appendRows(&w.spectroscopy, parents); err != nil {
+		return fmt.Errorf("append spectroscopy events: %w", err)
+	}
+	if err := appendRows(&w.index, indexes); err != nil {
+		return fmt.Errorf("append event indexes: %w", err)
+	}
+	return nil
 }
 
 func (w *Writer) appendSpectroscopy(wire dt5215.StreamEvent, event dt5202.Event) error {

@@ -3,7 +3,6 @@ package runstore
 
 import (
 	"bufio"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -124,7 +123,7 @@ type Artifact struct {
 	Kind      string `json:"kind"`
 	Name      string `json:"name"`
 	SizeBytes uint64 `json:"size_bytes"`
-	SHA256    string `json:"sha256"`
+	SHA256    string `json:"sha256,omitempty"`
 }
 
 type HistogramDataset struct {
@@ -403,20 +402,11 @@ func (w *Writer) finalizedArtifacts() ([]Artifact, error) {
 	artifacts := make([]Artifact, 0, len(names))
 	for _, candidate := range names {
 		path := filepath.Join(w.dir, candidate.name)
-		file, err := os.Open(path)
+		info, err := os.Stat(path)
 		if err != nil {
-			return nil, fmt.Errorf("open artifact %s: %w", candidate.name, err)
+			return nil, fmt.Errorf("stat artifact %s: %w", candidate.name, err)
 		}
-		hash := sha256.New()
-		size, copyErr := io.Copy(hash, file)
-		closeErr := file.Close()
-		if copyErr != nil {
-			return nil, fmt.Errorf("hash artifact %s: %w", candidate.name, copyErr)
-		}
-		if closeErr != nil {
-			return nil, fmt.Errorf("close artifact %s: %w", candidate.name, closeErr)
-		}
-		artifacts = append(artifacts, Artifact{Kind: candidate.kind, Name: candidate.name, SizeBytes: uint64(size), SHA256: fmt.Sprintf("%x", hash.Sum(nil))})
+		artifacts = append(artifacts, Artifact{Kind: candidate.kind, Name: candidate.name, SizeBytes: uint64(info.Size())})
 	}
 	return artifacts, nil
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -70,7 +71,7 @@ type RunService struct {
 	HardwareMetadata HardwareMetadataProvider
 	HealthInterval   time.Duration
 	RunParent        string
-	ReconcileCatalog func(context.Context, string) error
+	IndexRun         func(context.Context, string, string) error
 	CatalogError     func(error)
 	Catalog          RunCatalog
 	AllocateRunID    func(context.Context) (string, error)
@@ -697,6 +698,7 @@ func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1
 }
 
 func (s *RunService) stopActive(ctx context.Context, runID, requestedBy, reason string) (*connect.Response[daqv1.StopRunResponse], error) {
+	serviceStopStarted := time.Now()
 	pipeline := s.Controller.ActivePipeline()
 	var err error
 	if controller, ok := s.Controller.(interface {
@@ -746,7 +748,6 @@ func (s *RunService) stopActive(ctx context.Context, runID, requestedBy, reason 
 		statistics := source.FinalStatistics()
 		run.FinalStatistics = statisticsTelemetry(&statistics)
 	}
-	s.reconcileCatalog(ctx)
 	s.mu.Lock()
 	s.current = nil
 	if s.completed == nil {
@@ -757,16 +758,23 @@ func (s *RunService) stopActive(ctx context.Context, runID, requestedBy, reason 
 	snapshot := s.publish(nil)
 	snapshot.LatestCompletedRun = proto.Clone(run).(*daqv1.RunSummary)
 	snapshot = s.Telemetry.Publish(snapshot)
+	log.Printf("run_timing run_id=%s stage=completion_published duration_ms=%d", runID, time.Since(serviceStopStarted).Milliseconds())
+	s.indexCompletedRun(runID)
 	return connect.NewResponse(&daqv1.StopRunResponse{Run: run, Snapshot: snapshot}), nil
 }
 
-func (s *RunService) reconcileCatalog(ctx context.Context) {
-	if s.ReconcileCatalog == nil {
+func (s *RunService) indexCompletedRun(runID string) {
+	if s.IndexRun == nil {
 		return
 	}
-	if err := s.ReconcileCatalog(ctx, s.RunParent); err != nil && s.CatalogError != nil {
-		s.CatalogError(err)
-	}
+	go func() {
+		started := time.Now()
+		err := s.IndexRun(context.Background(), s.RunParent, runID)
+		log.Printf("run_timing run_id=%s stage=catalog_index duration_ms=%d error=%t", runID, time.Since(started).Milliseconds(), err != nil)
+		if err != nil && s.CatalogError != nil {
+			s.CatalogError(err)
+		}
+	}()
 }
 
 var validRunID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`)

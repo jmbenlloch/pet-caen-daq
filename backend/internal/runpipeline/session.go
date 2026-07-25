@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -93,7 +94,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 		_ = writer.Abort()
 		return nil, err
 	}
-	return &Session{pipeline: pipeline, writer: writer, sink: sink}, nil
+	return &Session{id: runID, pipeline: pipeline, writer: writer, sink: sink}, nil
 }
 
 func configurationIdentity(options acquisition.RunOptions) (runstore.ConfigurationIdentity, error) {
@@ -128,6 +129,7 @@ func backpressureName(policy acquisition.BackpressurePolicy) string {
 }
 
 type Session struct {
+	id         string
 	pipeline   *acquisition.Pipeline
 	writer     runWriter
 	sink       *sink
@@ -161,12 +163,14 @@ func (s *Session) Close() error {
 }
 
 func (s *Session) Finalize(completedAt, reason string) error {
+	finalizeStarted := time.Now()
 	completed, err := time.Parse(time.RFC3339Nano, completedAt)
 	if err != nil {
 		err = fmt.Errorf("parse run completion time: %w", err)
 		s.recordError(err)
 		return err
 	}
+	stageStarted := time.Now()
 	statistics := s.FinalStatisticsAt(completed)
 	if err := s.writer.SaveStatistics(statistics); err != nil {
 		s.recordError(err)
@@ -175,13 +179,21 @@ func (s *Session) Finalize(completedAt, reason string) error {
 	s.mu.Lock()
 	s.statistics = cloneRunStatistics(statistics)
 	s.mu.Unlock()
+	log.Printf("run_timing run_id=%s stage=statistics duration_ms=%d boards=%d", s.id, time.Since(stageStarted).Milliseconds(), len(statistics.Boards))
 	if s.sink.persistHistograms {
-		if err := s.writer.SaveHistograms(s.sink.HistogramSnapshot()); err != nil {
+		stageStarted = time.Now()
+		histograms := s.sink.HistogramSnapshot()
+		log.Printf("run_timing run_id=%s stage=histogram_snapshot duration_ms=%d datasets=%d", s.id, time.Since(stageStarted).Milliseconds(), len(histograms))
+		stageStarted = time.Now()
+		if err := s.writer.SaveHistograms(histograms); err != nil {
 			s.recordError(err)
 			return err
 		}
+		log.Printf("run_timing run_id=%s stage=histogram_write duration_ms=%d datasets=%d", s.id, time.Since(stageStarted).Milliseconds(), len(histograms))
 	}
+	stageStarted = time.Now()
 	err = s.writer.Finalize(completedAt, reason)
+	log.Printf("run_timing run_id=%s stage=storage_finalize duration_ms=%d error=%t", s.id, time.Since(stageStarted).Milliseconds(), err != nil)
 	s.mu.Lock()
 	if err != nil {
 		s.lastErr = err
@@ -189,6 +201,7 @@ func (s *Session) Finalize(completedAt, reason string) error {
 		s.finalized = true
 	}
 	s.mu.Unlock()
+	log.Printf("run_timing run_id=%s stage=session_finalize duration_ms=%d error=%t", s.id, time.Since(finalizeStarted).Milliseconds(), err != nil)
 	return err
 }
 
@@ -295,6 +308,31 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 	if err := s.writer.AppendEvent(wire, event); err != nil {
 		return err
 	}
+	s.recordEvent(wire, event)
+	return nil
+}
+
+func (s *sink) AppendEvents(events []acquisition.DecodedEvent) error {
+	if writer, ok := s.writer.(interface {
+		AppendEvents([]acquisition.DecodedEvent) error
+	}); ok {
+		if err := writer.AppendEvents(events); err != nil {
+			return err
+		}
+		for _, item := range events {
+			s.recordEvent(item.Wire, item.Event)
+		}
+		return nil
+	}
+	for _, item := range events {
+		if err := s.AppendEvent(item.Wire, item.Event); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *sink) recordEvent(wire dt5215.StreamEvent, event dt5202.Event) {
 	s.events.Add(1)
 	s.mu.Lock()
 	key := boardKey{chain: wire.Chain, node: wire.Descriptor.Node}
@@ -329,7 +367,6 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 	}
 	s.boards[key] = board
 	s.mu.Unlock()
-	return nil
 }
 
 func accumulateChannels(board *BoardStats, event dt5202.Event) {

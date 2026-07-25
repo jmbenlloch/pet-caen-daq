@@ -2,10 +2,8 @@ package runstore
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -87,9 +85,8 @@ func TestRunLifecycleAndReplay(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		digest := sha256.Sum256(artifactData)
-		if artifact.SizeBytes != uint64(len(artifactData)) || artifact.SHA256 != fmt.Sprintf("%x", digest) || len(artifact.SHA256) != 64 {
-			t.Fatalf("artifact=%+v bytes=%d digest=%x", artifact, len(artifactData), digest)
+		if artifact.SizeBytes != uint64(len(artifactData)) || artifact.SHA256 != "" {
+			t.Fatalf("artifact=%+v bytes=%d", artifact, len(artifactData))
 		}
 	}
 	rawFile, err := os.Open(filepath.Join(w.Directory(), "wire.raw"))
@@ -172,7 +169,7 @@ func TestFinalizeFailureRetainsIncompleteMarker(t *testing.T) {
 	if err := os.Remove(filepath.Join(w.Directory(), "events.jsonl")); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.Finalize("2026-07-21T00:00:00Z", "operator_stop"); err == nil || !strings.Contains(err.Error(), "open artifact events.jsonl") {
+	if err := w.Finalize("2026-07-21T00:00:00Z", "operator_stop"); err == nil || !strings.Contains(err.Error(), "stat artifact events.jsonl") {
 		t.Fatalf("finalize error = %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(w.Directory(), "incomplete")); err != nil {

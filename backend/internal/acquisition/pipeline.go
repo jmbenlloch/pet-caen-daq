@@ -33,6 +33,15 @@ type PipelineSink interface {
 	AppendEvent(dt5215.StreamEvent, dt5202.Event) error
 }
 
+type DecodedEvent struct {
+	Wire  dt5215.StreamEvent
+	Event dt5202.Event
+}
+
+type BatchPipelineSink interface {
+	AppendEvents([]DecodedEvent) error
+}
+
 // Pipeline preserves ordering within separate raw and decoded-event workers.
 // An event batch waits for its raw batch to persist, while the raw worker may
 // capture the next batch concurrently with decoding and event persistence.
@@ -255,6 +264,7 @@ func (p *Pipeline) runEvents() {
 }
 
 func (p *Pipeline) processEvents(batch PipelineBatch) error {
+	decodedBatch := make([]DecodedEvent, 0, len(batch.Events))
 	for _, wire := range batch.Events {
 		decoded, err := dt5202.DecodeEvent(wire.Descriptor.Qualifier, wire.Descriptor.TriggerID, wire.Descriptor.Timestamp, wire.Payload)
 		if err != nil {
@@ -262,9 +272,20 @@ func (p *Pipeline) processEvents(batch PipelineBatch) error {
 			return fmt.Errorf("decode chain %d node %d: %w", wire.Chain, wire.Descriptor.Node, err)
 		}
 		p.decoded.Add(1)
-		if err := p.sink.AppendEvent(wire, decoded); err != nil {
+		decodedBatch = append(decodedBatch, DecodedEvent{Wire: wire, Event: decoded})
+	}
+	if sink, ok := p.sink.(BatchPipelineSink); ok {
+		if err := sink.AppendEvents(decodedBatch); err != nil {
 			p.sinkFail.Add(1)
-			return fmt.Errorf("store chain %d node %d event: %w", wire.Chain, wire.Descriptor.Node, err)
+			return fmt.Errorf("store decoded event batch: %w", err)
+		}
+		p.persisted.Add(uint64(len(decodedBatch)))
+		return nil
+	}
+	for _, item := range decodedBatch {
+		if err := p.sink.AppendEvent(item.Wire, item.Event); err != nil {
+			p.sinkFail.Add(1)
+			return fmt.Errorf("store chain %d node %d event: %w", item.Wire.Chain, item.Wire.Descriptor.Node, err)
 		}
 		p.persisted.Add(1)
 	}
