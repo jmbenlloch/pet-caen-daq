@@ -794,6 +794,14 @@ onMounted(() => daq.connect())
               </span>
               <small>{{ activeStopPolicy() }}</small>
             </div>
+            <div
+              v-else-if="daq.snapshot.value?.state === SystemState.SCANNING"
+              class="run-now"
+              role="status"
+            >
+              <span><strong>Scan in progress</strong></span>
+              <small>Acquisition run controls are unavailable during the scan</small>
+            </div>
             <div v-else class="run-now quiet" role="status">
               <span>No active run</span>
               <small>{{ configuredStopPolicy }}</small>
