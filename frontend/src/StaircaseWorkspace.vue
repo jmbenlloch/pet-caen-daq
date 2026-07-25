@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch, type DeepReadonly } from 'vue'
 import type { DaqApi } from './api'
 import {
   ScanState,
+  ScanType,
   StartStaircaseRequestSchema,
   SystemState,
   type ScanSummary,
@@ -57,6 +58,7 @@ async function refresh() {
       historyPageSize,
       (historyPage.value - 1) * historyPageSize,
       boardFilter,
+      ScanType.STAIRCASE,
     )
     if (request !== historyRequest) return
     history.value = response.scans

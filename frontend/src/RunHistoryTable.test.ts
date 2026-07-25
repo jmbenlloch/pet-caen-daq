@@ -94,4 +94,29 @@ describe('run history table', () => {
     await wrapper.get('.artifact-download').trigger('click')
     expect(downloadArtifact).toHaveBeenCalledWith('scan-1', 'staircase.h5')
   })
+
+  it('labels hold-delay scans separately and does not request a run configuration', async () => {
+    const configuration = vi.fn()
+    const wrapper = mount(RunHistoryTable, {
+      props: {
+        runs: [
+          create(RunSummarySchema, {
+            runId: 'scan-2',
+            runType: RunType.HOLD_DELAY_SCAN,
+            terminationReason: 'completed',
+          }),
+        ],
+        configuration,
+        downloadArtifact: vi.fn(),
+      },
+    })
+
+    expect(wrapper.get('.run-type').text()).toBe('Hold-delay scan')
+    expect(wrapper.get('.run-row').text()).toContain('—')
+    await wrapper.get('.run-link').trigger('click')
+    expect(configuration).not.toHaveBeenCalled()
+    expect(wrapper.get('[aria-label="Details for run scan-2"]').text()).toContain(
+      'hold-delay spectra',
+    )
+  })
 })

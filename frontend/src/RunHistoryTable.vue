@@ -79,7 +79,7 @@ async function selectRun(run: RunRecord) {
     return
   }
   selectedRunId.value = run.runId
-  if (run.runType === RunType.STAIRCASE) return
+  if (isScan(run)) return
   if (Object.hasOwn(configurations.value, run.runId)) return
   configurationLoading.value = run.runId
   delete configurationErrors.value[run.runId]
@@ -93,7 +93,19 @@ async function selectRun(run: RunRecord) {
 }
 
 function typeLabel(run: RunRecord) {
-  return run.runType === RunType.STAIRCASE ? 'Staircase scan' : 'Data run'
+  if (run.runType === RunType.STAIRCASE) return 'Staircase scan'
+  if (run.runType === RunType.HOLD_DELAY_SCAN) return 'Hold-delay scan'
+  return 'Data run'
+}
+
+function isScan(run: RunRecord) {
+  return run.runType === RunType.STAIRCASE || run.runType === RunType.HOLD_DELAY_SCAN
+}
+
+function scanWorkspaceDescription(run: RunRecord) {
+  return run.runType === RunType.HOLD_DELAY_SCAN
+    ? 'Open the Scans workspace to inspect the hold-delay spectra.'
+    : 'Open the Scans workspace to compare channels, T-OR, and Q-OR curves.'
 }
 
 function downloadConfiguration(runId: string) {
@@ -155,13 +167,13 @@ function maskChannels(field: ConfigurationField) {
                 </button>
               </th>
               <td>
-                <span :class="['run-type', { scan: run.runType === RunType.STAIRCASE }]">{{
+                <span :class="['run-type', { scan: isScan(run) }]">{{
                   typeLabel(run)
                 }}</span>
               </td>
               <td>{{ localDateTime(run.startedAt) }}</td>
               <td>{{ duration(run) }}</td>
-              <td>{{ run.runType === RunType.STAIRCASE ? '—' : compact(run.eventCount) }}</td>
+              <td>{{ isScan(run) ? '—' : compact(run.eventCount) }}</td>
               <td>{{ bytes(totalSize(run)) }}</td>
               <td>
                 <span :class="['run-status', { incomplete: run.incomplete }]">
@@ -202,11 +214,11 @@ function maskChannels(field: ConfigurationField) {
                       <dt>Termination</dt>
                       <dd>{{ run.terminationReason || 'Not reported' }}</dd>
                     </div>
-                    <div v-if="run.runType !== RunType.STAIRCASE">
+                    <div v-if="!isScan(run)">
                       <dt>Events</dt>
                       <dd>{{ compact(run.eventCount) }}</dd>
                     </div>
-                    <div v-if="run.runType !== RunType.STAIRCASE">
+                    <div v-if="!isScan(run)">
                       <dt>Raw batches</dt>
                       <dd>{{ compact(run.rawBatchCount) }}</dd>
                     </div>
@@ -214,7 +226,7 @@ function maskChannels(field: ConfigurationField) {
                       <dt>Data size</dt>
                       <dd>{{ bytes(totalSize(run)) }}</dd>
                     </div>
-                    <div v-if="run.runType !== RunType.STAIRCASE">
+                    <div v-if="!isScan(run)">
                       <dt>Stop mode</dt>
                       <dd>{{ run.stopMode || 'Not reported' }}</dd>
                     </div>
@@ -248,7 +260,7 @@ function maskChannels(field: ConfigurationField) {
                     <p v-else class="empty">No artifact metadata was recorded.</p>
                   </div>
 
-                  <div v-if="run.runType !== RunType.STAIRCASE" class="run-detail-section">
+                  <div v-if="!isScan(run)" class="run-detail-section">
                     <div class="configuration-heading">
                       <div>
                         <h4>Configuration</h4>
@@ -328,7 +340,7 @@ function maskChannels(field: ConfigurationField) {
                   </div>
                   <div v-else class="run-detail-section">
                     <h4>Scan dataset</h4>
-                    <p>Open the Scans workspace to compare channels, T-OR, and Q-OR curves.</p>
+                    <p>{{ scanWorkspaceDescription(run) }}</p>
                   </div>
                 </section>
               </td>

@@ -5,6 +5,7 @@ import type { DaqApi } from './api'
 import StaircaseWorkspace from './StaircaseWorkspace.vue'
 import {
   ScanState,
+  ScanType,
   ScanSummarySchema,
   StaircaseScanSchema,
   SystemState,
@@ -73,7 +74,7 @@ describe('StaircaseWorkspace', () => {
     await wrapper.get('.scan-card-toggle').trigger('click')
     await wrapper.get('.scan-history button').trigger('click')
     await flushPromises()
-    expect(client.listScans).toHaveBeenCalledWith(8, 0, undefined)
+    expect(client.listScans).toHaveBeenCalledWith(8, 0, undefined, ScanType.STAIRCASE)
     expect(client.staircase).toHaveBeenCalledWith('42')
     expect(wrapper.get('.staircase-plot').attributes('aria-label')).toContain(
       'trigger rate by coarse threshold',
@@ -108,7 +109,7 @@ describe('StaircaseWorkspace', () => {
     expect(wrapper.text()).toContain('Page 1 of 2')
     await wrapper.get('[aria-label="Scan history pages"] button:last-child').trigger('click')
     await flushPromises()
-    expect(client.listScans).toHaveBeenLastCalledWith(8, 8, undefined)
+    expect(client.listScans).toHaveBeenLastCalledWith(8, 8, undefined, ScanType.STAIRCASE)
     expect(wrapper.findAll('.scan-history > button')).toHaveLength(1)
     expect(wrapper.text()).toContain('Run 92')
   })
@@ -141,7 +142,7 @@ describe('StaircaseWorkspace', () => {
     ])
     await filter.setValue('2')
     await flushPromises()
-    expect(client.listScans).toHaveBeenLastCalledWith(8, 0, 2)
+    expect(client.listScans).toHaveBeenLastCalledWith(8, 0, 2, ScanType.STAIRCASE)
     expect(wrapper.findAll('.scan-history > button')).toHaveLength(2)
     expect(wrapper.text()).toContain('Run 11')
     expect(wrapper.text()).toContain('Run 10')
