@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"sync"
 	"time"
 
@@ -44,6 +45,8 @@ type hardwareRuntime struct {
 	hv            *service.NativeHVController
 	monitorCancel context.CancelFunc
 	topology      dt5215.Topology
+	configuredFor *janusconfig.Document
+	configured    acquisition.ConfigurationResult
 }
 
 func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
@@ -125,6 +128,7 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 		r.publishConnectFailure(fmt.Errorf("apply connection configuration: %w", err))
 		return err
 	}
+	coordinator.SetSynchronized(topologySynchronized(topology))
 	scanTargets := staircaseTargets(targets, configured.Plans)
 	staircaseCoordinator, err := acquisition.NewStaircaseCoordinator(states, client, scanTargets)
 	if err != nil {
@@ -146,6 +150,7 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 	r.mu.Lock()
 	r.client, r.coordinator, r.configurator, r.staircase, r.holdDelay, r.hv = client, coordinator, configurator, staircaseCoordinator, holdDelayCoordinator, hv
 	r.monitorCancel, r.topology = monitorCancel, topology
+	r.configuredFor, r.configured = cloneDocument(r.document), cloneConfigurationResult(configured)
 	r.mu.Unlock()
 	failed = false
 	fmt.Fprintf(r.output, "hardware connected requested_by=%s devices=%d\n", actor, len(topology.Boards))
@@ -167,6 +172,7 @@ func (r *hardwareRuntime) Disconnect(_ context.Context, actor string) error {
 	client, cancel := r.client, r.monitorCancel
 	r.client, r.coordinator, r.configurator, r.staircase, r.holdDelay, r.hv, r.monitorCancel = nil, nil, nil, nil, nil, nil, nil
 	r.topology = dt5215.Topology{}
+	r.configuredFor, r.configured = nil, acquisition.ConfigurationResult{}
 	r.mu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -188,6 +194,7 @@ func (r *hardwareRuntime) Close() error {
 	client, cancel := r.client, r.monitorCancel
 	r.client, r.coordinator, r.configurator, r.staircase, r.holdDelay, r.hv, r.monitorCancel = nil, nil, nil, nil, nil, nil, nil
 	r.topology = dt5215.Topology{}
+	r.configuredFor, r.configured = nil, acquisition.ConfigurationResult{}
 	r.mu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -269,10 +276,14 @@ func (r *hardwareRuntime) StateSnapshot() acquisition.StateSnapshot {
 }
 
 func (r *hardwareRuntime) Configure(ctx context.Context, document *janusconfig.Document, actor string) (acquisition.ConfigurationResult, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.configurator == nil {
 		return acquisition.ConfigurationResult{}, fmt.Errorf("hardware is disconnected")
+	}
+	if sameConfiguration(r.configuredFor, document) {
+		fmt.Fprintf(r.output, "hardware configuration reused requested_by=%s devices=%d\n", actor, len(r.configured.Plans))
+		return cloneConfigurationResult(r.configured), nil
 	}
 	targets := make([]acquisition.ConfigurationTarget, 0, len(r.connections))
 	for _, connection := range r.connections {
@@ -280,6 +291,7 @@ func (r *hardwareRuntime) Configure(ctx context.Context, document *janusconfig.D
 	}
 	result, err := r.configurator.Configure(ctx, document, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: r.authorizeHV})
 	if err == nil && r.staircase != nil {
+		r.configuredFor, r.configured = cloneDocument(document), cloneConfigurationResult(result)
 		scanTargets := staircaseTargets(targets, result.Plans)
 		r.staircase.SetTargets(scanTargets)
 		if r.holdDelay != nil {
@@ -287,6 +299,57 @@ func (r *hardwareRuntime) Configure(ctx context.Context, document *janusconfig.D
 		}
 	}
 	return result, err
+}
+
+func topologySynchronized(topology dt5215.Topology) bool {
+	if len(topology.Boards) == 0 {
+		return false
+	}
+	for _, board := range topology.Boards {
+		if !dt5202.Status(board.AcquisitionState).Has(dt5202.StatusTDLinkSynchronized) {
+			return false
+		}
+	}
+	return true
+}
+
+func sameConfiguration(left, right *janusconfig.Document) bool {
+	if left == nil || right == nil || len(left.Assignments) != len(right.Assignments) {
+		return false
+	}
+	for index := range left.Assignments {
+		a, b := left.Assignments[index], right.Assignments[index]
+		if a.Name != b.Name || a.Value != b.Value ||
+			!reflect.DeepEqual(a.Index, b.Index) || !reflect.DeepEqual(a.Channel, b.Channel) {
+			return false
+		}
+	}
+	return true
+}
+
+func cloneDocument(document *janusconfig.Document) *janusconfig.Document {
+	if document == nil {
+		return nil
+	}
+	clone := &janusconfig.Document{Assignments: make([]janusconfig.Assignment, len(document.Assignments))}
+	for index, assignment := range document.Assignments {
+		clone.Assignments[index] = assignment
+		if assignment.Index != nil {
+			value := *assignment.Index
+			clone.Assignments[index].Index = &value
+		}
+		if assignment.Channel != nil {
+			value := *assignment.Channel
+			clone.Assignments[index].Channel = &value
+		}
+	}
+	return clone
+}
+
+func cloneConfigurationResult(result acquisition.ConfigurationResult) acquisition.ConfigurationResult {
+	result.Plans = append([]dt5202.ConfigurationPlan(nil), result.Plans...)
+	result.Calibrations = append([]dt5202.PedestalFlashCalibration(nil), result.Calibrations...)
+	return result
 }
 
 func (r *hardwareRuntime) Run(ctx context.Context, request staircase.Request, actor string, observe func(staircase.Point) error) (bool, error) {
