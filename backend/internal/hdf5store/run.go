@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
@@ -286,6 +288,7 @@ func (w *RunWriter) rotateIfNeeded() error {
 }
 
 func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
+	finalizeStarted := time.Now()
 	if w.closed {
 		return errors.New("run writer is closed")
 	}
@@ -296,34 +299,47 @@ func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
 		}
 	}()
 	w.eventMu.Lock()
+	stageStarted := time.Now()
 	err = w.flushEvents()
 	w.eventMu.Unlock()
+	w.logTiming("flush_pending_events", stageStarted, "events", w.manifest.EventCount)
 	if err != nil {
 		return err
 	}
+	stageStarted = time.Now()
 	if err = w.closeRaw(); err != nil {
 		return err
 	}
+	w.logTiming("close_raw", stageStarted, "batches", w.manifest.RawBatchCount)
+	stageStarted = time.Now()
 	if err = w.closeJournal(); err != nil {
 		return err
 	}
+	w.logTiming("close_journal", stageStarted)
 	w.manifest.CompletedAt = completedAt
 	w.manifest.TerminationReason = reason
 	if w.events != nil {
+		stageStarted = time.Now()
 		if err := w.finalizeSegment(); err != nil {
 			return err
 		}
+		w.logTiming("finalize_hdf5_segment", stageStarted, "segments", len(w.segmentNames))
 	}
+	stageStarted = time.Now()
 	w.manifest.Artifacts, err = w.finalizedArtifacts()
 	if err != nil {
 		return err
 	}
+	w.logTiming("hash_artifacts", stageStarted, "artifacts", len(w.manifest.Artifacts))
+	stageStarted = time.Now()
 	if err := w.writeManifest(); err != nil {
 		return err
 	}
+	w.logTiming("write_manifest", stageStarted)
 	if err := os.Remove(filepath.Join(w.dir, "incomplete")); err != nil {
 		return fmt.Errorf("remove incomplete marker: %w", err)
 	}
+	w.logTiming("hdf5_run_finalize", finalizeStarted, "events", w.manifest.EventCount, "batches", w.manifest.RawBatchCount, "artifacts", len(w.manifest.Artifacts))
 	return nil
 }
 
@@ -343,6 +359,7 @@ func (w *RunWriter) finalizedArtifacts() ([]runstore.Artifact, error) {
 	}
 	artifacts := make([]runstore.Artifact, 0, len(names))
 	for _, candidate := range names {
+		started := time.Now()
 		file, err := os.Open(filepath.Join(w.dir, candidate.name))
 		if err != nil {
 			return nil, fmt.Errorf("open artifact %s: %w", candidate.name, err)
@@ -359,8 +376,17 @@ func (w *RunWriter) finalizedArtifacts() ([]runstore.Artifact, error) {
 		artifacts = append(artifacts, runstore.Artifact{
 			Kind: candidate.kind, Name: candidate.name, SizeBytes: uint64(size), SHA256: fmt.Sprintf("%x", hash.Sum(nil)),
 		})
+		w.logTiming("hash_artifact", started, "artifact", candidate.name, "bytes", size)
 	}
 	return artifacts, nil
+}
+
+func (w *RunWriter) logTiming(stage string, started time.Time, fields ...any) {
+	message := fmt.Sprintf("run_timing run_id=%s stage=%s duration_ms=%d", w.manifest.RunID, stage, time.Since(started).Milliseconds())
+	for index := 0; index+1 < len(fields); index += 2 {
+		message += fmt.Sprintf(" %v=%v", fields[index], fields[index+1])
+	}
+	log.Print(message)
 }
 
 func (w *RunWriter) Abort() error {

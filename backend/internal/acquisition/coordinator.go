@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -211,6 +212,7 @@ func (c *Coordinator) Stop(ctx context.Context, actor string) error {
 }
 
 func (c *Coordinator) StopWithReason(ctx context.Context, actor, reason string) error {
+	stopStarted := time.Now()
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
 	c.mu.Lock()
@@ -225,12 +227,15 @@ func (c *Coordinator) StopWithReason(ctx context.Context, actor, reason string) 
 	if _, err := c.states.Move(StateStopping, actor); err != nil {
 		return err
 	}
+	log.Printf("run_timing run_id=%s stage=stop_requested reason=%s", run.id, reason)
+	stageStarted := time.Now()
 	run.cancel()
 	select {
 	case <-run.done:
 	case <-ctx.Done():
 		return c.finishFault(run, ctx.Err(), actor)
 	}
+	log.Printf("run_timing run_id=%s stage=read_loop_stop duration_ms=%d", run.id, time.Since(stageStarted).Milliseconds())
 	if _, err := c.states.Move(StateDraining, actor); err != nil {
 		return c.finishFault(run, err, actor)
 	}
@@ -240,16 +245,27 @@ func (c *Coordinator) StopWithReason(ctx context.Context, actor, reason string) 
 	// catches up. Pipeline.Close below already waits for accepted storage work,
 	// and pipeline failures independently unblock Submit.
 	deliveryCtx := context.WithoutCancel(ctx)
-	_, drainErr := StopAndDrain(drainCtx, c.hardware, c.expectedChains, func(raw []byte, events []dt5215.StreamEvent) error {
+	stageStarted = time.Now()
+	drainResult, drainErr := StopAndDrain(drainCtx, c.hardware, c.expectedChains, func(raw []byte, events []dt5215.StreamEvent) error {
 		return run.pipeline.Submit(deliveryCtx, PipelineBatch{Raw: raw, Events: events})
 	})
 	cancel()
+	log.Printf("run_timing run_id=%s stage=hardware_drain duration_ms=%d batches=%d events=%d error=%t", run.id, time.Since(stageStarted).Milliseconds(), drainResult.Batches, drainResult.Events, drainErr != nil)
 	result := JoinStopError(run.error(), drainErr)
 	c.detachJournal(run.journalAttached)
+	stageStarted = time.Now()
 	result = JoinStopError(result, run.pipeline.Close())
+	if provider, ok := run.pipeline.(interface{ PipelineStats() PipelineStats }); ok {
+		stats := provider.PipelineStats()
+		log.Printf("run_timing run_id=%s stage=pipeline_close duration_ms=%d received_batches=%d accepted_batches=%d decoded_events=%d persisted_events=%d raw_persisted=%d event_batches_persisted=%d", run.id, time.Since(stageStarted).Milliseconds(), stats.ReceivedBatches, stats.AcceptedBatches, stats.DecodedEvents, stats.PersistedEvents, stats.RawBatchesPersisted, stats.EventBatchesPersisted)
+	} else {
+		log.Printf("run_timing run_id=%s stage=pipeline_close duration_ms=%d", run.id, time.Since(stageStarted).Milliseconds())
+	}
 	if result == nil {
 		if finalizer, ok := run.pipeline.(RunPipelineFinalizer); ok {
+			stageStarted = time.Now()
 			result = finalizer.Finalize(time.Now().UTC().Format(time.RFC3339Nano), reason)
+			log.Printf("run_timing run_id=%s stage=run_finalize duration_ms=%d error=%t", run.id, time.Since(stageStarted).Milliseconds(), result != nil)
 		}
 	}
 	if result != nil {
@@ -258,6 +274,7 @@ func (c *Coordinator) StopWithReason(ctx context.Context, actor, reason string) 
 	}
 	c.clearActive(run, nil)
 	_, err := c.states.Move(StateReady, actor)
+	log.Printf("run_timing run_id=%s stage=ready total_stop_ms=%d error=%t", run.id, time.Since(stopStarted).Milliseconds(), err != nil)
 	return err
 }
 
