@@ -100,8 +100,10 @@ network; ensure the container can route to the hardware subnet and use
 unprivileged numeric user `65532`; a bind-mounted runs directory must be
 writable by that user. Additional backend flags can replace the image's default
 command, for example to select different control or stream addresses. The
-safety-sensitive `-authorize-hv-config` flag is deliberately not enabled by the
-image.
+image enables the safety-sensitive `-authorize-hv-config` flag by default, so
+the backend can apply configured HV setpoints and accept HV-on commands while
+the system is ready. When replacing the default command, include that flag to
+retain HV authorization.
 
 The operator dashboard also lists persisted runs from the configured `-runs`
 directory. Artifact downloads are streamed through the generated RunService API
