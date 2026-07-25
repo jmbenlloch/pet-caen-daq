@@ -31,8 +31,15 @@ const drainIdleTimeout = 100 * time.Millisecond
 // StopAndDrain sends an idempotent broadcast stop and reads until every observed
 // pending batch is delivered and the stream has remained silent for the
 // capture/source-confirmed FERSlib NODATA_TIMEOUT. Service-ready events are
-// retained as an optional early completion signal. The caller deadline remains
-// the authoritative upper bound for a stream that never becomes idle.
+// retained as completion evidence, but do not end draining before stream
+// silence: forward-version service payloads may not expose status, and accepted
+// batches may still follow a ready event.
+//
+// The caller deadline bounds a stalled hardware drain before any batch arrives.
+// After the first complete batch, draining continues only while complete
+// batches remain immediately available and finishes at the first idle period.
+// This prevents persistence time from consuming the following idle probe and
+// prevents a total-duration deadline from interrupting a partially read batch.
 func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains int, handle BatchHandler) (DrainResult, error) {
 	if expectedChains < 1 || expectedChains > dt5215.MaxChains {
 		return DrainResult{}, fmt.Errorf("expected chain count %d out of range", expectedChains)
@@ -42,17 +49,28 @@ func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains in
 	}
 	completed := make(map[uint8]bool, expectedChains)
 	var result DrainResult
-	for len(completed) < expectedChains {
-		idleDeadline := time.Now().Add(drainIdleTimeout)
-		canDeclareIdle := true
-		if parentDeadline, ok := ctx.Deadline(); ok && !parentDeadline.After(idleDeadline) {
-			canDeclareIdle = false
+	for {
+		if ctxErr := ctx.Err(); ctxErr != nil && (!errors.Is(ctxErr, context.DeadlineExceeded) || result.Batches == 0) {
+			return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), expectedChains, ctxErr)
 		}
-		readCtx, cancelRead := context.WithTimeout(ctx, drainIdleTimeout)
+		idleDeadline := time.Now().Add(drainIdleTimeout)
+		readParent := ctx
+		progressDrain := result.Batches > 0
+		if progressDrain {
+			readParent = context.Background()
+		}
+		canDeclareIdle := progressDrain
+		if !progressDrain {
+			canDeclareIdle = true
+			if parentDeadline, ok := ctx.Deadline(); ok && !parentDeadline.After(idleDeadline) {
+				canDeclareIdle = false
+			}
+		}
+		readCtx, cancelRead := context.WithTimeout(readParent, drainIdleTimeout)
 		raw, events, err := hardware.ReadRawStreamBatch(readCtx)
 		cancelRead()
 		if err != nil {
-			if canDeclareIdle && ctx.Err() == nil && errors.Is(err, context.DeadlineExceeded) {
+			if canDeclareIdle && errors.Is(err, context.DeadlineExceeded) {
 				result.CompletedChains = expectedChains
 				return result, nil
 			}
@@ -84,8 +102,6 @@ func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains in
 			}
 		}
 	}
-	result.CompletedChains = len(completed)
-	return result, nil
 }
 
 // JoinStopError retains the acquisition failure as the primary joined error

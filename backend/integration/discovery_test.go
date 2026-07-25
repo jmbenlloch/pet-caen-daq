@@ -107,7 +107,7 @@ func TestPersistedTestPulseRun(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(journalBytes) == 0 || len(failures) != 0 {
+	if len(journalBytes) == 0 || len(failures) != 1 || failures[0].Kind != transportjournal.Termination || failures[0].Stage != "header" || failures[0].Reason != context.DeadlineExceeded.Error() {
 		t.Fatalf("journal bytes=%d failures=%#v", len(journalBytes), failures)
 	}
 }

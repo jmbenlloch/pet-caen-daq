@@ -190,7 +190,7 @@ func TestRunServicePublishesFaultAfterStopFailure(t *testing.T) {
 	service := newRunService(t, controller)
 	service.current = &daqv1.RunSummary{RunId: "42", Incomplete: true}
 	_, err := service.StopRun(context.Background(), connect.NewRequest(&daqv1.StopRunRequest{RunId: "42", RequestedBy: "operator"}))
-	if connect.CodeOf(err) != connect.CodeFailedPrecondition || service.Telemetry.Snapshot().State != daqv1.SystemState_SYSTEM_STATE_FAULT {
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || service.Telemetry.Snapshot().State != daqv1.SystemState_SYSTEM_STATE_FAULT || service.Telemetry.Snapshot().CurrentRun != nil {
 		t.Fatalf("code=%v snapshot=%+v", connect.CodeOf(err), service.Telemetry.Snapshot())
 	}
 }
