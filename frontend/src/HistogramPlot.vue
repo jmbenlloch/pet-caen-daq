@@ -50,6 +50,21 @@ function datasetStructure() {
     .join('|')
 }
 
+function yRange() {
+  const counts = props.datasets.flatMap((dataset) => dataset.bins.map(Number))
+  const maximum = Math.max(0, ...counts)
+  if (!props.logarithmic) return { min: 0, max: Math.max(1, maximum * 1.05) }
+
+  const positive = counts.filter((count) => count > 0)
+  const minimum = Math.min(...positive)
+  const logarithmicMaximum = Math.max(...positive)
+  if (!positive.length) return { min: 1, max: 10 }
+  return {
+    min: minimum,
+    max: logarithmicMaximum > minimum ? logarithmicMaximum : minimum * 10,
+  }
+}
+
 function series(): Series[] {
   return [
     {},
@@ -103,7 +118,12 @@ function render() {
   if (!host.value) return
   const nextStructure = `${props.theme}:${props.logarithmic}:${datasetStructure()}`
   if (!plot || structure !== nextStructure) rebuild()
-  else plot.setData(alignedData(), false)
+  else {
+    plot.setData(alignedData(), false)
+    // Live refreshes and stored runs can share the same bin layout. Recalculate
+    // the count range explicitly without discarding an operator's horizontal zoom.
+    plot.setScale('y', yRange())
+  }
 }
 
 function resetZoom() {
