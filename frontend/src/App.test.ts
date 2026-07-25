@@ -128,9 +128,7 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     const panel = wrapper.get('[aria-labelledby="storage-heading"]')
-    expect(panel.get('[role="alert"]').text()).toBe(
-      'capture raw batch: no space left on device',
-    )
+    expect(panel.get('[role="alert"]').text()).toBe('capture raw batch: no space left on device')
     wrapper.unmount()
   })
 
