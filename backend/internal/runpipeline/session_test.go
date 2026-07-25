@@ -125,6 +125,20 @@ func TestSessionAbortRetainsIncompleteMarker(t *testing.T) {
 	}
 }
 
+func TestSessionDoesNotReportCancellationAsStorageFailure(t *testing.T) {
+	session := &Session{}
+	session.recordError(context.Canceled)
+	if session.lastErr != nil {
+		t.Fatalf("cancellation recorded as storage failure: %v", session.lastErr)
+	}
+
+	failure := errors.New("disk full")
+	session.recordError(failure)
+	if !errors.Is(session.lastErr, failure) {
+		t.Fatalf("storage failure not recorded: %v", session.lastErr)
+	}
+}
+
 func TestSessionRetainsLatestBoardServiceTelemetry(t *testing.T) {
 	observedAt := time.Date(2026, 7, 22, 17, 30, 0, 0, time.UTC)
 	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return observedAt }}}
