@@ -54,7 +54,7 @@ func TestRunWriterFinalizesHDF5ArtifactAndExternalManifest(t *testing.T) {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	artifact := manifest.Artifacts[0]
-	if artifact.Name != "run_42.0000.h5" || artifact.Kind != "decoded_events" || artifact.SizeBytes == 0 || len(artifact.SHA256) != 64 {
+	if artifact.Name != "run_42.0000.h5" || artifact.Kind != "decoded_events" || artifact.SizeBytes == 0 || artifact.SHA256 != "" {
 		t.Fatalf("artifact = %+v", artifact)
 	}
 	opened, _, err := runstore.OpenArtifact(parent, "42", "run_42.0000.h5")

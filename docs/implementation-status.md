@@ -194,7 +194,12 @@ The command binds its local ConnectRPC/HTTP listener before connecting to or con
 
 When transport journaling is requested, the coordinator attaches the run writer below DT5215 stream framing before any acquisition read and keeps it attached through orderly stop-and-drain. It detaches the sink before finalization or abort on successful stops, start failures, and asynchronous stream failures, preventing writes to a closed journal while preserving fragments and framing/termination evidence from malformed or truncated transport.
 
-Finalization now calculates exact sizes and SHA-256 digests after closing each stable payload artifact: decoded JSON Lines, optional complete-batch raw capture, and optional transport journal. The manifest persists those records and a successful `StopRun` returns the same artifact metadata in `RunSummary`; the manifest deliberately does not self-hash because embedding its own digest would be circular.
+Finalization records exact sizes after closing each stable payload artifact:
+decoded output, optional complete-batch raw capture, and optional transport
+journal. Acquisition artifact SHA-256 calculation is deliberately disabled:
+run 49 showed that rereading 919 MB of just-written artifacts consumed 20.8
+seconds, or 88% of stop-to-ready latency. Manifests and `RunSummary` therefore
+leave artifact `sha256` empty while retaining names and exact sizes.
 
 The production HDF5 build now selects a typed run writer behind the same
 pipeline storage boundary. It replaces `events.jsonl` with numbered
@@ -203,7 +208,7 @@ all six decoded event families in appendable typed parent/child datasets,
 preserves run-wide order in `/events/index`, embeds requested/audited/effective
 configuration and run metadata, and retains raw capture and transport journals
 as separate evidence artifacts. Finalization flushes the internal manifest
-snapshot, marks the HDF5 file complete, closes and hashes every artifact,
+snapshot, marks the HDF5 file complete, closes and catalogs every artifact,
 atomically updates the external manifest, and only then removes `incomplete`.
 Aborted runs retain both the marker and an internally incomplete HDF5 file.
 The explicit offline Go validator confirms the schema version, completion

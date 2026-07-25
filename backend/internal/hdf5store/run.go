@@ -3,11 +3,9 @@
 package hdf5store
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -330,7 +328,7 @@ func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
 	if err != nil {
 		return err
 	}
-	w.logTiming("hash_artifacts", stageStarted, "artifacts", len(w.manifest.Artifacts))
+	w.logTiming("catalog_artifacts", stageStarted, "artifacts", len(w.manifest.Artifacts))
 	stageStarted = time.Now()
 	if err := w.writeManifest(); err != nil {
 		return err
@@ -359,24 +357,13 @@ func (w *RunWriter) finalizedArtifacts() ([]runstore.Artifact, error) {
 	}
 	artifacts := make([]runstore.Artifact, 0, len(names))
 	for _, candidate := range names {
-		started := time.Now()
-		file, err := os.Open(filepath.Join(w.dir, candidate.name))
+		info, err := os.Stat(filepath.Join(w.dir, candidate.name))
 		if err != nil {
-			return nil, fmt.Errorf("open artifact %s: %w", candidate.name, err)
-		}
-		hash := sha256.New()
-		size, copyErr := io.Copy(hash, file)
-		closeErr := file.Close()
-		if copyErr != nil {
-			return nil, fmt.Errorf("hash artifact %s: %w", candidate.name, copyErr)
-		}
-		if closeErr != nil {
-			return nil, fmt.Errorf("close artifact %s: %w", candidate.name, closeErr)
+			return nil, fmt.Errorf("stat artifact %s: %w", candidate.name, err)
 		}
 		artifacts = append(artifacts, runstore.Artifact{
-			Kind: candidate.kind, Name: candidate.name, SizeBytes: uint64(size), SHA256: fmt.Sprintf("%x", hash.Sum(nil)),
+			Kind: candidate.kind, Name: candidate.name, SizeBytes: uint64(info.Size()),
 		})
-		w.logTiming("hash_artifact", started, "artifact", candidate.name, "bytes", size)
 	}
 	return artifacts, nil
 }

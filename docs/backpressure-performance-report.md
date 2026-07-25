@@ -83,8 +83,20 @@ stops because the synchronous finalization path may:
 7. read every artifact again to calculate SHA-256;
 8. publish the final manifest and transition to ready.
 
-The instrumented build emits one `run_timing` log record for every stage above,
-including per-artifact hash time and byte count. Capture the server log from
+Run 49 measured 23.519 seconds from stop request to ready. Artifact hashing
+consumed 20.779 seconds (88.3%): 10.316 seconds for the 461 MB event HDF5,
+5.438 seconds for the 227 MB raw capture, and 5.008 seconds for the 228 MB
+journal. Histogram persistence consumed another 2.299 seconds. Hardware drain
+was 220 ms and pipeline close was already fully caught up.
+
+Artifact hashing is now disabled for acquisition runs. Final manifests retain
+artifact kinds, names, and exact sizes but omit `sha256`; configuration and
+small catalog-manifest identity hashes are unaffected. This intentionally
+trades post-write content verification for prompt readiness and avoids
+rereading every large artifact immediately after writing it.
+
+The instrumented build emits one `run_timing` log record for every remaining
+stage. Capture the server log from
 the next representative run with:
 
 ```sh
