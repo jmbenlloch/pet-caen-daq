@@ -28,6 +28,7 @@ import {
 } from './configuration'
 import {
   ConfigurationLayer,
+  ConfigurationStage,
   DiagnosticSeverity,
   HealthStatus,
   RunType,
@@ -419,6 +420,52 @@ const severeDiagnostics = computed(() =>
     (item) => item.severity >= DiagnosticSeverity.WARNING,
   ),
 )
+const configurationProgress = computed(() => daq.snapshot.value?.configurationProgress)
+const configurationProgressVisible = computed(
+  () =>
+    configurationProgress.value?.active ||
+    configurationProgress.value?.stage === ConfigurationStage.FAILED,
+)
+const configurationStageLabels: Partial<Record<ConfigurationStage, string>> = {
+  [ConfigurationStage.PLANNING]: 'Planning',
+  [ConfigurationStage.PEDESTAL]: 'Pedestal setup',
+  [ConfigurationStage.WRITING_REGISTERS]: 'Register writes',
+  [ConfigurationStage.CONFIGURING_CITIROC]: 'CITIROC configuration',
+  [ConfigurationStage.READING_REGISTERS]: 'Register readback',
+  [ConfigurationStage.HV]: 'High voltage',
+  [ConfigurationStage.COMPLETE]: 'Complete',
+  [ConfigurationStage.FAILED]: 'Failed',
+}
+const configurationStageSteps = [
+  ConfigurationStage.PLANNING,
+  ConfigurationStage.PEDESTAL,
+  ConfigurationStage.WRITING_REGISTERS,
+  ConfigurationStage.CONFIGURING_CITIROC,
+  ConfigurationStage.READING_REGISTERS,
+  ConfigurationStage.HV,
+]
+const configurationStagePosition = computed(() =>
+  configurationStageSteps.indexOf(configurationProgress.value?.stage ?? 0),
+)
+const configurationStageLabel = computed(
+  () => configurationStageLabels[configurationProgress.value?.stage ?? 0] ?? 'Preparing',
+)
+const configurationBoardLabel = computed(() => {
+  const progress = configurationProgress.value
+  if (!progress?.boardsTotal) return ''
+  const current = progress.board === undefined ? progress.boardsCompleted + 1 : progress.board + 1
+  return `Board ${Math.min(current, progress.boardsTotal)} of ${progress.boardsTotal}`
+})
+const configurationCounterLabel = computed(() => {
+  const progress = configurationProgress.value
+  if (!progress?.total) return ''
+  return `${progress.completed} / ${progress.total}${progress.unit ? ` ${progress.unit}` : ''}`
+})
+const configurationOverallValue = computed(() => {
+  const progress = configurationProgress.value
+  if (!progress?.boardsTotal) return 0
+  return Math.min(progress.boardsCompleted, progress.boardsTotal)
+})
 
 async function loadConfiguration(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
@@ -826,6 +873,63 @@ onMounted(() => daq.connect())
           {{ diagnostic.code }} — {{ diagnostic.message }}
         </span>
       </div>
+
+      <section
+        v-if="configurationProgressVisible && configurationProgress"
+        class="configuration-progress-panel"
+        :class="{ failed: configurationProgress.stage === ConfigurationStage.FAILED }"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="configuration-progress-heading">
+          <div>
+            <span class="eyebrow">Hardware configuration</span>
+            <strong>{{ configurationStageLabel }}</strong>
+          </div>
+          <span v-if="configurationBoardLabel" class="configuration-progress-board">
+            {{ configurationBoardLabel }}
+          </span>
+        </div>
+        <ol
+          v-if="configurationProgress.stage !== ConfigurationStage.FAILED"
+          class="configuration-progress-steps"
+          aria-label="Configuration stages"
+        >
+          <li
+            v-for="(stage, index) in configurationStageSteps"
+            :key="stage"
+            :class="{
+              current: index === configurationStagePosition,
+              complete: index < configurationStagePosition,
+            }"
+          >
+            {{ configurationStageLabels[stage] }}
+          </li>
+        </ol>
+        <progress
+          v-if="configurationProgress.boardsTotal"
+          class="configuration-overall-progress"
+          :value="configurationOverallValue"
+          :max="configurationProgress.boardsTotal"
+          aria-label="Overall configuration progress"
+        />
+        <div class="configuration-progress-detail">
+          <span>{{ configurationProgress.message || 'Applying configuration' }}</span>
+          <span v-if="configurationCounterLabel">{{ configurationCounterLabel }}</span>
+        </div>
+        <progress
+          v-if="configurationProgress.total"
+          :value="configurationProgress.completed"
+          :max="configurationProgress.total"
+          :aria-label="`${configurationStageLabel} progress`"
+        />
+        <div class="configuration-progress-meta">
+          <span v-if="configurationProgress.chain !== undefined">
+            Chain {{ configurationProgress.chain }}, node {{ configurationProgress.node }}
+          </span>
+          <span v-if="configurationProgress.reused">Cached pedestal data reused</span>
+        </div>
+      </section>
 
       <nav class="workspace-tabs" role="tablist" aria-label="Operator workspace">
         <button
