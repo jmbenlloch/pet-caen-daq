@@ -223,6 +223,18 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
+  it('reports an active scan instead of saying there is no active run', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi(SystemState.SCANNING) } })
+    await flushPromises()
+
+    const status = wrapper.get('.run-now')
+    expect(status.text()).toContain('Scan in progress')
+    expect(status.text()).toContain('Acquisition run controls are unavailable during the scan')
+    expect(status.text()).not.toContain('No active run')
+    expect(status.text()).not.toContain('Automatic stop after')
+    wrapper.unmount()
+  })
+
   it('offers an immediate retry while automatic backend retries continue', async () => {
     const api = dashboardApi()
     vi.mocked(api.snapshot).mockRejectedValue(new Error('backend unavailable'))
