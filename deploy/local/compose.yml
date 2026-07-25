@@ -10,7 +10,7 @@ services:
       - -stream
       - 0.0.0.0:9000
       - -event-interval
-      - 100ms
+      - ${PET_CAEN_SIMULATOR_EVENT_INTERVAL:-10ms}
     working_dir: /workspace
     volumes:
       - ../..:/workspace:ro

@@ -164,10 +164,12 @@ onMounted(refresh)
         </select>
       </label>
       <HoldDelayPlot
-        v-if="displayed?.points.length"
+        v-if="displayed"
         :points="displayed.points"
         :channel="channel"
         :theme="theme"
+        :minimum-delay-ns="displayed.minimumDelayNs"
+        :maximum-delay-ns="displayed.maximumDelayNs"
       />
       <p v-else class="empty">Start a scan or select a finalized scan to plot its spectra.</p>
       <div class="section-title scan-history-title">

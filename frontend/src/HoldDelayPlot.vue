@@ -4,11 +4,16 @@ import uPlot, { type AlignedData, type Options } from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import type { HoldDelayPoint } from './gen/pet/caen/daq/v1/system_pb'
 
-const props = defineProps<{
-  points: readonly DeepReadonly<HoldDelayPoint>[]
-  channel: number
-  theme: 'dark' | 'light'
-}>()
+const props = withDefaults(
+  defineProps<{
+    points: readonly DeepReadonly<HoldDelayPoint>[]
+    channel: number
+    theme: 'dark' | 'light'
+    minimumDelayNs?: number
+    maximumDelayNs?: number
+  }>(),
+  { minimumDelayNs: 0, maximumDelayNs: 0 },
+)
 
 const host = ref<HTMLElement>()
 let plot: uPlot | undefined
@@ -38,6 +43,16 @@ const maximumCount = computed(() =>
 
 function data(): AlignedData {
   const ordered = orderedPoints()
+  if (!ordered.length) {
+    const maximum =
+      props.maximumDelayNs > props.minimumDelayNs
+        ? props.maximumDelayNs
+        : props.minimumDelayNs + delayStep()
+    return [
+      [props.minimumDelayNs, maximum],
+      [0, 0],
+    ]
+  }
   return [ordered.map((point) => point.effectiveDelayNs), ordered.map(() => 0)]
 }
 
@@ -98,7 +113,7 @@ function options(): Options {
 }
 
 function rebuild() {
-  if (!host.value || !props.points.length) return
+  if (!host.value) return
   plot?.destroy()
   host.value.replaceChildren()
   plot = new uPlot(options(), data(), host.value)
@@ -111,7 +126,10 @@ function render() {
 }
 
 watch(() => props.points, render)
-watch([() => props.channel, () => props.theme], rebuild)
+watch(
+  [() => props.channel, () => props.theme, () => props.minimumDelayNs, () => props.maximumDelayNs],
+  rebuild,
+)
 onMounted(() => {
   rebuild()
   resizeObserver = new ResizeObserver((entries) => {

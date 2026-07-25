@@ -45,4 +45,20 @@ describe('HoldDelayWorkspace', () => {
     expect(wrapper.get('.hold-delay-plot').attributes('aria-label')).toContain('channel 0')
     expect(wrapper.find('.heatmap-scale').exists()).toBe(true)
   })
+
+  it('mounts the heatmap before the first live point arrives', async () => {
+    const live = create(HoldDelayScanSchema, {
+      summary: { scanId: '64', state: ScanState.RUNNING, completedPoints: 0, totalPoints: 33 },
+      minimumDelayNs: 0,
+      maximumDelayNs: 256,
+    })
+    const wrapper = mount(HoldDelayWorkspace, {
+      props: { api: api(), systemState: SystemState.SCANNING, theme: 'light', live },
+    })
+
+    await wrapper.get('.scan-card-toggle').trigger('click')
+
+    expect(wrapper.get('.hold-delay-plot').attributes('aria-label')).toContain('channel 0')
+    expect(wrapper.find('.empty').exists()).toBe(false)
+  })
 })
