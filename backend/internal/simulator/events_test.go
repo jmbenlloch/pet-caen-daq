@@ -132,6 +132,28 @@ func TestGeneratedEnergyUsesConfiguredADCRange(t *testing.T) {
 	}
 }
 
+func TestGeneratedEnergyTracksHoldDelayWithoutSequenceOverflow(t *testing.T) {
+	board := configuredBoard(3|3<<12, 1)
+	board.Registers[uint32(dt5202.HoldDelay)] = 0
+	atZero := pulseEnergy(&board, 0, 20_000, false)
+	board.Registers[uint32(dt5202.HoldDelay)] = 16
+	onRise := pulseEnergy(&board, 0, 20_000, false)
+	board.Registers[uint32(dt5202.HoldDelay)] = 24
+	atPeak := pulseEnergy(&board, 0, 20_000, false)
+	board.Registers[uint32(dt5202.HoldDelay)] = 32
+	onPlateau := pulseEnergy(&board, 0, 20_000, false)
+
+	if !(atZero < onRise && onRise < atPeak) {
+		t.Fatalf("hold-delay energies do not rise: zero=%d rise=%d peak=%d", atZero, onRise, atPeak)
+	}
+	if onPlateau != atPeak {
+		t.Fatalf("hold-delay plateau energy = %d, want %d", onPlateau, atPeak)
+	}
+	if atPeak >= 512*16 {
+		t.Fatalf("hold-delay peak energy %d overflows the 512-bin scan", atPeak)
+	}
+}
+
 func TestGeneratedTimingModesUseEnablesAndThresholds(t *testing.T) {
 	for _, qualifier := range []uint8{dt5202.QualifierTiming, dt5202.QualifierCommonStop} {
 		board := configuredBoard(uint32(qualifier), 1<<4|1<<5)
