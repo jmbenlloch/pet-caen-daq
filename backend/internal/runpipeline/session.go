@@ -295,6 +295,31 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 	if err := s.writer.AppendEvent(wire, event); err != nil {
 		return err
 	}
+	s.recordEvent(wire, event)
+	return nil
+}
+
+func (s *sink) AppendEvents(events []acquisition.DecodedEvent) error {
+	if writer, ok := s.writer.(interface {
+		AppendEvents([]acquisition.DecodedEvent) error
+	}); ok {
+		if err := writer.AppendEvents(events); err != nil {
+			return err
+		}
+		for _, item := range events {
+			s.recordEvent(item.Wire, item.Event)
+		}
+		return nil
+	}
+	for _, item := range events {
+		if err := s.AppendEvent(item.Wire, item.Event); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *sink) recordEvent(wire dt5215.StreamEvent, event dt5202.Event) {
 	s.events.Add(1)
 	s.mu.Lock()
 	key := boardKey{chain: wire.Chain, node: wire.Descriptor.Node}
@@ -329,7 +354,6 @@ func (s *sink) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
 	}
 	s.boards[key] = board
 	s.mu.Unlock()
-	return nil
 }
 
 func accumulateChannels(board *BoardStats, event dt5202.Event) {

@@ -29,4 +29,4 @@ EXPOSE 8080
 VOLUME ["/var/lib/pet-caen/runs"]
 
 ENTRYPOINT ["/usr/local/bin/pet-caen-daq"]
-CMD ["-config", "/etc/pet-caen/config.txt", "-listen", "0.0.0.0:8080", "-frontend-dir", "/opt/pet-caen/frontend", "-runs", "/var/lib/pet-caen/runs", "-authorize-hv-config"]
+CMD ["-config", "/etc/pet-caen/config.txt", "-listen", "0.0.0.0:8080", "-frontend-dir", "/opt/pet-caen/frontend", "-runs", "/var/lib/pet-caen/runs", "-pipeline-capacity", "512", "-authorize-hv-config"]

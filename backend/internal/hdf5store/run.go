@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/rawcapture"
@@ -21,6 +22,10 @@ import (
 
 // RunWriter owns the production run directory and its HDF5 decoded artifact.
 const DefaultSegmentSizeBytes uint64 = 500 << 20
+const (
+	bufferedAcquisitionBatches = 8
+	bufferedEventPayloadBytes  = 16 << 20
+)
 
 type RunWriter struct {
 	rawMu          sync.Mutex
@@ -40,6 +45,9 @@ type RunWriter struct {
 	journalFile    *os.File
 	journalEnabled bool
 	closed         bool
+	pendingEvents  []EventRecord
+	pendingBatches int
+	pendingBytes   uint64
 }
 
 func CreateRun(parent string, manifest runstore.Manifest) (_ *RunWriter, err error) {
@@ -210,6 +218,9 @@ func (w *RunWriter) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) err
 	if w.closed {
 		return errors.New("run writer is closed")
 	}
+	if err := w.flushEvents(); err != nil {
+		return err
+	}
 	if w.events == nil {
 		if err := w.openSegment(); err != nil {
 			return err
@@ -219,6 +230,49 @@ func (w *RunWriter) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) err
 		return err
 	}
 	w.manifest.EventCount++
+	return w.rotateIfNeeded()
+}
+
+// AppendEvents buffers several decoded acquisition batches so HDF5 dataset
+// extents and hyperslabs are updated in groups rather than once per event.
+func (w *RunWriter) AppendEvents(events []acquisition.DecodedEvent) error {
+	w.eventMu.Lock()
+	defer w.eventMu.Unlock()
+	if w.closed {
+		return errors.New("run writer is closed")
+	}
+	for _, item := range events {
+		w.pendingEvents = append(w.pendingEvents, EventRecord{Wire: item.Wire, Event: item.Event})
+		w.pendingBytes += uint64(len(item.Wire.Payload))
+	}
+	w.pendingBatches++
+	if w.pendingBatches < bufferedAcquisitionBatches && w.pendingBytes < bufferedEventPayloadBytes {
+		return nil
+	}
+	return w.flushEvents()
+}
+
+func (w *RunWriter) flushEvents() error {
+	if len(w.pendingEvents) == 0 {
+		w.pendingBatches = 0
+		return nil
+	}
+	if w.events == nil {
+		if err := w.openSegment(); err != nil {
+			return err
+		}
+	}
+	if err := w.events.AppendEvents(w.pendingEvents); err != nil {
+		return err
+	}
+	w.manifest.EventCount += uint64(len(w.pendingEvents))
+	w.pendingEvents = w.pendingEvents[:0]
+	w.pendingBatches = 0
+	w.pendingBytes = 0
+	return w.rotateIfNeeded()
+}
+
+func (w *RunWriter) rotateIfNeeded() error {
 	info, err := os.Stat(filepath.Join(w.dir, w.currentSegmentName()))
 	if err != nil {
 		return fmt.Errorf("stat HDF5 segment: %w", err)
@@ -241,6 +295,12 @@ func (w *RunWriter) Finalize(completedAt, reason string) (err error) {
 			err = errors.Join(err, w.closeOpenArtifacts())
 		}
 	}()
+	w.eventMu.Lock()
+	err = w.flushEvents()
+	w.eventMu.Unlock()
+	if err != nil {
+		return err
+	}
 	if err = w.closeRaw(); err != nil {
 		return err
 	}
@@ -308,6 +368,12 @@ func (w *RunWriter) Abort() error {
 		return nil
 	}
 	w.closed = true
+	w.eventMu.Lock()
+	flushErr := w.flushEvents()
+	w.eventMu.Unlock()
+	if flushErr != nil {
+		return errors.Join(flushErr, w.closeOpenArtifacts())
+	}
 	return w.closeOpenArtifacts()
 }
 
