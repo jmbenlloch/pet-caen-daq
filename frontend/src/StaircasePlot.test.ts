@@ -31,7 +31,7 @@ describe('StaircasePlot', () => {
       create(StaircasePointSchema, { threshold: 200, channelRatesCps: [100] }),
     ]
     const wrapper = mount(StaircasePlot, {
-      props: { points, seriesKey: 'channel:0', theme: 'light' },
+      props: { points, seriesKey: 'channel:0', theme: 'light', logarithmic: false },
     })
 
     const [options, data] = constructed.mock.calls[0]
@@ -58,6 +58,7 @@ describe('StaircasePlot', () => {
         points: [create(StaircasePointSchema, { threshold: 500, channelRatesCps: [2] })],
         seriesKey: 'channel:0',
         theme: 'light',
+        logarithmic: false,
       },
     })
 
@@ -75,5 +76,24 @@ describe('StaircasePlot', () => {
       ],
       true,
     )
+  })
+
+  it('uses a logarithmic Y scale and omits zero rates', async () => {
+    const points = [
+      create(StaircasePointSchema, { threshold: 200, channelRatesCps: [0] }),
+      create(StaircasePointSchema, { threshold: 300, channelRatesCps: [100] }),
+    ]
+    const wrapper = mount(StaircasePlot, {
+      props: { points, seriesKey: 'channel:0', theme: 'dark', logarithmic: false },
+    })
+
+    await wrapper.setProps({ logarithmic: true })
+
+    const [options, data] = constructed.mock.calls.at(-1)!
+    expect(options.scales.y.distr).toBe(3)
+    expect(data).toEqual([
+      [200, 300],
+      [null, 100],
+    ])
   })
 })

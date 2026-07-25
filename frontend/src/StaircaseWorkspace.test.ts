@@ -2,6 +2,7 @@ import { create } from '@bufbuild/protobuf'
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import type { DaqApi } from './api'
+import StaircasePlot from './StaircasePlot.vue'
 import StaircaseWorkspace from './StaircaseWorkspace.vue'
 import {
   ScanState,
@@ -80,6 +81,10 @@ describe('StaircaseWorkspace', () => {
       'trigger rate by coarse threshold',
     )
     expect(wrapper.text()).toContain('Run 42')
+    const logScale = wrapper.get('.staircase-plot-controls input[type="checkbox"]')
+    expect((logScale.element as HTMLInputElement).checked).toBe(false)
+    await logScale.setValue(true)
+    expect(wrapper.getComponent(StaircasePlot).props('logarithmic')).toBe(true)
     expect(wrapper.text()).toContain(localDateTime(stored.summary?.startedAt))
     expect(wrapper.get('.scan-history-header').text()).toContain('Started')
     expect(wrapper.get('.scan-history-header').text()).toContain('Board')

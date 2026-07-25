@@ -69,6 +69,12 @@
   gap: 0.75rem;
 }
 
+.staircase-plot-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .staircase-plot-shell,
 .staircase-plot {
   min-width: 0;

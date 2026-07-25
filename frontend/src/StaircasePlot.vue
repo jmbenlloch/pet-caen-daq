@@ -8,6 +8,7 @@ const props = defineProps<{
   points: readonly DeepReadonly<StaircasePoint>[]
   seriesKey: string
   theme: 'dark' | 'light'
+  logarithmic: boolean
 }>()
 
 const host = ref<HTMLElement>()
@@ -25,10 +26,14 @@ function alignedData(): AlignedData {
   return [
     points.map((point) => point.threshold),
     points.map((point) => {
-      if (props.seriesKey === 'tor') return point.tOrRateCps
-      if (props.seriesKey === 'qor') return point.qOrRateCps
-      const channel = Number(props.seriesKey.split(':')[1])
-      return point.channelRatesCps[channel] ?? 0
+      let value: number
+      if (props.seriesKey === 'tor') value = point.tOrRateCps
+      else if (props.seriesKey === 'qor') value = point.qOrRateCps
+      else {
+        const channel = Number(props.seriesKey.split(':')[1])
+        value = point.channelRatesCps[channel] ?? 0
+      }
+      return props.logarithmic && value === 0 ? null : value
     }),
   ]
 }
@@ -56,9 +61,9 @@ function options(): Options {
     cursor: { drag: { x: true, y: false, setScale: true } },
     scales: {
       x: { time: false },
-      y: {
-        range: (_plot, _min, max) => [0, Math.max(1, max * 1.05)],
-      },
+      y: props.logarithmic
+        ? { distr: 3, range: (_plot, min, max) => [Math.max(1, min), max] }
+        : { range: (_plot, _min, max) => [0, Math.max(1, max * 1.05)] },
     },
     axes: [
       { label: 'Coarse threshold (DAC)', stroke: axis, grid: { stroke: grid, width: 1 } },
@@ -85,7 +90,7 @@ function resetZoom() {
 }
 
 watch(() => props.points, render, { deep: true })
-watch([() => props.seriesKey, () => props.theme], rebuild)
+watch([() => props.seriesKey, () => props.theme, () => props.logarithmic], rebuild)
 
 onMounted(() => {
   rebuild()

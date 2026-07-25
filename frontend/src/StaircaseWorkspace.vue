@@ -26,6 +26,7 @@ const maximum = ref(500)
 const step = ref(5)
 const dwellMilliseconds = ref(500)
 const selectedSeries = ref('channel:0')
+const logarithmic = ref(false)
 const history = ref<ScanSummary[]>([])
 const historyBoard = ref('any')
 const historyPage = ref(1)
@@ -218,21 +219,27 @@ onMounted(refresh)
         />
       </div>
 
-      <label class="staircase-series">
-        Curve
-        <select v-model="selectedSeries">
-          <option v-for="channel in 64" :key="channel - 1" :value="`channel:${channel - 1}`">
-            Channel {{ channel - 1 }} TD
-          </option>
-          <option value="tor">T-OR</option>
-          <option value="qor">Q-OR</option>
-        </select>
-      </label>
+      <div class="staircase-plot-controls">
+        <label class="staircase-series">
+          Curve
+          <select v-model="selectedSeries">
+            <option v-for="channel in 64" :key="channel - 1" :value="`channel:${channel - 1}`">
+              Channel {{ channel - 1 }} TD
+            </option>
+            <option value="tor">T-OR</option>
+            <option value="qor">Q-OR</option>
+          </select>
+        </label>
+        <label class="switch compact-switch"
+          ><input v-model="logarithmic" type="checkbox" /><span>Log Y</span></label
+        >
+      </div>
       <StaircasePlot
         v-if="displayed?.points.length"
         :points="displayed.points"
         :series-key="selectedSeries"
         :theme="theme"
+        :logarithmic="logarithmic"
       />
       <p v-else class="empty">
         Start a scan or select a finalized scan to plot its measured rates.
