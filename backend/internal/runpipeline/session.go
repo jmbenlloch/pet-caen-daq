@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -229,7 +230,7 @@ func (s *Session) Done() <-chan struct{}                    { return s.pipeline.
 func (s *Session) Err() error                               { return s.pipeline.Err() }
 
 func (s *Session) recordError(err error) {
-	if err == nil {
+	if err == nil || errors.Is(err, context.Canceled) {
 		return
 	}
 	s.mu.Lock()
