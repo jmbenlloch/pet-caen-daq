@@ -16,12 +16,20 @@ func PublishPipelineTelemetry(publisher SnapshotPublisher, source PipelineStatsS
 	stats := source.Stats()
 	snapshot := publisher.Snapshot()
 	snapshot.Pipeline = &daqv1.PipelineTelemetry{
-		QueueCapacity:   uint64(stats.Capacity),
-		QueueDepth:      uint64(stats.QueueDepth),
-		AcceptedBatches: stats.AcceptedBatches,
-		RejectedBatches: stats.RejectedBatches,
-		DecodedEvents:   stats.DecodedEvents,
-		DecodeFailures:  stats.DecodeFailures,
+		QueueCapacity:         uint64(stats.Capacity),
+		QueueDepth:            uint64(stats.QueueDepth),
+		AcceptedBatches:       stats.AcceptedBatches,
+		RejectedBatches:       stats.RejectedBatches,
+		DecodedEvents:         stats.DecodedEvents,
+		DecodeFailures:        stats.DecodeFailures,
+		ReceivedBatches:       stats.ReceivedBatches,
+		ReceivedEvents:        stats.ReceivedEvents,
+		RawQueueDepth:         uint64(stats.RawQueueDepth),
+		EventQueueDepth:       uint64(stats.EventQueueDepth),
+		RawBatchesPersisted:   stats.RawBatchesPersisted,
+		EventBatchesPersisted: stats.EventBatchesPersisted,
+		PersistedEvents:       stats.PersistedEvents,
+		SinkFailures:          stats.SinkFailures,
 	}
 	if stats.SinkFailures > 0 {
 		if snapshot.Storage == nil {

@@ -5027,15 +5027,23 @@ func (x *Board) GetHvModuleFirmwareAvailable() bool {
 }
 
 type PipelineTelemetry struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	QueueCapacity   uint64                 `protobuf:"varint,1,opt,name=queue_capacity,json=queueCapacity,proto3" json:"queue_capacity,omitempty"`
-	QueueDepth      uint64                 `protobuf:"varint,2,opt,name=queue_depth,json=queueDepth,proto3" json:"queue_depth,omitempty"`
-	AcceptedBatches uint64                 `protobuf:"varint,3,opt,name=accepted_batches,json=acceptedBatches,proto3" json:"accepted_batches,omitempty"`
-	RejectedBatches uint64                 `protobuf:"varint,4,opt,name=rejected_batches,json=rejectedBatches,proto3" json:"rejected_batches,omitempty"`
-	DecodedEvents   uint64                 `protobuf:"varint,5,opt,name=decoded_events,json=decodedEvents,proto3" json:"decoded_events,omitempty"`
-	DecodeFailures  uint64                 `protobuf:"varint,6,opt,name=decode_failures,json=decodeFailures,proto3" json:"decode_failures,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	QueueCapacity         uint64                 `protobuf:"varint,1,opt,name=queue_capacity,json=queueCapacity,proto3" json:"queue_capacity,omitempty"`
+	QueueDepth            uint64                 `protobuf:"varint,2,opt,name=queue_depth,json=queueDepth,proto3" json:"queue_depth,omitempty"`
+	AcceptedBatches       uint64                 `protobuf:"varint,3,opt,name=accepted_batches,json=acceptedBatches,proto3" json:"accepted_batches,omitempty"`
+	RejectedBatches       uint64                 `protobuf:"varint,4,opt,name=rejected_batches,json=rejectedBatches,proto3" json:"rejected_batches,omitempty"`
+	DecodedEvents         uint64                 `protobuf:"varint,5,opt,name=decoded_events,json=decodedEvents,proto3" json:"decoded_events,omitempty"`
+	DecodeFailures        uint64                 `protobuf:"varint,6,opt,name=decode_failures,json=decodeFailures,proto3" json:"decode_failures,omitempty"`
+	ReceivedBatches       uint64                 `protobuf:"varint,7,opt,name=received_batches,json=receivedBatches,proto3" json:"received_batches,omitempty"`
+	ReceivedEvents        uint64                 `protobuf:"varint,8,opt,name=received_events,json=receivedEvents,proto3" json:"received_events,omitempty"`
+	RawQueueDepth         uint64                 `protobuf:"varint,9,opt,name=raw_queue_depth,json=rawQueueDepth,proto3" json:"raw_queue_depth,omitempty"`
+	EventQueueDepth       uint64                 `protobuf:"varint,10,opt,name=event_queue_depth,json=eventQueueDepth,proto3" json:"event_queue_depth,omitempty"`
+	RawBatchesPersisted   uint64                 `protobuf:"varint,11,opt,name=raw_batches_persisted,json=rawBatchesPersisted,proto3" json:"raw_batches_persisted,omitempty"`
+	EventBatchesPersisted uint64                 `protobuf:"varint,12,opt,name=event_batches_persisted,json=eventBatchesPersisted,proto3" json:"event_batches_persisted,omitempty"`
+	PersistedEvents       uint64                 `protobuf:"varint,13,opt,name=persisted_events,json=persistedEvents,proto3" json:"persisted_events,omitempty"`
+	SinkFailures          uint64                 `protobuf:"varint,14,opt,name=sink_failures,json=sinkFailures,proto3" json:"sink_failures,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *PipelineTelemetry) Reset() {
@@ -5106,6 +5114,62 @@ func (x *PipelineTelemetry) GetDecodedEvents() uint64 {
 func (x *PipelineTelemetry) GetDecodeFailures() uint64 {
 	if x != nil {
 		return x.DecodeFailures
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetReceivedBatches() uint64 {
+	if x != nil {
+		return x.ReceivedBatches
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetReceivedEvents() uint64 {
+	if x != nil {
+		return x.ReceivedEvents
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetRawQueueDepth() uint64 {
+	if x != nil {
+		return x.RawQueueDepth
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetEventQueueDepth() uint64 {
+	if x != nil {
+		return x.EventQueueDepth
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetRawBatchesPersisted() uint64 {
+	if x != nil {
+		return x.RawBatchesPersisted
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetEventBatchesPersisted() uint64 {
+	if x != nil {
+		return x.EventBatchesPersisted
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetPersistedEvents() uint64 {
+	if x != nil {
+		return x.PersistedEvents
+	}
+	return 0
+}
+
+func (x *PipelineTelemetry) GetSinkFailures() uint64 {
+	if x != nil {
+		return x.SinkFailures
 	}
 	return 0
 }
@@ -5652,7 +5716,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x15telemetry_observed_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\x13telemetryObservedAt\x123\n" +
 	"\x16hv_module_firmware_raw\x18\x11 \x01(\rR\x13hvModuleFirmwareRaw\x12;\n" +
 	"\x1ahv_module_firmware_version\x18\x12 \x01(\x02R\x17hvModuleFirmwareVersion\x12?\n" +
-	"\x1chv_module_firmware_available\x18\x13 \x01(\bR\x19hvModuleFirmwareAvailable\"\x81\x02\n" +
+	"\x1chv_module_firmware_available\x18\x13 \x01(\bR\x19hvModuleFirmwareAvailable\"\xe5\x04\n" +
 	"\x11PipelineTelemetry\x12%\n" +
 	"\x0equeue_capacity\x18\x01 \x01(\x04R\rqueueCapacity\x12\x1f\n" +
 	"\vqueue_depth\x18\x02 \x01(\x04R\n" +
@@ -5660,7 +5724,16 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x10accepted_batches\x18\x03 \x01(\x04R\x0facceptedBatches\x12)\n" +
 	"\x10rejected_batches\x18\x04 \x01(\x04R\x0frejectedBatches\x12%\n" +
 	"\x0edecoded_events\x18\x05 \x01(\x04R\rdecodedEvents\x12'\n" +
-	"\x0fdecode_failures\x18\x06 \x01(\x04R\x0edecodeFailures\"\xd7\x01\n" +
+	"\x0fdecode_failures\x18\x06 \x01(\x04R\x0edecodeFailures\x12)\n" +
+	"\x10received_batches\x18\a \x01(\x04R\x0freceivedBatches\x12'\n" +
+	"\x0freceived_events\x18\b \x01(\x04R\x0ereceivedEvents\x12&\n" +
+	"\x0fraw_queue_depth\x18\t \x01(\x04R\rrawQueueDepth\x12*\n" +
+	"\x11event_queue_depth\x18\n" +
+	" \x01(\x04R\x0feventQueueDepth\x122\n" +
+	"\x15raw_batches_persisted\x18\v \x01(\x04R\x13rawBatchesPersisted\x126\n" +
+	"\x17event_batches_persisted\x18\f \x01(\x04R\x15eventBatchesPersisted\x12)\n" +
+	"\x10persisted_events\x18\r \x01(\x04R\x0fpersistedEvents\x12#\n" +
+	"\rsink_failures\x18\x0e \x01(\x04R\fsinkFailures\"\xd7\x01\n" +
 	"\x10StorageTelemetry\x125\n" +
 	"\x06health\x18\x01 \x01(\x0e2\x1d.pet.caen.daq.v1.HealthStatusR\x06health\x12#\n" +
 	"\rrun_directory\x18\x02 \x01(\tR\frunDirectory\x12#\n" +

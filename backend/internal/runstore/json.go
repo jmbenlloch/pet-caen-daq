@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
@@ -187,6 +188,8 @@ type Envelope struct {
 }
 
 type Writer struct {
+	rawMu    sync.Mutex
+	eventMu  sync.Mutex
 	dir      string
 	events   *os.File
 	manifest Manifest
@@ -283,6 +286,8 @@ func (w *Writer) EnableRawCapture() error {
 	return nil
 }
 func (w *Writer) AppendRaw(batch []byte) error {
+	w.rawMu.Lock()
+	defer w.rawMu.Unlock()
 	if w.closed {
 		return errors.New("run writer is closed")
 	}
@@ -313,6 +318,8 @@ func (w *Writer) AppendDecoded(wire dt5215.StreamEvent, event dt5202.Spectroscop
 // AppendEvent persists any qualifier-dispatched project event while retaining
 // the DT5215 descriptor identity required to correlate decoded and raw data.
 func (w *Writer) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
+	w.eventMu.Lock()
+	defer w.eventMu.Unlock()
 	if event.Kind == "" {
 		return errors.New("decoded event kind is required")
 	}

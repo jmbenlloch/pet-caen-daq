@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
@@ -22,6 +23,8 @@ import (
 const DefaultSegmentSizeBytes uint64 = 500 << 20
 
 type RunWriter struct {
+	rawMu          sync.Mutex
+	eventMu        sync.Mutex
 	dir            string
 	events         *Writer
 	metadata       Metadata
@@ -163,6 +166,8 @@ func (w *RunWriter) EnableRawCapture() error {
 }
 
 func (w *RunWriter) AppendRaw(batch []byte) error {
+	w.rawMu.Lock()
+	defer w.rawMu.Unlock()
 	if w.closed {
 		return errors.New("run writer is closed")
 	}
@@ -200,6 +205,8 @@ func (w *RunWriter) EnableTransportJournal() error {
 func (w *RunWriter) TransportJournal() transportjournal.Sink { return w.journal }
 
 func (w *RunWriter) AppendEvent(wire dt5215.StreamEvent, event dt5202.Event) error {
+	w.eventMu.Lock()
+	defer w.eventMu.Unlock()
 	if w.closed {
 		return errors.New("run writer is closed")
 	}

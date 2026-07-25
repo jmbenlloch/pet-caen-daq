@@ -80,6 +80,11 @@ func (m *HealthMonitor) publish() *daqv1.TelemetrySnapshot {
 			QueueCapacity: uint64(pipeline.Capacity), QueueDepth: uint64(pipeline.QueueDepth),
 			AcceptedBatches: pipeline.AcceptedBatches, RejectedBatches: pipeline.RejectedBatches,
 			DecodedEvents: pipeline.DecodedEvents, DecodeFailures: pipeline.DecodeFailures,
+			ReceivedBatches: pipeline.ReceivedBatches, ReceivedEvents: pipeline.ReceivedEvents,
+			RawQueueDepth: uint64(pipeline.RawQueueDepth), EventQueueDepth: uint64(pipeline.EventQueueDepth),
+			RawBatchesPersisted:   pipeline.RawBatchesPersisted,
+			EventBatchesPersisted: pipeline.EventBatchesPersisted,
+			PersistedEvents:       pipeline.PersistedEvents, SinkFailures: pipeline.SinkFailures,
 		}
 		health := daqv1.HealthStatus_HEALTH_STATUS_OK
 		if storage.LastError != "" || pipeline.SinkFailures > 0 {

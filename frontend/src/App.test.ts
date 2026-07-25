@@ -109,6 +109,40 @@ function dashboardApi(state = SystemState.READY): DaqApi {
 }
 
 describe('operator dashboard', () => {
+  it('distinguishes acquisition input from persistence backlog while draining', async () => {
+    const api = dashboardApi(SystemState.DRAINING)
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        instanceId: 'backend-test',
+        state: SystemState.DRAINING,
+        pipeline: {
+          queueCapacity: 32n,
+          queueDepth: 4n,
+          rawQueueDepth: 2n,
+          eventQueueDepth: 3n,
+          receivedBatches: 120n,
+          receivedEvents: 6000n,
+          acceptedBatches: 120n,
+          rawBatchesPersisted: 118n,
+          eventBatchesPersisted: 110n,
+          decodedEvents: 5500n,
+          persistedEvents: 5498n,
+        },
+      }),
+    )
+
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    const panel = wrapper.get('[aria-labelledby="pipeline-heading"]')
+    expect(panel.text()).toContain('Draining buffered data')
+    expect(panel.text()).toContain('6,000 events · 120 batches')
+    expect(panel.text()).toContain('5,498 / 5,500 decoded')
+    expect(panel.text()).toContain('Batch backlog10')
+    expect(panel.text()).toContain('raw 2 · events 3')
+    wrapper.unmount()
+  })
+
   it('shows structured hardware configuration progress', async () => {
     const api = dashboardApi(SystemState.CONFIGURING)
     vi.mocked(api.snapshot).mockResolvedValue(
