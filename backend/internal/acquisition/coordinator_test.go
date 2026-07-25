@@ -20,6 +20,7 @@ type coordinatorHardware struct {
 	readErr   error
 	startErr  error
 	journals  []transportjournal.Sink
+	syncCalls int
 }
 
 func (h *coordinatorHardware) SetStreamJournal(sink transportjournal.Sink, _ string, _ func() time.Time) {
@@ -37,7 +38,12 @@ func (h *coordinatorHardware) ReadRegister(context.Context, uint16, uint16, uint
 	return 0, nil
 }
 
-func (h *coordinatorHardware) Synchronize(context.Context) error { return nil }
+func (h *coordinatorHardware) Synchronize(context.Context) error {
+	h.mu.Lock()
+	h.syncCalls++
+	h.mu.Unlock()
+	return nil
+}
 func (h *coordinatorHardware) ClearStream(context.Context) error { return nil }
 func (h *coordinatorHardware) ControlChain(context.Context, uint16, bool, uint32) error {
 	return nil
@@ -170,6 +176,57 @@ func TestCoordinatorStartsReadsAndDrainsToReady(t *testing.T) {
 	defer pipeline.mu.Unlock()
 	if !pipeline.closed || !pipeline.finalized || pipeline.aborted || len(pipeline.batches) != 1 || string(pipeline.batches[0].Raw) != "complete" {
 		t.Fatalf("pipeline=%+v", pipeline)
+	}
+}
+
+func TestCoordinatorReusesVerifiedSynchronizationAcrossRuns(t *testing.T) {
+	hardware := &coordinatorHardware{}
+	coordinator, _, _ := readyCoordinator(t, hardware)
+	coordinator.SetSynchronized(true)
+	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Stop(context.Background(), "operator"); err != nil {
+		t.Fatal(err)
+	}
+	hardware.mu.Lock()
+	hardware.readCount = 0
+	hardware.mu.Unlock()
+	if err := coordinator.Start(context.Background(), "run-2", "operator", RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Stop(context.Background(), "operator"); err != nil {
+		t.Fatal(err)
+	}
+	hardware.mu.Lock()
+	defer hardware.mu.Unlock()
+	if hardware.syncCalls != 0 {
+		t.Fatalf("Synchronize calls = %d, want 0", hardware.syncCalls)
+	}
+}
+
+func TestCoordinatorSynchronizesOnceWithoutPriorEvidence(t *testing.T) {
+	hardware := &coordinatorHardware{}
+	coordinator, _, _ := readyCoordinator(t, hardware)
+	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Stop(context.Background(), "operator"); err != nil {
+		t.Fatal(err)
+	}
+	hardware.mu.Lock()
+	hardware.readCount = 0
+	hardware.mu.Unlock()
+	if err := coordinator.Start(context.Background(), "run-2", "operator", RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Stop(context.Background(), "operator"); err != nil {
+		t.Fatal(err)
+	}
+	hardware.mu.Lock()
+	defer hardware.mu.Unlock()
+	if hardware.syncCalls != 1 {
+		t.Fatalf("Synchronize calls = %d, want 1", hardware.syncCalls)
 	}
 }
 

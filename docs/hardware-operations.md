@@ -49,6 +49,18 @@ submitted configuration is the intended byte-exact document. Afterward, retain
 and any requested `wire.raw` and `transport.journal` artifacts and verify the
 manifest sizes and SHA-256 values.
 
+Starting a run reuses the configuration that was successfully applied when the
+hardware connected, or by the most recent successful configuration request,
+when the newly submitted parsed assignments are identical. Comments, blank
+lines, and source line numbers do not force reconfiguration; assignment order,
+scope, or value changes do. Changed configurations still use the complete hard
+apply and readback validation.
+
+DT5215 `SNT0` synchronization is session-scoped. Run start skips it only when
+discovery verified the TDlink-synchronized acquisition-status bit on every
+board, or after `SNT0` has succeeded once on the current connection.
+Reconnecting creates a new session with no inherited synchronization evidence.
+
 ## Fault and recovery
 
 If acquisition faults, do not delete or edit the run directory. Preserve its

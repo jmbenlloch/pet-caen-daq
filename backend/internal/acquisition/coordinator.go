@@ -94,6 +94,7 @@ type Coordinator struct {
 	newPipeline    PipelineFactory
 	expectedChains int
 	drainTimeout   time.Duration
+	synchronized   bool
 	active         *activeRun
 	lastErr        error
 	faultObserver  func(error)
@@ -135,8 +136,16 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 		hardware.SetStreamJournal(provider.TransportJournal(), "run-"+runID, nil)
 		journalAttached = true
 	}
-	if err = c.hardware.Synchronize(ctx); err != nil {
-		return c.failStartAttached(fmt.Errorf("synchronize: %w", err), actor, pipeline, journalAttached)
+	c.mu.Lock()
+	synchronized := c.synchronized
+	c.mu.Unlock()
+	if !synchronized {
+		if err = c.hardware.Synchronize(ctx); err != nil {
+			return c.failStartAttached(fmt.Errorf("synchronize: %w", err), actor, pipeline, journalAttached)
+		}
+		c.mu.Lock()
+		c.synchronized = true
+		c.mu.Unlock()
 	}
 	if err = c.hardware.ClearStream(ctx); err != nil {
 		return c.failStartAttached(fmt.Errorf("clear stream: %w", err), actor, pipeline, journalAttached)
@@ -178,6 +187,15 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 	}
 	go c.watch(run)
 	return nil
+}
+
+// SetSynchronized records synchronization evidence for the current hardware
+// session. A newly constructed coordinator remains conservative and performs
+// SNT0 until discovery or a successful synchronization proves it unnecessary.
+func (c *Coordinator) SetSynchronized(synchronized bool) {
+	c.mu.Lock()
+	c.synchronized = synchronized
+	c.mu.Unlock()
 }
 
 func (c *Coordinator) watchPipeline(run *activeRun, notifier RunPipelineNotifier) {
