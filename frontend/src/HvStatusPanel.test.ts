@@ -5,6 +5,8 @@ import HvStatusPanel from './HvStatusPanel.vue'
 const board = (chain: number, state: 'off' | 'on' | 'ramping' | 'fault') => ({
   chain,
   node: 0,
+  hvVoltageV: state === 'off' ? 4 : state === 'ramping' ? 25 : 45,
+  hvTargetVoltageV: 45,
   hvOn: state === 'on' || state === 'ramping' || state === 'fault',
   hvRamping: state === 'ramping',
   hvOverCurrent: state === 'fault',
@@ -38,5 +40,19 @@ describe('HV status panel', () => {
     })
 
     expect(wrapper.get('[aria-label="HV summary: 1/4 on"]').text()).toBe('1/4 on')
+  })
+
+  it('keeps ramp-up visible after the hardware ramp bit clears', () => {
+    const rising = { ...board(0, 'on'), hvVoltageV: 17.7, hvRamping: false }
+    const wrapper = mount(HvStatusPanel, { props: { boards: [rising] } })
+
+    expect(wrapper.get('[aria-label="Chain 0 node 0 HV: Ramping"]').classes()).toContain('ramping')
+  })
+
+  it('keeps ramp-down visible until the measured voltage is near the off baseline', () => {
+    const falling = { ...board(0, 'off'), hvVoltageV: 20, hvRamping: false }
+    const wrapper = mount(HvStatusPanel, { props: { boards: [falling] } })
+
+    expect(wrapper.get('[aria-label="Chain 0 node 0 HV: Ramping"]').classes()).toContain('ramping')
   })
 })

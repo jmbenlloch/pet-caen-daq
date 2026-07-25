@@ -13,6 +13,7 @@ import RunHistoryTable from './RunHistoryTable.vue'
 import StatisticsTab from './StatisticsTab.vue'
 import StaircaseWorkspace from './StaircaseWorkspace.vue'
 import HoldDelayWorkspace from './HoldDelayWorkspace.vue'
+import { hvState } from './hvStatus'
 import {
   isBooleanField,
   isMaskField,
@@ -406,7 +407,11 @@ const enabledLinkLabel = computed(
 )
 const boards = computed(() =>
   (daq.snapshot.value?.chains ?? []).flatMap((chain) =>
-    chain.boards.map((board) => ({ chain: chain.index, ...board })),
+    chain.boards.map((board) => ({
+      chain: chain.index,
+      ...board,
+      hvTargetVoltageV: effectiveBoardNumericValues('HV_Vbias')[chain.index] ?? 0,
+    })),
   ),
 )
 const severeDiagnostics = computed(() =>
@@ -1598,18 +1603,18 @@ onMounted(() => daq.connect())
             <div
               class="hv-state"
               :class="{
-                on: board.hvOn,
-                ramping: board.hvRamping,
-                fault: board.hvOverCurrent || board.hvOverVoltage,
+                on: hvState(board) === 'on',
+                ramping: hvState(board) === 'ramping',
+                fault: hvState(board) === 'fault',
               }"
             >
               <span class="status-dot" />
               {{
-                board.hvOverCurrent || board.hvOverVoltage
+                hvState(board) === 'fault'
                   ? 'HV fault'
-                  : board.hvRamping
+                  : hvState(board) === 'ramping'
                     ? 'Ramping'
-                    : board.hvOn
+                    : hvState(board) === 'on'
                       ? 'HV on'
                       : 'HV off'
               }}
