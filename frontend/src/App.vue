@@ -374,6 +374,17 @@ const configuredStopPolicy = computed(() => {
 })
 
 const state = computed(() => stateLabel[daq.snapshot.value?.state ?? 0])
+const pipeline = computed(() => daq.snapshot.value?.pipeline)
+const pipelineBacklog = computed(() => {
+  const accepted = pipeline.value?.acceptedBatches ?? 0n
+  const completed = pipeline.value?.eventBatchesPersisted ?? 0n
+  return accepted > completed ? accepted - completed : 0n
+})
+const pipelinePhase = computed(() => {
+  if (daq.snapshot.value?.state === SystemState.DRAINING) return 'Draining buffered data'
+  if (daq.snapshot.value?.state === SystemState.RUNNING) return 'Acquiring'
+  return pipelineBacklog.value > 0n ? 'Finishing persistence' : 'Idle'
+})
 const backendOnline = computed(() => daq.connected.value && !daq.stale.value)
 const hardwareDisconnected = computed(() => daq.snapshot.value?.state === SystemState.DISCONNECTED)
 const hardwareConnecting = computed(() => daq.snapshot.value?.state === SystemState.CONNECTING)
@@ -1270,23 +1281,51 @@ onMounted(() => daq.connect())
             <h2 id="pipeline-heading">Pipeline</h2>
             <dl class="metrics">
               <div>
-                <dt>Decoded events</dt>
-                <dd>{{ compact(daq.snapshot.value?.pipeline?.decodedEvents) }}</dd>
+                <dt>Phase</dt>
+                <dd>{{ pipelinePhase }}</dd>
               </div>
               <div>
-                <dt>Queue depth</dt>
+                <dt>Received</dt>
                 <dd>
-                  {{ compact(daq.snapshot.value?.pipeline?.queueDepth) }} /
-                  {{ compact(daq.snapshot.value?.pipeline?.queueCapacity) }}
+                  {{ compact(pipeline?.receivedEvents) }} events ·
+                  {{ compact(pipeline?.receivedBatches) }} batches
                 </dd>
               </div>
               <div>
-                <dt>Rejected</dt>
-                <dd>{{ compact(daq.snapshot.value?.pipeline?.rejectedBatches) }}</dd>
+                <dt>Raw persisted</dt>
+                <dd>{{ compact(pipeline?.rawBatchesPersisted) }} batches</dd>
               </div>
               <div>
-                <dt>Decode failures</dt>
-                <dd>{{ compact(daq.snapshot.value?.pipeline?.decodeFailures) }}</dd>
+                <dt>Events persisted</dt>
+                <dd>
+                  {{ compact(pipeline?.persistedEvents) }} /
+                  {{ compact(pipeline?.decodedEvents) }} decoded
+                </dd>
+              </div>
+              <div>
+                <dt>Batch backlog</dt>
+                <dd>{{ compact(pipelineBacklog) }}</dd>
+              </div>
+              <div>
+                <dt>Ingress queue</dt>
+                <dd>
+                  {{ compact(pipeline?.queueDepth) }} /
+                  {{ compact(pipeline?.queueCapacity) }}
+                </dd>
+              </div>
+              <div>
+                <dt>Worker queues</dt>
+                <dd>
+                  raw {{ compact(pipeline?.rawQueueDepth) }} · events
+                  {{ compact(pipeline?.eventQueueDepth) }}
+                </dd>
+              </div>
+              <div>
+                <dt>Rejected / failures</dt>
+                <dd>
+                  {{ compact(pipeline?.rejectedBatches) }} /
+                  {{ compact((pipeline?.decodeFailures ?? 0n) + (pipeline?.sinkFailures ?? 0n)) }}
+                </dd>
               </div>
             </dl>
           </section>

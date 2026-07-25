@@ -33,37 +33,58 @@ type PipelineSink interface {
 	AppendEvent(dt5215.StreamEvent, dt5202.Event) error
 }
 
-// Pipeline preserves batch ordering with one consumer. Raw evidence is stored
-// before any event in its batch is decoded, so decode failures cannot discard
-// the bytes that produced them.
+// Pipeline preserves ordering within separate raw and decoded-event workers.
+// An event batch waits for its raw batch to persist, while the raw worker may
+// capture the next batch concurrently with decoding and event persistence.
 type Pipeline struct {
 	policy BackpressurePolicy
 	sink   PipelineSink
 	queue  chan PipelineBatch
+	raw    chan *pipelineJob
+	events chan *pipelineJob
+	slots  chan struct{}
 	done   chan struct{}
 	stop   chan struct{}
 
-	mu         sync.Mutex
-	closed     bool
-	err        error
-	submitters sync.WaitGroup
-	stopOnce   sync.Once
-	closeOnce  sync.Once
-	accepted   atomic.Uint64
-	rejected   atomic.Uint64
-	decoded    atomic.Uint64
-	decodeFail atomic.Uint64
-	sinkFail   atomic.Uint64
+	mu             sync.Mutex
+	closed         bool
+	err            error
+	submitters     sync.WaitGroup
+	stopOnce       sync.Once
+	closeOnce      sync.Once
+	accepted       atomic.Uint64
+	rejected       atomic.Uint64
+	received       atomic.Uint64
+	receivedEvents atomic.Uint64
+	rawPersisted   atomic.Uint64
+	eventBatches   atomic.Uint64
+	persisted      atomic.Uint64
+	decoded        atomic.Uint64
+	decodeFail     atomic.Uint64
+	sinkFail       atomic.Uint64
 }
 
 type PipelineStats struct {
-	Capacity        int
-	QueueDepth      int
-	AcceptedBatches uint64
-	RejectedBatches uint64
-	DecodedEvents   uint64
-	DecodeFailures  uint64
-	SinkFailures    uint64
+	Capacity              int
+	QueueDepth            int
+	RawQueueDepth         int
+	EventQueueDepth       int
+	ReceivedBatches       uint64
+	ReceivedEvents        uint64
+	AcceptedBatches       uint64
+	RejectedBatches       uint64
+	RawBatchesPersisted   uint64
+	EventBatchesPersisted uint64
+	DecodedEvents         uint64
+	PersistedEvents       uint64
+	DecodeFailures        uint64
+	SinkFailures          uint64
+}
+
+type pipelineJob struct {
+	batch   PipelineBatch
+	rawDone chan struct{}
+	rawErr  error
 }
 
 func NewPipeline(capacity int, policy BackpressurePolicy, sink PipelineSink) (*Pipeline, error) {
@@ -76,13 +97,22 @@ func NewPipeline(capacity int, policy BackpressurePolicy, sink PipelineSink) (*P
 	if sink == nil {
 		return nil, fmt.Errorf("pipeline sink is required")
 	}
-	p := &Pipeline{policy: policy, sink: sink, queue: make(chan PipelineBatch, capacity), done: make(chan struct{}), stop: make(chan struct{})}
+	p := &Pipeline{
+		policy: policy, sink: sink,
+		queue:  make(chan PipelineBatch, capacity),
+		raw:    make(chan *pipelineJob, capacity),
+		events: make(chan *pipelineJob, capacity),
+		slots:  make(chan struct{}, capacity+1),
+		done:   make(chan struct{}), stop: make(chan struct{}),
+	}
 	go p.run()
 	return p, nil
 }
 
 func (p *Pipeline) Submit(ctx context.Context, batch PipelineBatch) (err error) {
 	batch = cloneBatch(batch)
+	p.received.Add(1)
+	p.receivedEvents.Add(uint64(len(batch.Events)))
 	p.mu.Lock()
 	if p.closed {
 		err := p.resultLocked()
@@ -96,32 +126,55 @@ func (p *Pipeline) Submit(ctx context.Context, batch PipelineBatch) (err error) 
 	defer p.submitters.Done()
 	if p.policy == BackpressureReject {
 		select {
-		case queue <- batch:
-			p.accepted.Add(1)
-			return nil
 		case <-stop:
 			return p.result()
+		case p.slots <- struct{}{}:
 		default:
 			p.rejected.Add(1)
 			return ErrPipelineFull
 		}
+		select {
+		case queue <- batch:
+			p.accepted.Add(1)
+			return nil
+		case <-stop:
+			<-p.slots
+			return p.result()
+		}
+	}
+	select {
+	case <-stop:
+		return p.result()
+	case <-ctx.Done():
+		return ctx.Err()
+	case p.slots <- struct{}{}:
 	}
 	select {
 	case queue <- batch:
 		p.accepted.Add(1)
 		return nil
 	case <-stop:
+		<-p.slots
 		return p.result()
 	case <-ctx.Done():
+		<-p.slots
 		return ctx.Err()
 	}
 }
 
 func (p *Pipeline) Stats() PipelineStats {
+	queueDepth := len(p.slots)
+	if queueDepth > 0 {
+		queueDepth--
+	}
 	return PipelineStats{
-		Capacity: cap(p.queue), QueueDepth: len(p.queue),
+		Capacity: cap(p.queue), QueueDepth: queueDepth,
+		RawQueueDepth: len(p.raw), EventQueueDepth: len(p.events),
+		ReceivedBatches: p.received.Load(), ReceivedEvents: p.receivedEvents.Load(),
 		AcceptedBatches: p.accepted.Load(), RejectedBatches: p.rejected.Load(),
-		DecodedEvents: p.decoded.Load(), DecodeFailures: p.decodeFail.Load(), SinkFailures: p.sinkFail.Load(),
+		RawBatchesPersisted: p.rawPersisted.Load(), EventBatchesPersisted: p.eventBatches.Load(),
+		DecodedEvents: p.decoded.Load(), PersistedEvents: p.persisted.Load(),
+		DecodeFailures: p.decodeFail.Load(), SinkFailures: p.sinkFail.Load(),
 	}
 }
 
@@ -144,21 +197,24 @@ func (p *Pipeline) Close() error {
 
 func (p *Pipeline) run() {
 	defer close(p.done)
+	var workers sync.WaitGroup
+	workers.Add(2)
+	go func() {
+		defer workers.Done()
+		p.runRaw()
+	}()
+	go func() {
+		defer workers.Done()
+		p.runEvents()
+	}()
 	for batch := range p.queue {
-		if err := p.process(batch); err != nil {
-			p.mu.Lock()
-			p.err = err
-			p.closed = true
-			p.mu.Unlock()
-			p.stopOnce.Do(func() { close(p.stop) })
-			go p.closeQueueAfterSubmitters()
-			// Keep draining accepted work so blocked submitters cannot remain
-			// stuck; no further sink calls occur after the first failure.
-			for range p.queue {
-			}
-			return
-		}
+		job := &pipelineJob{batch: batch, rawDone: make(chan struct{})}
+		p.raw <- job
+		p.events <- job
 	}
+	close(p.raw)
+	close(p.events)
+	workers.Wait()
 }
 
 func (p *Pipeline) closeQueueAfterSubmitters() {
@@ -166,11 +222,39 @@ func (p *Pipeline) closeQueueAfterSubmitters() {
 	p.closeOnce.Do(func() { close(p.queue) })
 }
 
-func (p *Pipeline) process(batch PipelineBatch) error {
-	if err := p.sink.AppendRaw(batch.Raw); err != nil {
-		p.sinkFail.Add(1)
-		return fmt.Errorf("capture raw batch: %w", err)
+func (p *Pipeline) runRaw() {
+	for job := range p.raw {
+		if !p.failed() {
+			if err := p.sink.AppendRaw(job.batch.Raw); err != nil {
+				p.sinkFail.Add(1)
+				job.rawErr = fmt.Errorf("capture raw batch: %w", err)
+				p.fail(job.rawErr)
+			} else {
+				p.rawPersisted.Add(1)
+			}
+		}
+		close(job.rawDone)
 	}
+}
+
+func (p *Pipeline) runEvents() {
+	for job := range p.events {
+		<-job.rawDone
+		if job.rawErr != nil || p.failed() {
+			<-p.slots
+			continue
+		}
+		if err := p.processEvents(job.batch); err != nil {
+			p.fail(err)
+			<-p.slots
+			continue
+		}
+		p.eventBatches.Add(1)
+		<-p.slots
+	}
+}
+
+func (p *Pipeline) processEvents(batch PipelineBatch) error {
 	for _, wire := range batch.Events {
 		decoded, err := dt5202.DecodeEvent(wire.Descriptor.Qualifier, wire.Descriptor.TriggerID, wire.Descriptor.Timestamp, wire.Payload)
 		if err != nil {
@@ -182,8 +266,26 @@ func (p *Pipeline) process(batch PipelineBatch) error {
 			p.sinkFail.Add(1)
 			return fmt.Errorf("store chain %d node %d event: %w", wire.Chain, wire.Descriptor.Node, err)
 		}
+		p.persisted.Add(1)
 	}
 	return nil
+}
+
+func (p *Pipeline) failed() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.err != nil
+}
+
+func (p *Pipeline) fail(err error) {
+	p.mu.Lock()
+	if p.err == nil {
+		p.err = err
+		p.closed = true
+		p.stopOnce.Do(func() { close(p.stop) })
+		go p.closeQueueAfterSubmitters()
+	}
+	p.mu.Unlock()
 }
 
 func (p *Pipeline) result() error {

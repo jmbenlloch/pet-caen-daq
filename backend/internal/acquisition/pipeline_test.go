@@ -2,9 +2,11 @@ package acquisition
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
@@ -42,6 +44,64 @@ func (s *pipelineSink) AppendEvent(_ dt5215.StreamEvent, event dt5202.Event) err
 	s.order = append(s.order, "event")
 	s.events = append(s.events, event)
 	return s.eventErr
+}
+
+type concurrentPipelineSink struct {
+	raw      chan byte
+	eventIn  chan struct{}
+	eventOut chan struct{}
+	once     sync.Once
+}
+
+func (s *concurrentPipelineSink) AppendRaw(raw []byte) error {
+	s.raw <- raw[0]
+	return nil
+}
+
+func (s *concurrentPipelineSink) AppendEvent(_ dt5215.StreamEvent, _ dt5202.Event) error {
+	s.once.Do(func() { close(s.eventIn) })
+	<-s.eventOut
+	return nil
+}
+
+func TestPipelinePersistsNextRawBatchWhileEventsAreBeingStored(t *testing.T) {
+	sink := &concurrentPipelineSink{raw: make(chan byte, 2), eventIn: make(chan struct{}), eventOut: make(chan struct{})}
+	pipeline, err := NewPipeline(2, BackpressureBlock, sink)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := make([]byte, 8)
+	binary.LittleEndian.PutUint32(payload, 0x11223344)
+	batch := func(raw byte) PipelineBatch {
+		return PipelineBatch{Raw: []byte{raw}, Events: []dt5215.StreamEvent{{
+			Descriptor: dt5215.Descriptor{Qualifier: dt5202.QualifierTest}, Payload: payload,
+		}}}
+	}
+	if err := pipeline.Submit(context.Background(), batch(1)); err != nil {
+		t.Fatal(err)
+	}
+	<-sink.eventIn
+	if err := pipeline.Submit(context.Background(), batch(2)); err != nil {
+		t.Fatal(err)
+	}
+	for want := byte(1); want <= 2; want++ {
+		select {
+		case got := <-sink.raw:
+			if got != want {
+				t.Fatalf("raw order = %d, want %d", got, want)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("raw batch %d did not persist while event worker was blocked", want)
+		}
+	}
+	close(sink.eventOut)
+	if err := pipeline.Close(); err != nil {
+		t.Fatal(err)
+	}
+	stats := pipeline.Stats()
+	if stats.RawBatchesPersisted != 2 || stats.EventBatchesPersisted != 2 || stats.PersistedEvents != 2 {
+		t.Fatalf("stats = %+v", stats)
+	}
 }
 
 func TestPipelineCapturesRawBeforeDecodeAndClonesInput(t *testing.T) {

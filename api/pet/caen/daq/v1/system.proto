@@ -612,6 +612,14 @@ message PipelineTelemetry {
   uint64 rejected_batches = 4;
   uint64 decoded_events = 5;
   uint64 decode_failures = 6;
+  uint64 received_batches = 7;
+  uint64 received_events = 8;
+  uint64 raw_queue_depth = 9;
+  uint64 event_queue_depth = 10;
+  uint64 raw_batches_persisted = 11;
+  uint64 event_batches_persisted = 12;
+  uint64 persisted_events = 13;
+  uint64 sink_failures = 14;
 }
 
 message StorageTelemetry {
