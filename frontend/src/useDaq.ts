@@ -243,7 +243,7 @@ export function useDaq(api: DaqApi) {
       )
       accept(result.snapshot)
       if (result.run) latestCompletedRun.value = result.run
-      await refreshHistory()
+      void refreshHistory()
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {

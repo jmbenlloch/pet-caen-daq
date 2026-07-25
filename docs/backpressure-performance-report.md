@@ -101,6 +101,12 @@ datasets. Histogram schema version 2 replaces those objects and their 8,192
 attributes with one bins dataset and one spectrum table per kind (eight
 datasets total), using grouped writes and per-channel hyperslab reads.
 
+Run completion no longer performs a synchronous full catalog reconciliation.
+The browser-visible ready snapshot is published immediately after storage
+finalization, and only the newly completed manifest is indexed in the
+background. Full catalog comparison and repair are explicit offline
+maintenance operations.
+
 The instrumented build emits one `run_timing` log record for every remaining
 stage. Capture the server log from
 the next representative run with:
@@ -109,5 +115,7 @@ the next representative run with:
 docker logs --timestamps <daq-container> 2>&1 | grep 'run_timing'
 ```
 
-The `ready total_stop_ms` record is the operator-visible stop latency. Compare
-its component durations before changing durability or integrity behavior.
+The `completion_published duration_ms` record is the browser-visible stop
+latency. `ready total_stop_ms` covers only the acquisition coordinator, while
+the separate asynchronous `catalog_index` record measures incremental catalog
+work without delaying the next run.

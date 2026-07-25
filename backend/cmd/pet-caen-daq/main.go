@@ -115,15 +115,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		fmt.Fprintf(output, "run catalog unavailable path=%s error=%v\n", *catalogPath, catalogErr)
 	} else {
 		defer catalog.Close()
-		report, reconcileErr := catalog.Reconcile(ctx, *runParent)
-		if reconcileErr != nil {
-			fmt.Fprintf(output, "run catalog reconciliation failed path=%s error=%v\n", *catalogPath, reconcileErr)
-		} else {
-			fmt.Fprintf(output, "run catalog reconciled indexed=%d unchanged=%d unavailable=%d problems=%d\n", report.Indexed, report.Unchanged, report.MarkedUnavailable, len(report.Problems))
-			for _, problem := range report.Problems {
-				fmt.Fprintf(output, "run catalog problem run_id=%s error=%s\n", problem.RunID, problem.Error)
-			}
-		}
+		fmt.Fprintf(output, "run catalog opened path=%s reconciliation=manual\n", *catalogPath)
 	}
 	publisher, err := telemetry.NewPublisher(instanceID(), &daqv1.TelemetrySnapshot{State: daqv1.SystemState_SYSTEM_STATE_DISCONNECTED}, nil)
 	if err != nil {
@@ -155,10 +147,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		runService.Catalog = catalog
 		runService.AllocateRunID = catalog.AllocateRunID
 		scanService.AllocateRunID = catalog.AllocateRunID
-		runService.ReconcileCatalog = func(reconcileCtx context.Context, parent string) error {
-			_, err := catalog.Reconcile(reconcileCtx, parent)
-			return err
-		}
+		runService.IndexRun = catalog.IndexRun
 		runService.CatalogError = func(err error) {
 			fmt.Fprintf(output, "run catalog update failed: %v\n", err)
 		}

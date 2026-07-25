@@ -244,19 +244,32 @@ func TestSearchRunsValidatesContractAndCatalogAvailability(t *testing.T) {
 	}
 }
 
-func TestCompletedRunReconcilesCatalogWithoutFailingOnCatalogError(t *testing.T) {
-	called := false
-	reported := error(nil)
+func TestCompletedRunIndexesOnlyThatRunWithoutFailingOnCatalogError(t *testing.T) {
+	called := make(chan string, 1)
+	reported := make(chan error, 1)
 	service := &RunService{
 		RunParent: "runs",
-		ReconcileCatalog: func(_ context.Context, parent string) error {
-			called = parent == "runs"
+		IndexRun: func(_ context.Context, parent, runID string) error {
+			called <- parent + "/" + runID
 			return errors.New("catalog locked")
 		},
-		CatalogError: func(err error) { reported = err },
+		CatalogError: func(err error) { reported <- err },
 	}
-	service.reconcileCatalog(context.Background())
-	if !called || reported == nil || reported.Error() != "catalog locked" {
-		t.Fatalf("called=%t reported=%v", called, reported)
+	service.indexCompletedRun("54")
+	select {
+	case value := <-called:
+		if value != "runs/54" {
+			t.Fatalf("indexed %q", value)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("index callback was not called")
+	}
+	select {
+	case err := <-reported:
+		if err.Error() != "catalog locked" {
+			t.Fatalf("reported=%v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("catalog error was not reported")
 	}
 }

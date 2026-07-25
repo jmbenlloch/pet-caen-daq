@@ -163,6 +163,40 @@ describe('useDaq', () => {
     wrapper.unmount()
   })
 
+  it('releases run controls without waiting for history refresh', async () => {
+    let resolveHistory!: (value: { runs: []; nextPageToken: string }) => void
+    const history = new Promise<{ runs: []; nextPageToken: string }>((resolve) => {
+      resolveHistory = resolve
+    })
+    const api = fakeApi({
+      snapshot: vi.fn().mockResolvedValue(
+        create(TelemetrySnapshotSchema, {
+          state: SystemState.RUNNING,
+          currentRun: { runId: 'run-55' },
+        }),
+      ),
+      stop: vi.fn().mockResolvedValue({
+        snapshot: create(TelemetrySnapshotSchema, { state: SystemState.READY }),
+      }),
+      listRuns: vi
+        .fn()
+        .mockResolvedValueOnce({ runs: [], nextPageToken: '' })
+        .mockReturnValueOnce(history),
+    })
+    const { store, wrapper } = mountStore(api)
+    void store.connect()
+    await vi.waitFor(() => expect(store.snapshot.value?.currentRun?.runId).toBe('run-55'))
+
+    await store.stopRun()
+
+    expect(store.busy.value).toBe(false)
+    expect(store.canStart.value).toBe(true)
+    expect(store.runHistoryLoading.value).toBe(true)
+    resolveHistory({ runs: [], nextPageToken: '' })
+    await vi.waitFor(() => expect(store.runHistoryLoading.value).toBe(false))
+    wrapper.unmount()
+  })
+
   it('does not surface an in-flight histogram failure when the run is stopped', async () => {
     let rejectHistograms!: (reason: Error) => void
     const histograms = vi.fn().mockReturnValue(

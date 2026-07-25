@@ -95,6 +95,39 @@ func TestReconcileIndexesHashesReportsAndMarksUnavailable(t *testing.T) {
 	}
 }
 
+func TestIndexRunIndexesOnlyRequestedDirectory(t *testing.T) {
+	parent := t.TempDir()
+	requested, err := runstore.Create(parent, runstore.Manifest{RunID: "54", StartedAt: "2026-07-25T16:47:09Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := requested.Finalize("2026-07-25T16:47:24Z", "preset_time"); err != nil {
+		t.Fatal(err)
+	}
+	other, err := runstore.Create(parent, runstore.Manifest{RunID: "53", StartedAt: "2026-07-25T16:46:00Z"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := other.Finalize("2026-07-25T16:46:15Z", "preset_time"); err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := Open(filepath.Join(t.TempDir(), "catalog.sqlite3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer catalog.Close()
+	if err := catalog.IndexRun(context.Background(), parent, "54"); err != nil {
+		t.Fatal(err)
+	}
+	runs, err := catalog.List(context.Background(), Query{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 || runs[0].RunID != "54" || runs[0].Incomplete {
+		t.Fatalf("runs=%+v", runs)
+	}
+}
+
 func TestReconcileRefreshesStaleAndRestoresAvailability(t *testing.T) {
 	parent := t.TempDir()
 	writer, err := runstore.Create(parent, runstore.Manifest{RunID: "42", StartedAt: "2026-07-22T10:00:00Z"})
