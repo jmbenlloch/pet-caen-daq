@@ -1426,6 +1426,7 @@ onMounted(() => daq.connect())
                   <option :value="RunType.UNSPECIFIED">All types</option>
                   <option :value="RunType.DATA">Data runs</option>
                   <option :value="RunType.STAIRCASE">Staircase scans</option>
+                  <option :value="RunType.HOLD_DELAY_SCAN">Hold-delay scans</option>
                 </select>
               </label>
               <label>

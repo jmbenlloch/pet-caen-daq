@@ -551,7 +551,7 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
-  it('searches all, data, or staircase run types', async () => {
+  it('searches all, data, staircase, or hold-delay run types', async () => {
     const api = dashboardApi()
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
@@ -561,6 +561,7 @@ describe('operator dashboard', () => {
       'All types',
       'Data runs',
       'Staircase scans',
+      'Hold-delay scans',
     ])
     await type.setValue(String(RunType.STAIRCASE))
     await wrapper.get('form[aria-label="Search stored runs"]').trigger('submit')
