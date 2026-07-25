@@ -1346,6 +1346,13 @@ onMounted(() => daq.connect())
             <p class="muted">
               {{ compact(daq.snapshot.value?.storage?.bytesWritten) }} bytes written
             </p>
+            <p
+              v-if="daq.snapshot.value?.storage?.lastError"
+              class="alert error storage-error"
+              role="alert"
+            >
+              {{ daq.snapshot.value.storage.lastError }}
+            </p>
           </section>
         </aside>
       </section>
