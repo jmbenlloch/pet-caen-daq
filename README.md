@@ -136,6 +136,7 @@ under the container's `/tmp`.
 
 ## Start here
 
+- [Operator user manual](docs/operator-user-manual.md)
 - [Project instructions](AGENTS.md)
 - [Architecture](docs/architecture.md)
 - [Engineering guidelines](docs/engineering-guidelines.md)
