@@ -260,7 +260,92 @@ The container runs as numeric user `65532`; a bind-mounted run directory must be
 
 The published production image includes a sample configuration and enables `-authorize-hv-config` by default. If the container command is replaced, include that flag only when applying configured HV setpoints and enabling HV has been explicitly authorized.
 
-## 2.7 Backend command-line options
+## 2.7 Running the production system on Windows with Docker Desktop
+
+The Windows operator station runs the complete application as a Docker container. The container includes the backend, built web frontend, production configuration, and HDF5 runtime. A separate frontend installation is not required.
+
+> **WARNING — DISCONNECT JANUS FIRST**
+>
+> JANUS and PET CAEN DAQ must never control the DT5215/DT5202 system at the same time. The PET CAEN DAQ container attempts to connect to the hardware when it starts. Before running or restarting the container, stop any JANUS acquisition, disconnect JANUS from the hardware, and close JANUS. Also make sure no other FERS or DAQ utility is connected.
+
+### First launch
+
+Open PowerShell and run:
+
+```powershell
+docker run -d `
+    --name pet-caen-daq `
+    -p 8081:8080 `
+    -v "C:\Users\investigator\daq\docker:/var/lib/pet-caen/runs" `
+    nextmgmt/pet-caen-daq:latest
+```
+
+The options have the following meaning:
+
+| Option                                                         | Meaning                                                                                                                                             |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docker run -d`                                                | Starts the application in the background.                                                                                                           |
+| `--name pet-caen-daq`                                          | Assigns the reusable container name `pet-caen-daq`.                                                                                                 |
+| `-p 8081:8080`                                                 | Publishes container port 8080 as Windows port 8081.                                                                                                 |
+| `-v "C:\Users\investigator\daq\docker:/var/lib/pet-caen/runs"` | Stores runs and the run catalog persistently in `C:\Users\investigator\daq\docker`. Data therefore remains available when the container is stopped. |
+| `nextmgmt/pet-caen-daq:latest`                                 | Uses the published production image.                                                                                                                |
+
+After the container starts, open:
+
+<http://localhost:8081>
+
+The browser address is port **8081**, not port 8080. Port 8080 is the private port inside the container.
+
+The command creates a named container, so it is intended for the first launch. If a container named `pet-caen-daq` already exists, Docker reports a name conflict. Do not create a second DAQ container. After confirming that JANUS is disconnected, restart the existing container with:
+
+```powershell
+docker start pet-caen-daq
+```
+
+Useful checks are:
+
+```powershell
+docker ps --filter "name=pet-caen-daq"
+docker logs pet-caen-daq
+```
+
+`docker ps` confirms whether it is running. `docker logs` shows startup, hardware-connection, configuration, and error messages.
+
+### Connecting from the web page
+
+When the page opens, read the masthead before issuing a command:
+
+- **Backend online** confirms that the browser can communicate with the container.
+- **Hardware connected** means the backend already owns the hardware connection.
+- **Hardware disconnected** means the automatic attempt did not leave a connection; after correcting the cause, select **Connect hardware** in the upper-right operations area.
+- Wait for **Ready** before starting a run, scan, or HV operation.
+
+If the page reports a hardware connection failure, do not start JANUS to test the same hardware while the container is still connected or attempting recovery. First use **Disconnect hardware** when the button is available, then stop the container if control must be returned to JANUS.
+
+### Ending work safely
+
+> **CRITICAL — DISCONNECT THE HARDWARE FROM THE PAGE**
+>
+> Do not finish a session by closing the browser, stopping Docker, shutting down Windows, or unplugging the network alone. Before ending work, explicitly select **Disconnect hardware** in the upper-right area of the page and wait until the masthead says **Hardware disconnected**.
+
+Use this shutdown order:
+
+1. If a data run is active, select **Stop and drain** and wait until the system returns to **Ready**.
+2. If a scan is active, allow it to complete or select **Cancel**, then wait for configuration restoration and **Ready**.
+3. If detector bias must be shut down, select **All HV off** while **Ready** and confirm each board reports **HV off** and an appropriate Vmon.
+4. Select **Disconnect hardware** in the upper-right operations area.
+5. Wait until the page explicitly reports **Hardware disconnected**.
+6. Only then stop the container:
+
+   ```powershell
+   docker stop pet-caen-daq
+   ```
+
+Closing the browser does not disconnect the backend from the DT5215. Stopping the container without using **Disconnect hardware** first prevents an orderly operator-confirmed handoff and can leave the hardware state uncertain.
+
+JANUS may be started again only after the page has reported **Hardware disconnected** and the PET CAEN DAQ container has been stopped. Before restarting the container later, disconnect and close JANUS again.
+
+## 2.8 Backend command-line options
 
 | Option                 |                  Default | Purpose                                                                |
 | ---------------------- | -----------------------: | ---------------------------------------------------------------------- |
@@ -365,6 +450,8 @@ Keyboard users can move among tabs with Left Arrow, Right Arrow, Home, and End.
 
 When the backend is online and state is **Disconnected**, select **Connect hardware**.
 
+Before selecting it, confirm that JANUS is disconnected and closed. JANUS and this DAQ cannot safely share the DT5215 connection.
+
 Connection performs the normal runtime sequence:
 
 1. open DT5215 control and stream transports;
@@ -389,6 +476,8 @@ If connection fails:
 Select **Disconnect hardware** to close both DT5215 transports.
 
 Disconnection is permitted only from **Idle**, **Ready**, or **Fault**. It is disabled during a run, scan, connection, configuration, start/stop, drain, or recovery. If a run is active, use **Stop and drain** first.
+
+This button is the required final step before closing the browser, stopping the container, shutting down the operator computer, or returning hardware control to JANUS. Wait for **Hardware disconnected**; closing the browser tab alone does not disconnect the backend.
 
 After disconnection:
 
@@ -1448,7 +1537,7 @@ Verify artifact size and SHA-256 against the manifest after copying.
 
 ## 15.1 Pre-run checklist
 
-1. Confirm no other DT5215/DT5202 client is running.
+1. Confirm JANUS is disconnected and closed and no other DT5215/DT5202 client is running.
 2. Confirm correct physical topology and DT5215 link provisioning.
 3. Confirm backend and hardware are online.
 4. Confirm system state is **Ready**.
@@ -1482,6 +1571,8 @@ Verify artifact size and SHA-256 against the manifest after copying.
 5. Confirm expected artifacts exist.
 6. Download or archive configuration/evidence as required.
 7. If shutting down detector bias, issue HV-off while **Ready** and confirm Vmon/state.
+8. Select **Disconnect hardware** in the upper-right operations area and wait for **Hardware disconnected**.
+9. Only after hardware disconnection, close the browser or stop the Docker container.
 
 ## 15.4 Scan checklist
 
