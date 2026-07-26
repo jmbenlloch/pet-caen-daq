@@ -65,6 +65,36 @@ func TestSendCommandWaitsForScheduledExecutionBeforeReturning(t *testing.T) {
 	}
 }
 
+func TestSendCommandRetriesTransientStatus(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	client := &Client{control: clientConn}
+	requests := make(chan int, 1)
+	go func() {
+		buffer := make([]byte, 20)
+		count := 0
+		for count < 2 {
+			_, _ = io.ReadFull(serverConn, buffer)
+			count++
+			status := uint32(StatusOK)
+			if count == 1 {
+				status = 26
+			}
+			response := []byte{byte(status), byte(status >> 8), byte(status >> 16), byte(status >> 24)}
+			_, _ = serverConn.Write(response)
+		}
+		requests <- count
+	}()
+
+	if err := client.SendCommand(context.Background(), 0xff, 0xff, CommandResetPeriodic, 0); err != nil {
+		t.Fatalf("SendCommand() error = %v", err)
+	}
+	if count := <-requests; count != 2 {
+		t.Fatalf("request count = %d, want 2", count)
+	}
+}
+
 func TestSendCommandDelayIsContextCancelable(t *testing.T) {
 	clientConn, serverConn := net.Pipe()
 	defer clientConn.Close()
