@@ -27,12 +27,6 @@ func (h *recoveryHardware) SendCommand(_ context.Context, _, _ uint16, command, 
 	}
 	return nil
 }
-func (h *recoveryHardware) SendSynchronizedCommand(_ context.Context, command uint32) error {
-	if command == uint32(dt5202.CommandAcquisitionStop) {
-		return h.stopErr
-	}
-	return nil
-}
 func (h *recoveryHardware) ReadRawStreamBatch(context.Context) ([]byte, []dt5215.StreamEvent, error) {
 	if h.reads == 0 {
 		h.reads++

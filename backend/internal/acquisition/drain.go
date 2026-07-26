@@ -13,7 +13,6 @@ import (
 // DrainHardware is the control/stream boundary needed for orderly shutdown.
 type DrainHardware interface {
 	SendCommand(context.Context, uint16, uint16, uint32, uint32) error
-	SendSynchronizedCommand(context.Context, uint32) error
 	ReadRawStreamBatch(context.Context) ([]byte, []dt5215.StreamEvent, error)
 }
 
@@ -45,7 +44,7 @@ func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains in
 	if expectedChains < 1 || expectedChains > dt5215.MaxChains {
 		return DrainResult{}, fmt.Errorf("expected chain count %d out of range", expectedChains)
 	}
-	if err := hardware.SendSynchronizedCommand(ctx, dt5215.CommandAcquisitionStop); err != nil {
+	if err := hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStop, dt5215.TDLCommandDelay); err != nil {
 		return DrainResult{}, fmt.Errorf("stop acquisition: %w", err)
 	}
 	completed := make(map[uint8]bool, expectedChains)

@@ -20,7 +20,6 @@ const (
 	syncOperationTimeout    = 10 * time.Second
 	tdlCommandDelayUnit     = 10 * time.Nanosecond
 	tdlCommandMaxAttempts   = 10
-	tdlSynchronizedArmDelay = 10 * time.Millisecond
 )
 
 // Client owns one DT5215 control connection and one stream connection.
@@ -70,32 +69,6 @@ func (c *Client) SendCommand(ctx context.Context, chain, node uint16, command, d
 func (c *Client) SetDelayedCommand(ctx context.Context, command, delay uint32) error {
 	return c.sendCommand(ctx, true, 0xff, 0xff, command, delay)
 }
-func (c *Client) SendSynchronizedCommand(ctx context.Context, command uint32) error {
-	request, err := EncodeCommandRequest(true, 0xff, 0xff, command, TDLSynchronizedCommandDelay)
-	if err != nil {
-		return err
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if err := c.sendCommandLocked(ctx, "DCMD", command, request, TDLSynchronizedCommandDelay); err != nil {
-		return fmt.Errorf("stage synchronized command: %w", err)
-	}
-	timer := time.NewTimer(tdlSynchronizedArmDelay)
-	defer timer.Stop()
-	select {
-	case <-timer.C:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	response, err := c.exchangeAfterWriteDelayWithTimeoutLocked(ctx, EncodeConcentratorWriteRegisterRequest(ConcentratorSyncSend, 1), 4, 0, defaultOperationTimeout)
-	if err != nil {
-		return fmt.Errorf("trigger synchronized command 0x%02x: %w", command, err)
-	}
-	if err := DecodeStatusResponse("CWRG", response); err != nil {
-		return fmt.Errorf("trigger synchronized command 0x%02x: %w", command, err)
-	}
-	return nil
-}
 func (c *Client) sendCommand(ctx context.Context, delayed bool, chain, node uint16, command, delay uint32) error {
 	request, err := EncodeCommandRequest(delayed, chain, node, command, delay)
 	if err != nil {
@@ -113,10 +86,6 @@ func (c *Client) sendCommand(ctx context.Context, delayed bool, chain, node uint
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.sendCommandLocked(ctx, op, command, request, delay)
-}
-
-func (c *Client) sendCommandLocked(ctx context.Context, op string, command uint32, request []byte, delay uint32) error {
 	for attempt := 1; attempt <= tdlCommandMaxAttempts; attempt++ {
 		response, err := c.exchangeAfterWriteDelayWithTimeoutLocked(ctx, request, 4, time.Duration(delay)*tdlCommandDelayUnit, defaultOperationTimeout)
 		if err != nil {
