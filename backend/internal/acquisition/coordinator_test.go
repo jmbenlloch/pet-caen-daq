@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -21,6 +22,7 @@ type coordinatorHardware struct {
 	startErr  error
 	journals  []transportjournal.Sink
 	syncCalls int
+	failOnce  uint32
 }
 
 func (h *coordinatorHardware) SetStreamJournal(sink transportjournal.Sink, _ string, _ func() time.Time) {
@@ -52,6 +54,10 @@ func (h *coordinatorHardware) SendCommand(_ context.Context, _, _ uint16, comman
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.commands = append(h.commands, command)
+	if command == h.failOnce {
+		h.failOnce = 0
+		return &dt5215.StatusError{Operation: "FCMD", Status: dt5215.StatusTimeout}
+	}
 	if command == dt5215.CommandAcquisitionStart {
 		return h.startErr
 	}
@@ -227,6 +233,34 @@ func TestCoordinatorSynchronizesOnceWithoutPriorEvidence(t *testing.T) {
 	defer hardware.mu.Unlock()
 	if hardware.syncCalls != 1 {
 		t.Fatalf("Synchronize calls = %d, want 1", hardware.syncCalls)
+	}
+}
+
+func TestCoordinatorResynchronizesAndRetriesStartAfterStatus26(t *testing.T) {
+	hardware := &coordinatorHardware{failOnce: dt5215.CommandResetPeriodic}
+	coordinator, _, _ := readyCoordinator(t, hardware)
+	coordinator.SetSynchronized(true)
+	if err := coordinator.Start(context.Background(), "run-1", "operator", RunOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Stop(context.Background(), "operator"); err != nil {
+		t.Fatal(err)
+	}
+	hardware.mu.Lock()
+	defer hardware.mu.Unlock()
+	if hardware.syncCalls != 1 {
+		t.Fatalf("Synchronize calls = %d, want 1", hardware.syncCalls)
+	}
+	want := []uint32{
+		dt5215.CommandResetTime,
+		dt5215.CommandResetPeriodic,
+		dt5215.CommandResetTime,
+		dt5215.CommandResetPeriodic,
+		dt5215.CommandAcquisitionStart,
+		dt5215.CommandAcquisitionStop,
+	}
+	if !reflect.DeepEqual(hardware.commands, want) {
+		t.Fatalf("commands = %v, want %v", hardware.commands, want)
 	}
 }
 

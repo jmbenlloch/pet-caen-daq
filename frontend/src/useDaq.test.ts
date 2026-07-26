@@ -11,6 +11,7 @@ import {
   TelemetrySnapshotSchema,
   type StartRunRequest,
   type StopRunRequest,
+  type TelemetrySnapshot,
 } from './gen/pet/caen/daq/v1/system_pb'
 import { useDaq } from './useDaq'
 
@@ -110,6 +111,38 @@ describe('useDaq', () => {
 
     expect(api.validate).toHaveBeenCalledWith('invalid')
     expect(start).not.toHaveBeenCalled()
+    wrapper.unmount()
+  })
+
+  it('keeps an explicit starting state while the hardware start request is pending', async () => {
+    let finishStart!: (value: { snapshot: TelemetrySnapshot }) => void
+    const start = vi.fn(
+      () =>
+        new Promise<{ snapshot: TelemetrySnapshot }>((resolve) => {
+          finishStart = resolve
+        }),
+    )
+    const { store, wrapper } = mountStore(fakeApi({ start }))
+
+    const pending = store.startRun({
+      configuration: 'Open[0] usb:host:tdl:0:0',
+      captureRaw: false,
+      journalTransport: false,
+      persistHistograms: true,
+      hdf5SegmentSizeMb: 500,
+      hdf5Compression: 'blosc-lz4-level4-bitshuffle',
+    })
+    await vi.waitFor(() => expect(start).toHaveBeenCalled())
+    expect(store.startingRun.value).toBe(true)
+
+    finishStart({
+      snapshot: create(TelemetrySnapshotSchema, {
+        state: SystemState.RUNNING,
+        currentRun: { runId: 'run-55' },
+      }),
+    })
+    await pending
+    expect(store.startingRun.value).toBe(false)
     wrapper.unmount()
   })
 

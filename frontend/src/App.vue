@@ -373,7 +373,9 @@ const configuredStopPolicy = computed(() => {
   return 'Manual stop'
 })
 
-const state = computed(() => stateLabel[daq.snapshot.value?.state ?? 0])
+const state = computed(() =>
+  daq.startingRun.value ? stateLabel[SystemState.STARTING] : stateLabel[daq.snapshot.value?.state ?? 0],
+)
 const pipeline = computed(() => daq.snapshot.value?.pipeline)
 const pipelineBacklog = computed(() => {
   const accepted = pipeline.value?.acceptedBatches ?? 0n
@@ -385,7 +387,12 @@ const pipelinePhase = computed(() => {
   if (daq.snapshot.value?.state === SystemState.RUNNING) return 'Acquiring'
   return pipelineBacklog.value > 0n ? 'Finishing persistence' : 'Idle'
 })
-const backendOnline = computed(() => daq.connected.value && !daq.stale.value)
+// A long DT5215 synchronization command can exceed the telemetry stale
+// threshold while its StartRun request is still active. The request itself is
+// positive backend-liveness evidence, so do not flash "offline" during it.
+const backendOnline = computed(
+  () => daq.connected.value && (!daq.stale.value || daq.startingRun.value),
+)
 const hardwareDisconnected = computed(() => daq.snapshot.value?.state === SystemState.DISCONNECTED)
 const hardwareConnecting = computed(() => daq.snapshot.value?.state === SystemState.CONNECTING)
 const hardwareConnectionLabel = computed(() => {
@@ -864,6 +871,10 @@ onMounted(() => daq.connect())
             >
               <span><strong>Scan in progress</strong></span>
               <small>Acquisition run controls are unavailable during the scan</small>
+            </div>
+            <div v-else-if="daq.startingRun.value" class="run-now" role="status" aria-live="polite">
+              <span><strong>Starting run…</strong></span>
+              <small>Waiting for hardware commands; synchronization recovery can take several seconds</small>
             </div>
             <div v-else class="run-now quiet" role="status">
               <span>No active run</span>

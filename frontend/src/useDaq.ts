@@ -23,6 +23,7 @@ export function useDaq(api: DaqApi) {
   const stale = ref(true)
   const error = ref('')
   const busy = ref(false)
+  const startingRun = ref(false)
   const validationIssues = ref<ValidationIssue[]>([])
   const latestCompletedRun = ref<RunSummary>()
   const runHistory = ref<RunSummary[]>([])
@@ -207,6 +208,7 @@ export function useDaq(api: DaqApi) {
     hdf5Compression: string
   }) {
     busy.value = true
+    startingRun.value = true
     error.value = ''
     try {
       const valid = await validate(input.configuration)
@@ -227,6 +229,7 @@ export function useDaq(api: DaqApi) {
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {
+      startingRun.value = false
       busy.value = false
     }
   }
@@ -325,6 +328,7 @@ export function useDaq(api: DaqApi) {
     stale: readonly(stale),
     error: readonly(error),
     busy: readonly(busy),
+    startingRun: readonly(startingRun),
     validationIssues: readonly(validationIssues),
     latestCompletedRun: readonly(latestCompletedRun),
     runHistory: readonly(runHistory),
