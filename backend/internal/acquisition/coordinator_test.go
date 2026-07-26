@@ -60,9 +60,6 @@ func (h *coordinatorHardware) SendCommand(_ context.Context, _, _ uint16, comman
 	}
 	return nil
 }
-func (h *coordinatorHardware) SendSynchronizedCommand(ctx context.Context, command uint32) error {
-	return h.SendCommand(ctx, 0xff, 0xff, command, dt5215.TDLSynchronizedCommandDelay)
-}
 func (h *coordinatorHardware) ReadRawStreamBatch(ctx context.Context) ([]byte, []dt5215.StreamEvent, error) {
 	h.mu.Lock()
 	h.readCount++

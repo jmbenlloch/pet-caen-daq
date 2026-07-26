@@ -19,7 +19,6 @@ type CoordinatorHardware interface {
 	ClearStream(context.Context) error
 	ControlChain(context.Context, uint16, bool, uint32) error
 	SendCommand(context.Context, uint16, uint16, uint32, uint32) error
-	SendSynchronizedCommand(context.Context, uint32) error
 	ReadRawStreamBatch(context.Context) ([]byte, []dt5215.StreamEvent, error)
 }
 
@@ -157,13 +156,13 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 			return c.failStartAttached(fmt.Errorf("disable chain %d readout train: %w", chain, err), actor, pipeline, journalAttached)
 		}
 	}
-	if err = c.hardware.SendSynchronizedCommand(ctx, dt5215.CommandResetTime); err != nil {
+	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetTime, dt5215.TDLCommandDelay); err != nil {
 		return c.failStartAttached(fmt.Errorf("reset acquisition time: %w", err), actor, pipeline, journalAttached)
 	}
-	if err = c.hardware.SendSynchronizedCommand(ctx, dt5215.CommandResetPeriodic); err != nil {
+	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetPeriodic, dt5215.TDLCommandDelay); err != nil {
 		return c.failStartAttached(fmt.Errorf("reset periodic trigger: %w", err), actor, pipeline, journalAttached)
 	}
-	if err = c.hardware.SendSynchronizedCommand(ctx, dt5215.CommandAcquisitionStart); err != nil {
+	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, dt5215.TDLCommandDelay); err != nil {
 		return c.failStartAttached(fmt.Errorf("start acquisition: %w", err), actor, pipeline, journalAttached)
 	}
 	for chain := 0; chain < c.expectedChains; chain++ {

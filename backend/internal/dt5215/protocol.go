@@ -24,6 +24,8 @@ const (
 	RegisterAcquisitionStatus uint32 = 0x01000304
 	RegisterProductID         uint32 = 0x01000400
 
+	VirtualRegisterSyncDelay uint32 = 23
+
 	CommandResetTime        uint32 = 0x11
 	CommandAcquisitionStart uint32 = 0x12
 	CommandAcquisitionStop  uint32 = 0x13
@@ -37,11 +39,6 @@ const (
 	// TDLCommandDelay is the capture-verified FERSlib broadcast delay. One
 	// hardware unit is 10 ns, so this schedules execution 10 ms later.
 	TDLCommandDelay uint32 = 1_000_000
-
-	// TDLSynchronizedCommandDelay is the source-confirmed delay staged in a
-	// DCMD before the concentrator executes it from VR_IO_SYNC_SEND.
-	TDLSynchronizedCommandDelay uint32 = 100
-	ConcentratorSyncSend        uint32 = 22
 )
 
 var littleEndian = binary.LittleEndian
@@ -166,6 +163,14 @@ func EncodeChainControlRequest(chain uint16, enable bool, tokenInterval uint32) 
 	return request, nil
 }
 
+func EncodeConcentratorWriteRegisterRequest(address, value uint32) []byte {
+	request := make([]byte, 12)
+	copy(request, "CWRG")
+	littleEndian.PutUint32(request[4:8], address)
+	littleEndian.PutUint32(request[8:12], value)
+	return request
+}
+
 func DecodeEnumerateResponse(response []byte) (EnumerationInfo, error) {
 	if len(response) != 12 {
 		return EnumerationInfo{}, fmt.Errorf("ENUM response length = %d, want 12", len(response))
@@ -219,14 +224,6 @@ func EncodeWriteRegisterRequest(chain, node uint16, address, value uint32) ([]by
 	littleEndian.PutUint32(request[8:12], address)
 	littleEndian.PutUint32(request[12:16], value)
 	return request, nil
-}
-
-func EncodeConcentratorWriteRegisterRequest(address, value uint32) []byte {
-	request := make([]byte, 12)
-	copy(request, "CWRG")
-	littleEndian.PutUint32(request[4:8], address)
-	littleEndian.PutUint32(request[8:12], value)
-	return request
 }
 
 func EncodeCommandRequest(delayed bool, chain, node uint16, command, delay uint32) ([]byte, error) {
