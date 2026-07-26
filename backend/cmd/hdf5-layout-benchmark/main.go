@@ -128,6 +128,7 @@ type field struct {
 }
 
 type result struct {
+	EventKind             string  `json:"event_kind"`
 	Mode                  string  `json:"mode"`
 	Input                 string  `json:"input"`
 	Output                string  `json:"output"`
@@ -140,6 +141,8 @@ type result struct {
 	TimingRows            uint64  `json:"timing_rows"`
 	ObservationRows       uint64  `json:"observation_rows,omitempty"`
 	TimingOnlyRows        uint64  `json:"timing_only_rows,omitempty"`
+	ChildRows             uint64  `json:"child_rows,omitempty"`
+	SentinelRows          uint64  `json:"sentinel_rows,omitempty"`
 	LogicalBytes          uint64  `json:"logical_bytes"`
 	AllocatedDatasetBytes uint64  `json:"allocated_dataset_bytes"`
 	FileBytes             int64   `json:"file_bytes"`
@@ -150,11 +153,12 @@ type result struct {
 }
 
 func main() {
-	var input, output, mode string
+	var input, output, mode, eventKind string
 	var batchRows int
 	flag.StringVar(&input, "input", "", "source decoded-event HDF5 file")
 	flag.StringVar(&output, "output", "", "benchmark output HDF5 file")
 	flag.StringVar(&mode, "mode", "", "layout to write: split or flat")
+	flag.StringVar(&eventKind, "event-kind", "spectroscopy", "event family: spectroscopy, timing, counting, waveform, service, or test")
 	flag.IntVar(&batchRows, "batch-rows", 1_000_000, "maximum rows per read/write batch")
 	flag.Parse()
 
@@ -177,11 +181,17 @@ func main() {
 	started := time.Now()
 
 	var metrics result
-	switch mode {
-	case "split":
-		metrics, err = rewriteSplit(input, output, batchRows)
-	case "flat":
-		metrics, err = rewriteFlat(input, output, batchRows)
+	switch eventKind {
+	case "spectroscopy":
+		if mode == "split" {
+			metrics, err = rewriteSplit(input, output, batchRows)
+		} else {
+			metrics, err = rewriteFlat(input, output, batchRows)
+		}
+	case "timing", "counting", "waveform", "service", "test":
+		metrics, err = rewriteOtherEvent(eventKind, mode, input, output, batchRows)
+	default:
+		fatalf("unsupported event kind %q", eventKind)
 	}
 	if err != nil {
 		fatalf("%s rewrite: %v", mode, err)
@@ -192,6 +202,7 @@ func main() {
 		fatalf("stat output: %v", err)
 	}
 	metrics.Mode = mode
+	metrics.EventKind = eventKind
 	metrics.Input = input
 	metrics.Output = output
 	metrics.BloscVersion = bloscVersion

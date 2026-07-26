@@ -279,6 +279,156 @@ def validate_range(name, parents, offset_name, count_name, children):
             fail(f"/{name} has an orphaned or incorrectly parented child row")
 
 
+def validate_spectroscopy(handle, index):
+    parents = handle["events/spectroscopy/events"][:]
+    observations = handle["events/spectroscopy/observations"]
+    parent_count = len(parents)
+    observation_count = len(observations)
+
+    offsets = parents["observation_offset"].astype(np.uint64)
+    counts = parents["observation_count"].astype(np.uint64)
+    ends = offsets + counts
+    expected_offsets = np.empty(parent_count, dtype=np.uint64)
+    if parent_count:
+        expected_offsets[0] = 0
+        expected_offsets[1:] = np.cumsum(counts[:-1], dtype=np.uint64)
+    if not np.array_equal(offsets, expected_offsets):
+        fail("/events/spectroscopy/events has non-contiguous observation offsets")
+    if np.any(counts == 0):
+        fail("/events/spectroscopy/events contains a row without an observation or sentinel")
+    if np.any(ends < offsets) or (parent_count and int(ends[-1]) != observation_count):
+        fail("/events/spectroscopy/observations contains an invalid or unreferenced range")
+    if not parent_count and observation_count:
+        fail("/events/spectroscopy/observations contains rows without parents")
+
+    selected = index[index["kind"] == 1]
+    if len(selected) != parent_count:
+        fail("spectroscopy index and parent counts differ")
+    order = np.argsort(selected["kind_row"])
+    sources = selected[order]
+    if not np.array_equal(
+        sources["kind_row"], np.arange(parent_count, dtype=np.uint64)
+    ):
+        fail("spectroscopy parents do not have unique index rows")
+
+    channel_masks = np.zeros(parent_count, dtype=np.uint64)
+    energy_masks = np.zeros(parent_count, dtype=np.uint64)
+    valid_channel_counts = np.zeros(parent_count, dtype=np.uint32)
+    sentinel_counts = np.zeros(parent_count, dtype=np.uint32)
+    boolean_fields = (
+        "channel_valid", "has_energy", "has_low_gain", "has_high_gain",
+        "discriminator", "has_timing",
+    )
+    source_fields = ("sequence", "chain", "node", "qualifier")
+    parent_fields = (
+        "trigger_id", "timestamp", "relative_timestamp_clock",
+        "time_reference", "validity",
+    )
+
+    def grouped_counts(parent_rows):
+        """Return IDs and counts for an already parent-sorted row selection."""
+        if not len(parent_rows):
+            return parent_rows, np.empty(0, dtype=np.uint32), np.empty(0, dtype=np.intp)
+        starts = np.concatenate((
+            np.array([0], dtype=np.intp),
+            np.flatnonzero(parent_rows[1:] != parent_rows[:-1]) + 1,
+        ))
+        group_counts = np.diff(
+            np.append(starts, len(parent_rows))
+        ).astype(np.uint32)
+        return parent_rows[starts], group_counts, starts
+
+    def accumulate_masks(target, parent_rows, bits):
+        ids, _, starts = grouped_counts(parent_rows)
+        if len(ids):
+            target[ids] |= np.bitwise_or.reduceat(bits, starts)
+
+    # Reading the complete 50-million-row compound dataset would require more
+    # than 3 GiB. Validate bounded chunks and retain only per-parent masks and
+    # counts between chunks.
+    chunk_rows = 1_000_000
+    for begin in range(0, observation_count, chunk_rows):
+        end = min(begin + chunk_rows, observation_count)
+        rows = observations[begin:end]
+        positions = np.arange(begin, end, dtype=np.uint64)
+        parent_rows = np.searchsorted(ends, positions, side="right")
+        if np.any(parent_rows >= parent_count):
+            fail("/events/spectroscopy/observations contains an orphaned row")
+        if not np.array_equal(
+            rows["parent_row"], parent_rows.astype(rows["parent_row"].dtype)
+        ):
+            fail("/events/spectroscopy/observations has an incorrect parent_row")
+
+        source = sources[parent_rows]
+        for field in source_fields:
+            if np.any(rows[field] != source[field]):
+                fail(f"/events/spectroscopy/observations repeats incorrect {field}")
+        parent = parents[parent_rows]
+        for field in parent_fields:
+            if np.any(rows[field] != parent[field]):
+                fail(f"/events/spectroscopy/observations repeats incorrect {field}")
+        for field in boolean_fields:
+            if np.any(rows[field] > 1):
+                fail(f"/events/spectroscopy/observations has invalid boolean {field}")
+
+        valid = rows["channel_valid"] != 0
+        sentinel = ~valid
+        if np.any(sentinel & (
+            (rows["has_energy"] != 0) | (rows["has_timing"] != 0)
+        )):
+            fail("/events/spectroscopy/observations has a sentinel carrying data")
+        sentinel_ids, grouped_sentinels, _ = grouped_counts(parent_rows[sentinel])
+        sentinel_counts[sentinel_ids] += grouped_sentinels
+
+        if np.any(rows["channel"][valid] > 63):
+            fail("/events/spectroscopy/observations has an out-of-range channel")
+        if np.any(valid & (
+            (rows["has_energy"] == 0) & (rows["has_timing"] == 0)
+        )):
+            fail("/events/spectroscopy/observations has an empty non-sentinel row")
+        no_energy = valid & (rows["has_energy"] == 0)
+        if np.any(no_energy & (
+            (rows["low_gain"] != 0) | (rows["high_gain"] != 0) |
+            (rows["has_low_gain"] != 0) | (rows["has_high_gain"] != 0) |
+            (rows["discriminator"] != 0)
+        )):
+            fail("/events/spectroscopy/observations has energy data without validity")
+        no_timing = valid & (rows["has_timing"] == 0)
+        if np.any(no_timing & ((rows["toa"] != 0) | (rows["tot"] != 0))):
+            fail("/events/spectroscopy/observations has timing data without validity")
+
+        valid_parents = parent_rows[valid]
+        valid_bits = np.left_shift(
+            np.uint64(1), rows["channel"][valid].astype(np.uint64)
+        )
+        accumulate_masks(channel_masks, valid_parents, valid_bits)
+        valid_ids, grouped_valid, _ = grouped_counts(valid_parents)
+        valid_channel_counts[valid_ids] += grouped_valid
+
+        energy = valid & (rows["has_energy"] != 0)
+        energy_bits = np.left_shift(
+            np.uint64(1), rows["channel"][energy].astype(np.uint64)
+        )
+        accumulate_masks(energy_masks, parent_rows[energy], energy_bits)
+
+    invalid_sentinel = (sentinel_counts != 0) & (
+        (sentinel_counts != 1) | (counts != 1)
+    )
+    if np.any(invalid_sentinel):
+        fail("/events/spectroscopy/observations has an invalid sentinel range")
+
+    byte_popcount = np.unpackbits(
+        np.arange(256, dtype=np.uint8)[:, None], axis=1
+    ).sum(axis=1)
+    unique_channel_counts = byte_popcount[
+        channel_masks.view(np.uint8).reshape(parent_count, 8)
+    ].sum(axis=1)
+    if np.any(unique_channel_counts != valid_channel_counts):
+        fail("/events/spectroscopy/observations repeats a channel within an event")
+    if not np.array_equal(energy_masks, parents["channel_mask"]):
+        fail("/events/spectroscopy/observations energy masks do not match parents")
+
+
 def validate_references(handle):
     index = handle["events/index"][:]
     first_sequence = int(handle.attrs.get("first_event_sequence", 0))
@@ -300,49 +450,7 @@ def validate_references(handle):
     if unknown:
         fail(f"/events/index contains unknown kinds {sorted(unknown)}")
 
-    spectroscopy = handle["events/spectroscopy/events"][:]
-    observations = handle["events/spectroscopy/observations"]
-    validate_range(
-        "events/spectroscopy/observations", spectroscopy,
-        "observation_offset", "observation_count", observations,
-    )
-    if len(spectroscopy) and np.any(spectroscopy["observation_count"] == 0):
-        fail("/events/spectroscopy/events contains a row without an observation or sentinel")
-    observation_rows = observations[:]
-    spectroscopy_index = index[index["kind"] == 1]
-    for parent, event in enumerate(spectroscopy):
-        offset = int(event["observation_offset"])
-        end = offset + int(event["observation_count"])
-        rows = observation_rows[offset:end]
-        source = spectroscopy_index[spectroscopy_index["kind_row"] == parent]
-        if len(source) != 1:
-            fail(f"spectroscopy parent {parent} has no unique index row")
-        source = source[0]
-        for field in ("sequence", "chain", "node", "qualifier"):
-            if np.any(rows[field] != source[field]):
-                fail(f"/events/spectroscopy/observations repeats incorrect {field}")
-        for field in (
-            "trigger_id", "timestamp", "relative_timestamp_clock",
-            "time_reference", "validity",
-        ):
-            if np.any(rows[field] != event[field]):
-                fail(f"/events/spectroscopy/observations repeats incorrect {field}")
-        sentinels = rows["channel_valid"] == 0
-        if np.any(sentinels):
-            if len(rows) != 1 or not np.all(sentinels):
-                fail(f"spectroscopy parent {parent} has an invalid sentinel")
-            if rows[0]["has_energy"] or rows[0]["has_timing"]:
-                fail(f"spectroscopy parent {parent} sentinel carries data")
-            continue
-        channels = rows["channel"]
-        if np.any(channels > 63) or len(np.unique(channels)) != len(channels):
-            fail(f"spectroscopy parent {parent} has invalid or duplicate channels")
-        if np.any((rows["has_energy"] == 0) & (rows["has_timing"] == 0)):
-            fail(f"spectroscopy parent {parent} has an empty non-sentinel observation")
-        energy = rows["has_energy"] != 0
-        mask = sum(1 << int(channel) for channel in channels[energy])
-        if mask != int(event["channel_mask"]):
-            fail(f"spectroscopy parent {parent} energy mask does not match channel_mask")
+    validate_spectroscopy(handle, index)
     validate_range(
         "events/timing/hits", handle["events/timing/events"][:],
         "hit_offset", "hit_count", handle["events/timing/hits"],
