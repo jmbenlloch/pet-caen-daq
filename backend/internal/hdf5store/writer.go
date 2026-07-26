@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	SchemaVersion          = 1
+	SchemaVersion          = 2
 	KindSpectroscopy uint8 = 1
 	KindTiming       uint8 = 2
 	KindCounting     uint8 = 3
@@ -42,24 +42,36 @@ type indexRow struct {
 type spectroscopyRow struct {
 	TriggerID              uint64
 	Timestamp              uint64
-	Validity               uint8
-	RelativeTimestampClock uint32
 	ChannelMask            uint64
-	EnergyOffset           uint64
-	EnergyCount            uint32
-	TimingOffset           uint64
-	TimingCount            uint32
+	ObservationOffset      uint64
+	RelativeTimestampClock uint32
 	TimeReference          uint32
+	ObservationCount       uint32
+	Validity               uint8
 }
 
-type energyRow struct {
-	ParentRow     uint64
-	Channel       uint8
-	LowGain       uint16
-	HighGain      uint16
-	HasLowGain    uint8
-	HasHighGain   uint8
-	Discriminator uint8
+type observationRow struct {
+	Sequence               uint64
+	ParentRow              uint64
+	TriggerID              uint64
+	Timestamp              uint64
+	RelativeTimestampClock uint32
+	TimeReference          uint32
+	ToA                    uint32
+	LowGain                uint16
+	HighGain               uint16
+	ToT                    uint16
+	Chain                  uint8
+	Node                   uint8
+	Qualifier              uint8
+	Validity               uint8
+	Channel                uint8
+	ChannelValid           uint8
+	HasEnergy              uint8
+	HasLowGain             uint8
+	HasHighGain            uint8
+	Discriminator          uint8
+	HasTiming              uint8
 }
 
 type timingRow struct {
@@ -86,8 +98,7 @@ type Writer struct {
 	complete     *hdf5.Attribute
 	index        table
 	spectroscopy table
-	energies     table
-	timings      table
+	observations table
 	timingEvents table
 	timingHits   table
 	counting     table
@@ -210,10 +221,7 @@ func CreateWithMetadata(path string, metadata Metadata) (_ *Writer, err error) {
 	if w.spectroscopy.dataset, err = createTable(spectroscopy, "events", compoundSpectroscopy(), compression); err != nil {
 		return nil, err
 	}
-	if w.energies.dataset, err = createTable(spectroscopy, "energies", compoundEnergy(), compression); err != nil {
-		return nil, err
-	}
-	if w.timings.dataset, err = createTable(spectroscopy, "timings", compoundTiming(), compression); err != nil {
+	if w.observations.dataset, err = createTable(spectroscopy, "observations", compoundObservation(), compression); err != nil {
 		return nil, err
 	}
 	if w.timingEvents.dataset, err = createTable(timing, "events", compoundTimingEvent(), compression); err != nil {
@@ -325,9 +333,8 @@ func (w *Writer) AppendEvents(events []EventRecord) error {
 func (w *Writer) appendSpectroscopyBatch(events []EventRecord) error {
 	parents := make([]spectroscopyRow, 0, len(events))
 	indexes := make([]indexRow, 0, len(events))
-	var energies []energyRow
-	var timings []timingRow
-	energyBase, timingBase, parentBase := w.energies.length, w.timings.length, w.spectroscopy.length
+	var observations []observationRow
+	observationBase, parentBase := w.observations.length, w.spectroscopy.length
 	indexBase := w.index.length
 	for i, item := range events {
 		value := item.Event.Spectroscopy
@@ -337,23 +344,13 @@ func (w *Writer) appendSpectroscopyBatch(events []EventRecord) error {
 		if value.TriggerID != item.Wire.Descriptor.TriggerID || value.Timestamp != item.Wire.Descriptor.Timestamp {
 			return errors.New("typed spectroscopy identity does not match DT5215 descriptor")
 		}
-		energyCount, err := uint32Count("spectroscopy energies", len(value.Energies))
-		if err != nil {
-			return err
-		}
-		timingCount, err := uint32Count("spectroscopy timings", len(value.Timings))
-		if err != nil {
-			return err
-		}
 		parent := parentBase + uint64(i)
-		energyOffset, timingOffset := energyBase+uint64(len(energies)), timingBase+uint64(len(timings))
-		for _, value := range value.Energies {
-			energies = append(energies, energyRow{ParentRow: parent, Channel: value.Channel, LowGain: value.LowGain, HighGain: value.HighGain, HasLowGain: boolean(value.HasLowGain), HasHighGain: boolean(value.HasHighGain), Discriminator: boolean(value.Discriminator)})
+		sequence := w.sequenceBase + indexBase + uint64(i) + 1
+		observationOffset := observationBase + uint64(len(observations))
+		row := spectroscopyRow{
+			TriggerID: value.TriggerID, Timestamp: value.Timestamp, ChannelMask: value.ChannelMask,
+			ObservationOffset: observationOffset,
 		}
-		for _, value := range value.Timings {
-			timings = append(timings, timingRow{ParentRow: parent, Channel: value.Channel, ToA: value.ToA, ToT: value.ToT})
-		}
-		row := spectroscopyRow{TriggerID: value.TriggerID, Timestamp: value.Timestamp, ChannelMask: value.ChannelMask, EnergyOffset: energyOffset, EnergyCount: energyCount, TimingOffset: timingOffset, TimingCount: timingCount}
 		if value.RelativeTimestampClock != nil {
 			row.Validity |= 1
 			row.RelativeTimestampClock = *value.RelativeTimestampClock
@@ -362,15 +359,21 @@ func (w *Writer) appendSpectroscopyBatch(events []EventRecord) error {
 			row.Validity |= 2
 			row.TimeReference = *value.TimeReference
 		}
+		eventObservations, err := spectroscopyObservations(parent, sequence, item.Wire, row, value)
+		if err != nil {
+			return err
+		}
+		row.ObservationCount, err = uint32Count("spectroscopy observations", len(eventObservations))
+		if err != nil {
+			return err
+		}
+		observations = append(observations, eventObservations...)
 		parents = append(parents, row)
 		wire := item.Wire
-		indexes = append(indexes, indexRow{Sequence: w.sequenceBase + indexBase + uint64(i) + 1, Kind: KindSpectroscopy, KindRow: parent, Chain: wire.Chain, Node: wire.Descriptor.Node, Qualifier: wire.Descriptor.Qualifier, TriggerID: wire.Descriptor.TriggerID, Timestamp: wire.Descriptor.Timestamp, PayloadOffsetWords: wire.Descriptor.PayloadOffsetWords, PayloadSizeWords: wire.Descriptor.PayloadSizeWords, CRCError: boolean(wire.Descriptor.CRCError)})
+		indexes = append(indexes, indexRow{Sequence: sequence, Kind: KindSpectroscopy, KindRow: parent, Chain: wire.Chain, Node: wire.Descriptor.Node, Qualifier: wire.Descriptor.Qualifier, TriggerID: wire.Descriptor.TriggerID, Timestamp: wire.Descriptor.Timestamp, PayloadOffsetWords: wire.Descriptor.PayloadOffsetWords, PayloadSizeWords: wire.Descriptor.PayloadSizeWords, CRCError: boolean(wire.Descriptor.CRCError)})
 	}
-	if err := appendRows(&w.energies, energies); err != nil {
-		return fmt.Errorf("append spectroscopy energies: %w", err)
-	}
-	if err := appendRows(&w.timings, timings); err != nil {
-		return fmt.Errorf("append spectroscopy timings: %w", err)
+	if err := appendRows(&w.observations, observations); err != nil {
+		return fmt.Errorf("append spectroscopy observations: %w", err)
 	}
 	if err := appendRows(&w.spectroscopy, parents); err != nil {
 		return fmt.Errorf("append spectroscopy events: %w", err)
@@ -382,57 +385,69 @@ func (w *Writer) appendSpectroscopyBatch(events []EventRecord) error {
 }
 
 func (w *Writer) appendSpectroscopy(wire dt5215.StreamEvent, event dt5202.Event) error {
-	if event.Spectroscopy == nil {
-		return errors.New("spectroscopy event payload is missing")
+	return w.appendSpectroscopyBatch([]EventRecord{{Wire: wire, Event: event}})
+}
+
+func spectroscopyObservations(parent, sequence uint64, wire dt5215.StreamEvent, row spectroscopyRow, event *dt5202.SpectroscopyEvent) ([]observationRow, error) {
+	common := observationRow{
+		Sequence: sequence, ParentRow: parent, TriggerID: row.TriggerID, Timestamp: row.Timestamp,
+		RelativeTimestampClock: row.RelativeTimestampClock, TimeReference: row.TimeReference,
+		Chain: wire.Chain, Node: wire.Descriptor.Node, Qualifier: wire.Descriptor.Qualifier, Validity: row.Validity,
 	}
-	value := event.Spectroscopy
-	if value.TriggerID != wire.Descriptor.TriggerID || value.Timestamp != wire.Descriptor.Timestamp {
-		return errors.New("typed spectroscopy identity does not match DT5215 descriptor")
-	}
-	parent := w.spectroscopy.length
-	energyCount, err := uint32Count("spectroscopy energies", len(value.Energies))
-	if err != nil {
-		return err
-	}
-	timingCount, err := uint32Count("spectroscopy timings", len(value.Timings))
-	if err != nil {
-		return err
-	}
-	energies := make([]energyRow, len(value.Energies))
-	for i, item := range value.Energies {
-		energies[i] = energyRow{
-			ParentRow: parent, Channel: item.Channel, LowGain: item.LowGain, HighGain: item.HighGain,
-			HasLowGain: boolean(item.HasLowGain), HasHighGain: boolean(item.HasHighGain),
-			Discriminator: boolean(item.Discriminator),
+	timingIndex := [64]uint16{}
+	for index, timing := range event.Timings {
+		if timing.Channel >= 64 {
+			return nil, fmt.Errorf("spectroscopy timing channel %d out of range", timing.Channel)
 		}
+		if timingIndex[timing.Channel] != 0 {
+			return nil, fmt.Errorf("spectroscopy timing repeats channel %d", timing.Channel)
+		}
+		timingIndex[timing.Channel] = uint16(index + 1)
 	}
-	timings := make([]timingRow, len(value.Timings))
-	for i, item := range value.Timings {
-		timings[i] = timingRow{ParentRow: parent, Channel: item.Channel, ToA: item.ToA, ToT: item.ToT}
+	energySeen, timingSeen := [64]bool{}, [64]bool{}
+	observations := make([]observationRow, 0, len(event.Energies)+len(event.Timings))
+	for _, energy := range event.Energies {
+		if energy.Channel >= 64 {
+			return nil, fmt.Errorf("spectroscopy energy channel %d out of range", energy.Channel)
+		}
+		if energySeen[energy.Channel] {
+			return nil, fmt.Errorf("spectroscopy energy repeats channel %d", energy.Channel)
+		}
+		energySeen[energy.Channel] = true
+		observation := common
+		observation.Channel = energy.Channel
+		observation.ChannelValid = 1
+		observation.HasEnergy = 1
+		observation.LowGain = energy.LowGain
+		observation.HighGain = energy.HighGain
+		observation.HasLowGain = boolean(energy.HasLowGain)
+		observation.HasHighGain = boolean(energy.HasHighGain)
+		observation.Discriminator = boolean(energy.Discriminator)
+		if encoded := timingIndex[energy.Channel]; encoded != 0 {
+			timing := event.Timings[encoded-1]
+			observation.HasTiming = 1
+			observation.ToA = timing.ToA
+			observation.ToT = timing.ToT
+			timingSeen[energy.Channel] = true
+		}
+		observations = append(observations, observation)
 	}
-	if err := appendRows(&w.energies, energies); err != nil {
-		return fmt.Errorf("append spectroscopy energies: %w", err)
+	for _, timing := range event.Timings {
+		if timingSeen[timing.Channel] {
+			continue
+		}
+		observation := common
+		observation.Channel = timing.Channel
+		observation.ChannelValid = 1
+		observation.HasTiming = 1
+		observation.ToA = timing.ToA
+		observation.ToT = timing.ToT
+		observations = append(observations, observation)
 	}
-	if err := appendRows(&w.timings, timings); err != nil {
-		return fmt.Errorf("append spectroscopy timings: %w", err)
+	if len(observations) == 0 {
+		observations = append(observations, common)
 	}
-	row := spectroscopyRow{
-		TriggerID: value.TriggerID, Timestamp: value.Timestamp, ChannelMask: value.ChannelMask,
-		EnergyOffset: w.energies.length - uint64(len(energies)), EnergyCount: energyCount,
-		TimingOffset: w.timings.length - uint64(len(timings)), TimingCount: timingCount,
-	}
-	if value.RelativeTimestampClock != nil {
-		row.Validity |= 1
-		row.RelativeTimestampClock = *value.RelativeTimestampClock
-	}
-	if value.TimeReference != nil {
-		row.Validity |= 2
-		row.TimeReference = *value.TimeReference
-	}
-	if err := appendRows(&w.spectroscopy, []spectroscopyRow{row}); err != nil {
-		return fmt.Errorf("append spectroscopy event: %w", err)
-	}
-	return w.appendIndex(wire, KindSpectroscopy, parent)
+	return observations, nil
 }
 
 func (w *Writer) Close() error {
@@ -453,8 +468,7 @@ func (w *Writer) Close() error {
 		closeDataset(w.counting.dataset),
 		closeDataset(w.timingHits.dataset),
 		closeDataset(w.timingEvents.dataset),
-		closeDataset(w.timings.dataset),
-		closeDataset(w.energies.dataset),
+		closeDataset(w.observations.dataset),
 		closeDataset(w.spectroscopy.dataset),
 		closeDataset(w.index.dataset),
 		closeAttribute(w.complete),
@@ -704,27 +718,39 @@ func compoundSpectroscopy() *hdf5.CompoundType {
 	return mustCompound(unsafe.Sizeof(value), []field{
 		{"trigger_id", unsafe.Offsetof(value.TriggerID), hdf5.T_STD_U64LE},
 		{"timestamp", unsafe.Offsetof(value.Timestamp), hdf5.T_STD_U64LE},
-		{"validity", unsafe.Offsetof(value.Validity), hdf5.T_STD_U8LE},
-		{"relative_timestamp_clock", unsafe.Offsetof(value.RelativeTimestampClock), hdf5.T_STD_U32LE},
 		{"channel_mask", unsafe.Offsetof(value.ChannelMask), hdf5.T_STD_U64LE},
-		{"energy_offset", unsafe.Offsetof(value.EnergyOffset), hdf5.T_STD_U64LE},
-		{"energy_count", unsafe.Offsetof(value.EnergyCount), hdf5.T_STD_U32LE},
-		{"timing_offset", unsafe.Offsetof(value.TimingOffset), hdf5.T_STD_U64LE},
-		{"timing_count", unsafe.Offsetof(value.TimingCount), hdf5.T_STD_U32LE},
+		{"observation_offset", unsafe.Offsetof(value.ObservationOffset), hdf5.T_STD_U64LE},
+		{"relative_timestamp_clock", unsafe.Offsetof(value.RelativeTimestampClock), hdf5.T_STD_U32LE},
 		{"time_reference", unsafe.Offsetof(value.TimeReference), hdf5.T_STD_U32LE},
+		{"observation_count", unsafe.Offsetof(value.ObservationCount), hdf5.T_STD_U32LE},
+		{"validity", unsafe.Offsetof(value.Validity), hdf5.T_STD_U8LE},
 	})
 }
 
-func compoundEnergy() *hdf5.CompoundType {
-	var value energyRow
+func compoundObservation() *hdf5.CompoundType {
+	var value observationRow
 	return mustCompound(unsafe.Sizeof(value), []field{
+		{"sequence", unsafe.Offsetof(value.Sequence), hdf5.T_STD_U64LE},
 		{"parent_row", unsafe.Offsetof(value.ParentRow), hdf5.T_STD_U64LE},
-		{"channel", unsafe.Offsetof(value.Channel), hdf5.T_STD_U8LE},
+		{"trigger_id", unsafe.Offsetof(value.TriggerID), hdf5.T_STD_U64LE},
+		{"timestamp", unsafe.Offsetof(value.Timestamp), hdf5.T_STD_U64LE},
+		{"relative_timestamp_clock", unsafe.Offsetof(value.RelativeTimestampClock), hdf5.T_STD_U32LE},
+		{"time_reference", unsafe.Offsetof(value.TimeReference), hdf5.T_STD_U32LE},
+		{"toa", unsafe.Offsetof(value.ToA), hdf5.T_STD_U32LE},
 		{"low_gain", unsafe.Offsetof(value.LowGain), hdf5.T_STD_U16LE},
 		{"high_gain", unsafe.Offsetof(value.HighGain), hdf5.T_STD_U16LE},
+		{"tot", unsafe.Offsetof(value.ToT), hdf5.T_STD_U16LE},
+		{"chain", unsafe.Offsetof(value.Chain), hdf5.T_STD_U8LE},
+		{"node", unsafe.Offsetof(value.Node), hdf5.T_STD_U8LE},
+		{"qualifier", unsafe.Offsetof(value.Qualifier), hdf5.T_STD_U8LE},
+		{"validity", unsafe.Offsetof(value.Validity), hdf5.T_STD_U8LE},
+		{"channel", unsafe.Offsetof(value.Channel), hdf5.T_STD_U8LE},
+		{"channel_valid", unsafe.Offsetof(value.ChannelValid), hdf5.T_STD_U8LE},
+		{"has_energy", unsafe.Offsetof(value.HasEnergy), hdf5.T_STD_U8LE},
 		{"has_low_gain", unsafe.Offsetof(value.HasLowGain), hdf5.T_STD_U8LE},
 		{"has_high_gain", unsafe.Offsetof(value.HasHighGain), hdf5.T_STD_U8LE},
 		{"discriminator", unsafe.Offsetof(value.Discriminator), hdf5.T_STD_U8LE},
+		{"has_timing", unsafe.Offsetof(value.HasTiming), hdf5.T_STD_U8LE},
 	})
 }
 

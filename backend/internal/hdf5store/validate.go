@@ -63,11 +63,7 @@ func Validate(path string, requireComplete bool) error {
 	if err != nil {
 		return err
 	}
-	energies, err := readRows[energyRow](file, "events/spectroscopy/energies")
-	if err != nil {
-		return err
-	}
-	spectroscopyTimings, err := readRows[timingRow](file, "events/spectroscopy/timings")
+	observations, err := readRows[observationRow](file, "events/spectroscopy/observations")
 	if err != nil {
 		return err
 	}
@@ -124,6 +120,7 @@ func Validate(path string, requireComplete bool) error {
 	for kind, length := range kindLengths {
 		seen[kind] = make([]bool, length)
 	}
+	spectroscopySources := make([]indexRow, len(spectroscopy))
 	for row, item := range index {
 		if item.Sequence != firstSequence+uint64(row) {
 			return fmt.Errorf("events/index row %d has sequence %d", row, item.Sequence)
@@ -139,6 +136,9 @@ func Validate(path string, requireComplete bool) error {
 			return fmt.Errorf("events/index row %d repeats kind %d row %d", row, item.Kind, item.KindRow)
 		}
 		seen[item.Kind][item.KindRow] = true
+		if item.Kind == KindSpectroscopy {
+			spectroscopySources[item.KindRow] = item
+		}
 	}
 	for kind, rows := range seen {
 		for row, found := range rows {
@@ -148,28 +148,70 @@ func Validate(path string, requireComplete bool) error {
 		}
 	}
 
-	var energyCursor, spectroscopyTimingCursor uint64
+	var observationCursor uint64
 	for row, item := range spectroscopy {
-		if item.EnergyOffset != energyCursor || item.TimingOffset != spectroscopyTimingCursor {
-			return fmt.Errorf("spectroscopy row %d has non-contiguous child offsets", row)
+		if item.ObservationOffset != observationCursor {
+			return fmt.Errorf("spectroscopy row %d has non-contiguous observation offset", row)
 		}
-		if err := validateRange("spectroscopy energies", row, item.EnergyOffset, item.EnergyCount, len(energies)); err != nil {
+		if item.ObservationCount == 0 {
+			return fmt.Errorf("spectroscopy row %d has no observation or sentinel", row)
+		}
+		if err := validateRange("spectroscopy observations", row, item.ObservationOffset, item.ObservationCount, len(observations)); err != nil {
 			return err
 		}
-		if err := validateParents("spectroscopy energies", row, item.EnergyOffset, item.EnergyCount, energies, func(v energyRow) uint64 { return v.ParentRow }); err != nil {
+		if err := validateParents("spectroscopy observations", row, item.ObservationOffset, item.ObservationCount, observations, func(v observationRow) uint64 { return v.ParentRow }); err != nil {
 			return err
 		}
-		if err := validateRange("spectroscopy timings", row, item.TimingOffset, item.TimingCount, len(spectroscopyTimings)); err != nil {
-			return err
+		source := spectroscopySources[row]
+		var energyMask uint64
+		channels := [64]bool{}
+		start := item.ObservationOffset
+		stop := start + uint64(item.ObservationCount)
+		for offset := start; offset < stop; offset++ {
+			observation := observations[offset]
+			if observation.Sequence != source.Sequence || observation.Chain != source.Chain ||
+				observation.Node != source.Node || observation.Qualifier != source.Qualifier {
+				return fmt.Errorf("spectroscopy observation %d source identity does not match index", offset)
+			}
+			if observation.TriggerID != item.TriggerID || observation.Timestamp != item.Timestamp ||
+				observation.Validity != item.Validity ||
+				observation.RelativeTimestampClock != item.RelativeTimestampClock ||
+				observation.TimeReference != item.TimeReference {
+				return fmt.Errorf("spectroscopy observation %d event identity does not match parent", offset)
+			}
+			if observation.ChannelValid == 0 {
+				if item.ObservationCount != 1 || observation.HasEnergy != 0 || observation.HasTiming != 0 {
+					return fmt.Errorf("spectroscopy observation %d has invalid sentinel", offset)
+				}
+				continue
+			}
+			if observation.Channel >= 64 {
+				return fmt.Errorf("spectroscopy observation %d channel %d out of range", offset, observation.Channel)
+			}
+			if channels[observation.Channel] {
+				return fmt.Errorf("spectroscopy row %d repeats observation channel %d", row, observation.Channel)
+			}
+			channels[observation.Channel] = true
+			if observation.HasEnergy == 0 && observation.HasTiming == 0 {
+				return fmt.Errorf("spectroscopy observation %d has neither energy nor timing", offset)
+			}
+			if observation.HasEnergy != 0 {
+				energyMask |= uint64(1) << observation.Channel
+			} else if observation.LowGain != 0 || observation.HighGain != 0 ||
+				observation.HasLowGain != 0 || observation.HasHighGain != 0 || observation.Discriminator != 0 {
+				return fmt.Errorf("spectroscopy observation %d has energy values without energy validity", offset)
+			}
+			if observation.HasTiming == 0 && (observation.ToA != 0 || observation.ToT != 0) {
+				return fmt.Errorf("spectroscopy observation %d has timing values without timing validity", offset)
+			}
 		}
-		if err := validateParents("spectroscopy timings", row, item.TimingOffset, item.TimingCount, spectroscopyTimings, func(v timingRow) uint64 { return v.ParentRow }); err != nil {
-			return err
+		if energyMask != item.ChannelMask {
+			return fmt.Errorf("spectroscopy row %d energy mask 0x%x does not match parent mask 0x%x", row, energyMask, item.ChannelMask)
 		}
-		energyCursor += uint64(item.EnergyCount)
-		spectroscopyTimingCursor += uint64(item.TimingCount)
+		observationCursor += uint64(item.ObservationCount)
 	}
-	if energyCursor != uint64(len(energies)) || spectroscopyTimingCursor != uint64(len(spectroscopyTimings)) {
-		return fmt.Errorf("spectroscopy child datasets contain unreferenced rows")
+	if observationCursor != uint64(len(observations)) {
+		return fmt.Errorf("spectroscopy observations contain unreferenced rows")
 	}
 	var hitCursor uint64
 	for row, item := range timingEvents {
