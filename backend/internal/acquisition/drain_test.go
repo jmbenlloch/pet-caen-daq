@@ -29,6 +29,10 @@ func (h *scriptedDrainHardware) SendCommand(context.Context, uint16, uint16, uin
 	h.stops++
 	return h.stopErr
 }
+func (h *scriptedDrainHardware) SendSynchronizedCommand(context.Context, uint32) error {
+	h.stops++
+	return h.stopErr
+}
 func (h *scriptedDrainHardware) ReadRawStreamBatch(ctx context.Context) ([]byte, []dt5215.StreamEvent, error) {
 	if h.stall {
 		<-ctx.Done()

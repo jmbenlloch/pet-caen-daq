@@ -15,6 +15,7 @@ type TestPulseHardware interface {
 	ClearStream(context.Context) error
 	ControlChain(context.Context, uint16, bool, uint32) error
 	SendCommand(context.Context, uint16, uint16, uint32, uint32) error
+	SendSynchronizedCommand(context.Context, uint32) error
 	ReadRawStreamBatch(context.Context) ([]byte, []dt5215.StreamEvent, error)
 }
 type TestPulseSink interface {
@@ -40,13 +41,13 @@ func RunTestPulse(ctx context.Context, hardware TestPulseHardware, sink TestPuls
 			return fmt.Errorf("disable chain %d readout train: %w", chain, err)
 		}
 	}
-	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetTime, dt5215.TDLCommandDelay); err != nil {
+	if err = hardware.SendSynchronizedCommand(ctx, dt5215.CommandResetTime); err != nil {
 		return fmt.Errorf("reset acquisition time: %w", err)
 	}
-	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetPeriodic, dt5215.TDLCommandDelay); err != nil {
+	if err = hardware.SendSynchronizedCommand(ctx, dt5215.CommandResetPeriodic); err != nil {
 		return fmt.Errorf("reset periodic trigger: %w", err)
 	}
-	if err = hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, dt5215.TDLCommandDelay); err != nil {
+	if err = hardware.SendSynchronizedCommand(ctx, dt5215.CommandAcquisitionStart); err != nil {
 		return fmt.Errorf("start acquisition: %w", err)
 	}
 	for chain := 0; chain < expectedChains; chain++ {

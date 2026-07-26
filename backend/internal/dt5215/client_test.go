@@ -1,6 +1,7 @@
 package dt5215
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -92,6 +93,41 @@ func TestSendCommandRetriesTransientStatus(t *testing.T) {
 	}
 	if count := <-requests; count != 2 {
 		t.Fatalf("request count = %d, want 2", count)
+	}
+}
+
+func TestSendSynchronizedCommandStagesThenTriggers(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	client := &Client{control: clientConn}
+	requests := make(chan [][]byte, 1)
+	times := make(chan []time.Time, 1)
+	go func() {
+		dcmd := make([]byte, 20)
+		_, _ = io.ReadFull(serverConn, dcmd)
+		stagedAt := time.Now()
+		_, _ = serverConn.Write(make([]byte, 4))
+		cwrg := make([]byte, 12)
+		_, _ = io.ReadFull(serverConn, cwrg)
+		triggeredAt := time.Now()
+		_, _ = serverConn.Write(make([]byte, 4))
+		requests <- [][]byte{dcmd, cwrg}
+		times <- []time.Time{stagedAt, triggeredAt}
+	}()
+
+	if err := client.SendSynchronizedCommand(context.Background(), CommandResetPeriodic); err != nil {
+		t.Fatalf("SendSynchronizedCommand() error = %v", err)
+	}
+	got := <-requests
+	wantDCMD, _ := EncodeCommandRequest(true, 0xff, 0xff, CommandResetPeriodic, TDLSynchronizedCommandDelay)
+	wantCWRG := EncodeConcentratorWriteRegisterRequest(ConcentratorSyncSend, 1)
+	if !bytes.Equal(got[0], wantDCMD) || !bytes.Equal(got[1], wantCWRG) {
+		t.Fatalf("requests = %x, %x; want %x, %x", got[0], got[1], wantDCMD, wantCWRG)
+	}
+	stamps := <-times
+	if elapsed := stamps[1].Sub(stamps[0]); elapsed < tdlSynchronizedArmDelay {
+		t.Fatalf("sync trigger followed DCMD after %s, want at least %s", elapsed, tdlSynchronizedArmDelay)
 	}
 }
 
