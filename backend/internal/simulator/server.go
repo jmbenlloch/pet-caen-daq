@@ -88,6 +88,13 @@ type Server struct {
 	faults         []Fault
 	hvRampDuration time.Duration
 	now            func() time.Time
+	delayedCommand *delayedCommand
+}
+
+type delayedCommand struct {
+	chain   uint16
+	node    uint16
+	command uint32
 }
 
 func Start(controlAddress, streamAddress string, topology Topology) (*Server, error) {
@@ -354,7 +361,7 @@ func (s *Server) serveControl(connection net.Conn) {
 		case "WREG":
 			err = s.handleWriteRegister(writer)
 		case "FCMD", "DCMD":
-			err = s.handleCommand(writer)
+			err = s.handleCommand(writer, string(opcode) == "DCMD")
 		case "SNT0":
 			s.mu.Lock()
 			s.synchronized = true
@@ -423,6 +430,18 @@ func (s *Server) handleConcentratorWriteRegister(connection net.Conn) error {
 	request := make([]byte, 8)
 	if _, err := io.ReadFull(connection, request); err != nil {
 		return err
+	}
+	address := binary.LittleEndian.Uint32(request[0:4])
+	value := binary.LittleEndian.Uint32(request[4:8])
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if address == dt5215.ConcentratorSyncSend && value != 0 {
+		if s.delayedCommand == nil {
+			return writeStatus(connection, 10)
+		}
+		command := *s.delayedCommand
+		s.delayedCommand = nil
+		return writeStatus(connection, s.executeCommandLocked(command.chain, command.node, command.command))
 	}
 	return writeStatus(connection, 0)
 }
@@ -594,7 +613,7 @@ func (s *Server) handleWriteRegister(connection net.Conn) error {
 	}
 	return writeStatus(connection, 0)
 }
-func (s *Server) handleCommand(connection net.Conn) error {
+func (s *Server) handleCommand(connection net.Conn, delayed bool) error {
 	rest := make([]byte, 16)
 	if _, err := io.ReadFull(connection, rest); err != nil {
 		return err
@@ -604,6 +623,14 @@ func (s *Server) handleCommand(connection net.Conn) error {
 	command := binary.LittleEndian.Uint32(rest[4:])
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if delayed {
+		s.delayedCommand = &delayedCommand{chain: chain, node: node, command: command}
+		return writeStatus(connection, 0)
+	}
+	return writeStatus(connection, s.executeCommandLocked(chain, node, command))
+}
+
+func (s *Server) executeCommandLocked(chain, node uint16, command uint32) uint32 {
 	type target struct {
 		chain, node int
 		board       *Board
@@ -616,12 +643,12 @@ func (s *Server) handleCommand(connection net.Conn) error {
 			}
 		}
 	} else if chain >= dt5215.MaxChains || int(node) >= len(s.topology.Chains[chain]) {
-		return writeStatus(connection, 2)
+		return 2
 	} else {
 		targets = append(targets, target{int(chain), int(node), &s.topology.Chains[chain][node]})
 	}
 	if command == dt5215.CommandAcquisitionStart && !s.synchronized {
-		return writeStatus(connection, 10)
+		return 10
 	}
 	for _, target := range targets {
 		board := target.board
@@ -632,14 +659,14 @@ func (s *Server) handleCommand(connection net.Conn) error {
 				s.eventSequence++
 				batch, err := generatedBatch(uint8(target.chain), uint8(target.node), s.eventSequence, dt5202.QualifierService, board)
 				if err != nil {
-					return writeStatus(connection, 22)
+					return 22
 				}
 				item, drop := s.prepareStreamItem(batch, true, false)
 				if !drop {
 					select {
 					case s.streamData <- item:
 					default:
-						return writeStatus(connection, 11)
+						return 11
 					}
 				}
 			}
@@ -649,7 +676,7 @@ func (s *Server) handleCommand(connection net.Conn) error {
 				s.eventSequence++
 				batch, err := generatedBatch(uint8(target.chain), uint8(target.node), s.eventSequence, dt5202.QualifierService, board)
 				if err != nil {
-					return writeStatus(connection, 22)
+					return 22
 				}
 				item, drop := s.prepareStreamItem(batch, true, true)
 				if drop {
@@ -658,7 +685,7 @@ func (s *Server) handleCommand(connection net.Conn) error {
 				select {
 				case s.streamData <- item:
 				default:
-					return writeStatus(connection, 11)
+					return 11
 				}
 			}
 		case dt5215.CommandGlobalReset:
@@ -674,12 +701,12 @@ func (s *Server) handleCommand(connection net.Conn) error {
 			board.spi = flashReadState{}
 		case dt5215.CommandTestPulse:
 			if !dt5202.Status(board.Status).Has(dt5202.StatusRunning) {
-				return writeStatus(connection, 10)
+				return 10
 			}
 			s.eventSequence++
 			batch, err := generatedBatch(uint8(target.chain), uint8(target.node), s.eventSequence, 0, board)
 			if err != nil {
-				return writeStatus(connection, 22)
+				return 22
 			}
 			item, drop := s.prepareStreamItem(batch, false, false)
 			if drop {
@@ -688,17 +715,17 @@ func (s *Server) handleCommand(connection net.Conn) error {
 			select {
 			case s.streamData <- item:
 			default:
-				return writeStatus(connection, 11)
+				return 11
 			}
 		case dt5215.CommandResetTime, dt5215.CommandResetPeriodic, dt5215.CommandSoftwareTrigger, dt5215.CommandClearData, dt5215.CommandSync:
 		case uint32(dt5202.CommandConfigureASIC):
 			chip := (board.Registers[uint32(dt5202.CitirocSlowControl)] >> 9) & 1
 			board.CitirocLoads[chip]++
 		default:
-			return writeStatus(connection, 22)
+			return 22
 		}
 	}
-	return writeStatus(connection, 0)
+	return 0
 }
 func eventBatch(chain, node, qualifier uint8, sequence uint64, payload []byte) []byte {
 	return eventBatchAt(chain, node, qualifier, sequence, sequence, payload)

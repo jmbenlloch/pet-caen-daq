@@ -26,6 +26,9 @@ func (f *fakeHardware) SendCommand(_ context.Context, _, _ uint16, c, _ uint32) 
 	}
 	return nil
 }
+func (f *fakeHardware) SendSynchronizedCommand(ctx context.Context, command uint32) error {
+	return f.SendCommand(ctx, 0xff, 0xff, command, dt5215.TDLSynchronizedCommandDelay)
+}
 func TestRunTestPulsePreservesAcquisitionErrorWhenStopFails(t *testing.T) {
 	primary, stop := errors.New("stream disconnected"), errors.New("stop rejected")
 	hardware := &fakeHardware{readErr: primary, stopErr: stop}
