@@ -52,61 +52,40 @@ byte offsets.
 
 `/events/spectroscopy/events`:
 
-| trigger_id | timestamp | channel_mask | relative_clock | valid_bits | energy_offset | energy_count | timing_offset | timing_count | time_reference |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0 | 26865 | `0xffffffffffffffff` | 0 | `0b10` | 0 | 64 | 0 | 13 | 428870 |
-| 4 | 61124 | `0xffffffffffffffff` | 0 | `0b10` | 64 | 64 | 13 | 23 | 977014 |
-| 10 | 105400 | `0x0000000000000089` | 77 | `0b01` | 128 | 3 | 36 | 0 | 0 |
+| trigger_id | timestamp | channel_mask | observation_offset | relative_clock | time_reference | observation_count | validity |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 26865 | `0xffffffffffffffff` | 0 | 0 | 428870 | 64 | `0b10` |
+| 4 | 61124 | `0xffffffffffffffff` | 64 | 0 | 977014 | 64 | `0b10` |
+| 10 | 105400 | `0x0000000000000089` | 128 | 77 | 0 | 3 | `0b01` |
 
 For this example, validity bit 0 means `relative_clock` is present and bit 1
 means `time_reference` is present. The exact bit assignments become schema
 constants.
 
-The third row illustrates sparse energy readout for channels 0, 3, and 7 and
-an empty TDC child range. It is not from the retained real run.
+The third row illustrates sparse energy readout for channels 0, 3, and 7. It
+is not from the retained real run.
 
-### Energy children
+### Self-contained observations
 
-`/events/spectroscopy/energies`:
+`/events/spectroscopy/observations` merges energy and timing for the same
+event/channel and repeats the source and event identity needed for analysis:
 
-| parent_row | channel | low_gain | high_gain | has_low_gain | has_high_gain | discriminator |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 0 | 0 | 263 | 2225 | 1 | 1 | 1 |
-| 0 | 1 | 374 | 3673 | 1 | 1 | 1 |
-| 0 | 2 | 354 | 2164 | 1 | 1 | 1 |
-| 0 | 3 | 202 | 1688 | 1 | 1 | 0 |
-| … | … | … | … | … | … | … |
-| 0 | 63 | 371 | 3464 | 1 | 1 | 1 |
-| 1 | 0 | 437 | 3425 | 1 | 1 | 0 |
-| 1 | 1 | 166 | 140 | 1 | 1 | 0 |
+| sequence | parent_row | chain | node | channel | low_gain | high_gain | has_energy | toa | tot | has_timing |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 0 | 1 | 0 | 0 | 263 | 2225 | 1 | 0 | 0 | 0 |
+| 1 | 0 | 1 | 0 | 1 | 374 | 3673 | 1 | 0 | 0 | 0 |
+| 1 | 0 | 1 | 0 | 13 | 335 | 1550 | 1 | 903 | 0 | 1 |
+| 1 | 0 | 1 | 0 | 40 | 301 | 2077 | 1 | 869 | 0 | 1 |
+| 1 | 0 | 1 | 0 | 63 | 371 | 3464 | 1 | 861 | 0 | 1 |
 
-The first parent owns `energies[0:64]`. `discriminator` is the packed
-charge-discriminator/QD bit. It is not proof that the channel alone caused the
-board trigger.
+The first parent owns `observations[0:64]`. The complete table also contains
+the repeated trigger/timestamp/clock fields, gain-validity and discriminator
+flags, qualifier, validity, and `channel_valid`; see
+`docs/hdf5/spectroscopy-events.md`.
 
-`parent_row` is redundant with the parent range and may be omitted from the
-physical format. Retaining it improves direct inspection and integrity checks
-at a storage cost that should be measured.
-
-### TDC children attached to spectroscopy
-
-`/events/spectroscopy/timings`:
-
-| parent_row | channel | toa | tot |
-| ---: | ---: | ---: | ---: |
-| 0 | 63 | 861 | 0 |
-| 0 | 40 | 869 | 0 |
-| 0 | 13 | 903 | 0 |
-| 0 | 49 | 871 | 0 |
-| … | … | … | … |
-| 1 | 48 | 913 | 0 |
-| 1 | 52 | 918 | 0 |
-| 1 | 44 | 939 | 0 |
-
-These rows prove that accepted TDC measurements exist for the listed channels.
-They do not provide a general `TD asserted` bit. Analysis may derive
-`has_timing_hit`; absence of a row does not prove that the analog TD never
-crossed.
+An event with no channel data owns one sentinel row with
+`channel_valid = has_energy = has_timing = 0`. Ordinary rows have
+`channel_valid = 1` and at least one of `has_energy` or `has_timing`.
 
 ## Timing-only events
 

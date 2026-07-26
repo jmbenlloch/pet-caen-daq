@@ -86,7 +86,8 @@ func TestSessionFinalizesTypedEventsAndRawCapture(t *testing.T) {
 	identity := manifest.ExecutionIdentity
 	if len(identity.Topology.Boards) != 1 || identity.Topology.Boards[0].FirmwareRevision != 0x0708 ||
 		identity.Software.Revision != "abc123" || !identity.Software.Modified ||
-		identity.Storage.Format != expectedStorageFormat() || identity.Storage.WriterVersion != 1 ||
+		identity.Storage.Format != expectedStorageFormat() ||
+		identity.Storage.WriterVersion != storageIdentity(acquisition.RunOptions{}).WriterVersion ||
 		identity.Runtime.PipelineCapacity != 2 || identity.Runtime.BackpressurePolicy != "block" ||
 		!identity.Runtime.CaptureRaw || !identity.Runtime.JournalTransport {
 		t.Fatalf("execution identity = %+v", identity)

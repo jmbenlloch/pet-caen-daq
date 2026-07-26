@@ -532,7 +532,7 @@ These attributes are outside `/run`, but are required to interpret a segment:
 
 | Root attribute | Run-54 value | Meaning |
 | --- | ---: | --- |
-| `schema_version` | 1 | Physical decoded-event HDF5 schema |
+| `schema_version` | 2 | Physical decoded-event HDF5 schema |
 | `complete` | 1 | Segment finalized successfully |
 | `segment_index` | 0 | Zero-based segment number |
 | `first_event_sequence` | 1 | First global event sequence in this segment |

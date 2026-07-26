@@ -25,7 +25,7 @@ func TestSpectroscopyWriterCreatesTypedAppendableDatasets(t *testing.T) {
 		PayloadOffsetWords: 4, PayloadSizeWords: 18, CRCError: true,
 	}}
 	event := dt5202.Event{Kind: dt5202.EventSpectroscopy, Spectroscopy: &dt5202.SpectroscopyEvent{
-		TriggerID: 7, Timestamp: 26865, RelativeTimestampClock: &relative, ChannelMask: 5,
+		TriggerID: 7, Timestamp: 26865, RelativeTimestampClock: &relative, ChannelMask: 1,
 		Energies: []dt5202.Energy{{Channel: 0, LowGain: 263, HighGain: 2225, HasLowGain: true, HasHighGain: true, Discriminator: true}},
 		Timings:  []dt5202.Timing{{Channel: 2, ToA: 861, ToT: 12}}, TimeReference: &reference,
 	}}
@@ -65,13 +65,31 @@ func TestSpectroscopyWriterCreatesTypedAppendableDatasets(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got := parent[0]; got.Validity != 3 || got.RelativeTimestampClock != 99 ||
-		got.EnergyOffset != 0 || got.EnergyCount != 1 || got.TimingOffset != 0 ||
-		got.TimingCount != 1 || got.TimeReference != 428870 {
+		got.ObservationOffset != 0 || got.ObservationCount != 2 || got.TimeReference != 428870 {
 		t.Fatalf("spectroscopy row = %+v", got)
+	}
+	observations, err := file.OpenDataset("events/spectroscopy/observations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer observations.Close()
+	var rows [2]observationRow
+	if err := observations.Read(&rows); err != nil {
+		t.Fatal(err)
+	}
+	if got := rows[0]; got.Sequence != 1 || got.ParentRow != 0 || got.Chain != 1 || got.Node != 2 ||
+		got.Qualifier != 0x33 || got.Channel != 0 || got.ChannelValid != 1 || got.HasEnergy != 1 ||
+		got.LowGain != 263 || got.HighGain != 2225 || got.HasLowGain != 1 || got.HasHighGain != 1 ||
+		got.Discriminator != 1 || got.HasTiming != 0 {
+		t.Fatalf("energy observation = %+v", got)
+	}
+	if got := rows[1]; got.Channel != 2 || got.ChannelValid != 1 || got.HasEnergy != 0 ||
+		got.HasTiming != 1 || got.ToA != 861 || got.ToT != 12 {
+		t.Fatalf("timing-only observation = %+v", got)
 	}
 }
 
-func TestSpectroscopyBatchPreservesParentOffsetsAndIndexOrder(t *testing.T) {
+func TestSpectroscopyBatchPreservesObservationOffsetsAndIndexOrder(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "events.h5")
 	writer, err := Create(path)
 	if err != nil {
@@ -109,9 +127,25 @@ func TestSpectroscopyBatchPreservesParentOffsetsAndIndexOrder(t *testing.T) {
 	if err := parents.Read(&parentRows); err != nil {
 		t.Fatal(err)
 	}
-	if parentRows[0].EnergyOffset != 0 || parentRows[1].EnergyOffset != 1 ||
-		parentRows[0].TimingOffset != 0 || parentRows[1].TimingOffset != 1 {
+	if parentRows[0].ObservationOffset != 0 || parentRows[0].ObservationCount != 1 ||
+		parentRows[1].ObservationOffset != 1 || parentRows[1].ObservationCount != 1 {
 		t.Fatalf("parent offsets = %+v", parentRows)
+	}
+	observations, err := file.OpenDataset("events/spectroscopy/observations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer observations.Close()
+	var observationRows [2]observationRow
+	if err := observations.Read(&observationRows); err != nil {
+		t.Fatal(err)
+	}
+	if observationRows[0].Sequence != 1 || observationRows[0].ParentRow != 0 ||
+		observationRows[0].Channel != 0 || observationRows[0].HasEnergy != 1 ||
+		observationRows[0].HasTiming != 1 || observationRows[0].ToA != 300 ||
+		observationRows[1].Sequence != 2 || observationRows[1].ParentRow != 1 ||
+		observationRows[1].Channel != 1 || observationRows[1].ToA != 301 {
+		t.Fatalf("observations = %+v", observationRows)
 	}
 	index, err := file.OpenDataset("events/index")
 	if err != nil {
@@ -126,6 +160,44 @@ func TestSpectroscopyBatchPreservesParentOffsetsAndIndexOrder(t *testing.T) {
 		indexRows[1].Sequence != 2 || indexRows[1].KindRow != 1 ||
 		indexRows[0].TriggerID != 10 || indexRows[1].TriggerID != 11 {
 		t.Fatalf("index rows = %+v", indexRows)
+	}
+}
+
+func TestSpectroscopyWriterPreservesEmptyEventWithSentinel(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "events.h5")
+	writer, err := Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wire := dt5215.StreamEvent{Chain: 3, Descriptor: dt5215.Descriptor{
+		Node: 1, Qualifier: 0x01, TriggerID: 9, Timestamp: 10,
+	}}
+	event := dt5202.Event{Kind: dt5202.EventSpectroscopy, Spectroscopy: &dt5202.SpectroscopyEvent{
+		TriggerID: 9, Timestamp: 10,
+	}}
+	if err := writer.AppendEvent(wire, event); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	file, err := hdf5.OpenFile(path, hdf5.F_ACC_RDONLY)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	observations, err := file.OpenDataset("events/spectroscopy/observations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer observations.Close()
+	var rows [1]observationRow
+	if err := observations.Read(&rows); err != nil {
+		t.Fatal(err)
+	}
+	if got := rows[0]; got.Sequence != 1 || got.ParentRow != 0 || got.Chain != 3 || got.Node != 1 ||
+		got.ChannelValid != 0 || got.HasEnergy != 0 || got.HasTiming != 0 {
+		t.Fatalf("sentinel observation = %+v", got)
 	}
 }
 

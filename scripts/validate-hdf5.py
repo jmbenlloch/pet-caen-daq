@@ -68,15 +68,17 @@ REQUIRED_FIELDS = {
         "payload_size_words", "crc_error",
     ),
     "events/spectroscopy/events": (
-        "trigger_id", "timestamp", "validity", "relative_timestamp_clock",
-        "channel_mask", "energy_offset", "energy_count", "timing_offset",
-        "timing_count", "time_reference",
+        "trigger_id", "timestamp", "channel_mask", "observation_offset",
+        "relative_timestamp_clock", "time_reference", "observation_count",
+        "validity",
     ),
-    "events/spectroscopy/energies": (
-        "parent_row", "channel", "low_gain", "high_gain", "has_low_gain",
-        "has_high_gain", "discriminator",
+    "events/spectroscopy/observations": (
+        "sequence", "parent_row", "trigger_id", "timestamp",
+        "relative_timestamp_clock", "time_reference", "toa", "low_gain",
+        "high_gain", "tot", "chain", "node", "qualifier", "validity",
+        "channel", "channel_valid", "has_energy", "has_low_gain",
+        "has_high_gain", "discriminator", "has_timing",
     ),
-    "events/spectroscopy/timings": ("parent_row", "channel", "toa", "tot"),
     "events/timing/events": (
         "trigger_id", "timestamp", "time_reference", "hit_offset", "hit_count",
     ),
@@ -298,16 +300,49 @@ def validate_references(handle):
     if unknown:
         fail(f"/events/index contains unknown kinds {sorted(unknown)}")
 
+    spectroscopy = handle["events/spectroscopy/events"][:]
+    observations = handle["events/spectroscopy/observations"]
     validate_range(
-        "events/spectroscopy/energies",
-        handle["events/spectroscopy/events"][:], "energy_offset", "energy_count",
-        handle["events/spectroscopy/energies"],
+        "events/spectroscopy/observations", spectroscopy,
+        "observation_offset", "observation_count", observations,
     )
-    validate_range(
-        "events/spectroscopy/timings",
-        handle["events/spectroscopy/events"][:], "timing_offset", "timing_count",
-        handle["events/spectroscopy/timings"],
-    )
+    if len(spectroscopy) and np.any(spectroscopy["observation_count"] == 0):
+        fail("/events/spectroscopy/events contains a row without an observation or sentinel")
+    observation_rows = observations[:]
+    spectroscopy_index = index[index["kind"] == 1]
+    for parent, event in enumerate(spectroscopy):
+        offset = int(event["observation_offset"])
+        end = offset + int(event["observation_count"])
+        rows = observation_rows[offset:end]
+        source = spectroscopy_index[spectroscopy_index["kind_row"] == parent]
+        if len(source) != 1:
+            fail(f"spectroscopy parent {parent} has no unique index row")
+        source = source[0]
+        for field in ("sequence", "chain", "node", "qualifier"):
+            if np.any(rows[field] != source[field]):
+                fail(f"/events/spectroscopy/observations repeats incorrect {field}")
+        for field in (
+            "trigger_id", "timestamp", "relative_timestamp_clock",
+            "time_reference", "validity",
+        ):
+            if np.any(rows[field] != event[field]):
+                fail(f"/events/spectroscopy/observations repeats incorrect {field}")
+        sentinels = rows["channel_valid"] == 0
+        if np.any(sentinels):
+            if len(rows) != 1 or not np.all(sentinels):
+                fail(f"spectroscopy parent {parent} has an invalid sentinel")
+            if rows[0]["has_energy"] or rows[0]["has_timing"]:
+                fail(f"spectroscopy parent {parent} sentinel carries data")
+            continue
+        channels = rows["channel"]
+        if np.any(channels > 63) or len(np.unique(channels)) != len(channels):
+            fail(f"spectroscopy parent {parent} has invalid or duplicate channels")
+        if np.any((rows["has_energy"] == 0) & (rows["has_timing"] == 0)):
+            fail(f"spectroscopy parent {parent} has an empty non-sentinel observation")
+        energy = rows["has_energy"] != 0
+        mask = sum(1 << int(channel) for channel in channels[energy])
+        if mask != int(event["channel_mask"]):
+            fail(f"spectroscopy parent {parent} energy mask does not match channel_mask")
     validate_range(
         "events/timing/hits", handle["events/timing/events"][:],
         "hit_offset", "hit_count", handle["events/timing/hits"],
@@ -336,7 +371,7 @@ def validate_references(handle):
 
 def validate(path, require_complete):
     with h5py.File(path, "r") as handle:
-        if int(handle.attrs.get("schema_version", -1)) != 1:
+        if int(handle.attrs.get("schema_version", -1)) != 2:
             fail("unsupported or missing schema_version attribute")
         complete = int(handle.attrs.get("complete", -1))
         if complete not in (0, 1):

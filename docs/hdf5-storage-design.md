@@ -383,7 +383,8 @@ the latter from the former.
 
 The packed spectroscopy energy word contains an explicit QD bit, exposed as
 `energy.discriminator`. There is no equivalent primary TD boolean in the
-decoded spectroscopy format. A row in `spectroscopy/timings` proves that an
+decoded spectroscopy format. A row in `spectroscopy/observations` with
+`has_timing = 1` proves that an
 accepted TDC measurement was emitted for that channel; the absence of a row
 does not prove that the analog TD never crossed. A crossing might be masked,
 outside the reference window, suppressed by holdoff/dead time, or omitted by
@@ -478,7 +479,7 @@ retains compatibility with schema-version-1 artifacts whose dataset names are
 /
   attributes:
     format = "pet-caen-daq-hdf5"
-    schema_version = 1
+    schema_version = 2
     writer_version
     run_id
     complete = 0|1
@@ -487,8 +488,7 @@ retains compatibility with schema-version-1 artifacts whose dataset names are
     index                    # common envelope, one row per event
     spectroscopy/
       events                 # scalar header + child offsets/counts
-      energies               # flat Energy rows
-      timings                # flat Timing rows
+      observations           # self-contained channel energy/timing rows
     timing/
       events
       hits                   # flat Timing rows
