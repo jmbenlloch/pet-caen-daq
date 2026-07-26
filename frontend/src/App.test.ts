@@ -316,6 +316,27 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
+  it('shows hardware startup feedback while a start request is pending', async () => {
+    const api = dashboardApi()
+    vi.mocked(api.start).mockImplementation(() => new Promise(() => undefined))
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Start run')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('#system-heading').text()).toBe('Starting')
+    expect(wrapper.get('.run-now').text()).toContain('Starting run…')
+    expect(wrapper.get('.run-now').text()).toContain(
+      'synchronization recovery can take several seconds',
+    )
+    expect(wrapper.get('.backend-state').text()).toBe('Backend online')
+    wrapper.unmount()
+  })
+
   it('reports an active scan instead of saying there is no active run', async () => {
     const wrapper = mount(App, { props: { api: dashboardApi(SystemState.SCANNING) } })
     await flushPromises()

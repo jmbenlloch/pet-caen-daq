@@ -156,14 +156,23 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 			return c.failStartAttached(fmt.Errorf("disable chain %d readout train: %w", chain, err), actor, pipeline, journalAttached)
 		}
 	}
-	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetTime, dt5215.TDLCommandDelay); err != nil {
-		return c.failStartAttached(fmt.Errorf("reset acquisition time: %w", err), actor, pipeline, journalAttached)
-	}
-	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetPeriodic, dt5215.TDLCommandDelay); err != nil {
-		return c.failStartAttached(fmt.Errorf("reset periodic trigger: %w", err), actor, pipeline, journalAttached)
-	}
-	if err = c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, dt5215.TDLCommandDelay); err != nil {
-		return c.failStartAttached(fmt.Errorf("start acquisition: %w", err), actor, pipeline, journalAttached)
+	if err = c.sendStartCommands(ctx); err != nil {
+		if !dt5215.IsStatus(err, dt5215.StatusTimeout) {
+			return c.failStartAttached(err, actor, pipeline, journalAttached)
+		}
+		// A stopped DT5215 can retain apparently synchronized links while
+		// rejecting FCMD with status 26. Pay the expensive SNT0 cost only
+		// after observing that state, then retry the idempotent reset/start
+		// sequence once.
+		if syncErr := c.hardware.Synchronize(ctx); syncErr != nil {
+			return c.failStartAttached(fmt.Errorf("%w; synchronize after status 26: %v", err, syncErr), actor, pipeline, journalAttached)
+		}
+		c.mu.Lock()
+		c.synchronized = true
+		c.mu.Unlock()
+		if err = c.sendStartCommands(ctx); err != nil {
+			return c.failStartAttached(fmt.Errorf("retry after synchronization: %w", err), actor, pipeline, journalAttached)
+		}
 	}
 	for chain := 0; chain < c.expectedChains; chain++ {
 		if err = c.hardware.ControlChain(ctx, uint16(chain), true, 0x100); err != nil {
@@ -276,6 +285,19 @@ func (c *Coordinator) StopWithReason(ctx context.Context, actor, reason string) 
 	_, err := c.states.Move(StateReady, actor)
 	log.Printf("run_timing run_id=%s stage=ready total_stop_ms=%d error=%t", run.id, time.Since(stopStarted).Milliseconds(), err != nil)
 	return err
+}
+
+func (c *Coordinator) sendStartCommands(ctx context.Context) error {
+	if err := c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetTime, dt5215.TDLCommandDelay); err != nil {
+		return fmt.Errorf("reset acquisition time: %w", err)
+	}
+	if err := c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandResetPeriodic, dt5215.TDLCommandDelay); err != nil {
+		return fmt.Errorf("reset periodic trigger: %w", err)
+	}
+	if err := c.hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStart, dt5215.TDLCommandDelay); err != nil {
+		return fmt.Errorf("start acquisition: %w", err)
+	}
+	return nil
 }
 
 func (c *Coordinator) ActiveRunID() string {

@@ -19,6 +19,7 @@ const (
 
 	StatusOK            uint32 = 0
 	StatusChainDisabled uint32 = 25
+	StatusTimeout       uint32 = 26
 
 	RegisterFirmwareRevision  uint32 = 0x01000300
 	RegisterAcquisitionStatus uint32 = 0x01000304
