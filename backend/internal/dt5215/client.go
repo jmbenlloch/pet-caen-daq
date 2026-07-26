@@ -183,6 +183,42 @@ func (c *Client) ControlChain(ctx context.Context, chain uint16, enable bool, to
 	return DecodeStatusResponse("CCNT", response)
 }
 
+func (c *Client) WriteConcentratorRegister(ctx context.Context, address, value uint32) error {
+	response, err := c.exchange(ctx, EncodeConcentratorWriteRegisterRequest(address, value), 4)
+	if err != nil {
+		return fmt.Errorf("CWRG %d: %w", address, err)
+	}
+	return DecodeStatusResponse("CWRG", response)
+}
+
+// recoverTDL reproduces the connection-time sequence captured from JANUS.
+// It clears a DT5215 state in which CINF still succeeds but every board RREG
+// returns CNC status 26, so it must run before discovery reads board registers.
+func (c *Client) recoverTDL(ctx context.Context, chains []int) error {
+	for _, chain := range chains {
+		// FERSlib encodes the link number in the high byte of VR_SYNC_DELAY.
+		if err := c.WriteConcentratorRegister(ctx, VirtualRegisterSyncDelay, uint32(chain)<<24); err != nil {
+			return fmt.Errorf("set TDlink %d synchronization delay: %w", chain, err)
+		}
+	}
+	for _, chain := range chains {
+		if err := c.ControlChain(ctx, uint16(chain), false, 0); err != nil {
+			return fmt.Errorf("disable TDlink %d readout train for recovery: %w", chain, err)
+		}
+	}
+	for _, command := range []uint32{CommandSync, CommandResetTime, CommandResetPeriodic} {
+		if err := c.SendCommand(ctx, 0xff, 0xff, command, TDLCommandDelay); err != nil {
+			return fmt.Errorf("recover TDlinks with command 0x%02x: %w", command, err)
+		}
+	}
+	for _, chain := range chains {
+		if err := c.ControlChain(ctx, uint16(chain), true, 256); err != nil {
+			return fmt.Errorf("enable TDlink %d readout train after recovery: %w", chain, err)
+		}
+	}
+	return nil
+}
+
 func (c *Client) ReadRegister(ctx context.Context, chain, node uint16, address uint32) (uint32, error) {
 	request, err := EncodeReadRegisterRequest(chain, node, address)
 	if err != nil {
@@ -384,6 +420,18 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 				return Topology{}, err
 			}
 			topology.Chains[chain] = info
+		}
+	}
+
+	if initialize {
+		chains := make([]int, 0, len(expectedByChain))
+		for chain := 0; chain < MaxChains; chain++ {
+			if _, wanted := expectedByChain[chain]; wanted {
+				chains = append(chains, chain)
+			}
+		}
+		if err := c.recoverTDL(ctx, chains); err != nil {
+			return Topology{}, fmt.Errorf("recover DT5215 TDlinks before board discovery: %w", err)
 		}
 	}
 

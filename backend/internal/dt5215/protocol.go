@@ -24,6 +24,8 @@ const (
 	RegisterAcquisitionStatus uint32 = 0x01000304
 	RegisterProductID         uint32 = 0x01000400
 
+	VirtualRegisterSyncDelay uint32 = 23
+
 	CommandResetTime        uint32 = 0x11
 	CommandAcquisitionStart uint32 = 0x12
 	CommandAcquisitionStop  uint32 = 0x13
@@ -159,6 +161,14 @@ func EncodeChainControlRequest(chain uint16, enable bool, tokenInterval uint32) 
 	}
 	littleEndian.PutUint32(request[8:12], tokenInterval)
 	return request, nil
+}
+
+func EncodeConcentratorWriteRegisterRequest(address, value uint32) []byte {
+	request := make([]byte, 12)
+	copy(request, "CWRG")
+	littleEndian.PutUint32(request[4:8], address)
+	littleEndian.PutUint32(request[8:12], value)
+	return request
 }
 
 func DecodeEnumerateResponse(response []byte) (EnumerationInfo, error) {

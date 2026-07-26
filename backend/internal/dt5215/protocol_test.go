@@ -16,6 +16,9 @@ func TestEncodeRequestsGolden(t *testing.T) {
 		{"enumerate", func() ([]byte, error) { return EncodeEnumerateRequest(2) }, "454e554d0200"},
 		{"disable chain", func() ([]byte, error) { return EncodeChainControlRequest(2, false, 0) }, "43434e540200000000000000"},
 		{"enable chain", func() ([]byte, error) { return EncodeChainControlRequest(3, true, 0x100) }, "43434e540300010000010000"},
+		{"write concentrator register", func() ([]byte, error) {
+			return EncodeConcentratorWriteRegisterRequest(VirtualRegisterSyncDelay, 0x03000000), nil
+		}, "435752471700000000000003"},
 		{"read register", func() ([]byte, error) {
 			return EncodeReadRegisterRequest(1, 0, RegisterProductID)
 		}, "525245470100000000040001"},
