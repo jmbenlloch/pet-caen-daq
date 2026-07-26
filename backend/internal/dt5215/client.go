@@ -19,6 +19,7 @@ const (
 	enumOperationTimeout    = 10 * time.Second
 	syncOperationTimeout    = 10 * time.Second
 	tdlCommandDelayUnit     = 10 * time.Nanosecond
+	tdlCommandMaxAttempts   = 10
 )
 
 // Client owns one DT5215 control connection and one stream connection.
@@ -79,15 +80,24 @@ func (c *Client) sendCommand(ctx context.Context, delayed bool, chain, node uint
 	// the wait, a following command can be submitted while the previous one
 	// is still pending; real hardware has returned CNC_STATUS_TIMEOUT in that
 	// situation on the second consecutive run.
-	response, err := c.exchangeAfterWriteDelay(ctx, request, 4, time.Duration(delay)*tdlCommandDelayUnit)
 	op := "FCMD"
 	if delayed {
 		op = "DCMD"
 	}
-	if err != nil {
-		return fmt.Errorf("%s command 0x%02x: %w", op, command, err)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for attempt := 1; attempt <= tdlCommandMaxAttempts; attempt++ {
+		response, err := c.exchangeAfterWriteDelayWithTimeoutLocked(ctx, request, 4, time.Duration(delay)*tdlCommandDelayUnit, defaultOperationTimeout)
+		if err != nil {
+			return fmt.Errorf("%s command 0x%02x: %w", op, command, err)
+		}
+		if err := DecodeStatusResponse(op, response); err == nil {
+			return nil
+		} else if attempt == tdlCommandMaxAttempts {
+			return fmt.Errorf("%s command 0x%02x failed after %d attempts: %w", op, command, attempt, err)
+		}
 	}
-	return DecodeStatusResponse(op, response)
+	panic("unreachable")
 }
 func (c *Client) Synchronize(ctx context.Context) error {
 	return c.simpleWithTimeout(ctx, "SNT0", syncOperationTimeout)
@@ -208,6 +218,10 @@ func (c *Client) exchangeAfterWriteDelay(ctx context.Context, request []byte, re
 func (c *Client) exchangeAfterWriteDelayWithTimeout(ctx context.Context, request []byte, responseSize int, delay, timeout time.Duration) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	return c.exchangeAfterWriteDelayWithTimeoutLocked(ctx, request, responseSize, delay, timeout)
+}
+
+func (c *Client) exchangeAfterWriteDelayWithTimeoutLocked(ctx context.Context, request []byte, responseSize int, delay, timeout time.Duration) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

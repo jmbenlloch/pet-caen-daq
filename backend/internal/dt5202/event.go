@@ -334,7 +334,10 @@ func DecodeCounting(qualifier uint8, triggerID, timestamp uint64, payload []byte
 		e.RelativeTimestampClock = &v
 		p = p[4:]
 	}
-	seen := [66]bool{}
+	// FERSlib's source-confirmed behavior is last-value-wins when a counting
+	// payload contains the same channel more than once. Keep the typed event
+	// canonical (one Count per channel) while matching that behavior.
+	countIndex := [64]uint8{}
 	for len(p) > 0 {
 		word := binary.LittleEndian.Uint32(p)
 		p = p[4:]
@@ -343,18 +346,19 @@ func DecodeCounting(qualifier uint8, triggerID, timestamp uint64, payload []byte
 		if ch > 65 {
 			return CountingEvent{}, fmt.Errorf("counting channel %d out of range", ch)
 		}
-		if seen[ch] {
-			return CountingEvent{}, fmt.Errorf("duplicate counting channel %d", ch)
-		}
-		seen[ch] = true
 		switch ch {
 		case 64:
 			e.TORCount = value
 		case 65:
 			e.QORCount = value
 		default:
+			if index := countIndex[ch]; index != 0 {
+				e.Counts[index-1].Value = value
+				continue
+			}
 			e.ChannelMask |= uint64(1) << ch
 			e.Counts = append(e.Counts, Count{Channel: ch, Value: value})
+			countIndex[ch] = uint8(len(e.Counts))
 		}
 	}
 	return e, nil

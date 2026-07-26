@@ -105,6 +105,29 @@ func TestDecodeCountingGolden(t *testing.T) {
 	}
 }
 
+func TestDecodeCountingDuplicateChannelUsesLastValue(t *testing.T) {
+	e, err := DecodeEvent(QualifierCounting, 11, 12, words(
+		34<<24|123,
+		2<<24|456,
+		34<<24|789,
+		64<<24|100,
+		64<<24|200,
+		65<<24|300,
+		65<<24|400,
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.Counting.ChannelMask != 1<<34|1<<2 ||
+		len(e.Counting.Counts) != 2 ||
+		e.Counting.Counts[0] != (Count{34, 789}) ||
+		e.Counting.Counts[1] != (Count{2, 456}) ||
+		e.Counting.TORCount != 200 ||
+		e.Counting.QORCount != 400 {
+		t.Fatalf("counting event = %#v", e.Counting)
+	}
+}
+
 func TestDecodeWaveformGolden(t *testing.T) {
 	e, err := DecodeEvent(QualifierWaveform, 1, 2, words(0xa<<28|222<<14|111))
 	if err != nil {
@@ -167,7 +190,6 @@ func TestDecodeEventRejectsUnsupportedAndMalformed(t *testing.T) {
 		{"truncated timing", QualifierTiming, nil, "payload length"},
 		{"timing channel", QualifierTiming, words(0, 64<<25), "channel 64"},
 		{"too many timing hits", QualifierTiming, make([]byte, (MaxTimingHits+2)*4), "hit count"},
-		{"duplicate count", QualifierCounting, words(1<<24|1, 1<<24|2), "duplicate"},
 		{"bad count channel", QualifierCounting, words(66 << 24), "channel 66"},
 		{"truncated service HV", QualifierService, words(1 << 12), "HV section"},
 		{"service trailing", QualifierService, words(0, 1), "unexpected trailing"},
