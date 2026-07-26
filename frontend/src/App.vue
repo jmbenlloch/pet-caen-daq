@@ -374,7 +374,9 @@ const configuredStopPolicy = computed(() => {
 })
 
 const state = computed(() =>
-  daq.startingRun.value ? stateLabel[SystemState.STARTING] : stateLabel[daq.snapshot.value?.state ?? 0],
+  daq.startingRun.value
+    ? stateLabel[SystemState.STARTING]
+    : stateLabel[daq.snapshot.value?.state ?? 0],
 )
 const pipeline = computed(() => daq.snapshot.value?.pipeline)
 const pipelineBacklog = computed(() => {
@@ -874,7 +876,10 @@ onMounted(() => daq.connect())
             </div>
             <div v-else-if="daq.startingRun.value" class="run-now" role="status" aria-live="polite">
               <span><strong>Starting run…</strong></span>
-              <small>Waiting for hardware commands; synchronization recovery can take several seconds</small>
+              <small
+                >Waiting for hardware commands; synchronization recovery can take several
+                seconds</small
+              >
             </div>
             <div v-else class="run-now quiet" role="status">
               <span>No active run</span>
