@@ -189,6 +189,14 @@ configuration before connecting, and use the raw-configuration view if an
 external detector-position convention requires different logical board
 numbers.
 
+The same section provides a **Number of cards** control with limits 1–128,
+corresponding to eight DT5215 links with up to sixteen daisy-chained nodes per
+link. Removing cards truncates the highest logical board indices. Adding cards
+preserves every existing address and assigns unused nodes on the already-used
+links first, then unused links. Each generated `Open[board]` value remains
+individually editable. The DT5215 web interface must enable exactly the links
+referenced by the resulting configuration before connecting.
+
 Discovery does not enable persistent TDlinks, apply the JANUS configuration,
 change high voltage, or start acquisition. It is nevertheless a state-changing
 hardware operation because it resets, enumerates, and synchronizes enabled

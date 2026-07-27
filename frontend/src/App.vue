@@ -22,7 +22,9 @@ import {
   parameterActive,
   parameterScope,
   parseConfiguration,
+  maxConfiguredBoards,
   replaceIndexedConfigurationValues,
+  resizeConnectionConfiguration,
   setConfigurationValue,
   updateConfiguration,
   type ConfigurationField,
@@ -475,6 +477,10 @@ function useDiscoveredConnections() {
     'Open',
     discoveredConnections.value.map((connection) => connection.address),
   )
+}
+
+function setConfiguredCardCount(count: number) {
+  configurationDocument.value = resizeConnectionConfiguration(configurationDocument.value, count)
 }
 const severeDiagnostics = computed(() =>
   (daq.snapshot.value?.diagnostics ?? []).filter(
@@ -1106,6 +1112,49 @@ onMounted(() => daq.connect())
               <span>{{ visibleFields.length }} shown</span>
             </div>
             <div class="parameter-list">
+              <article
+                v-if="selectedSection === 'Connect'"
+                class="parameter-row configured-card-count"
+              >
+                <div class="parameter-copy">
+                  <label for="configured-card-count">Number of cards</label>
+                  <p>
+                    One logical board per Open entry. Additional cards use free daisy-chain
+                    addresses while preserving existing assignments.
+                  </p>
+                </div>
+                <div class="card-count-control">
+                  <button
+                    type="button"
+                    class="secondary"
+                    aria-label="Remove one card"
+                    :disabled="configuredBoardIndices.length <= 1"
+                    @click="setConfiguredCardCount(configuredBoardIndices.length - 1)"
+                  >
+                    −
+                  </button>
+                  <input
+                    id="configured-card-count"
+                    type="number"
+                    min="1"
+                    :max="maxConfiguredBoards"
+                    :value="configuredBoardIndices.length"
+                    @change="
+                      setConfiguredCardCount(Number(($event.target as HTMLInputElement).value))
+                    "
+                  />
+                  <button
+                    type="button"
+                    class="secondary"
+                    aria-label="Add one card"
+                    :disabled="configuredBoardIndices.length >= maxConfiguredBoards"
+                    @click="setConfiguredCardCount(configuredBoardIndices.length + 1)"
+                  >
+                    +
+                  </button>
+                  <small>1–{{ maxConfiguredBoards }}</small>
+                </div>
+              </article>
               <article
                 v-if="selectedSection === 'Connect' && discoveredConnections.length"
                 class="parameter-row discovered-connections"

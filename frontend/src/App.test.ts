@@ -354,6 +354,38 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
+  it('adds and removes configured cards within concentrator limits', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi(SystemState.DISCONNECTED) } })
+    await flushPromises()
+    const count = wrapper.get('#configured-card-count')
+    expect((count.element as HTMLInputElement).value).toBe('4')
+
+    await wrapper.get('[aria-label="Add one card"]').trigger('click')
+    expect((count.element as HTMLInputElement).value).toBe('5')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'View raw configuration')!
+      .trigger('click')
+    expect(
+      (
+        wrapper.get('textarea[aria-label="JANUS configuration source"]')
+          .element as HTMLTextAreaElement
+      ).value,
+    ).toContain('Open[4] usb:172.16.0.11:tdl:0:1')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Use parameter editor')!
+      .trigger('click')
+    await wrapper.get('[aria-label="Remove one card"]').trigger('click')
+    expect((wrapper.get('#configured-card-count').element as HTMLInputElement).value).toBe('4')
+    expect(wrapper.get('#configured-card-count').attributes()).toMatchObject({
+      min: '1',
+      max: '128',
+    })
+    wrapper.unmount()
+  })
+
   it('shows only the run action relevant to the current state', async () => {
     const api = dashboardApi()
     const wrapper = mount(App, { props: { api } })

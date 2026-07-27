@@ -29,6 +29,10 @@ export interface ConfigurationDocument {
   fields: ConfigurationField[]
 }
 
+export const maxTDLinkChains = 8
+export const maxTDLinkNodes = 16
+export const maxConfiguredBoards = maxTDLinkChains * maxTDLinkNodes
+
 const assignment =
   /^(\s*)([A-Za-z][A-Za-z0-9_]*)(?:\[([^\]]+)\])?(?:\[([^\]]+)\])?(\s+)(.*?)(\s*)(#.*)?$/
 
@@ -127,6 +131,53 @@ export function replaceIndexedConfigurationValues(
   const retained = lines.filter((_, index) => !removed.has(index))
   retained.splice(insertion, 0, ...values.map((value, index) => `${name}[${index}] ${value}`))
   return parseConfiguration(retained.join(newline))
+}
+
+export function resizeConnectionConfiguration(
+  document: ConfigurationDocument,
+  requestedCount: number,
+) {
+  if (
+    !Number.isInteger(requestedCount) ||
+    requestedCount < 1 ||
+    requestedCount > maxConfiguredBoards
+  )
+    return document
+  const configured = document.fields
+    .filter((field) => field.name === 'Open' && field.index !== undefined)
+    .sort((left, right) => Number(left.index) - Number(right.index))
+    .map((field) => field.value)
+  if (requestedCount <= configured.length)
+    return replaceIndexedConfigurationValues(document, 'Open', configured.slice(0, requestedCount))
+
+  const first = configured[0] ?? 'usb:127.0.0.1:tdl:0:0'
+  const marker = first.lastIndexOf(':tdl:')
+  const prefix = marker >= 0 ? first.slice(0, marker) : 'usb:127.0.0.1'
+  const used = new Set<string>()
+  const preferredChains: number[] = []
+  for (const value of configured) {
+    const match = value.match(/:tdl:(\d+):(\d+)$/)
+    if (!match) continue
+    used.add(`${Number(match[1])}:${Number(match[2])}`)
+    const chain = Number(match[1])
+    if (!preferredChains.includes(chain)) preferredChains.push(chain)
+  }
+  const otherChains = Array.from({ length: maxTDLinkChains }, (_, chain) => chain).filter(
+    (chain) => !preferredChains.includes(chain),
+  )
+  const values = [...configured]
+  for (const chains of [preferredChains, otherChains]) {
+    for (let node = 0; node < maxTDLinkNodes && values.length < requestedCount; node++) {
+      for (const chain of chains) {
+        const key = `${chain}:${node}`
+        if (used.has(key)) continue
+        used.add(key)
+        values.push(`${prefix}:tdl:${key}`)
+        if (values.length === requestedCount) break
+      }
+    }
+  }
+  return replaceIndexedConfigurationValues(document, 'Open', values)
 }
 
 export function parameterScope(field: ConfigurationField): 'global' | 'board' | 'channel' {

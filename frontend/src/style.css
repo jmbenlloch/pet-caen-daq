@@ -872,6 +872,28 @@ select:focus {
 .discovered-connections code {
   overflow-wrap: anywhere;
 }
+.card-count-control {
+  display: grid;
+  grid-template-columns: 38px minmax(70px, 100px) 38px;
+  align-items: center;
+  justify-content: start;
+  gap: 7px;
+}
+.card-count-control button {
+  min-height: 36px;
+  padding: 6px;
+  font-size: 1rem;
+}
+.card-count-control input {
+  width: 100%;
+  text-align: center;
+}
+.card-count-control small {
+  grid-column: 1 / -1;
+  color: #788ba3;
+  font-size: 0.65rem;
+  text-align: center;
+}
 .override {
   margin-left: 7px;
   padding: 2px 6px;
