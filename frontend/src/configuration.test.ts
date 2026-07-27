@@ -6,6 +6,7 @@ import {
   numericConstraint,
   numericError,
   setConfigurationValue,
+  replaceIndexedConfigurationValues,
   parseConfiguration,
   updateConfiguration,
 } from './configuration'
@@ -133,4 +134,20 @@ describe('JANUS configuration editor', () => {
     document = setConfigurationValue(document, 'TD_FineThreshold', 2, 17, undefined)
     expect(document.source).not.toContain('[2][17]')
   })
+})
+
+it('replaces indexed connection values while preserving the surrounding document', () => {
+  const source =
+    '# Connect\r\nOpen[0] usb:127.0.0.1:tdl:0:0\r\nOpen[1] usb:127.0.0.1:tdl:1:0\r\n# Run\r\nPresetTime 10\r\n'
+  const changed = replaceIndexedConfigurationValues(parseConfiguration(source), 'Open', [
+    'usb:127.0.0.1:tdl:0:0',
+    'usb:127.0.0.1:tdl:0:1',
+    'usb:127.0.0.1:tdl:1:0',
+  ])
+
+  expect(changed.source).toContain(
+    'Open[0] usb:127.0.0.1:tdl:0:0\r\nOpen[1] usb:127.0.0.1:tdl:0:1\r\nOpen[2] usb:127.0.0.1:tdl:1:0',
+  )
+  expect(changed.source).toContain('# Run\r\nPresetTime 10')
+  expect(changed.fields.filter((field) => field.name === 'Open')).toHaveLength(3)
 })

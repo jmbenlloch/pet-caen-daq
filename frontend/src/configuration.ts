@@ -107,6 +107,28 @@ export function setConfigurationValue(
   )
 }
 
+export function replaceIndexedConfigurationValues(
+  document: ConfigurationDocument,
+  name: string,
+  values: string[],
+) {
+  const matching = document.fields.filter(
+    (field) => field.name === name && field.index !== undefined && field.channel === undefined,
+  )
+  const newline = document.source.includes('\r\n') ? '\r\n' : '\n'
+  const lines = document.source.split(/\r?\n/)
+  const insertion = matching.length
+    ? Math.min(...matching.map((field) => field.line - 1))
+    : Math.max(
+        0,
+        lines.findIndex((line) => assignment.test(line)),
+      )
+  const removed = new Set(matching.map((field) => field.line - 1))
+  const retained = lines.filter((_, index) => !removed.has(index))
+  retained.splice(insertion, 0, ...values.map((value, index) => `${name}[${index}] ${value}`))
+  return parseConfiguration(retained.join(newline))
+}
+
 export function parameterScope(field: ConfigurationField): 'global' | 'board' | 'channel' {
   return janusParameterCatalog.get(field.name)?.scope ?? 'global'
 }

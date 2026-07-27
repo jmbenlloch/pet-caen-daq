@@ -13,6 +13,7 @@ import (
 type connectionControllerStub struct {
 	connectActor    string
 	disconnectActor string
+	discoverActor   string
 	connectErr      error
 }
 
@@ -23,6 +24,11 @@ func (s *connectionControllerStub) Connect(_ context.Context, actor string) erro
 
 func (s *connectionControllerStub) Disconnect(_ context.Context, actor string) error {
 	s.disconnectActor = actor
+	return nil
+}
+
+func (s *connectionControllerStub) Discover(_ context.Context, actor string) error {
+	s.discoverActor = actor
 	return nil
 }
 
@@ -83,5 +89,24 @@ func TestHardwareConnectionFailureIsFailedPrecondition(t *testing.T) {
 	_, err := service.ConnectHardware(context.Background(), connect.NewRequest(&daqv1.ConnectHardwareRequest{RequestedBy: "operator"}))
 	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("connect code = %v error=%v", connect.CodeOf(err), err)
+	}
+}
+
+func TestHardwareDiscoveryRequiresIdentityAndReturnsSnapshot(t *testing.T) {
+	publisher, _ := telemetry.NewPublisher("instance-a", &daqv1.TelemetrySnapshot{State: daqv1.SystemState_SYSTEM_STATE_DISCONNECTED}, nil)
+	controller := &connectionControllerStub{}
+	service := &SystemService{Source: publisher, Discovery: controller}
+	if _, err := service.DiscoverHardware(context.Background(), connect.NewRequest(&daqv1.DiscoverHardwareRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("missing identity code = %v", connect.CodeOf(err))
+	}
+	publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		snapshot.Chains = []*daqv1.Chain{{Index: 0, Enabled: true, Boards: []*daqv1.Board{{Node: 0}}}}
+	})
+	response, err := service.DiscoverHardware(context.Background(), connect.NewRequest(&daqv1.DiscoverHardwareRequest{RequestedBy: "operator"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controller.discoverActor != "operator" || len(response.Msg.GetSnapshot().GetChains()[0].GetBoards()) != 1 {
+		t.Fatalf("discovery response = %+v actor=%q", response.Msg, controller.discoverActor)
 	}
 }

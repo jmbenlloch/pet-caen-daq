@@ -132,7 +132,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		capacity: *pipelineCapacity, drainTimeout: *drainTimeout, authorizeHV: *authorizeHV,
 		publisher: publisher, output: output,
 	}
-	systemService := &service.SystemService{Source: publisher, ConfigurationTemplate: string(configuration), HV: runtime, Hardware: runtime}
+	systemService := &service.SystemService{Source: publisher, ConfigurationTemplate: string(configuration), HV: runtime, Hardware: runtime, Discovery: runtime}
 	runService := &service.RunService{
 		Controller: runtime, Telemetry: publisher, HardwareMetadata: runtime, RunParent: *runParent,
 		Configure: runtime.Configure,

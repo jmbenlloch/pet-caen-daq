@@ -423,6 +423,40 @@ func TestReadOnlyInspectionAcceptsReadyProductionTopology(t *testing.T) {
 	}
 }
 
+func TestEnabledLinkDiscoveryFindsEveryNode(t *testing.T) {
+	topology := simulator.ProductionTopology()
+	for chain := 0; chain < 4; chain++ {
+		template := topology.Chains[chain][0]
+		topology.Chains[chain] = []simulator.Board{template, template, template}
+	}
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", topology)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	discovered, err := client.DiscoverEnabledTopology(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(discovered.Boards) != 12 {
+		t.Fatalf("boards = %d, want 12", len(discovered.Boards))
+	}
+	for index, board := range discovered.Boards {
+		wantChain, wantNode := uint16(index/3), uint16(index%3)
+		if board.Chain != wantChain || board.Node != wantNode {
+			t.Fatalf("board %d = %d:%d, want %d:%d", index, board.Chain, board.Node, wantChain, wantNode)
+		}
+	}
+}
+
 func TestReadOnlyInspectionRejectsLinksRequiringInitialization(t *testing.T) {
 	topology := simulator.ProductionTopology()
 	for chain := 0; chain < 4; chain++ {

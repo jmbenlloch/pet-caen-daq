@@ -22,6 +22,7 @@ import {
   parameterActive,
   parameterScope,
   parseConfiguration,
+  replaceIndexedConfigurationValues,
   setConfigurationValue,
   updateConfiguration,
   type ConfigurationField,
@@ -435,6 +436,39 @@ const boards = computed(() =>
     })),
   ),
 )
+const discoveredConnections = computed(() => {
+  if (daq.snapshot.value?.state !== SystemState.DISCONNECTED) return []
+  const open = configurationDocument.value.fields.find(
+    (field) => field.name === 'Open' && field.index !== undefined,
+  )
+  const marker = open?.value.lastIndexOf(':tdl:') ?? -1
+  const prefix = marker >= 0 ? open!.value.slice(0, marker) : 'usb:127.0.0.1'
+  return (daq.snapshot.value?.chains ?? []).flatMap((chain) =>
+    chain.boards.map((board) => ({
+      chain: chain.index,
+      node: board.node,
+      address: `${prefix}:tdl:${chain.index}:${board.node}`,
+    })),
+  )
+})
+const discoveredConfigurationMatches = computed(() => {
+  const configured = configurationDocument.value.fields
+    .filter((field) => field.name === 'Open' && field.index !== undefined)
+    .sort((left, right) => Number(left.index) - Number(right.index))
+    .map((field) => field.value)
+  return (
+    configured.length === discoveredConnections.value.length &&
+    configured.every((value, index) => value === discoveredConnections.value[index]?.address)
+  )
+})
+
+function useDiscoveredConnections() {
+  configurationDocument.value = replaceIndexedConfigurationValues(
+    configurationDocument.value,
+    'Open',
+    discoveredConnections.value.map((connection) => connection.address),
+  )
+}
 const severeDiagnostics = computed(() =>
   (daq.snapshot.value?.diagnostics ?? []).filter(
     (item) => item.severity >= DiagnosticSeverity.WARNING,
@@ -819,6 +853,16 @@ onMounted(() => daq.connect())
               >
                 {{ hardwareActionLabel }}
               </button>
+              <button
+                v-if="backendOnline && hardwareDisconnected"
+                type="button"
+                class="connection-action"
+                :disabled="!daq.canDiscoverHardware.value"
+                title="Reset, enumerate, and synchronize enabled TDlinks without applying card configuration"
+                @click="daq.discoverHardware()"
+              >
+                Discover cards
+              </button>
             </div>
           </div>
           <div class="run-control">
@@ -1055,6 +1099,40 @@ onMounted(() => daq.connect())
               <span>{{ visibleFields.length }} shown</span>
             </div>
             <div class="parameter-list">
+              <article
+                v-if="selectedSection === 'Connect' && discoveredConnections.length"
+                class="parameter-row discovered-connections"
+                aria-label="Discovered card addresses"
+              >
+                <div class="parameter-copy">
+                  <label>Discovered cards</label>
+                  <p>
+                    Review the physical chain/node order before updating the logical board
+                    addresses.
+                  </p>
+                  <ol>
+                    <li
+                      v-for="(connection, board) in discoveredConnections"
+                      :key="connection.address"
+                    >
+                      <strong>Board {{ board }}</strong>
+                      <code>{{ connection.address }}</code>
+                    </li>
+                  </ol>
+                </div>
+                <button
+                  type="button"
+                  class="secondary use-discovered-connections"
+                  :disabled="discoveredConfigurationMatches"
+                  @click="useDiscoveredConnections"
+                >
+                  {{
+                    discoveredConfigurationMatches
+                      ? 'Addresses already in configuration'
+                      : 'Use discovered addresses'
+                  }}
+                </button>
+              </article>
               <article
                 v-for="field in visibleFields"
                 :key="field.id"

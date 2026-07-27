@@ -29,6 +29,7 @@ export interface DaqApi {
   telemetry(signal: AbortSignal): AsyncIterable<TelemetrySnapshot>
   connectHardware(requestedBy: string): Promise<TelemetrySnapshot>
   disconnectHardware(requestedBy: string): Promise<TelemetrySnapshot>
+  discoverHardware(requestedBy: string): Promise<TelemetrySnapshot>
   validate(configuration: string): Promise<{ valid: boolean; issues: ValidationIssue[] }>
   start(request: StartRunRequest): Promise<RunCommandResult>
   stop(request: StopRunRequest): Promise<RunCommandResult>
@@ -99,6 +100,11 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
     async disconnectHardware(requestedBy) {
       const response = await system.disconnectHardware({ requestedBy })
       if (!response.snapshot) throw new Error('Disconnect command returned no telemetry snapshot')
+      return response.snapshot
+    },
+    async discoverHardware(requestedBy) {
+      const response = await system.discoverHardware({ requestedBy })
+      if (!response.snapshot) throw new Error('Discovery command returned no telemetry snapshot')
       return response.snapshot
     },
     async start(request) {

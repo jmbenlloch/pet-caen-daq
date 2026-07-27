@@ -853,6 +853,25 @@ select:focus {
   font-size: 0.69rem;
   line-height: 1.35;
 }
+.discovered-connections ol {
+  display: grid;
+  gap: 5px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.discovered-connections li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 14px;
+}
+.discovered-connections li strong {
+  white-space: nowrap;
+}
+.discovered-connections code {
+  overflow-wrap: anywhere;
+}
 .override {
   margin-left: 7px;
   padding: 2px 6px;

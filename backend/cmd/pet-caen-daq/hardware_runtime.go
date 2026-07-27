@@ -49,6 +49,46 @@ type hardwareRuntime struct {
 	configured    acquisition.ConfigurationResult
 }
 
+func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
+	r.opMu.Lock()
+	defer r.opMu.Unlock()
+	r.mu.RLock()
+	connected := r.client != nil
+	r.mu.RUnlock()
+	if connected {
+		return fmt.Errorf("disconnect hardware before discovering cards")
+	}
+	r.publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		snapshot.State = daqv1.SystemState_SYSTEM_STATE_CONNECTING
+	})
+	discoveryCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(discoveryCtx, r.controlAddress, r.streamAddress)
+	if err != nil {
+		r.publishConnectFailure(err)
+		return err
+	}
+	defer client.Close()
+	topology, err := client.DiscoverEnabledTopology(discoveryCtx)
+	if err != nil {
+		r.publishConnectFailure(err)
+		return err
+	}
+	firmwareCtx, cancelFirmware := context.WithTimeout(ctx, 15*time.Second)
+	readHVModuleFirmware(firmwareCtx, client, &topology, r.output)
+	cancelFirmware()
+	printDiscoveredDevices(r.output, topology)
+	snapshot := topologySnapshot(topology)
+	snapshot.State = daqv1.SystemState_SYSTEM_STATE_DISCONNECTED
+	snapshot.Diagnostics = append(snapshot.Diagnostics, &daqv1.Diagnostic{
+		Severity: daqv1.DiagnosticSeverity_DIAGNOSTIC_SEVERITY_INFO,
+		Code:     "HARDWARE_DISCOVERY_COMPLETE",
+		Message:  fmt.Sprintf("discovered %d cards; requested by %s", len(topology.Boards), actor),
+	})
+	r.publisher.Publish(snapshot)
+	return nil
+}
+
 func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 	r.opMu.Lock()
 	defer r.opMu.Unlock()

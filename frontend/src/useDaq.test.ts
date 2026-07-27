@@ -52,6 +52,9 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
     disconnectHardware: vi
       .fn()
       .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.DISCONNECTED })),
+    discoverHardware: vi
+      .fn()
+      .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.DISCONNECTED })),
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
     start: vi.fn().mockResolvedValue({}),
     stop: vi.fn().mockResolvedValue({}),
@@ -164,6 +167,29 @@ describe('useDaq', () => {
     expect(api.disconnectHardware).toHaveBeenCalledWith('operator')
     expect(store.snapshot.value?.state).toBe(SystemState.DISCONNECTED)
     expect(store.connected.value).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('discovers cards while leaving hardware disconnected', async () => {
+    const discovered = create(TelemetrySnapshotSchema, {
+      state: SystemState.DISCONNECTED,
+      chains: [{ index: 0, enabled: true, boards: [{ node: 0 }, { node: 1 }] }],
+    })
+    const api = fakeApi({
+      snapshot: vi
+        .fn()
+        .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.DISCONNECTED })),
+      discoverHardware: vi.fn().mockResolvedValue(discovered),
+    })
+    const { store, wrapper } = mountStore(api)
+    void store.connect()
+    await vi.waitFor(() => expect(store.canDiscoverHardware.value).toBe(true))
+
+    await store.discoverHardware()
+
+    expect(api.discoverHardware).toHaveBeenCalledWith('operator')
+    expect(store.snapshot.value?.state).toBe(SystemState.DISCONNECTED)
+    expect(store.snapshot.value?.chains[0].boards).toHaveLength(2)
     wrapper.unmount()
   })
 
