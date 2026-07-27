@@ -12,6 +12,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
 )
 
 func TestRunRequiresConfigurationBeforeNetworkAccess(t *testing.T) {
@@ -63,6 +64,53 @@ func TestTopologySnapshotIncludesEnabledAndDisabledChains(t *testing.T) {
 	}
 	if snapshot.Chains[1].Enabled || snapshot.Chains[1].Health != daqv1.HealthStatus_HEALTH_STATUS_UNKNOWN {
 		t.Fatalf("disabled chain = %+v", snapshot.Chains[1])
+	}
+}
+
+func TestDiscoveredTopologyMustExactlyMatchStartupConfiguration(t *testing.T) {
+	snapshot := &daqv1.TelemetrySnapshot{Chains: []*daqv1.Chain{
+		{Index: 0, Boards: []*daqv1.Board{{Node: 0}, {Node: 1}}},
+		{Index: 1, Boards: []*daqv1.Board{{Node: 0}}},
+	}}
+	if !discoveredTopologyMatchesConfiguration(snapshot, []janusconfig.Connection{
+		{Board: 0, Chain: 0, Node: 0},
+		{Board: 1, Chain: 0, Node: 1},
+		{Board: 2, Chain: 1, Node: 0},
+	}) {
+		t.Fatal("matching topology was rejected")
+	}
+	if discoveredTopologyMatchesConfiguration(snapshot, []janusconfig.Connection{
+		{Board: 0, Chain: 0, Node: 0},
+		{Board: 1, Chain: 1, Node: 0},
+	}) {
+		t.Fatal("topology with an additional daisy-chain node was accepted")
+	}
+}
+
+func TestConnectionFailurePreservesLastDiscoveredTopology(t *testing.T) {
+	publisher, err := telemetry.NewPublisher("test", &daqv1.TelemetrySnapshot{
+		State:        daqv1.SystemState_SYSTEM_STATE_CONNECTING,
+		Concentrator: &daqv1.Concentrator{ProductId: 5215},
+		Chains: []*daqv1.Chain{{
+			Index: 0, Enabled: true, Boards: []*daqv1.Board{{Node: 0}, {Node: 1}},
+		}},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := &hardwareRuntime{publisher: publisher}
+	runtime.publishConnectFailure(errors.New("configuration expects 1 card"))
+
+	snapshot := publisher.Snapshot()
+	if snapshot.GetState() != daqv1.SystemState_SYSTEM_STATE_DISCONNECTED ||
+		snapshot.GetConcentrator().GetProductId() != 5215 ||
+		len(snapshot.GetChains()) != 1 ||
+		len(snapshot.GetChains()[0].GetBoards()) != 2 {
+		t.Fatalf("failure discarded discovered topology: %+v", snapshot)
+	}
+	if diagnostics := snapshot.GetDiagnostics(); len(diagnostics) != 1 ||
+		diagnostics[0].GetCode() != "HARDWARE_CONNECTION_FAILED" {
+		t.Fatalf("failure diagnostic = %+v", diagnostics)
 	}
 }
 

@@ -114,7 +114,7 @@ func auditHardware(setting *Setting, doc *janusconfig.Document, plans map[int]dt
 			setting.Status, setting.Reason = Rejected, fmt.Sprintf("no hardware plan for board %d", board)
 			return
 		}
-		if strings.HasPrefix(setting.Name, "DigitalProbe") && firmware[board]>>24 < 5 {
+		if strings.HasPrefix(setting.Name, "DigitalProbe") && setting.Requested != "OFF" && firmware[board]>>24 < 5 {
 			setting.Status, setting.Reason = Rejected, fmt.Sprintf("board %d firmware %#08x does not support firmware-5 digital-probe packing", board, firmware[board])
 			return
 		}

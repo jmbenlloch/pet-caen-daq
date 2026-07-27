@@ -6,6 +6,7 @@ import type { DaqApi } from './api'
 import {
   ConfigurationLayer,
   ConfigurationStage,
+  DiscoveryStage,
   HealthStatus,
   RunType,
   RunSummarySchema,
@@ -18,7 +19,7 @@ async function* pendingTelemetry() {
   await new Promise(() => undefined)
 }
 
-function dashboardApi(state = SystemState.READY): DaqApi {
+function dashboardApi(state = SystemState.READY, advertiseTopology = true): DaqApi {
   return {
     snapshot: vi.fn().mockResolvedValue(
       create(TelemetrySnapshotSchema, {
@@ -40,27 +41,29 @@ function dashboardApi(state = SystemState.READY): DaqApi {
             },
           ],
         },
-        chains: [
-          {
-            index: 0,
-            enabled: true,
-            health: HealthStatus.OK,
-            boards: [
+        chains: advertiseTopology
+          ? [
               {
-                node: 0,
-                productId: 5202,
-                fpgaFirmware: 0x800,
+                index: 0,
+                enabled: true,
                 health: HealthStatus.OK,
-                boardTemperatureC: 24.5,
+                boards: [
+                  {
+                    node: 0,
+                    productId: 5202,
+                    fpgaFirmware: 0x800,
+                    health: HealthStatus.OK,
+                    boardTemperatureC: 24.5,
+                  },
+                ],
               },
-            ],
-          },
-          {
-            index: 1,
-            enabled: false,
-            health: HealthStatus.UNKNOWN,
-          },
-        ],
+              {
+                index: 1,
+                enabled: false,
+                health: HealthStatus.UNKNOWN,
+              },
+            ]
+          : [],
       }),
     ),
     configurationTemplate: vi
@@ -305,7 +308,7 @@ describe('operator dashboard', () => {
   })
 
   it('offers discovered card addresses to the configuration editor', async () => {
-    const api = dashboardApi(SystemState.DISCONNECTED)
+    const api = dashboardApi(SystemState.DISCONNECTED, false)
     api.discoverHardware = vi.fn().mockResolvedValue(
       create(TelemetrySnapshotSchema, {
         state: SystemState.DISCONNECTED,
@@ -328,11 +331,14 @@ describe('operator dashboard', () => {
     await flushPromises()
 
     const proposal = wrapper.get('[aria-label="Discovered card addresses"]')
+    expect(proposal.get('details').attributes('open')).toBeDefined()
+    expect(proposal.get('summary').text()).toContain('Discovered devices')
+    expect(proposal.get('summary').text()).toContain('2 cards found')
     expect(proposal.text()).toContain('Board 0')
     expect(proposal.text()).toContain('usb:172.16.0.11:tdl:0:0')
     expect(proposal.text()).toContain('Board 1')
     expect(proposal.text()).toContain('usb:172.16.0.11:tdl:0:1')
-    await proposal.get('.use-discovered-connections').trigger('click')
+    expect(proposal.get('.use-discovered-connections').attributes('disabled')).toBeDefined()
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'View raw configuration')!
@@ -354,8 +360,61 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
-  it('adds and removes configured cards within concentrator limits', async () => {
+  it('hydrates connection entries from backend topology after a frontend reload', async () => {
     const wrapper = mount(App, { props: { api: dashboardApi(SystemState.DISCONNECTED) } })
+    await flushPromises()
+
+    expect((wrapper.get('#configured-card-count').element as HTMLInputElement).value).toBe('1')
+    expect(
+      wrapper.get('[aria-label="Discovered card addresses"]').get('details').attributes('open'),
+    ).toBeUndefined()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'View raw configuration')!
+      .trigger('click')
+    const source = (
+      wrapper.get('textarea[aria-label="JANUS configuration source"]')
+        .element as HTMLTextAreaElement
+    ).value
+    expect(source).toContain('Open[0] usb:172.16.0.11:tdl:0:0')
+    expect(source).not.toContain('Open[1]')
+    wrapper.unmount()
+  })
+
+  it('shows live card discovery progress', async () => {
+    const api = dashboardApi(SystemState.CONNECTING)
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        state: SystemState.CONNECTING,
+        discoveryProgress: {
+          stage: DiscoveryStage.READING_BOARDS,
+          active: true,
+          chain: 3,
+          node: 1,
+          chainsCompleted: 6,
+          chainsTotal: 6,
+          boardsDiscovered: 7,
+          boardsTotal: 12,
+          message: 'Reading TDlink 3 node 1 identity',
+        },
+      }),
+    )
+
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    const progress = wrapper.get('[aria-label="Card discovery progress"]')
+    expect(progress.text()).toContain('Read cards')
+    expect(progress.text()).toContain('7 / 12 cards')
+    expect(progress.text()).toContain('TDlink 3, node 1')
+    expect(progress.get('[aria-label="Board discovery progress"]').attributes('value')).toBe('7')
+  })
+
+  it('adds and removes configured cards within concentrator limits', async () => {
+    const wrapper = mount(App, {
+      props: { api: dashboardApi(SystemState.DISCONNECTED, false) },
+    })
     await flushPromises()
     const count = wrapper.get('#configured-card-count')
     expect((count.element as HTMLInputElement).value).toBe('4')
@@ -487,7 +546,7 @@ describe('operator dashboard', () => {
   })
 
   it('keeps the raw configuration hidden until explicitly requested', async () => {
-    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    const wrapper = mount(App, { props: { api: dashboardApi(SystemState.READY, false) } })
     await flushPromises()
 
     expect(wrapper.find('[aria-label="JANUS configuration source"]').exists()).toBe(false)
@@ -522,7 +581,7 @@ describe('operator dashboard', () => {
   })
 
   it('opens configuration on Connect and only offers search from All parameters', async () => {
-    const wrapper = mount(App, { props: { api: dashboardApi() } })
+    const wrapper = mount(App, { props: { api: dashboardApi(SystemState.READY, false) } })
     await flushPromises()
 
     expect(wrapper.get('.section-tabs [role="tab"][aria-selected="true"]').text()).toBe('Connect')
@@ -602,7 +661,8 @@ describe('operator dashboard', () => {
     expect(wrapper.get('#system-heading').text()).toBe('Ready')
     expect(wrapper.text()).toContain('1 enabled link')
     expect(wrapper.text()).not.toContain('2 enabled links')
-    expect(wrapper.text()).toContain('DT5202 · node 0')
+    expect(wrapper.text()).toContain('Board 0 · Chain 0 · Node 0')
+    expect(wrapper.text()).toContain('DT5202')
     expect(wrapper.text()).toContain('24.5 °C')
     expect(wrapper.get('#history-heading').text()).toBe('Run history')
     expect(wrapper.get('#statistics-heading').text()).toBe('Statistics')
@@ -679,7 +739,7 @@ describe('operator dashboard', () => {
   })
 
   it('searches run configuration with typed scoped predicates and clears results', async () => {
-    const api = dashboardApi()
+    const api = dashboardApi(SystemState.READY, false)
     vi.mocked(api.searchRuns).mockResolvedValue({
       runs: [create(RunSummarySchema, { runId: '40', eventCount: 120n })],
       nextPageToken: '',

@@ -318,6 +318,35 @@ message TelemetrySnapshot {
   ScanSummary latest_completed_scan = 14;
   HoldDelayScan current_hold_delay_scan = 15;
   ConfigurationProgress configuration_progress = 16;
+  DiscoveryProgress discovery_progress = 17;
+}
+
+// Reconnect-safe snapshot of hardware discovery.
+message DiscoveryProgress {
+  DiscoveryStage stage = 1;
+  bool active = 2;
+  optional uint32 chain = 3;
+  optional uint32 node = 4;
+  uint32 chains_completed = 5;
+  uint32 chains_total = 6;
+  uint32 boards_discovered = 7;
+  uint32 boards_total = 8;
+  string message = 9;
+  google.protobuf.Timestamp started_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+enum DiscoveryStage {
+  DISCOVERY_STAGE_UNSPECIFIED = 0;
+  DISCOVERY_STAGE_IDENTITY = 1;
+  DISCOVERY_STAGE_SCANNING_LINKS = 2;
+  DISCOVERY_STAGE_RESETTING_LINKS = 3;
+  DISCOVERY_STAGE_ENUMERATING_LINKS = 4;
+  DISCOVERY_STAGE_SYNCHRONIZING_LINKS = 5;
+  DISCOVERY_STAGE_RECOVERING_LINKS = 6;
+  DISCOVERY_STAGE_READING_BOARDS = 7;
+  DISCOVERY_STAGE_COMPLETE = 8;
+  DISCOVERY_STAGE_FAILED = 9;
 }
 
 // Reconnect-safe snapshot of the current or most recently completed hardware

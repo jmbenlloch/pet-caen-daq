@@ -47,6 +47,17 @@ describe('HV status panel', () => {
     expect(wrapper.get('[aria-label="HV summary: 1/4 on"]').text()).toBe('1/4 on')
   })
 
+  it('uses two balanced rows for large card topologies', () => {
+    const wrapper = mount(HvStatusPanel, {
+      props: { boards: Array.from({ length: 12 }, (_, index) => board(index, 'off')) },
+    })
+
+    const strip = wrapper.get('.hv-led-strip')
+    expect(strip.classes()).toContain('two-rows')
+    expect(strip.attributes('style')).toContain('--hv-columns: 6')
+    expect(strip.findAll('.hv-board-led')).toHaveLength(12)
+  })
+
   it('keeps ramp-up visible after the hardware ramp bit clears', () => {
     const rising = { ...board(0, 'on'), hvVoltageV: 17.7, hvRamping: false }
     const wrapper = mount(HvStatusPanel, { props: { boards: [rising] } })

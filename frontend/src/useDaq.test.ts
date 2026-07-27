@@ -149,6 +149,51 @@ describe('useDaq', () => {
     wrapper.unmount()
   })
 
+  it('keeps a command error visible while telemetry continues', async () => {
+    let publishTelemetry!: (snapshot: TelemetrySnapshot) => void
+    const telemetry = vi.fn(
+      () =>
+        ({
+          [Symbol.asyncIterator]() {
+            return {
+              next: () =>
+                new Promise<IteratorResult<TelemetrySnapshot>>((resolve) => {
+                  publishTelemetry = (snapshot) => resolve({ value: snapshot, done: false })
+                }),
+            }
+          },
+        }) as AsyncIterable<TelemetrySnapshot>,
+    )
+    const api = fakeApi({
+      telemetry,
+      start: vi
+        .fn()
+        .mockRejectedValue(
+          new Error(
+            '[failed_precondition] [CONFIGURATION_AUDIT_FAILED] line 2 DigitalProbe0: unsupported firmware',
+          ),
+        ),
+    })
+    const { store, wrapper } = mountStore(api)
+    void store.connect()
+    await vi.waitFor(() => expect(telemetry).toHaveBeenCalled())
+
+    await store.startRun({
+      configuration: 'Open[0] usb:host:tdl:0:0',
+      captureRaw: false,
+      journalTransport: false,
+      persistHistograms: false,
+      hdf5SegmentSizeMb: 500,
+      hdf5Compression: 'none',
+    })
+    expect(store.error.value).toContain('CONFIGURATION_AUDIT_FAILED')
+
+    publishTelemetry(create(TelemetrySnapshotSchema, { state: SystemState.READY }))
+    await vi.waitFor(() => expect(store.snapshot.value?.state).toBe(SystemState.READY))
+    expect(store.error.value).toContain('CONFIGURATION_AUDIT_FAILED')
+    wrapper.unmount()
+  })
+
   it('connects and disconnects hardware without stopping backend telemetry', async () => {
     const api = fakeApi({
       snapshot: vi

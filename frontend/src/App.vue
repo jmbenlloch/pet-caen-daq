@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { create } from '@bufbuild/protobuf'
 import defaultConfiguration from '../../test/fixtures/janus/config_same4_v3_good.txt?raw'
 import { createDaqApi, type DaqApi } from './api'
@@ -33,6 +33,7 @@ import {
   ConfigurationLayer,
   ConfigurationStage,
   DiagnosticSeverity,
+  DiscoveryStage,
   HealthStatus,
   RunType,
   SearchRunsRequestSchema,
@@ -80,6 +81,9 @@ const activeWorkspaceTab = ref<WorkspaceTab>('acquisition')
 const selectedSection = ref('Connect')
 const parameterSearch = ref('')
 const showRawConfiguration = ref(false)
+const discoveredDevicesOpen = ref(false)
+const connectionConfigurationTouched = ref(false)
+const connectionsHydratedFromBackend = ref(false)
 const activeMask = ref<{ low: ConfigurationField; high: ConfigurationField }>()
 const activeBoardField = ref<ConfigurationField>()
 const activeChannelField = ref<ConfigurationField>()
@@ -430,6 +434,11 @@ function toggleHardwareConnection() {
     void daq.disconnectHardware()
   }
 }
+
+async function discoverHardware() {
+  await daq.discoverHardware()
+  if (discoveredConnections.value.length) discoveredDevicesOpen.value = true
+}
 const enabledLinkCount = computed(
   () => daq.snapshot.value?.chains.filter((chain) => chain.enabled).length ?? 0,
 )
@@ -446,7 +455,6 @@ const boards = computed(() =>
   ),
 )
 const discoveredConnections = computed(() => {
-  if (daq.snapshot.value?.state !== SystemState.DISCONNECTED) return []
   const open = configurationDocument.value.fields.find(
     (field) => field.name === 'Open' && field.index !== undefined,
   )
@@ -471,7 +479,19 @@ const discoveredConfigurationMatches = computed(() => {
   )
 })
 
+watch(discoveredConnections, (connections) => {
+  if (connectionsHydratedFromBackend.value || !connections.length) return
+  connectionsHydratedFromBackend.value = true
+  if (connectionConfigurationTouched.value) return
+  configurationDocument.value = replaceIndexedConfigurationValues(
+    configurationDocument.value,
+    'Open',
+    connections.map((connection) => connection.address),
+  )
+})
+
 function useDiscoveredConnections() {
+  connectionConfigurationTouched.value = true
   configurationDocument.value = replaceIndexedConfigurationValues(
     configurationDocument.value,
     'Open',
@@ -480,6 +500,7 @@ function useDiscoveredConnections() {
 }
 
 function setConfiguredCardCount(count: number) {
+  connectionConfigurationTouched.value = true
   configurationDocument.value = resizeConnectionConfiguration(configurationDocument.value, count)
 }
 const severeDiagnostics = computed(() =>
@@ -533,13 +554,62 @@ const configurationOverallValue = computed(() => {
   if (!progress?.boardsTotal) return 0
   return Math.min(progress.boardsCompleted, progress.boardsTotal)
 })
+const discoveryProgress = computed(() => daq.snapshot.value?.discoveryProgress)
+watch(
+  () => discoveryProgress.value?.stage,
+  (stage) => {
+    if (stage === DiscoveryStage.COMPLETE) discoveredDevicesOpen.value = true
+  },
+)
+const discoveryProgressVisible = computed(
+  () =>
+    discoveryProgress.value !== undefined &&
+    discoveryProgress.value.stage !== DiscoveryStage.UNSPECIFIED,
+)
+const discoveryStageLabels: Partial<Record<DiscoveryStage, string>> = {
+  [DiscoveryStage.IDENTITY]: 'Identity',
+  [DiscoveryStage.SCANNING_LINKS]: 'Scan links',
+  [DiscoveryStage.RESETTING_LINKS]: 'Reset links',
+  [DiscoveryStage.ENUMERATING_LINKS]: 'Enumerate',
+  [DiscoveryStage.SYNCHRONIZING_LINKS]: 'Synchronize',
+  [DiscoveryStage.RECOVERING_LINKS]: 'Recover',
+  [DiscoveryStage.READING_BOARDS]: 'Read cards',
+  [DiscoveryStage.COMPLETE]: 'Complete',
+  [DiscoveryStage.FAILED]: 'Failed',
+}
+const discoveryStageSteps = [
+  DiscoveryStage.IDENTITY,
+  DiscoveryStage.SCANNING_LINKS,
+  DiscoveryStage.RESETTING_LINKS,
+  DiscoveryStage.ENUMERATING_LINKS,
+  DiscoveryStage.SYNCHRONIZING_LINKS,
+  DiscoveryStage.RECOVERING_LINKS,
+  DiscoveryStage.READING_BOARDS,
+]
+const discoveryStagePosition = computed(() =>
+  discoveryStageSteps.indexOf(discoveryProgress.value?.stage ?? 0),
+)
+const discoveryStageLabel = computed(
+  () => discoveryStageLabels[discoveryProgress.value?.stage ?? 0] ?? 'Preparing',
+)
+const discoveryCounterLabel = computed(() => {
+  const progress = discoveryProgress.value
+  if (!progress) return ''
+  if (progress.boardsTotal) return `${progress.boardsDiscovered} / ${progress.boardsTotal} cards`
+  if (progress.chainsTotal) return `${progress.chainsCompleted} / ${progress.chainsTotal} links`
+  return ''
+})
 
 async function loadConfiguration(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
-  if (file) configuration.value = await file.text()
+  if (file) {
+    connectionConfigurationTouched.value = true
+    configuration.value = await file.text()
+  }
 }
 
 function setField(field: ConfigurationField, value: string) {
+  if (field.name === 'Open') connectionConfigurationTouched.value = true
   configurationDocument.value = updateConfiguration(configurationDocument.value, field, value)
 }
 
@@ -872,7 +942,7 @@ onMounted(() => daq.connect())
                 class="connection-action"
                 :disabled="!daq.canDiscoverHardware.value"
                 title="Reset, enumerate, and synchronize enabled TDlinks without applying card configuration"
-                @click="daq.discoverHardware()"
+                @click="discoverHardware"
               >
                 Discover cards
               </button>
@@ -957,6 +1027,65 @@ onMounted(() => daq.connect())
           {{ diagnostic.code }} — {{ diagnostic.message }}
         </span>
       </div>
+
+      <section
+        v-if="discoveryProgressVisible && discoveryProgress"
+        class="configuration-progress-panel"
+        :class="{ failed: discoveryProgress.stage === DiscoveryStage.FAILED }"
+        role="status"
+        aria-live="polite"
+        aria-label="Card discovery progress"
+      >
+        <div class="configuration-progress-heading">
+          <div>
+            <span class="eyebrow">Hardware discovery</span>
+            <strong>{{ discoveryStageLabel }}</strong>
+          </div>
+          <span class="configuration-progress-board">{{ discoveryCounterLabel }}</span>
+        </div>
+        <ol
+          v-if="discoveryProgress.stage !== DiscoveryStage.FAILED"
+          class="configuration-progress-steps discovery-progress-steps"
+          aria-label="Discovery stages"
+        >
+          <li
+            v-for="(stage, index) in discoveryStageSteps"
+            :key="stage"
+            :class="{
+              current: index === discoveryStagePosition,
+              complete:
+                discoveryProgress.stage === DiscoveryStage.COMPLETE ||
+                index < discoveryStagePosition,
+            }"
+          >
+            {{ discoveryStageLabels[stage] }}
+          </li>
+        </ol>
+        <div class="configuration-progress-detail">
+          <span>{{ discoveryProgress.message || 'Discovering cards' }}</span>
+          <span>{{ discoveryCounterLabel }}</span>
+        </div>
+        <progress
+          v-if="discoveryProgress.boardsTotal"
+          :value="discoveryProgress.boardsDiscovered"
+          :max="discoveryProgress.boardsTotal"
+          aria-label="Board discovery progress"
+        />
+        <progress
+          v-else-if="discoveryProgress.chainsTotal"
+          :value="discoveryProgress.chainsCompleted"
+          :max="discoveryProgress.chainsTotal"
+          aria-label="TDlink scan progress"
+        />
+        <div class="configuration-progress-meta">
+          <span v-if="discoveryProgress.chain !== undefined">
+            TDlink {{ discoveryProgress.chain
+            }}<template v-if="discoveryProgress.node !== undefined"
+              >, node {{ discoveryProgress.node }}</template
+            >
+          </span>
+        </div>
+      </section>
 
       <section
         v-if="configurationProgressVisible && configurationProgress"
@@ -1160,34 +1289,48 @@ onMounted(() => daq.connect())
                 class="parameter-row discovered-connections"
                 aria-label="Discovered card addresses"
               >
-                <div class="parameter-copy">
-                  <label>Discovered cards</label>
-                  <p>
-                    Review the physical chain/node order before updating the logical board
-                    addresses.
-                  </p>
-                  <ol>
-                    <li
-                      v-for="(connection, board) in discoveredConnections"
-                      :key="connection.address"
-                    >
-                      <strong>Board {{ board }}</strong>
-                      <code>{{ connection.address }}</code>
-                    </li>
-                  </ol>
-                </div>
-                <button
-                  type="button"
-                  class="secondary use-discovered-connections"
-                  :disabled="discoveredConfigurationMatches"
-                  @click="useDiscoveredConnections"
+                <details
+                  :open="discoveredDevicesOpen"
+                  @toggle="
+                    discoveredDevicesOpen = ($event.currentTarget as HTMLDetailsElement).open
+                  "
                 >
-                  {{
-                    discoveredConfigurationMatches
-                      ? 'Addresses already in configuration'
-                      : 'Use discovered addresses'
-                  }}
-                </button>
+                  <summary>
+                    <span>
+                      <strong>Discovered devices</strong>
+                      <small>{{ discoveredConnections.length }} cards found</small>
+                    </span>
+                  </summary>
+                  <div class="discovered-connections-content">
+                    <div class="parameter-copy">
+                      <p>
+                        Review the physical chain/node order before updating the logical board
+                        addresses.
+                      </p>
+                      <ol>
+                        <li
+                          v-for="(connection, board) in discoveredConnections"
+                          :key="connection.address"
+                        >
+                          <strong>Board {{ board }}</strong>
+                          <code>{{ connection.address }}</code>
+                        </li>
+                      </ol>
+                    </div>
+                    <button
+                      type="button"
+                      class="secondary use-discovered-connections"
+                      :disabled="discoveredConfigurationMatches"
+                      @click="useDiscoveredConnections"
+                    >
+                      {{
+                        discoveredConfigurationMatches
+                          ? 'Addresses already in configuration'
+                          : 'Use discovered addresses'
+                      }}
+                    </button>
+                  </div>
+                </details>
               </article>
               <article
                 v-for="field in visibleFields"
@@ -1900,8 +2043,10 @@ onMounted(() => daq.connect())
           <article v-for="board in boards" :key="`${board.chain}-${board.node}`" class="board-card">
             <div class="board-title">
               <div>
-                <span>Board {{ board.logicalIndex }} · Chain {{ board.chain }}</span
-                ><strong>DT5202 · node {{ board.node }}</strong>
+                <span
+                  >Board {{ board.logicalIndex }} · Chain {{ board.chain }} · Node
+                  {{ board.node }}</span
+                ><strong>DT5202</strong>
               </div>
               <span class="health-pill" :class="healthLabel[board.health].toLowerCase()">{{
                 healthLabel[board.health]

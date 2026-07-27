@@ -180,9 +180,18 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		_ = server.Shutdown(shutdownCtx)
 	}()
 	fmt.Fprintf(output, "PET CAEN DAQ instance=%s listen=%s state=ready hv_authorized=%t frontend=%t\n", publisher.Snapshot().GetInstanceId(), listener.Addr(), *authorizeHV, *frontendDirectory != "")
-	// Serve the API immediately while the capture-verified discovery sequence
-	// runs in the background. Failure is non-fatal and can be retried via RPC.
+	// Serve the API immediately while topology discovery runs in the background.
+	// Startup discovery must not apply the bundled configuration: its Open entries
+	// are only a template and may not match the cards currently daisy-chained.
 	go func() {
+		if discoveryErr := runtime.Discover(ctx, "backend_startup"); discoveryErr != nil {
+			fmt.Fprintf(output, "initial hardware discovery failed: %v\n", discoveryErr)
+			return
+		}
+		if !discoveredTopologyMatchesConfiguration(publisher.Snapshot(), connections) {
+			fmt.Fprintln(output, "initial hardware discovery differs from startup configuration; waiting for operator connection")
+			return
+		}
 		if connectErr := runtime.Connect(ctx, "backend_startup", ""); connectErr != nil {
 			fmt.Fprintf(output, "initial hardware connection failed: %v\n", connectErr)
 		}
@@ -195,6 +204,24 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	stopServer()
 	<-shutdownDone
 	return err
+}
+
+func discoveredTopologyMatchesConfiguration(snapshot *daqv1.TelemetrySnapshot, connections []janusconfig.Connection) bool {
+	discovered := make(map[[2]uint16]struct{})
+	for _, chain := range snapshot.GetChains() {
+		for _, board := range chain.GetBoards() {
+			discovered[[2]uint16{uint16(chain.GetIndex()), uint16(board.GetNode())}] = struct{}{}
+		}
+	}
+	if len(discovered) != len(connections) {
+		return false
+	}
+	for _, connection := range connections {
+		if _, ok := discovered[[2]uint16{uint16(connection.Chain), uint16(connection.Node)}]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func executionIdentity(topology dt5215.Topology, connections []janusconfig.Connection, controlAddress, streamAddress string) runstore.ExecutionIdentity {

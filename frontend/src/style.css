@@ -589,6 +589,9 @@ main {
   padding: 0;
   list-style: none;
 }
+.configuration-progress-steps.discovery-progress-steps {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
 .configuration-progress-steps li {
   overflow: hidden;
   padding: 5px 7px;
@@ -852,6 +855,34 @@ select:focus {
   color: #788ba3;
   font-size: 0.69rem;
   line-height: 1.35;
+}
+.discovered-connections {
+  display: block;
+}
+.discovered-connections details {
+  width: 100%;
+}
+.discovered-connections summary {
+  cursor: pointer;
+  color: #dce7f4;
+}
+.discovered-connections summary span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.discovered-connections summary strong {
+  font-size: 0.79rem;
+}
+.discovered-connections summary small {
+  color: #788ba3;
+}
+.discovered-connections-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 20px;
+  padding-top: 8px;
 }
 .discovered-connections ol {
   display: grid;
@@ -1268,6 +1299,11 @@ select:focus {
   display: flex;
   gap: 11px;
   margin-top: 9px;
+}
+.hv-led-strip.two-rows {
+  display: grid;
+  grid-template-columns: repeat(var(--hv-columns), max-content);
+  row-gap: 7px;
 }
 .hv-board-led {
   display: inline-flex;
