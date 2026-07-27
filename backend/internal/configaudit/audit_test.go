@@ -2,6 +2,7 @@ package configaudit
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
@@ -76,6 +77,11 @@ func TestProductionAuditAccountsForEveryAssignment(t *testing.T) {
 
 func TestAuditRejectsFirmwareBeforeDigitalProbePacking(t *testing.T) {
 	doc, plans := loadProduction(t)
+	for index := range doc.Assignments {
+		if doc.Assignments[index].Name == "DigitalProbe0" {
+			doc.Assignments[index].Value = "Q_OR"
+		}
+	}
 	boards := []BoardEvidence{
 		{Board: 0, FirmwareRevision: 0x04000000},
 		{Board: 1, FirmwareRevision: 0x08000000},
@@ -95,4 +101,20 @@ func TestAuditRejectsFirmwareBeforeDigitalProbePacking(t *testing.T) {
 		}
 	}
 	t.Fatal("missing rejected digital-probe record")
+}
+
+func TestAuditAllowsDisabledDigitalProbesOnOlderFirmware(t *testing.T) {
+	document, err := janusconfig.Parse(strings.NewReader("Open[0] usb:host:tdl:0:0\nDigitalProbe0 OFF\nDigitalProbe1 OFF\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	report, err := Build(document, []dt5202.ConfigurationPlan{{Board: 0}}, []BoardEvidence{{
+		Board: 0, FirmwareRevision: 0x04000000,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Valid {
+		t.Fatalf("disabled digital probes must be valid on older firmware: %+v", report.Settings)
+	}
 }

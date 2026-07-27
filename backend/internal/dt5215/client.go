@@ -2,6 +2,7 @@ package dt5215
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -21,6 +22,7 @@ const (
 	syncOperationTimeout    = 10 * time.Second
 	tdlCommandDelayUnit     = 10 * time.Nanosecond
 	tdlCommandMaxAttempts   = 10
+	enumMaxAttempts         = 5
 	tdlSyncDelaySetting     = 0x16
 	tdlSyncAdjustment       = 0x00010000
 )
@@ -172,6 +174,46 @@ func (c *Client) Enumerate(ctx context.Context, chain uint16) (EnumerationInfo, 
 		return EnumerationInfo{}, fmt.Errorf("chain %d ENUM: %w", chain, err)
 	}
 	return DecodeEnumerateResponse(response)
+}
+
+type enumerationObserver func(attempt, index, chain int, info *EnumerationInfo, err error)
+
+// enumerateChainsWithRetry matches the vendor control flow: a transient ENUM
+// status invalidates that reset cycle, so every enabled chain is reset and
+// enumeration restarts from the first chain. A timed-out exchange is not safe
+// to retry on the same TCP stream because its delayed reply could corrupt
+// framing; only complete ENUM replies carrying a nonzero status are retried.
+func (c *Client) enumerateChainsWithRetry(ctx context.Context, chains []int, observe enumerationObserver) ([MaxChains]EnumerationInfo, error) {
+	var enumerations [MaxChains]EnumerationInfo
+	for attempt := 1; attempt <= enumMaxAttempts; attempt++ {
+		if err := c.ResetLinks(ctx); err != nil {
+			return enumerations, fmt.Errorf("initialize TDlinks: %w", err)
+		}
+		enumerations = [MaxChains]EnumerationInfo{}
+		retry := false
+		for index, chain := range chains {
+			info, err := c.Enumerate(ctx, uint16(chain))
+			if err != nil {
+				if observe != nil {
+					observe(attempt, index, chain, nil, err)
+				}
+				var statusErr *StatusError
+				if errors.As(err, &statusErr) && attempt < enumMaxAttempts {
+					retry = true
+					break
+				}
+				return enumerations, fmt.Errorf("enumerate TDlinks after %d attempt(s): %w", attempt, err)
+			}
+			enumerations[chain] = info
+			if observe != nil {
+				observe(attempt, index, chain, &info, nil)
+			}
+		}
+		if !retry {
+			return enumerations, nil
+		}
+	}
+	panic("unreachable")
 }
 
 func (c *Client) ControlChain(ctx context.Context, chain uint16, enable bool, tokenInterval uint32) error {
@@ -440,25 +482,24 @@ func (c *Client) DiscoverEnabledTopologyWithObserver(ctx context.Context, observ
 		Stage: DiscoveryResetting, Chain: -1, Node: -1, ChainsCompleted: 0,
 		ChainsTotal: len(enabled), Message: "Resetting enabled TDlinks",
 	})
-	if err = c.ResetLinks(ctx); err != nil {
-		return Topology{}, fmt.Errorf("initialize TDlinks: %w", err)
-	}
-	for index, chain := range enabled {
-		publish(DiscoveryProgress{
-			Stage: DiscoveryEnumerating, Chain: chain, Node: -1, ChainsCompleted: index,
-			ChainsTotal: len(enabled), Message: fmt.Sprintf("Enumerating TDlink %d", chain),
-		})
-		enumeration, enumerateErr := c.Enumerate(ctx, uint16(chain))
+	enumerations, err := c.enumerateChainsWithRetry(ctx, enabled, func(attempt, index, chain int, info *EnumerationInfo, enumerateErr error) {
 		if enumerateErr != nil {
-			return Topology{}, enumerateErr
+			publish(DiscoveryProgress{
+				Stage: DiscoveryEnumerating, Chain: chain, Node: -1, ChainsCompleted: index,
+				ChainsTotal: len(enabled), Message: fmt.Sprintf("TDlink %d enumeration failed (%v); retrying all links, attempt %d of %d", chain, enumerateErr, attempt+1, enumMaxAttempts),
+			})
+			return
 		}
-		topology.Enumerations[chain] = enumeration
 		publish(DiscoveryProgress{
 			Stage: DiscoveryEnumerating, Chain: chain, Node: -1, ChainsCompleted: index + 1,
-			ChainsTotal: len(enabled), BoardsTotal: int(enumeration.NodeCount),
-			Message: fmt.Sprintf("TDlink %d enumerated %d cards", chain, enumeration.NodeCount),
+			ChainsTotal: len(enabled), BoardsTotal: int(info.NodeCount),
+			Message: fmt.Sprintf("TDlink %d enumerated %d cards (attempt %d)", chain, info.NodeCount, attempt),
 		})
+	})
+	if err != nil {
+		return Topology{}, err
 	}
+	topology.Enumerations = enumerations
 	publish(DiscoveryProgress{
 		Stage: DiscoverySynchronizing, Chain: -1, Node: -1, ChainsCompleted: len(enabled),
 		ChainsTotal: len(enabled), Message: "Synchronizing enumerated TDlinks",
@@ -585,18 +626,19 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 		if !initialize {
 			return Topology{}, fmt.Errorf("one or more expected TDlinks require runtime initialization; read-only inspection will not reset, enumerate, or synchronize links")
 		}
-		if err := c.ResetLinks(ctx); err != nil {
-			return Topology{}, fmt.Errorf("initialize TDlinks: %w", err)
-		}
+		chains := make([]int, 0, len(expectedByChain))
 		for chain := 0; chain < MaxChains; chain++ {
-			if _, wanted := expectedByChain[chain]; !wanted {
-				continue
+			if _, wanted := expectedByChain[chain]; wanted {
+				chains = append(chains, chain)
 			}
-			enumeration, err := c.Enumerate(ctx, uint16(chain))
-			if err != nil {
-				return Topology{}, err
-			}
-			topology.Enumerations[chain] = enumeration
+		}
+		enumerations, err := c.enumerateChainsWithRetry(ctx, chains, nil)
+		if err != nil {
+			return Topology{}, err
+		}
+		topology.Enumerations = enumerations
+		for _, chain := range chains {
+			enumeration := enumerations[chain]
 			if int(enumeration.NodeCount) != len(expectedByChain[chain]) {
 				return Topology{}, fmt.Errorf("TDlink %d enumerated %d nodes; configuration expects %d", chain, enumeration.NodeCount, len(expectedByChain[chain]))
 			}

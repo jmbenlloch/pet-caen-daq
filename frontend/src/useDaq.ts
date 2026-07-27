@@ -58,7 +58,6 @@ export function useDaq(api: DaqApi) {
     if (next.latestCompletedRun) latestCompletedRun.value = next.latestCompletedRun
     connected.value = true
     stale.value = false
-    error.value = ''
     window.clearTimeout(staleTimer)
     staleTimer = window.setTimeout(() => (stale.value = true), staleAfterMs)
   }
@@ -75,6 +74,7 @@ export function useDaq(api: DaqApi) {
         configurationTemplate.value = await api.configurationTemplate()
       }
       accept(await api.snapshot())
+      error.value = ''
       for await (const next of api.telemetry(controller.signal)) accept(next)
       if (!controller.signal.aborted) throw new Error('Telemetry stream ended')
     } catch (reason) {

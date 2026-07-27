@@ -111,6 +111,63 @@ func TestRecoverTDLMatchesJANUSMultiChainSequence(t *testing.T) {
 	}
 }
 
+func TestEnumerationRestartsAllChainsAfterTransientStatus(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	client := &Client{control: clientConn}
+	serverErr := make(chan error, 1)
+	go func() {
+		for attempt := 1; attempt <= 2; attempt++ {
+			reset := make([]byte, 4)
+			if _, err := io.ReadFull(serverConn, reset); err != nil {
+				serverErr <- err
+				return
+			}
+			if !bytes.Equal(reset, []byte("RLNK")) {
+				serverErr <- fmt.Errorf("attempt %d reset = %q", attempt, reset)
+				return
+			}
+			if _, err := serverConn.Write(make([]byte, 4)); err != nil {
+				serverErr <- err
+				return
+			}
+			request := make([]byte, 6)
+			if _, err := io.ReadFull(serverConn, request); err != nil {
+				serverErr <- err
+				return
+			}
+			want, _ := EncodeEnumerateRequest(0)
+			if !bytes.Equal(request, want) {
+				serverErr <- fmt.Errorf("attempt %d request = %x", attempt, request)
+				return
+			}
+			response := make([]byte, 12)
+			if attempt == 1 {
+				littleEndian.PutUint32(response, 31)
+			} else {
+				littleEndian.PutUint32(response[4:], 2)
+			}
+			if _, err := serverConn.Write(response); err != nil {
+				serverErr <- err
+				return
+			}
+		}
+		serverErr <- nil
+	}()
+
+	enumerations, err := client.enumerateChainsWithRetry(context.Background(), []int{0}, nil)
+	if err != nil {
+		t.Fatalf("enumerateChainsWithRetry() error = %v", err)
+	}
+	if enumerations[0].NodeCount != 2 {
+		t.Fatalf("node count = %d, want 2", enumerations[0].NodeCount)
+	}
+	if err := <-serverErr; err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestControlCancellationInterruptsStalledReply(t *testing.T) {
 	clientConn, serverConn := net.Pipe()
 	defer clientConn.Close()

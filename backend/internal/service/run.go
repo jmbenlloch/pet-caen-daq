@@ -636,7 +636,14 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	audit, err := configaudit.Build(document, configured.Plans, boards)
 	if err != nil || !audit.Valid {
 		if err == nil {
-			err = fmt.Errorf("effective configuration audit rejected one or more settings")
+			rejected := make([]string, 0)
+			for _, setting := range audit.Settings {
+				if setting.Status != configaudit.Rejected {
+					continue
+				}
+				rejected = append(rejected, fmt.Sprintf("line %d %s: %s", setting.Line, setting.Name, setting.Reason))
+			}
+			err = fmt.Errorf("effective configuration audit rejected: %s", strings.Join(rejected, "; "))
 		}
 		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_AUDIT_FAILED", err)
 	}

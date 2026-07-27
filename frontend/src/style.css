@@ -856,6 +856,34 @@ select:focus {
   font-size: 0.69rem;
   line-height: 1.35;
 }
+.discovered-connections {
+  display: block;
+}
+.discovered-connections details {
+  width: 100%;
+}
+.discovered-connections summary {
+  cursor: pointer;
+  color: #dce7f4;
+}
+.discovered-connections summary span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.discovered-connections summary strong {
+  font-size: 0.79rem;
+}
+.discovered-connections summary small {
+  color: #788ba3;
+}
+.discovered-connections-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 20px;
+  padding-top: 8px;
+}
 .discovered-connections ol {
   display: grid;
   gap: 5px;

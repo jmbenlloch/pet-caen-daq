@@ -50,7 +50,10 @@ type hardwareRuntime struct {
 	configured    acquisition.ConfigurationResult
 }
 
-const topologyOperationTimeout = 3 * time.Minute
+// Six to eight enabled links take about seven seconds each to enumerate on
+// real hardware. Allow enough time for the vendor-matched whole-chain retry
+// cycles without cutting off a legitimate recovery attempt.
+const topologyOperationTimeout = 10 * time.Minute
 
 func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	r.opMu.Lock()
@@ -342,8 +345,6 @@ func (r *hardwareRuntime) Close() error {
 func (r *hardwareRuntime) publishConnectFailure(err error) {
 	r.publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = daqv1.SystemState_SYSTEM_STATE_DISCONNECTED
-		snapshot.Chains = nil
-		snapshot.Concentrator = nil
 		snapshot.Diagnostics = append(snapshot.Diagnostics, &daqv1.Diagnostic{
 			Severity: daqv1.DiagnosticSeverity_DIAGNOSTIC_SEVERITY_ERROR,
 			Code:     "HARDWARE_CONNECTION_FAILED", Message: err.Error(), ObservedAt: timestamppb.Now(),
@@ -534,10 +535,14 @@ func (r *hardwareRuntime) HardwareMetadata() ([]configaudit.BoardEvidence, *dt52
 	if r.client == nil {
 		return nil, nil
 	}
+	boardNumbers := make(map[[2]uint16]int, len(r.connections))
+	for _, connection := range r.connections {
+		boardNumbers[[2]uint16{uint16(connection.Chain), uint16(connection.Node)}] = connection.Board
+	}
 	boards := make([]configaudit.BoardEvidence, 0, len(r.topology.Boards))
 	for _, board := range r.topology.Boards {
 		boards = append(boards, configaudit.BoardEvidence{
-			Board: int(board.Chain), FirmwareRevision: board.FirmwareRevision,
+			Board: boardNumbers[[2]uint16{board.Chain, board.Node}], FirmwareRevision: board.FirmwareRevision,
 			HVModuleFirmwareRaw: board.HVModuleFirmwareRaw, HVModuleFirmwareVersion: board.HVModuleFirmwareVersion,
 			HVModuleFirmwareAvailable: board.HVModuleFirmwareAvailable,
 		})
