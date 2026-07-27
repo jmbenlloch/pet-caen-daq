@@ -165,7 +165,10 @@ func statisticsBoards(snapshot *daqv1.TelemetrySnapshot, observations []runpipel
 	result := make([]*daqv1.BoardStatistics, 0, len(observations))
 	for _, chain := range snapshot.GetChains() {
 		for _, board := range chain.GetBoards() {
-			statistic := &daqv1.BoardStatistics{Chain: chain.GetIndex(), Node: board.GetNode()}
+			logicalIndex := board.GetLogicalIndex()
+			statistic := &daqv1.BoardStatistics{
+				Chain: chain.GetIndex(), Node: board.GetNode(), LogicalIndex: &logicalIndex,
+			}
 			if observation, ok := observed[boardKey{chain: chain.GetIndex(), node: board.GetNode()}]; ok {
 				statistic.Timestamp = observation.Timestamp
 				statistic.TriggerId = observation.TriggerID

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
@@ -20,7 +21,7 @@ type hardwareConnectionStub struct {
 	disconnects int
 }
 
-func (s *hardwareConnectionStub) Connect(context.Context, string) error {
+func (s *hardwareConnectionStub) Connect(context.Context, string, string) error {
 	s.connects++
 	return nil
 }
@@ -58,13 +59,16 @@ func TestGeneratedClientSnapshotStreamAndReconnect(t *testing.T) {
 		t.Fatalf("configuration template = %q", template.Msg.GetJanusConfiguration())
 	}
 
-	streamCtx, cancelStream := context.WithCancel(context.Background())
+	streamCtx, cancelStream := context.WithTimeout(context.Background(), 3*time.Second)
 	stream, err := client.StreamTelemetry(streamCtx, connect.NewRequest(&daqv1.StreamTelemetryRequest{}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !stream.Receive() || stream.Msg().Snapshot.GetSequence() != 1 {
 		t.Fatalf("initial stream message=%+v error=%v", stream.Msg(), stream.Err())
+	}
+	if !stream.Receive() || stream.Msg().Snapshot.GetSequence() != 1 {
+		t.Fatalf("heartbeat stream message=%+v error=%v", stream.Msg(), stream.Err())
 	}
 	publisher.Publish(&daqv1.TelemetrySnapshot{State: daqv1.SystemState_SYSTEM_STATE_RUNNING, CurrentRun: &daqv1.RunSummary{RunId: "42"}})
 	if !stream.Receive() || stream.Msg().Snapshot.GetSequence() != 2 || stream.Msg().Snapshot.CurrentRun.GetRunId() != "42" {

@@ -289,7 +289,7 @@ describe('operator dashboard', () => {
     expect(connect.text()).toBe('Connect hardware')
     expect(connect.classes()).toContain('connect')
     await connect.trigger('click')
-    expect(disconnectedApi.connectHardware).toHaveBeenCalledWith('operator')
+    expect(disconnectedApi.connectHardware).toHaveBeenCalledWith('operator', expect.any(String))
     expect(disconnectedApi.disconnectHardware).not.toHaveBeenCalled()
     disconnected.unmount()
 
@@ -341,8 +341,48 @@ describe('operator dashboard', () => {
     const raw = wrapper.get('textarea[aria-label="JANUS configuration source"]')
     expect((raw.element as HTMLTextAreaElement).value).toContain('Open[1] usb:172.16.0.11:tdl:0:1')
     expect((raw.element as HTMLTextAreaElement).value).not.toContain(
-      'Open[2] usb:127.0.0.1:tdl:2:0',
+      'Open[2] usb:172.16.0.11:tdl:2:0',
     )
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Connect hardware')!
+      .trigger('click')
+    expect(api.connectHardware).toHaveBeenCalledWith(
+      'operator',
+      expect.stringContaining('Open[1] usb:172.16.0.11:tdl:0:1'),
+    )
+    wrapper.unmount()
+  })
+
+  it('adds and removes configured cards within concentrator limits', async () => {
+    const wrapper = mount(App, { props: { api: dashboardApi(SystemState.DISCONNECTED) } })
+    await flushPromises()
+    const count = wrapper.get('#configured-card-count')
+    expect((count.element as HTMLInputElement).value).toBe('4')
+
+    await wrapper.get('[aria-label="Add one card"]').trigger('click')
+    expect((count.element as HTMLInputElement).value).toBe('5')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'View raw configuration')!
+      .trigger('click')
+    expect(
+      (
+        wrapper.get('textarea[aria-label="JANUS configuration source"]')
+          .element as HTMLTextAreaElement
+      ).value,
+    ).toContain('Open[4] usb:172.16.0.11:tdl:0:1')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Use parameter editor')!
+      .trigger('click')
+    await wrapper.get('[aria-label="Remove one card"]').trigger('click')
+    expect((wrapper.get('#configured-card-count').element as HTMLInputElement).value).toBe('4')
+    expect(wrapper.get('#configured-card-count').attributes()).toMatchObject({
+      min: '1',
+      max: '128',
+    })
     wrapper.unmount()
   })
 

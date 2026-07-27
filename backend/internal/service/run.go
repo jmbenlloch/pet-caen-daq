@@ -253,14 +253,14 @@ func catalogPredicate(predicate *daqv1.ConfigurationPredicate) (runcatalog.Predi
 			global := -1
 			result.Board, result.Channel = &global, &global
 		case *daqv1.ConfigurationScope_Board:
-			if value.Board >= 4 {
-				return result, fmt.Errorf("board must be between 0 and 3")
+			if value.Board >= janusconfig.MaxBoards {
+				return result, fmt.Errorf("board must be between 0 and %d", janusconfig.MaxBoards-1)
 			}
 			board := int(value.Board)
 			result.Board = &board
 		case *daqv1.ConfigurationScope_Channel:
-			if value.Channel == nil || value.Channel.Board >= 4 || value.Channel.Channel >= 64 {
-				return result, fmt.Errorf("channel scope requires board 0-3 and channel 0-63")
+			if value.Channel == nil || value.Channel.Board >= janusconfig.MaxBoards || value.Channel.Channel >= 64 {
+				return result, fmt.Errorf("channel scope requires board 0-%d and channel 0-63", janusconfig.MaxBoards-1)
 			}
 			board, channel := int(value.Channel.Board), int(value.Channel.Channel)
 			result.Board, result.Channel = &board, &channel
@@ -493,7 +493,7 @@ func statisticsTelemetry(statistics *runstore.RunStatistics) *daqv1.StatisticsTe
 			Chain: uint32(board.Chain), Node: uint32(board.Node), Timestamp: board.Timestamp,
 			TriggerId: board.TriggerID, TriggerCount: board.TriggerCount,
 			LostTriggerCount: board.LostTriggerCount, DataBytes: board.DataBytes,
-			TOrCount: board.TORCount,
+			TOrCount: board.TORCount, LogicalIndex: board.LogicalIndex,
 		}
 		for channel := range dt5202.ChannelCount {
 			converted.ChannelTriggerCounts = append(converted.ChannelTriggerCounts, uint64(board.ChannelTriggerCounts[channel]))

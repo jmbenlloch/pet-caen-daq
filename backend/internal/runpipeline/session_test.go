@@ -219,7 +219,13 @@ func TestSessionPreservesTelemetryAcrossUnknownServiceVersion(t *testing.T) {
 
 func TestSessionAccumulatesBoardAndChannelStatistics(t *testing.T) {
 	now := time.Unix(100, 0)
-	factory := Factory{Options: Options{Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock, Now: func() time.Time { return now }}}
+	factory := Factory{Options: Options{
+		Parent: t.TempDir(), Capacity: 1, Backpressure: acquisition.BackpressureBlock,
+		Now: func() time.Time { return now },
+		ExecutionIdentity: runstore.ExecutionIdentity{Topology: runstore.TopologyIdentity{
+			Boards: []runstore.BoardIdentity{{Board: 7, Chain: 1, Node: 2}},
+		}},
+	}}
 	created, err := factory.New("statistics", acquisition.RunOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -258,7 +264,8 @@ func TestSessionAccumulatesBoardAndChannelStatistics(t *testing.T) {
 		t.Fatalf("persisted statistics = %+v", manifest.Statistics)
 	}
 	persisted := manifest.Statistics.Boards[0]
-	if persisted.Chain != 1 || persisted.Node != 2 || persisted.TriggerCount != 2 ||
+	if persisted.LogicalIndex == nil || *persisted.LogicalIndex != 7 ||
+		persisted.Chain != 1 || persisted.Node != 2 || persisted.TriggerCount != 2 ||
 		persisted.LostTriggerCount != 2 || persisted.TriggerID != 13 || persisted.Timestamp != 1100 ||
 		persisted.DataBytes != 40 || persisted.ChannelTriggerCounts[3] != 2 ||
 		persisted.TimestampCounts[3] != 2 || persisted.PHACounts[7] != 2 {

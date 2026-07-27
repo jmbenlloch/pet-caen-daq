@@ -18,6 +18,7 @@ const props = defineProps<{
   systemState: SystemState
   theme: 'dark' | 'light'
   live?: DeepReadonly<StaircaseScan>
+  boards: number[]
 }>()
 
 const board = ref(0)
@@ -32,7 +33,7 @@ const historyBoard = ref('any')
 const historyPage = ref(1)
 const historyPageSize = 8
 const historyTotal = ref(0)
-const scanBoards = [0, 1, 2, 3]
+const scanBoards = computed(() => props.boards)
 const finalized = ref<StaircaseScan>()
 const busy = ref(false)
 const error = ref('')
@@ -175,7 +176,12 @@ onMounted(refresh)
 
     <div v-if="expanded" id="staircase-content" class="scan-card-content">
       <div class="plot-controls staircase-controls">
-        <label>Board<input v-model.number="board" type="number" min="0" max="3" /></label>
+        <label
+          >Board
+          <select v-model.number="board">
+            <option v-for="index in scanBoards" :key="index" :value="index">{{ index }}</option>
+          </select>
+        </label>
         <label>Minimum<input v-model.number="minimum" type="number" min="0" max="2047" /></label>
         <label>Maximum<input v-model.number="maximum" type="number" min="0" max="2047" /></label>
         <label>Step<input v-model.number="step" type="number" min="1" /></label>

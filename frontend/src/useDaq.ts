@@ -266,11 +266,11 @@ export function useDaq(api: DaqApi) {
     }
   }
 
-  async function connectHardware() {
+  async function connectHardware(configuration: string) {
     busy.value = true
     error.value = ''
     try {
-      accept(await api.connectHardware(operatorIdentity))
+      accept(await api.connectHardware(operatorIdentity, configuration))
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {

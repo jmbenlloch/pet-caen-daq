@@ -37,6 +37,12 @@ type Connection struct {
 	Node      int
 }
 
+const (
+	MaxChains        = 8
+	MaxNodesPerChain = 16
+	MaxBoards        = MaxChains * MaxNodesPerChain
+)
+
 // Parse reads a JANUS configuration. Empty lines and full-line comments are
 // ignored; inline comments begin with '#'.
 func Parse(r io.Reader) (*Document, error) {
@@ -165,11 +171,11 @@ func parseConnection(board int, value string) (Connection, error) {
 		return Connection{}, fmt.Errorf("invalid concentrator IP address %q", parts[1])
 	}
 	chain, err := strconv.Atoi(parts[3])
-	if err != nil || chain < 0 || chain > 7 {
+	if err != nil || chain < 0 || chain >= MaxChains {
 		return Connection{}, fmt.Errorf("invalid TDlink chain %q", parts[3])
 	}
 	node, err := strconv.Atoi(parts[4])
-	if err != nil || node < 0 || node > 15 {
+	if err != nil || node < 0 || node >= MaxNodesPerChain {
 		return Connection{}, fmt.Errorf("invalid TDlink node %q", parts[4])
 	}
 	return Connection{
@@ -181,21 +187,43 @@ func parseConnection(board int, value string) (Connection, error) {
 	}, nil
 }
 
-// ValidateProductionTopology checks the version-one topology contract.
+// ValidateProductionTopology checks that logical board numbers and physical
+// TDlink addresses form a complete, unambiguous topology supported by one
+// DT5215 concentrator.
 func ValidateProductionTopology(connections []Connection) error {
-	if len(connections) != 4 {
-		return fmt.Errorf("expected 4 board connections, got %d", len(connections))
+	if len(connections) < 1 || len(connections) > MaxBoards {
+		return fmt.Errorf("expected between 1 and %d board connections, got %d", MaxBoards, len(connections))
 	}
-	for expected := 0; expected < 4; expected++ {
-		found := false
-		for _, connection := range connections {
-			if connection.Board == expected && connection.Chain == expected && connection.Node == 0 {
-				found = true
-				break
-			}
+	boards := make(map[int]struct{}, len(connections))
+	addresses := make(map[[2]int]int, len(connections))
+	nodesByChain := make(map[int]map[int]struct{}, MaxChains)
+	host, iface := connections[0].Host, connections[0].Interface
+	for _, connection := range connections {
+		if connection.Board < 0 || connection.Board >= len(connections) {
+			return fmt.Errorf("board index %d is outside contiguous range 0-%d", connection.Board, len(connections)-1)
 		}
-		if !found {
-			return fmt.Errorf("expected board %d on TDlink %d node 0", expected, expected)
+		if _, exists := boards[connection.Board]; exists {
+			return fmt.Errorf("duplicate board index %d", connection.Board)
+		}
+		boards[connection.Board] = struct{}{}
+		address := [2]int{connection.Chain, connection.Node}
+		if board, exists := addresses[address]; exists {
+			return fmt.Errorf("boards %d and %d both use TDlink %d node %d", board, connection.Board, connection.Chain, connection.Node)
+		}
+		addresses[address] = connection.Board
+		if nodesByChain[connection.Chain] == nil {
+			nodesByChain[connection.Chain] = make(map[int]struct{})
+		}
+		nodesByChain[connection.Chain][connection.Node] = struct{}{}
+		if connection.Host != host || connection.Interface != iface {
+			return fmt.Errorf("board %d uses concentrator %s:%s; expected %s:%s", connection.Board, connection.Interface, connection.Host, iface, host)
+		}
+	}
+	for chain, nodes := range nodesByChain {
+		for node := 0; node < len(nodes); node++ {
+			if _, exists := nodes[node]; !exists {
+				return fmt.Errorf("TDlink %d node indices must be contiguous from 0; node %d is missing", chain, node)
+			}
 		}
 	}
 	return nil

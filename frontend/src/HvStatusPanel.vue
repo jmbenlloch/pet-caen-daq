@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { hvState, type HvState } from './hvStatus'
 
 type HvBoard = {
+  logicalIndex: number
   chain: number
   node: number
   hvVoltageV: number
@@ -54,11 +55,11 @@ const globalLabel = computed(() => {
         :key="`${board.chain}-${board.node}`"
         class="hv-board-led"
         :class="hvState(board)"
-        :aria-label="`Chain ${board.chain} node ${board.node} HV: ${stateLabel[hvState(board)]}`"
-        :title="`Chain ${board.chain}: ${stateLabel[hvState(board)]}`"
+        :aria-label="`Board ${board.logicalIndex}, chain ${board.chain} node ${board.node} HV: ${stateLabel[hvState(board)]}`"
+        :title="`Board ${board.logicalIndex} · Chain ${board.chain} · Node ${board.node}: ${stateLabel[hvState(board)]}`"
       >
         <span class="hv-led" aria-hidden="true" />
-        <span>B{{ board.chain }}</span>
+        <span>B{{ board.logicalIndex }}</span>
       </span>
     </div>
     <span v-else class="hv-unavailable">Waiting…</span>

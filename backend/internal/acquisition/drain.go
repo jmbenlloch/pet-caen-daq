@@ -41,17 +41,32 @@ const drainIdleTimeout = 100 * time.Millisecond
 // This prevents persistence time from consuming the following idle probe and
 // prevents a total-duration deadline from interrupting a partially read batch.
 func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains int, handle BatchHandler) (DrainResult, error) {
-	if expectedChains < 1 || expectedChains > dt5215.MaxChains {
-		return DrainResult{}, fmt.Errorf("expected chain count %d out of range", expectedChains)
+	chains := make([]uint16, expectedChains)
+	for chain := range chains {
+		chains[chain] = uint16(chain)
+	}
+	return StopAndDrainChains(ctx, hardware, chains, handle)
+}
+
+// StopAndDrainChains drains an explicit set of active TDlinks. Unlike the
+// compatibility count-based wrapper, it supports non-contiguous enabled links.
+func StopAndDrainChains(ctx context.Context, hardware DrainHardware, activeChains []uint16, handle BatchHandler) (DrainResult, error) {
+	chains, err := normalizeChains(activeChains)
+	if err != nil {
+		return DrainResult{}, err
+	}
+	expected := make(map[uint8]struct{}, len(chains))
+	for _, chain := range chains {
+		expected[uint8(chain)] = struct{}{}
 	}
 	if err := hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStop, dt5215.TDLCommandDelay); err != nil {
 		return DrainResult{}, fmt.Errorf("stop acquisition: %w", err)
 	}
-	completed := make(map[uint8]bool, expectedChains)
+	completed := make(map[uint8]bool, len(chains))
 	var result DrainResult
 	for {
 		if ctxErr := ctx.Err(); ctxErr != nil && (!errors.Is(ctxErr, context.DeadlineExceeded) || result.Batches == 0) {
-			return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), expectedChains, ctxErr)
+			return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), len(chains), ctxErr)
 		}
 		idleDeadline := time.Now().Add(drainIdleTimeout)
 		readParent := ctx
@@ -71,13 +86,13 @@ func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains in
 		cancelRead()
 		if err != nil {
 			if canDeclareIdle && errors.Is(err, context.DeadlineExceeded) {
-				result.CompletedChains = expectedChains
+				result.CompletedChains = len(chains)
 				return result, nil
 			}
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), expectedChains, ctxErr)
+				return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), len(chains), ctxErr)
 			}
-			return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), expectedChains, err)
+			return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), len(chains), err)
 		}
 		result.Batches++
 		result.Events += len(events)
@@ -87,7 +102,7 @@ func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains in
 			}
 		}
 		for _, event := range events {
-			if int(event.Chain) >= expectedChains {
+			if _, ok := expected[event.Chain]; !ok {
 				return result, fmt.Errorf("drain completion from unexpected chain %d", event.Chain)
 			}
 			if event.Descriptor.Qualifier != dt5202.QualifierService {
@@ -102,6 +117,24 @@ func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains in
 			}
 		}
 	}
+}
+
+func normalizeChains(activeChains []uint16) ([]uint16, error) {
+	if len(activeChains) < 1 || len(activeChains) > dt5215.MaxChains {
+		return nil, fmt.Errorf("active chain count %d out of range", len(activeChains))
+	}
+	seen := make(map[uint16]struct{}, len(activeChains))
+	chains := append([]uint16(nil), activeChains...)
+	for _, chain := range chains {
+		if chain >= dt5215.MaxChains {
+			return nil, fmt.Errorf("active chain %d out of range", chain)
+		}
+		if _, exists := seen[chain]; exists {
+			return nil, fmt.Errorf("duplicate active chain %d", chain)
+		}
+		seen[chain] = struct{}{}
+	}
+	return chains, nil
 }
 
 // JoinStopError retains the acquisition failure as the primary joined error

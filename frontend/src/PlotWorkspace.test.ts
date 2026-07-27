@@ -37,7 +37,7 @@ describe('PlotWorkspace', () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
         api: apiWithRuns(run),
-        boards: [{ chain: 2, ...create(BoardSchema, { node: 3 }) }],
+        boards: [{ chain: 2, ...create(BoardSchema, { node: 3, logicalIndex: 7 }) }],
         running: false,
         loading: false,
         datasets: [],
@@ -64,7 +64,7 @@ describe('PlotWorkspace', () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
         api: apiWithRuns(persistedRun),
-        boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
+        boards: [{ chain: 0, ...create(BoardSchema, { node: 0, logicalIndex: 0 }) }],
         running: false,
         loading: false,
         datasets: [],
@@ -94,8 +94,8 @@ describe('PlotWorkspace', () => {
       props: {
         api: apiWithRuns(createRun('41')),
         boards: [
-          { chain: 1, ...create(BoardSchema, { node: 2 }) },
-          { chain: 3, ...create(BoardSchema, { node: 0 }) },
+          { chain: 1, ...create(BoardSchema, { node: 2, logicalIndex: 4 }) },
+          { chain: 3, ...create(BoardSchema, { node: 0, logicalIndex: 9 }) },
         ],
         activeRunId: '42',
         running: true,
@@ -112,10 +112,10 @@ describe('PlotWorkspace', () => {
     await wrapper.get('[aria-haspopup="true"]').trigger('click')
     expect(wrapper.findAll('.histogram-board-action')).toHaveLength(4)
     expect(wrapper.get('.plot-request-button').classes()).toContain('secondary-accent')
-    await wrapper.get('[aria-label="Board 1 node 2 channel 2"]').trigger('click')
-    await wrapper.get('[aria-label="Board 1 node 2 channel 8"]').trigger('click')
-    await wrapper.get('[aria-label="Board 1 node 2 channel 9"]').trigger('click')
-    await wrapper.get('[aria-label="Board 3 node 0 channel 4"]').trigger('click')
+    await wrapper.get('[aria-label="Board 4, chain 1 node 2, channel 2"]').trigger('click')
+    await wrapper.get('[aria-label="Board 4, chain 1 node 2, channel 8"]').trigger('click')
+    await wrapper.get('[aria-label="Board 4, chain 1 node 2, channel 9"]').trigger('click')
+    await wrapper.get('[aria-label="Board 9, chain 3 node 0, channel 4"]').trigger('click')
     expect(wrapper.emitted('request')?.at(-1)?.[2]).toEqual([
       expect.objectContaining({ chain: 1, node: 2, channel: 0 }),
       expect.objectContaining({ channel: 2 }),
@@ -167,7 +167,7 @@ describe('PlotWorkspace', () => {
     expect(wrapper.text()).toContain('Viewing persisted histograms from run 42.')
     wrapper.get('[aria-label="Live selected-channel histogram plot"]')
 
-    await wrapper.get('[aria-label="Board 1 node 2 channel 2"]').trigger('click')
+    await wrapper.get('[aria-label="Board 4, chain 1 node 2, channel 2"]').trigger('click')
     expect(wrapper.emitted('request')?.at(-1)).toEqual([
       '42',
       HistogramKind.PHA_HIGH_GAIN,
@@ -184,7 +184,7 @@ describe('PlotWorkspace', () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
         api: apiWithRuns(createRun('41')),
-        boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
+        boards: [{ chain: 0, ...create(BoardSchema, { node: 0, logicalIndex: 0 }) }],
         running: false,
         loading: false,
         datasets: [],
@@ -200,7 +200,7 @@ describe('PlotWorkspace', () => {
     const requestsBeforeChange = wrapper.emitted('request')?.length ?? 0
 
     await wrapper.get('[aria-haspopup="true"]').trigger('click')
-    await wrapper.get('[aria-label="Board 0 node 0 channel 3"]').trigger('click')
+    await wrapper.get('[aria-label="Board 0, chain 0 node 0, channel 3"]').trigger('click')
 
     expect(wrapper.emitted('request')).toHaveLength(requestsBeforeChange + 1)
     expect(wrapper.emitted('request')?.at(-1)).toEqual([
@@ -214,7 +214,7 @@ describe('PlotWorkspace', () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
         api: apiWithRuns(),
-        boards: [{ chain: 0, ...create(BoardSchema, { node: 0 }) }],
+        boards: [{ chain: 0, ...create(BoardSchema, { node: 0, logicalIndex: 0 }) }],
         activeRunId: '42',
         running: true,
         loading: false,
@@ -243,8 +243,8 @@ describe('PlotWorkspace', () => {
       props: {
         api: apiWithRuns(),
         boards: [
-          { chain: 0, ...create(BoardSchema, { node: 0 }) },
-          { chain: 1, ...create(BoardSchema, { node: 0 }) },
+          { chain: 0, ...create(BoardSchema, { node: 0, logicalIndex: 3 }) },
+          { chain: 1, ...create(BoardSchema, { node: 0, logicalIndex: 8 }) },
         ],
         activeRunId: '42',
         running: true,
@@ -268,7 +268,7 @@ describe('PlotWorkspace', () => {
     expect(wrapper.get('[aria-haspopup="true"]').text()).toContain('64 / 64 selected')
     expect(wrapper.get('[role="alert"]').text()).toContain('limited to 64 channels')
     expect(
-      wrapper.get('[aria-label="Board 1 node 0 channel 0"]').attributes('disabled'),
+      wrapper.get('[aria-label="Board 8, chain 1 node 0, channel 0"]').attributes('disabled'),
     ).toBeDefined()
 
     await allButtons[1].trigger('click')

@@ -49,7 +49,7 @@ function api(): DaqApi {
 describe('StaircaseWorkspace', () => {
   it('is collapsed by default and exposes the scan controls when expanded', async () => {
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: api(), systemState: SystemState.READY, theme: 'dark' },
+      props: { api: api(), systemState: SystemState.READY, theme: 'dark', boards: [0, 1, 2, 3] },
     })
 
     expect(wrapper.get('section').classes()).toEqual(
@@ -69,7 +69,7 @@ describe('StaircaseWorkspace', () => {
   it('loads and plots a finalized scan', async () => {
     const client = api()
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: client, systemState: SystemState.READY, theme: 'dark' },
+      props: { api: client, systemState: SystemState.READY, theme: 'dark', boards: [0, 1, 2, 3] },
     })
     await flushPromises()
     await wrapper.get('.scan-card-toggle').trigger('click')
@@ -105,7 +105,7 @@ describe('StaircaseWorkspace', () => {
       totalCount: scans.length,
     }))
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: client, systemState: SystemState.READY, theme: 'dark' },
+      props: { api: client, systemState: SystemState.READY, theme: 'dark', boards: [0, 1, 2, 3] },
     })
     await flushPromises()
     await wrapper.get('.scan-card-toggle').trigger('click')
@@ -132,7 +132,7 @@ describe('StaircaseWorkspace', () => {
       return { scans: matching, totalCount: matching.length }
     })
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: client, systemState: SystemState.READY, theme: 'dark' },
+      props: { api: client, systemState: SystemState.READY, theme: 'dark', boards: [0, 1, 2, 3] },
     })
     await flushPromises()
     await wrapper.get('.scan-card-toggle').trigger('click')
@@ -160,7 +160,13 @@ describe('StaircaseWorkspace', () => {
       points: [{ threshold: 250, channelRatesCps: [42] }],
     })
     const wrapper = mount(StaircaseWorkspace, {
-      props: { api: api(), systemState: SystemState.SCANNING, theme: 'dark', live },
+      props: {
+        api: api(),
+        systemState: SystemState.SCANNING,
+        theme: 'dark',
+        live,
+        boards: [0, 1, 2, 3],
+      },
     })
     expect(wrapper.find('.staircase-plot').exists()).toBe(false)
 

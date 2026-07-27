@@ -125,6 +125,20 @@ func TestStopAndDrainWaitsForSilenceAfterReadyEvidence(t *testing.T) {
 	}
 }
 
+func TestStopAndDrainSupportsNonContiguousActiveChains(t *testing.T) {
+	hardware := &scriptedDrainHardware{
+		reads: []drainRead{
+			{events: []dt5215.StreamEvent{completion(2, true)}},
+			{events: []dt5215.StreamEvent{completion(5, true)}},
+		},
+		stallAfterReads: true,
+	}
+	result, err := StopAndDrainChains(context.Background(), hardware, []uint16{2, 5}, nil)
+	if err != nil || result.CompletedChains != 2 {
+		t.Fatalf("result=%#v error=%v", result, err)
+	}
+}
+
 func TestStopAndDrainTimeoutAndCancellation(t *testing.T) {
 	for _, test := range []struct {
 		name string

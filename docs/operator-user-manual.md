@@ -189,6 +189,14 @@ configuration before connecting, and use the raw-configuration view if an
 external detector-position convention requires different logical board
 numbers.
 
+The same section provides a **Number of cards** control with limits 1–128,
+corresponding to eight DT5215 links with up to sixteen daisy-chained nodes per
+link. Removing cards truncates the highest logical board indices. Adding cards
+preserves every existing address and assigns unused nodes on the already-used
+links first, then unused links. Each generated `Open[board]` value remains
+individually editable. The DT5215 web interface must enable exactly the links
+referenced by the resulting configuration before connecting.
+
 Discovery does not enable persistent TDlinks, apply the JANUS configuration,
 change high voltage, or start acquisition. It is nevertheless a state-changing
 hardware operation because it resets, enumerates, and synchronizes enabled
@@ -398,7 +406,7 @@ The masthead is always visible and contains:
 - **System state** — authoritative backend state;
 - **Sequence** — latest telemetry sequence number;
 - **enabled links** — count of enabled DT5215 chains;
-- **SiPM bias** — summary and four board indicators for HV state;
+- **SiPM bias** — summary and one indicator per configured board for HV state;
 - **Backend online/offline** — freshness of the API telemetry stream;
 - **Hardware connected/disconnected/connecting** — DT5215 session state;
 - connection and run-control buttons.
@@ -605,7 +613,7 @@ Channel-scoped fields include timing/charge fine thresholds, HG/LG gain, zero-su
 
 1. set the general value;
 2. select **Per-channel overrides**;
-3. select board 0–3;
+3. select one of the configured boards;
 4. enter exceptions in the 64-channel grid;
 5. leave a cell blank to inherit the general value;
 6. select **Apply overrides**.
@@ -624,7 +632,7 @@ The paired masks are:
 
 The low word covers channels 0–31 and the high word channels 32–63. Select **Configure channels** to open an 8×8 grid.
 
-The target list contains **Global** and **Board 0** through **Board 3**. A board inherits the global pair until a board override is applied.
+The target list contains **Global** and every board declared by an indexed `Open` entry. A board inherits the global pair until a board override is applied.
 
 Mask actions are:
 
@@ -905,7 +913,7 @@ Estimated lost triggers are diagnostic estimates based on forward trigger-ID gap
 
 ## 7.4 Board channel view
 
-Select **Board 0** through **Board 3** for a 64-channel grid.
+Select any configured board for its 64-channel grid.
 
 **Per-channel metric** choices are:
 
@@ -1022,7 +1030,7 @@ The scan runs from the configured maximum threshold downward to the minimum.
 
 | Control    |    Allowed value | Meaning                            |
 | ---------- | ---------------: | ---------------------------------- |
-| Board      |              0–3 | Board/chain to scan                |
+| Board      | Configured board | Logical board to scan              |
 | Minimum    |           0–2047 | Inclusive lowest coarse threshold  |
 | Maximum    |           0–2047 | Inclusive highest coarse threshold |
 | Step       | positive integer | Threshold decrement between points |
@@ -1076,7 +1084,7 @@ The heatmap allows the operator to locate the delay region where high-gain pulse
 
 | Control        |                      Allowed value | Meaning                                           |
 | -------------- | ---------------------------------: | ------------------------------------------------- |
-| Board          |                                0–3 | Board/chain to scan                               |
+| Board          |                   Configured board | Logical board to scan                             |
 | Minimum (ns)   |         non-negative multiple of 8 | Inclusive first requested delay                   |
 | Maximum (ns)   |   multiple of 8, not below minimum | Inclusive upper delay                             |
 | Step (ns)      | positive multiple of 8, at least 8 | Increment between delay points                    |
@@ -1393,9 +1401,9 @@ This section documents every JANUS parameter intentionally exposed by the fronte
 
 ## 13.1 Connect
 
-| Parameter | Scope | Description                                                                                                                                                                                                                                            |
-| --------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Open`    | Board | JANUS connection descriptor retained in the configuration document. The production backend command-line `-control` and `-stream` addresses select the DT5215 transports; the document is still validated for the required four board/link assignments. |
+| Parameter | Scope | Description                                                                                                                                                                                                                                                                                   |
+| --------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Open`    | Board | JANUS connection descriptor defining the logical-board to TDlink/node mapping. Logical indices must be contiguous from zero, physical addresses unique, and nodes on each active link contiguous from zero. The command-line `-control` and `-stream` addresses select the DT5215 transports. |
 
 ## 13.2 HV_bias
 
@@ -1565,7 +1573,7 @@ Verify artifact size and SHA-256 against the manifest after copying.
 2. Confirm correct physical topology and DT5215 link provisioning.
 3. Confirm backend and hardware are online.
 4. Confirm system state is **Ready**.
-5. Confirm four board cards and acceptable health/temperatures.
+5. Confirm that every configured board card is present with acceptable health and temperatures.
 6. Confirm intended HV state, stable Vmon/Imon, and no HV fault.
 7. Load or edit the exact approved configuration.
 8. Review all board/channel overrides and masks.
@@ -1676,11 +1684,11 @@ The request limit is 64 total channels across all boards. Clear channels or a se
 
 ## Staircase start fails
 
-Confirm **Ready**, board 0–3, thresholds 0–2047, positive step, minimum not above maximum, dwell 1–34,000 ms, and no more than 4,096 points.
+Confirm **Ready**, select a configured board, use thresholds 0–2047, a positive step, minimum not above maximum, dwell 1–34,000 ms, and no more than 4,096 points.
 
 ## Hold-delay start fails
 
-Confirm **Ready**, board 0–3, delay bounds and step are multiples of 8 ns, step is at least 8 ns, event target is 10–100,000, timeout is 1–600 s, and point count is 1–64.
+Confirm **Ready**, select a configured board, ensure delay bounds and step are multiples of 8 ns, step is at least 8 ns, event target is 10–100,000, timeout is 1–600 s, and point count is 1–64.
 
 ## Scan was cancelled but controls remain unavailable
 

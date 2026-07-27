@@ -33,7 +33,13 @@ describe('HoldDelayWorkspace', () => {
       ],
     })
     const wrapper = mount(HoldDelayWorkspace, {
-      props: { api: api(), systemState: SystemState.SCANNING, theme: 'light', live },
+      props: {
+        api: api(),
+        systemState: SystemState.SCANNING,
+        theme: 'light',
+        live,
+        boards: [0, 1, 2, 3],
+      },
     })
 
     expect(wrapper.get('.scan-card-toggle').attributes('aria-expanded')).toBe('false')
@@ -53,7 +59,13 @@ describe('HoldDelayWorkspace', () => {
       maximumDelayNs: 256,
     })
     const wrapper = mount(HoldDelayWorkspace, {
-      props: { api: api(), systemState: SystemState.SCANNING, theme: 'light', live },
+      props: {
+        api: api(),
+        systemState: SystemState.SCANNING,
+        theme: 'light',
+        live,
+        boards: [0, 1, 2, 3],
+      },
     })
 
     await wrapper.get('.scan-card-toggle').trigger('click')

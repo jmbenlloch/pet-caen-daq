@@ -56,7 +56,7 @@ out-of-range majority, trigger-width, discriminator, gain, test-pulse, and
 active-probe settings before configuration planning.
 
 JANUS board/channel inheritance is now implemented rather than merely displayed.
-Mask dialogs select Global or Board 0–3 and create paired board overrides only
+Mask dialogs select Global or any board declared by the current `Open` entries and create paired board overrides only
 when edited. Channel-scoped HV adjustment, timing/charge fine thresholds,
 high/low gains, and zero-suppression thresholds expose a board-specific
 64-channel exception grid. The parser accepts `Parameter[board][channel]`, and
@@ -71,7 +71,7 @@ longer depend on comments in the selected sample configuration.
 
 The HV_bias surface now includes continuously polled firmware-4+ Vmon, Imon,
 detector/HV/FPGA/board temperatures, and off/ramping/on/over-current/over-voltage
-state for all four boards. Explicit per-board and all-board switches are exposed
+state for every configured board. Explicit per-board and all-board switches are exposed
 only while Ready; HV-on requires the backend authorization flag and a failed
 multi-board enable rolls already-enabled targets back off. The channel adjustment
 dialog calculates live `Vnom`, and `TempSensType` accepts either a named sensor
@@ -295,10 +295,10 @@ An HTTP integration test now uses the checked-in generated ConnectRPC client aga
 Implemented on 2026-07-20:
 
 - lossless parsing of JANUS assignment syntax, including indexed settings, comments, repeated settings, and the production Windows/CRLF fixture;
-- extraction and validation of the four production `Open` connections (TDlinks 0–3, node 0);
+- extraction and validation of one to 128 `Open` connections within the DT5215's eight-link, sixteen-node-per-link address space;
 - exact little-endian codecs for DT5215 `CINF`, `ENUM`, and `RREG` requests and responses; the capture-verified `ENUM` reply is 12 bytes and its third, semantically unknown word is retained as evidence;
 - simultaneous connection to TCP 9760 for slow control and TCP 9000 for the data stream;
-- validation that links 0–3 are enabled and links 4–7 are disabled, as required by the version-one web-provisioning decision;
+- validation that exactly the configured links are enabled and that each link enumerates the configured number of contiguous nodes;
 - enumeration of exactly one DT5202 on each production link;
 - reads of product ID, FPGA firmware revision, and acquisition status registers;
 - a typed Go topology returned as JSON by the initial command-line backend;
@@ -308,7 +308,7 @@ Implemented on 2026-07-20:
 - golden codec and configuration-parser unit tests plus simulator-backed integration tests, including incorrect provisioning and pre-enumeration link states;
 - an initial Buf API module and generated Go/ConnectRPC bindings for configuration validation and system snapshots.
 
-The implementation does not use FERSlib or cgo. It does not configure persistent DT5215 link activation: operators must provision links 0–3 enabled and links 4–7 disabled through the concentrator web interface before startup. Discovery preserves already-ready links. If an expected enabled link reports pre-enumeration state 1 or 2, discovery performs the capture-verified runtime `RLNK`, `ENUM`, and `SNT0` sequence, refreshes `CINF`, and requires exactly one ready board per expected chain. These runtime operations do not replace web provisioning.
+The implementation does not use FERSlib or cgo. It does not configure persistent DT5215 link activation: operators provision the required links through the concentrator web interface before startup. Discovery preserves already-ready links. If an expected enabled link reports pre-enumeration state 1 or 2, discovery performs the capture-verified runtime `RLNK`, `ENUM`, and `SNT0` sequence, refreshes `CINF`, and requires the enumerated node count to match the configuration. These runtime operations do not replace web provisioning.
 
 The 2026-07-21 real-hardware evidence and patch history are indexed in [Real-hardware capture evidence](real-hardware-capture-evidence.md). Capture-verified facts include the 12-byte `ENUM` reply, reset/enumeration/synchronization timing, four-board identity/status reads, complete startup configuration, the signed 20-bit time-reference-delay readback, JANUS HV-on traffic, and JANUS plus native acquisition traffic. Opt-in conformance tests decode 18,784 events from the first JANUS stream, 158,417 from the second, and all 87,989 events in the finalized native raw run. Unobserved error/status meanings remain provisional.
 

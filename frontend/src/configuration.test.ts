@@ -7,6 +7,7 @@ import {
   numericError,
   setConfigurationValue,
   replaceIndexedConfigurationValues,
+  resizeConnectionConfiguration,
   parseConfiguration,
   updateConfiguration,
 } from './configuration'
@@ -150,4 +151,32 @@ it('replaces indexed connection values while preserving the surrounding document
   )
   expect(changed.source).toContain('# Run\r\nPresetTime 10')
   expect(changed.fields.filter((field) => field.name === 'Open')).toHaveLength(3)
+})
+
+it('adds and removes cards in deterministic daisy-chain order', () => {
+  const source =
+    'Open[0] usb:172.16.0.11:tdl:0:0\nOpen[1] usb:172.16.0.11:tdl:1:0\nAcquisitionMode SPECT_TIMING\n'
+  const expanded = resizeConnectionConfiguration(parseConfiguration(source), 6)
+  expect(
+    expanded.fields.filter((field) => field.name === 'Open').map((field) => field.value),
+  ).toEqual([
+    'usb:172.16.0.11:tdl:0:0',
+    'usb:172.16.0.11:tdl:1:0',
+    'usb:172.16.0.11:tdl:0:1',
+    'usb:172.16.0.11:tdl:1:1',
+    'usb:172.16.0.11:tdl:0:2',
+    'usb:172.16.0.11:tdl:1:2',
+  ])
+  const reduced = resizeConnectionConfiguration(expanded, 3)
+  expect(reduced.fields.filter((field) => field.name === 'Open')).toHaveLength(3)
+  expect(reduced.source).toContain('AcquisitionMode SPECT_TIMING')
+})
+
+it('enforces the concentrator card-count limits', () => {
+  const document = parseConfiguration('Open[0] usb:172.16.0.11:tdl:0:0\n')
+  expect(resizeConnectionConfiguration(document, 0)).toBe(document)
+  expect(resizeConnectionConfiguration(document, 129)).toBe(document)
+  expect(
+    resizeConnectionConfiguration(document, 128).fields.filter((field) => field.name === 'Open'),
+  ).toHaveLength(128)
 })

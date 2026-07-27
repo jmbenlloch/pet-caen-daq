@@ -86,24 +86,25 @@ func TestHealthMonitorValidatesDependenciesAndCadence(t *testing.T) {
 
 func TestStatisticsIncludeTopologyBoardsBeforeTheyEmitEvents(t *testing.T) {
 	snapshot := &daqv1.TelemetrySnapshot{Chains: []*daqv1.Chain{
-		{Index: 0, Boards: []*daqv1.Board{{Node: 0}}},
-		{Index: 1, Boards: []*daqv1.Board{{Node: 0}}},
-		{Index: 2, Boards: []*daqv1.Board{{Node: 0}}},
-		{Index: 3, Boards: []*daqv1.Board{{Node: 0}}},
+		{Index: 1, Boards: []*daqv1.Board{
+			{Node: 0, LogicalIndex: 4},
+			{Node: 1, LogicalIndex: 5},
+			{Node: 2, LogicalIndex: 6},
+		}},
 	}}
-	observations := []runpipeline.BoardStats{{Chain: 0, Node: 0, TriggerCount: 7}}
+	observations := []runpipeline.BoardStats{{Chain: 1, Node: 1, TriggerCount: 7}}
 
 	boards := statisticsBoards(snapshot, observations)
 
-	if len(boards) != 4 {
-		t.Fatalf("statistics boards = %d, want 4", len(boards))
+	if len(boards) != 3 {
+		t.Fatalf("statistics boards = %d, want 3", len(boards))
 	}
-	for chain, board := range boards {
-		if board.GetChain() != uint32(chain) || board.GetNode() != 0 {
-			t.Fatalf("board %d identity = %d:%d", chain, board.GetChain(), board.GetNode())
+	for node, board := range boards {
+		if board.GetLogicalIndex() != uint32(node+4) || board.GetChain() != 1 || board.GetNode() != uint32(node) {
+			t.Fatalf("board %d identity = logical %d, physical %d:%d", node, board.GetLogicalIndex(), board.GetChain(), board.GetNode())
 		}
 	}
-	if boards[0].GetTriggerCount() != 7 || boards[1].GetTriggerCount() != 0 {
+	if boards[0].GetTriggerCount() != 0 || boards[1].GetTriggerCount() != 7 {
 		t.Fatalf("statistics did not preserve observed and zero-filled boards: %+v", boards)
 	}
 }

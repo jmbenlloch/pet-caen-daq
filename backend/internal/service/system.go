@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
@@ -17,7 +18,7 @@ type SnapshotSource interface {
 }
 
 type HardwareConnectionController interface {
-	Connect(context.Context, string) error
+	Connect(context.Context, string, string) error
 	Disconnect(context.Context, string) error
 }
 
@@ -42,7 +43,7 @@ func (s *SystemService) ConnectHardware(ctx context.Context, request *connect.Re
 	if actor == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requested_by is required"))
 	}
-	if err := s.Hardware.Connect(ctx, actor); err != nil {
+	if err := s.Hardware.Connect(ctx, actor, request.Msg.GetJanusConfiguration()); err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 	}
 	return connect.NewResponse(&daqv1.ConnectHardwareResponse{Snapshot: s.Source.Snapshot()}), nil
@@ -116,12 +117,18 @@ func (s *SystemService) ValidateConfiguration(_ context.Context, request *connec
 
 func (s *SystemService) StreamTelemetry(ctx context.Context, _ *connect.Request[daqv1.StreamTelemetryRequest], stream *connect.ServerStream[daqv1.StreamTelemetryResponse]) error {
 	updates := s.Source.Subscribe(ctx)
+	heartbeat := time.NewTicker(2 * time.Second)
+	defer heartbeat.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case snapshot := <-updates:
 			if err := stream.Send(&daqv1.StreamTelemetryResponse{Snapshot: snapshot}); err != nil {
+				return err
+			}
+		case <-heartbeat.C:
+			if err := stream.Send(&daqv1.StreamTelemetryResponse{Snapshot: s.Source.Snapshot()}); err != nil {
 				return err
 			}
 		}

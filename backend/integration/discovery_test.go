@@ -457,6 +457,72 @@ func TestEnabledLinkDiscoveryFindsEveryNode(t *testing.T) {
 	}
 }
 
+func TestProductionDiscoveryValidatesTwelveConfiguredBoards(t *testing.T) {
+	topology := simulator.ProductionTopology()
+	connections := make([]janusconfig.Connection, 0, 12)
+	for chain := 0; chain < 4; chain++ {
+		template := topology.Chains[chain][0]
+		topology.Chains[chain] = []simulator.Board{template, template, template}
+		for node := 0; node < 3; node++ {
+			connections = append(connections, janusconfig.Connection{
+				Board: len(connections), Interface: "usb", Host: "172.16.0.11",
+				Chain: chain, Node: node,
+			})
+		}
+	}
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", topology)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	discovered, err := client.DiscoverProductionTopology(ctx, connections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(discovered.Boards) != 12 {
+		t.Fatalf("boards = %d, want 12", len(discovered.Boards))
+	}
+}
+
+func TestProductionDiscoverySupportsNonContiguousLinks(t *testing.T) {
+	source := simulator.ProductionTopology()
+	var topology simulator.Topology
+	topology.Chains[2], topology.LinkStatuses[2] = source.Chains[0], 3
+	topology.Chains[5], topology.LinkStatuses[5] = source.Chains[1], 3
+	connections := []janusconfig.Connection{
+		{Board: 0, Interface: "usb", Host: "172.16.0.11", Chain: 2, Node: 0},
+		{Board: 1, Interface: "usb", Host: "172.16.0.11", Chain: 5, Node: 0},
+	}
+	server, err := simulator.Start("127.0.0.1:0", "127.0.0.1:0", topology)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client, err := dt5215.Dial(ctx, server.ControlAddress(), server.StreamAddress())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	discovered, err := client.DiscoverProductionTopology(ctx, connections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(discovered.Boards) != 2 || discovered.Boards[0].Chain != 2 || discovered.Boards[1].Chain != 5 {
+		t.Fatalf("boards = %#v", discovered.Boards)
+	}
+}
+
 func TestReadOnlyInspectionRejectsLinksRequiringInitialization(t *testing.T) {
 	topology := simulator.ProductionTopology()
 	for chain := 0; chain < 4; chain++ {

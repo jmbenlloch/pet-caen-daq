@@ -111,3 +111,49 @@ func TestConnectionsRejectDuplicateBoard(t *testing.T) {
 		t.Fatal("Connections() succeeded, want duplicate error")
 	}
 }
+
+func TestValidateProductionTopologyAcceptsTwelveBoardsAcrossFourChains(t *testing.T) {
+	connections := make([]Connection, 0, 12)
+	for board := 0; board < 12; board++ {
+		connections = append(connections, Connection{
+			Board: board, Interface: "usb", Host: "172.16.0.11",
+			Chain: board / 3, Node: board % 3,
+		})
+	}
+	if err := ValidateProductionTopology(connections); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateProductionTopologyRejectsAmbiguousAndSparseMappings(t *testing.T) {
+	tests := []struct {
+		name        string
+		connections []Connection
+		message     string
+	}{
+		{
+			name: "duplicate physical address",
+			connections: []Connection{
+				{Board: 0, Interface: "usb", Host: "172.16.0.11", Chain: 0, Node: 0},
+				{Board: 1, Interface: "usb", Host: "172.16.0.11", Chain: 0, Node: 0},
+			},
+			message: "both use",
+		},
+		{
+			name: "sparse nodes",
+			connections: []Connection{
+				{Board: 0, Interface: "usb", Host: "172.16.0.11", Chain: 3, Node: 0},
+				{Board: 1, Interface: "usb", Host: "172.16.0.11", Chain: 3, Node: 2},
+			},
+			message: "node 1 is missing",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := ValidateProductionTopology(test.connections)
+			if err == nil || !strings.Contains(err.Error(), test.message) {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
