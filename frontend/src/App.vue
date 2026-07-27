@@ -81,6 +81,13 @@ const showRawConfiguration = ref(false)
 const activeMask = ref<{ low: ConfigurationField; high: ConfigurationField }>()
 const activeBoardField = ref<ConfigurationField>()
 const activeChannelField = ref<ConfigurationField>()
+const configuredBoardIndices = computed(() =>
+  configurationDocument.value.fields
+    .filter((field) => field.name === 'Open' && field.index !== undefined)
+    .map((field) => Number(field.index))
+    .filter((board) => Number.isInteger(board) && board >= 0)
+    .sort((left, right) => left - right),
+)
 
 type SearchValueType = 'integer' | 'real' | 'text'
 type SearchScope = 'global' | 'board' | 'channel'
@@ -416,7 +423,7 @@ const hardwareActionDisabled = computed(() => {
 
 function toggleHardwareConnection() {
   if (hardwareDisconnected.value) {
-    void daq.connectHardware()
+    void daq.connectHardware(configuration.value)
   } else {
     void daq.disconnectHardware()
   }
@@ -432,7 +439,7 @@ const boards = computed(() =>
     chain.boards.map((board) => ({
       chain: chain.index,
       ...board,
-      hvTargetVoltageV: effectiveBoardNumericValues('HV_Vbias')[chain.index] ?? 0,
+      hvTargetVoltageV: effectiveBoardNumericValues('HV_Vbias')[board.logicalIndex] ?? 0,
     })),
   ),
 )
@@ -543,7 +550,7 @@ function maskBoardSummaries(field: ConfigurationField) {
   const globalHigh = configurationDocument.value.fields.find(
     (candidate) => candidate.name === highName && candidate.index === undefined,
   )
-  return Array.from({ length: 4 }, (_, board) => {
+  return configuredBoardIndices.value.map((board) => {
     const index = String(board)
     const low = configurationDocument.value.fields.find(
       (candidate) => candidate.name === field.name && candidate.index === index,
@@ -563,7 +570,7 @@ function maskBoardSummaries(field: ConfigurationField) {
 function maskVariants() {
   if (!activeMask.value) return []
   const variants = []
-  for (let target = -1; target < 4; target++) {
+  for (const target of [-1, ...configuredBoardIndices.value]) {
     const index = target < 0 ? undefined : String(target)
     const low = configurationDocument.value.fields.find(
       (field) =>
@@ -625,7 +632,7 @@ function channelOverrides(field: ConfigurationField) {
 }
 
 function nonZeroChannelOverrides(field: ConfigurationField) {
-  const counts = [0, 0, 0, 0]
+  const counts = Array.from({ length: configuredBoardIndices.value.length }, () => 0)
   for (const candidate of configurationDocument.value.fields) {
     if (
       candidate.name !== field.name ||
@@ -641,7 +648,7 @@ function nonZeroChannelOverrides(field: ConfigurationField) {
 }
 
 function boardValues(field: ConfigurationField) {
-  return Array.from({ length: 4 }, (_, board) => {
+  return configuredBoardIndices.value.map((board) => {
     const override = configurationDocument.value.fields.find(
       (candidate) =>
         candidate.name === field.name &&
@@ -670,7 +677,7 @@ function globalValue(name: string) {
 function effectiveBoardNumericValues(name: string) {
   const general = Number.parseFloat(globalValue(name) ?? '0')
   const result: Record<number, number> = {}
-  for (let board = 0; board < 4; board++) {
+  for (const board of configuredBoardIndices.value) {
     const override = configurationDocument.value.fields.find(
       (field) =>
         field.name === name && field.index === String(board) && field.channel === undefined,
@@ -695,7 +702,7 @@ function activeStopPolicy() {
 
 function applyBoardOverrides(values: Record<number, string>) {
   if (!activeBoardField.value) return
-  for (let board = 0; board < 4; board++) {
+  for (const board of configuredBoardIndices.value) {
     configurationDocument.value = setConfigurationValue(
       configurationDocument.value,
       activeBoardField.value.name,
@@ -1561,8 +1568,12 @@ onMounted(() => daq.connect())
                   @change="predicate.channel = ''"
                 >
                   <option value="">All boards</option>
-                  <option v-for="board in 4" :key="board - 1" :value="String(board - 1)">
-                    Board {{ board - 1 }}
+                  <option
+                    v-for="board in configuredBoardIndices"
+                    :key="board"
+                    :value="String(board)"
+                  >
+                    Board {{ board }}
                   </option>
                 </select>
               </label>
@@ -1791,12 +1802,14 @@ onMounted(() => daq.connect())
       >
         <StaircaseWorkspace
           :api="api"
+          :boards="configuredBoardIndices"
           :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
           :theme="theme"
           :live="daq.snapshot.value?.currentStaircase"
         />
         <HoldDelayWorkspace
           :api="api"
+          :boards="configuredBoardIndices"
           :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
           :theme="theme"
           :live="daq.snapshot.value?.currentHoldDelayScan"
@@ -1812,7 +1825,7 @@ onMounted(() => daq.connect())
       >
         <div class="section-title">
           <div>
-            <p class="eyebrow">Four-link topology</p>
+            <p class="eyebrow">Configured topology</p>
             <h2 id="boards-heading">Detector boards</h2>
           </div>
           <div class="hv-global-actions">
@@ -1838,7 +1851,7 @@ onMounted(() => daq.connect())
           <article v-for="board in boards" :key="`${board.chain}-${board.node}`" class="board-card">
             <div class="board-title">
               <div>
-                <span>Chain {{ board.chain }}</span
+                <span>Board {{ board.logicalIndex }} · Chain {{ board.chain }}</span
                 ><strong>DT5202 · node {{ board.node }}</strong>
               </div>
               <span class="health-pill" :class="healthLabel[board.health].toLowerCase()">{{
@@ -1906,9 +1919,9 @@ onMounted(() => daq.connect())
               type="button"
               :class="board.hvOn ? 'danger' : 'secondary'"
               :disabled="!daq.canSwitchHV.value"
-              @click="daq.setHighVoltage([board.chain], !board.hvOn)"
+              @click="daq.setHighVoltage([board.logicalIndex], !board.hvOn)"
             >
-              Turn board {{ board.chain }} HV {{ board.hvOn ? 'off' : 'on' }}
+              Turn board {{ board.logicalIndex }} HV {{ board.hvOn ? 'off' : 'on' }}
             </button>
           </article>
           <p v-if="!boards.length" class="empty">Waiting for discovered boards…</p>
@@ -1926,6 +1939,7 @@ onMounted(() => daq.connect())
       v-if="activeBoardField && numericConstraint(activeBoardField)"
       :field="activeBoardField"
       :constraint="numericConstraint(activeBoardField)!"
+      :boards="configuredBoardIndices"
       :overrides="boardOverrides(activeBoardField)"
       @apply="applyBoardOverrides"
       @close="activeBoardField = undefined"
@@ -1934,6 +1948,7 @@ onMounted(() => daq.connect())
       v-if="activeChannelField && numericConstraint(activeChannelField)"
       :field="activeChannelField"
       :constraint="numericConstraint(activeChannelField)!"
+      :boards="configuredBoardIndices"
       :overrides="channelOverrides(activeChannelField)"
       :nominal-bias="
         activeChannelField.name === 'HV_IndivAdj'

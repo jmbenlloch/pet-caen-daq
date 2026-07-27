@@ -159,8 +159,8 @@ describe('useDaq', () => {
     void store.connect()
     await vi.waitFor(() => expect(store.canConnectHardware.value).toBe(true))
 
-    await store.connectHardware()
-    expect(api.connectHardware).toHaveBeenCalledWith('operator')
+    await store.connectHardware('Open[0] usb:host:tdl:0:0')
+    expect(api.connectHardware).toHaveBeenCalledWith('operator', 'Open[0] usb:host:tdl:0:0')
     expect(store.snapshot.value?.state).toBe(SystemState.READY)
 
     await store.disconnectHardware()

@@ -183,7 +183,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	// Serve the API immediately while the capture-verified discovery sequence
 	// runs in the background. Failure is non-fatal and can be retried via RPC.
 	go func() {
-		if connectErr := runtime.Connect(ctx, "backend_startup"); connectErr != nil {
+		if connectErr := runtime.Connect(ctx, "backend_startup", ""); connectErr != nil {
 			fmt.Fprintf(output, "initial hardware connection failed: %v\n", connectErr)
 		}
 	}()
@@ -262,7 +262,7 @@ func listenHTTP(address string) (net.Listener, error) {
 	return listener, nil
 }
 
-func topologySnapshot(topology dt5215.Topology) *daqv1.TelemetrySnapshot {
+func topologySnapshot(topology dt5215.Topology, connections []janusconfig.Connection) *daqv1.TelemetrySnapshot {
 	snapshot := &daqv1.TelemetrySnapshot{
 		State: daqv1.SystemState_SYSTEM_STATE_IDLE,
 		Concentrator: &daqv1.Concentrator{
@@ -271,12 +271,21 @@ func topologySnapshot(topology dt5215.Topology) *daqv1.TelemetrySnapshot {
 			ProductId:        topology.Concentrator.ProductID,
 		},
 	}
+	logicalBoards := make(map[[2]uint16]uint32, len(connections))
+	for _, connection := range connections {
+		logicalBoards[[2]uint16{uint16(connection.Chain), uint16(connection.Node)}] = uint32(connection.Board)
+	}
 	boards := make(map[uint16][]*daqv1.Board)
-	for _, board := range topology.Boards {
+	for discoveredIndex, board := range topology.Boards {
+		logicalIndex, mapped := logicalBoards[[2]uint16{board.Chain, board.Node}]
+		if !mapped {
+			logicalIndex = uint32(discoveredIndex)
+		}
 		boards[board.Chain] = append(boards[board.Chain], &daqv1.Board{
 			Node: uint32(board.Node), ProductId: board.ProductID, FpgaFirmware: board.FirmwareRevision,
 			HvModuleFirmwareRaw: board.HVModuleFirmwareRaw, HvModuleFirmwareVersion: board.HVModuleFirmwareVersion,
 			HvModuleFirmwareAvailable: board.HVModuleFirmwareAvailable, Health: daqv1.HealthStatus_HEALTH_STATUS_OK,
+			LogicalIndex: logicalIndex,
 		})
 	}
 	for index, chain := range topology.Chains {

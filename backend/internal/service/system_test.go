@@ -15,10 +15,12 @@ type connectionControllerStub struct {
 	disconnectActor string
 	discoverActor   string
 	connectErr      error
+	connectConfig   string
 }
 
-func (s *connectionControllerStub) Connect(_ context.Context, actor string) error {
+func (s *connectionControllerStub) Connect(_ context.Context, actor, configuration string) error {
 	s.connectActor = actor
+	s.connectConfig = configuration
 	return s.connectErr
 }
 
@@ -71,11 +73,11 @@ func TestHardwareConnectionCommandsRequireIdentityAndReturnSnapshot(t *testing.T
 		t.Fatalf("missing identity code = %v", connect.CodeOf(err))
 	}
 	publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) { snapshot.State = daqv1.SystemState_SYSTEM_STATE_READY })
-	response, err := service.ConnectHardware(context.Background(), connect.NewRequest(&daqv1.ConnectHardwareRequest{RequestedBy: "operator"}))
+	response, err := service.ConnectHardware(context.Background(), connect.NewRequest(&daqv1.ConnectHardwareRequest{RequestedBy: "operator", JanusConfiguration: "Open[0] usb:host:tdl:0:0"}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if controller.connectActor != "operator" || response.Msg.GetSnapshot().GetState() != daqv1.SystemState_SYSTEM_STATE_READY {
+	if controller.connectActor != "operator" || controller.connectConfig == "" || response.Msg.GetSnapshot().GetState() != daqv1.SystemState_SYSTEM_STATE_READY {
 		t.Fatalf("connect response = %+v actor=%q", response.Msg, controller.connectActor)
 	}
 	if _, err = service.DisconnectHardware(context.Background(), connect.NewRequest(&daqv1.DisconnectHardwareRequest{RequestedBy: "operator"})); err != nil || controller.disconnectActor != "operator" {

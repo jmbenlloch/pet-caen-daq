@@ -1,6 +1,6 @@
 # CAEN DAQ
 
-Replacement data-acquisition software for a PET system using four CAEN DT5202 front-end boards and one DT5215 concentrator.
+Replacement data-acquisition software for a PET system using a configurable number of CAEN DT5202 front-end boards behind one DT5215 concentrator.
 
 The planned system has:
 
@@ -10,7 +10,7 @@ The planned system has:
 - a deterministic DT5215/DT5202 simulator;
 - unit, integration, protocol-conformance, and end-to-end tests.
 
-The first protocol vertical slice is implemented: the backend parses the production JANUS configuration, connects to the DT5215 control and data ports, discovers and validates the provisioned four-link topology, and reads board identity/status registers. A deterministic TCP simulator exercises the same native binary protocol in integration tests.
+The first protocol vertical slice is implemented: the backend parses the production JANUS configuration, connects to the DT5215 control and data ports, discovers and validates the provisioned multi-link/multi-node topology, and reads board identity/status registers. A deterministic TCP simulator exercises the same native binary protocol in integration tests.
 
 Project workflows use [Task](https://taskfile.dev/docs/installation) through the root `Taskfile.yml`.
 The reproducible Docker build environment, including HDF5 and Blosc, is
@@ -63,8 +63,7 @@ task docker:local:logs
 ```
 
 Open `http://localhost:5173`. This workflow runs Vite's development server with
-source hot reload and proxies its API requests to the backend container on port
-8080. Run artifacts persist in the Compose-managed volume across restarts. Use
+source hot reload and proxies its API requests to the backend container on port 8080. Run artifacts persist in the Compose-managed volume across restarts. Use
 `task docker:local:status` to inspect the services and
 `task docker:local:down` to stop them without deleting run data.
 
@@ -119,7 +118,7 @@ source editor; all paths produce the same text submitted to backend validation.
 Numeric parameters use bounded steppers with visible ranges and increments;
 native number inputs support typing and Arrow Up/Down. The three paired 64-bit
 channel masks open an accessible 8×8 selector with bulk enable, disable, and
-invert operations and Global/Board 0–3 targets. Channel-scoped settings retain
+invert operations and Global/per-configured-board targets. Channel-scoped settings retain
 a general value and provide per-board 64-channel exception grids; blank cells
 inherit the general value and explicit exceptions use JANUS
 `Parameter[board][channel]` syntax.

@@ -289,7 +289,7 @@ describe('operator dashboard', () => {
     expect(connect.text()).toBe('Connect hardware')
     expect(connect.classes()).toContain('connect')
     await connect.trigger('click')
-    expect(disconnectedApi.connectHardware).toHaveBeenCalledWith('operator')
+    expect(disconnectedApi.connectHardware).toHaveBeenCalledWith('operator', expect.any(String))
     expect(disconnectedApi.disconnectHardware).not.toHaveBeenCalled()
     disconnected.unmount()
 
@@ -341,7 +341,15 @@ describe('operator dashboard', () => {
     const raw = wrapper.get('textarea[aria-label="JANUS configuration source"]')
     expect((raw.element as HTMLTextAreaElement).value).toContain('Open[1] usb:172.16.0.11:tdl:0:1')
     expect((raw.element as HTMLTextAreaElement).value).not.toContain(
-      'Open[2] usb:127.0.0.1:tdl:2:0',
+      'Open[2] usb:172.16.0.11:tdl:2:0',
+    )
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Connect hardware')!
+      .trigger('click')
+    expect(api.connectHardware).toHaveBeenCalledWith(
+      'operator',
+      expect.stringContaining('Open[1] usb:172.16.0.11:tdl:0:1'),
     )
     wrapper.unmount()
   })

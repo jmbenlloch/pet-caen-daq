@@ -401,6 +401,9 @@ func (c *Client) DiscoverEnabledTopology(ctx context.Context) (Topology, error) 
 			return Topology{}, fmt.Errorf("TDlink %d is not ready after discovery (status %d, boards %d)", chain, info.Status, info.BoardCount)
 		}
 		nodeCount := int(info.BoardCount)
+		if nodeCount > janusconfig.MaxNodesPerChain {
+			return Topology{}, fmt.Errorf("TDlink %d reports %d boards; maximum supported is %d", chain, nodeCount, janusconfig.MaxNodesPerChain)
+		}
 		if enumerated := int(topology.Enumerations[chain].NodeCount); enumerated != nodeCount {
 			return Topology{}, fmt.Errorf("TDlink %d reports %d boards after enumerating %d nodes", chain, nodeCount, enumerated)
 		}
@@ -436,9 +439,9 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 	if err := janusconfig.ValidateProductionTopology(expected); err != nil {
 		return Topology{}, fmt.Errorf("expected topology: %w", err)
 	}
-	expectedByChain := make(map[int]janusconfig.Connection, len(expected))
+	expectedByChain := make(map[int][]janusconfig.Connection, MaxChains)
 	for _, connection := range expected {
-		expectedByChain[connection.Chain] = connection
+		expectedByChain[connection.Chain] = append(expectedByChain[connection.Chain], connection)
 	}
 
 	concentrator, err := c.ConcentratorInfo(ctx)
@@ -453,22 +456,24 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 			return Topology{}, err
 		}
 		topology.Chains[chain] = info
-		_, wanted := expectedByChain[chain]
+		connections, wanted := expectedByChain[chain]
 		// The concentrator reports disabled as status zero. Non-zero states also
 		// include pre-enumeration states, which are enabled links that this client
 		// must not mistake for disabled web provisioning.
 		enabled := info.Status != 0
 		if wanted && !enabled {
-			return Topology{}, fmt.Errorf("TDlink %d is disabled; enable links 0-3 in the DT5215 web interface", chain)
+			return Topology{}, fmt.Errorf("TDlink %d is disabled; enable the configured link in the DT5215 web interface", chain)
 		}
 		if !wanted && enabled {
-			return Topology{}, fmt.Errorf("unexpected enabled TDlink %d; disable unused links 4-7 in the DT5215 web interface", chain)
+			return Topology{}, fmt.Errorf("unexpected enabled TDlink %d; disable the unused link in the DT5215 web interface or add its cards to the configuration", chain)
 		}
 		if !wanted {
 			continue
 		}
 		if info.Status == 1 || info.Status == 2 {
 			requiresEnumeration = true
+		} else if int(info.BoardCount) != len(connections) {
+			return Topology{}, fmt.Errorf("TDlink %d reports %d boards; configuration expects %d", chain, info.BoardCount, len(connections))
 		}
 	}
 
@@ -488,8 +493,8 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 				return Topology{}, err
 			}
 			topology.Enumerations[chain] = enumeration
-			if enumeration.NodeCount != 1 {
-				return Topology{}, fmt.Errorf("TDlink %d enumerated %d nodes; expected exactly one", chain, enumeration.NodeCount)
+			if int(enumeration.NodeCount) != len(expectedByChain[chain]) {
+				return Topology{}, fmt.Errorf("TDlink %d enumerated %d nodes; configuration expects %d", chain, enumeration.NodeCount, len(expectedByChain[chain]))
 			}
 		}
 		if err := c.Synchronize(ctx); err != nil {
@@ -517,35 +522,41 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 	}
 
 	for chain := 0; chain < MaxChains; chain++ {
-		connection, wanted := expectedByChain[chain]
+		connections, wanted := expectedByChain[chain]
 		if !wanted {
 			continue
 		}
 		info := topology.Chains[chain]
-		if info.Status == 1 || info.Status == 2 || info.BoardCount != 1 {
-			return Topology{}, fmt.Errorf("TDlink %d is not ready after discovery (status %d, boards %d); expected exactly one board", chain, info.Status, info.BoardCount)
+		if info.Status == 1 || info.Status == 2 || int(info.BoardCount) != len(connections) {
+			return Topology{}, fmt.Errorf("TDlink %d is not ready after discovery (status %d, boards %d); expected %d boards", chain, info.Status, info.BoardCount, len(connections))
 		}
-
-		productID, err := c.ReadRegister(ctx, uint16(chain), uint16(connection.Node), RegisterProductID)
-		if err != nil {
-			return Topology{}, err
+		for _, connection := range connections {
+			productID, err := c.ReadRegister(ctx, uint16(chain), uint16(connection.Node), RegisterProductID)
+			if err != nil {
+				return Topology{}, err
+			}
+			firmware, err := c.ReadRegister(ctx, uint16(chain), uint16(connection.Node), RegisterFirmwareRevision)
+			if err != nil {
+				return Topology{}, err
+			}
+			status, err := c.ReadRegister(ctx, uint16(chain), uint16(connection.Node), RegisterAcquisitionStatus)
+			if err != nil {
+				return Topology{}, err
+			}
+			topology.Boards = append(topology.Boards, BoardInfo{
+				Chain:            uint16(chain),
+				Node:             uint16(connection.Node),
+				ProductID:        productID,
+				FirmwareRevision: firmware,
+				AcquisitionState: status,
+			})
 		}
-		firmware, err := c.ReadRegister(ctx, uint16(chain), uint16(connection.Node), RegisterFirmwareRevision)
-		if err != nil {
-			return Topology{}, err
-		}
-		status, err := c.ReadRegister(ctx, uint16(chain), uint16(connection.Node), RegisterAcquisitionStatus)
-		if err != nil {
-			return Topology{}, err
-		}
-		topology.Boards = append(topology.Boards, BoardInfo{
-			Chain:            uint16(chain),
-			Node:             uint16(connection.Node),
-			ProductID:        productID,
-			FirmwareRevision: firmware,
-			AcquisitionState: status,
-		})
 	}
-	sort.Slice(topology.Boards, func(i, j int) bool { return topology.Boards[i].Chain < topology.Boards[j].Chain })
+	sort.Slice(topology.Boards, func(i, j int) bool {
+		if topology.Boards[i].Chain != topology.Boards[j].Chain {
+			return topology.Boards[i].Chain < topology.Boards[j].Chain
+		}
+		return topology.Boards[i].Node < topology.Boards[j].Node
+	})
 	return topology, nil
 }

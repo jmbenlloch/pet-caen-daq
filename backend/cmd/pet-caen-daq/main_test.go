@@ -44,9 +44,12 @@ func TestTopologySnapshotIncludesEnabledAndDisabledChains(t *testing.T) {
 		Chain: 0, Node: 0, ProductID: 5202, FirmwareRevision: 0x050100,
 		HVModuleFirmwareRaw: 0x3f99999a, HVModuleFirmwareVersion: 1.2, HVModuleFirmwareAvailable: true,
 	}}
-	snapshot := topologySnapshot(topology)
+	snapshot := topologySnapshot(topology, []janusconfig.Connection{{Board: 7, Chain: 0, Node: 0}})
 	if snapshot.State != daqv1.SystemState_SYSTEM_STATE_IDLE || len(snapshot.Chains) != dt5215.MaxChains {
 		t.Fatalf("snapshot = %+v", snapshot)
+	}
+	if snapshot.Chains[0].Boards[0].GetLogicalIndex() != 7 {
+		t.Fatalf("logical board = %d, want 7", snapshot.Chains[0].Boards[0].GetLogicalIndex())
 	}
 	if snapshot.Concentrator.GetSoftwareRevision() != "2026.4.1.1" || snapshot.Concentrator.GetFpgaRevision() != "25.11.24.01-2-2" || snapshot.Concentrator.GetProductId() != 66643 {
 		t.Fatalf("concentrator = %+v", snapshot.Concentrator)

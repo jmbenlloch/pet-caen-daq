@@ -18,6 +18,7 @@ const props = defineProps<{
   systemState: SystemState
   theme: 'dark' | 'light'
   live?: DeepReadonly<HoldDelayScan>
+  boards?: number[]
 }>()
 const board = ref(0)
 const minimum = ref(0)
@@ -122,7 +123,14 @@ onMounted(refresh)
     </div>
     <div v-if="expanded" id="hold-delay-content" class="scan-card-content">
       <div class="plot-controls staircase-controls">
-        <label>Board<input v-model.number="board" type="number" min="0" max="3" /></label>
+        <label
+          >Board
+          <select v-model.number="board">
+            <option v-for="index in boards ?? [0, 1, 2, 3]" :key="index" :value="index">
+              {{ index }}
+            </option>
+          </select>
+        </label>
         <label>Minimum (ns)<input v-model.number="minimum" type="number" min="0" step="8" /></label>
         <label>Maximum (ns)<input v-model.number="maximum" type="number" min="0" step="8" /></label>
         <label>Step (ns)<input v-model.number="step" type="number" min="8" step="8" /></label>

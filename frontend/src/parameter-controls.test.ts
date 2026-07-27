@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import MaskEditor from './MaskEditor.vue'
 import NumericField from './NumericField.vue'
+import BoardOverrides from './BoardOverrides.vue'
 import { parseConfiguration } from './configuration'
 
 describe('parameter controls', () => {
@@ -41,5 +42,20 @@ describe('parameter controls', () => {
     await wrapper.get('button[aria-label="Channel 63"]').trigger('click')
     await wrapper.get('button.primary').trigger('click')
     expect(wrapper.emitted('apply')).toEqual([['global', '0x00000001', '0x80000000']])
+  })
+
+  it('renders every configured board in the override editor', () => {
+    const field = parseConfiguration('TD_CoarseThreshold 180').fields[0]
+    const boards = Array.from({ length: 12 }, (_, board) => board)
+    const wrapper = mount(BoardOverrides, {
+      props: {
+        field,
+        boards,
+        constraint: { min: 0, max: 2047, step: 1, integer: true },
+        overrides: {},
+      },
+    })
+    expect(wrapper.findAll('.board-values label')).toHaveLength(12)
+    expect(wrapper.get('[aria-label="TD_CoarseThreshold board 11"]').element).toBeTruthy()
   })
 })

@@ -17,7 +17,7 @@ type SnapshotSource interface {
 }
 
 type HardwareConnectionController interface {
-	Connect(context.Context, string) error
+	Connect(context.Context, string, string) error
 	Disconnect(context.Context, string) error
 }
 
@@ -42,7 +42,7 @@ func (s *SystemService) ConnectHardware(ctx context.Context, request *connect.Re
 	if actor == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requested_by is required"))
 	}
-	if err := s.Hardware.Connect(ctx, actor); err != nil {
+	if err := s.Hardware.Connect(ctx, actor, request.Msg.GetJanusConfiguration()); err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 	}
 	return connect.NewResponse(&daqv1.ConnectHardwareResponse{Snapshot: s.Source.Snapshot()}), nil

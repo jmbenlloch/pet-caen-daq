@@ -20,7 +20,7 @@ type hardwareConnectionStub struct {
 	disconnects int
 }
 
-func (s *hardwareConnectionStub) Connect(context.Context, string) error {
+func (s *hardwareConnectionStub) Connect(context.Context, string, string) error {
 	s.connects++
 	return nil
 }

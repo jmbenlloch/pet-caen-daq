@@ -90,28 +90,37 @@ type Coordinator struct {
 	opMu sync.Mutex
 	mu   sync.Mutex
 
-	states         *StateMachine
-	hardware       CoordinatorHardware
-	newPipeline    PipelineFactory
-	expectedChains int
-	drainTimeout   time.Duration
-	synchronized   bool
-	active         *activeRun
-	lastErr        error
-	faultObserver  func(error)
+	states        *StateMachine
+	hardware      CoordinatorHardware
+	newPipeline   PipelineFactory
+	activeChains  []uint16
+	drainTimeout  time.Duration
+	synchronized  bool
+	active        *activeRun
+	lastErr       error
+	faultObserver func(error)
 }
 
 func NewCoordinator(states *StateMachine, hardware CoordinatorHardware, newPipeline PipelineFactory, expectedChains int, drainTimeout time.Duration) (*Coordinator, error) {
+	chains := make([]uint16, expectedChains)
+	for chain := range chains {
+		chains[chain] = uint16(chain)
+	}
+	return NewCoordinatorForChains(states, hardware, newPipeline, chains, drainTimeout)
+}
+
+func NewCoordinatorForChains(states *StateMachine, hardware CoordinatorHardware, newPipeline PipelineFactory, activeChains []uint16, drainTimeout time.Duration) (*Coordinator, error) {
 	if states == nil || hardware == nil || newPipeline == nil {
 		return nil, fmt.Errorf("state machine, hardware, and pipeline factory are required")
 	}
-	if expectedChains < 1 || expectedChains > dt5215.MaxChains {
-		return nil, fmt.Errorf("expected chain count %d out of range", expectedChains)
+	chains, err := normalizeChains(activeChains)
+	if err != nil {
+		return nil, err
 	}
 	if drainTimeout <= 0 {
 		return nil, fmt.Errorf("drain timeout must be positive")
 	}
-	return &Coordinator{states: states, hardware: hardware, newPipeline: newPipeline, expectedChains: expectedChains, drainTimeout: drainTimeout}, nil
+	return &Coordinator{states: states, hardware: hardware, newPipeline: newPipeline, activeChains: chains, drainTimeout: drainTimeout}, nil
 }
 
 func (c *Coordinator) Start(ctx context.Context, runID, actor string, options RunOptions) error {
@@ -151,8 +160,8 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 	if err = c.hardware.ClearStream(ctx); err != nil {
 		return c.failStartAttached(fmt.Errorf("clear stream: %w", err), actor, pipeline, journalAttached)
 	}
-	for chain := 0; chain < c.expectedChains; chain++ {
-		if err = c.hardware.ControlChain(ctx, uint16(chain), false, 0); err != nil {
+	for _, chain := range c.activeChains {
+		if err = c.hardware.ControlChain(ctx, chain, false, 0); err != nil {
 			return c.failStartAttached(fmt.Errorf("disable chain %d readout train: %w", chain, err), actor, pipeline, journalAttached)
 		}
 	}
@@ -174,8 +183,8 @@ func (c *Coordinator) Start(ctx context.Context, runID, actor string, options Ru
 			return c.failStartAttached(fmt.Errorf("retry after synchronization: %w", err), actor, pipeline, journalAttached)
 		}
 	}
-	for chain := 0; chain < c.expectedChains; chain++ {
-		if err = c.hardware.ControlChain(ctx, uint16(chain), true, 0x100); err != nil {
+	for _, chain := range c.activeChains {
+		if err = c.hardware.ControlChain(ctx, chain, true, 0x100); err != nil {
 			return c.failStartAttached(fmt.Errorf("enable chain %d readout train: %w", chain, err), actor, pipeline, journalAttached)
 		}
 	}
@@ -255,7 +264,7 @@ func (c *Coordinator) StopWithReason(ctx context.Context, actor, reason string) 
 	// and pipeline failures independently unblock Submit.
 	deliveryCtx := context.WithoutCancel(ctx)
 	stageStarted = time.Now()
-	drainResult, drainErr := StopAndDrain(drainCtx, c.hardware, c.expectedChains, func(raw []byte, events []dt5215.StreamEvent) error {
+	drainResult, drainErr := StopAndDrainChains(drainCtx, c.hardware, c.activeChains, func(raw []byte, events []dt5215.StreamEvent) error {
 		return run.pipeline.Submit(deliveryCtx, PipelineBatch{Raw: raw, Events: events})
 	})
 	cancel()
@@ -370,7 +379,7 @@ func (c *Coordinator) watch(run *activeRun) {
 	_ = c.recordFault(readErr, "backend")
 	cleanupCtx, cancel := context.WithTimeout(context.Background(), c.drainTimeout)
 	deliveryCtx := context.WithoutCancel(cleanupCtx)
-	_, cleanupErr := StopAndDrain(cleanupCtx, c.hardware, c.expectedChains, func(raw []byte, events []dt5215.StreamEvent) error {
+	_, cleanupErr := StopAndDrainChains(cleanupCtx, c.hardware, c.activeChains, func(raw []byte, events []dt5215.StreamEvent) error {
 		return run.pipeline.Submit(deliveryCtx, PipelineBatch{Raw: raw, Events: events})
 	})
 	cancel()

@@ -94,6 +94,9 @@ message StreamTelemetryResponse {
 
 message ConnectHardwareRequest {
   string requested_by = 1;
+  // Configuration whose Open entries define the topology for this session.
+  // Empty retains the backend startup configuration for compatibility.
+  string janus_configuration = 2;
 }
 
 message ConnectHardwareResponse {
@@ -117,7 +120,7 @@ message DiscoverHardwareResponse {
 }
 
 message SetHighVoltageRequest {
-  // Empty applies to all configured boards; otherwise these are chain/board indices.
+  // Empty applies to all configured boards; otherwise these are logical JANUS board indices.
   repeated uint32 boards = 1;
   bool enabled = 2;
   string requested_by = 3;
@@ -604,6 +607,8 @@ message Board {
   // Decoded A7585 firmware version when hv_module_firmware_available is true.
   float hv_module_firmware_version = 18;
   bool hv_module_firmware_available = 19;
+  // Logical JANUS board index mapped to this physical chain/node.
+  uint32 logical_index = 20;
 }
 
 enum HealthStatus {

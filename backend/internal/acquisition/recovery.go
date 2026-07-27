@@ -29,6 +29,14 @@ type StartupRecoveryResult struct {
 }
 
 func RecoverStartup(ctx context.Context, states *StateMachine, hardware RecoveryHardware, boards []RecoveryBoard, expectedChains int, timeout time.Duration, actor string) (StartupRecoveryResult, error) {
+	chains := make([]uint16, expectedChains)
+	for chain := range chains {
+		chains[chain] = uint16(chain)
+	}
+	return RecoverStartupChains(ctx, states, hardware, boards, chains, timeout, actor)
+}
+
+func RecoverStartupChains(ctx context.Context, states *StateMachine, hardware RecoveryHardware, boards []RecoveryBoard, activeChains []uint16, timeout time.Duration, actor string) (StartupRecoveryResult, error) {
 	result := StartupRecoveryResult{Boards: append([]RecoveryBoard(nil), boards...)}
 	if states == nil || hardware == nil {
 		return result, fmt.Errorf("startup recovery state machine and hardware are required")
@@ -55,7 +63,7 @@ func RecoverStartup(ctx context.Context, states *StateMachine, hardware Recovery
 	}
 
 	drainCtx, cancelDrain := context.WithTimeout(ctx, timeout)
-	if _, err := StopAndDrain(drainCtx, hardware, expectedChains, nil); err != nil {
+	if _, err := StopAndDrainChains(drainCtx, hardware, activeChains, nil); err != nil {
 		result.CleanupWarnings = errors.Join(result.CleanupWarnings, fmt.Errorf("bounded stop and drain: %w", err))
 	}
 	cancelDrain()

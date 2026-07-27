@@ -35,8 +35,8 @@ func TestValidateConfigurationReturnsStructuredSourceLine(t *testing.T) {
 }
 
 func TestValidateConfigurationRejectsWrongTopology(t *testing.T) {
-	issues := ValidateJANUSConfiguration(strings.Replace(validTopology, ":tdl:3:0", ":tdl:4:0", 1))
-	if len(issues) != 1 || issues[0].Field != "Open" || !strings.Contains(issues[0].Message, "expected board 3") {
+	issues := ValidateJANUSConfiguration(strings.Replace(validTopology, "Open[3]", "Open[4]", 1))
+	if len(issues) != 1 || issues[0].Field != "Open" || !strings.Contains(issues[0].Message, "contiguous range") {
 		t.Fatalf("issues = %+v", issues)
 	}
 }

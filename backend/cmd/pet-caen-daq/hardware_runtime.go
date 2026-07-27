@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -78,7 +79,7 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	readHVModuleFirmware(firmwareCtx, client, &topology, r.output)
 	cancelFirmware()
 	printDiscoveredDevices(r.output, topology)
-	snapshot := topologySnapshot(topology)
+	snapshot := topologySnapshot(topology, nil)
 	snapshot.State = daqv1.SystemState_SYSTEM_STATE_DISCONNECTED
 	snapshot.Diagnostics = append(snapshot.Diagnostics, &daqv1.Diagnostic{
 		Severity: daqv1.DiagnosticSeverity_DIAGNOSTIC_SEVERITY_INFO,
@@ -89,7 +90,7 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	return nil
 }
 
-func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
+func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration string) error {
 	r.opMu.Lock()
 	defer r.opMu.Unlock()
 	r.mu.RLock()
@@ -97,6 +98,23 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 	r.mu.RUnlock()
 	if connected {
 		return fmt.Errorf("hardware is already connected")
+	}
+	if configuration != "" {
+		document, err := janusconfig.Parse(bytes.NewBufferString(configuration))
+		if err != nil {
+			return err
+		}
+		if _, err = document.Classify(); err != nil {
+			return err
+		}
+		connections, err := document.Connections()
+		if err != nil {
+			return err
+		}
+		if err = janusconfig.ValidateProductionTopology(connections); err != nil {
+			return err
+		}
+		r.document, r.connections = document, connections
 	}
 	r.publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = daqv1.SystemState_SYSTEM_STATE_CONNECTING
@@ -129,7 +147,8 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 		Parent: r.runParent, Capacity: r.capacity, Backpressure: acquisition.BackpressureBlock,
 		ExecutionIdentity: executionIdentity(topology, r.connections, r.controlAddress, r.streamAddress),
 	}}
-	coordinator, err := acquisition.NewCoordinator(states, client, factory.New, 4, r.drainTimeout)
+	activeChains := configuredChains(r.connections)
+	coordinator, err := acquisition.NewCoordinatorForChains(states, client, factory.New, activeChains, r.drainTimeout)
 	if err != nil {
 		r.publishConnectFailure(err)
 		return err
@@ -142,8 +161,8 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 	for _, board := range topology.Boards {
 		recoveryBoards = append(recoveryBoards, acquisition.RecoveryBoard{Chain: board.Chain, Node: board.Node, Status: board.AcquisitionState})
 	}
-	recoveryResult, recoveryErr := acquisition.RecoverStartup(ctx, states, client, recoveryBoards, 4, r.drainTimeout, actor)
-	r.publisher.Publish(topologySnapshot(topology))
+	recoveryResult, recoveryErr := acquisition.RecoverStartupChains(ctx, states, client, recoveryBoards, activeChains, r.drainTimeout, actor)
+	r.publisher.Publish(topologySnapshot(topology, r.connections))
 	service.PublishStartupRecovery(r.publisher, recoveryResult, recoveryErr, time.Now())
 	if recoveryErr != nil {
 		err = fmt.Errorf("recover hardware after connection: %w", recoveryErr)
@@ -161,7 +180,8 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 		targets = append(targets, acquisition.ConfigurationTarget{Board: connection.Board, Chain: uint16(connection.Chain), Node: uint16(connection.Node)})
 		hvTargets = append(hvTargets, service.HVTarget{Board: connection.Board, Chain: uint16(connection.Chain), Node: uint16(connection.Node)})
 	}
-	configurationCtx, cancelConfiguration := context.WithTimeout(ctx, 30*time.Second)
+	configurationTimeout := max(30*time.Second, time.Duration(len(r.connections))*8*time.Second)
+	configurationCtx, cancelConfiguration := context.WithTimeout(ctx, configurationTimeout)
 	configured, err := configurator.Configure(configurationCtx, r.document, targets, acquisition.ConfigureOptions{Actor: actor, Hard: true, AuthorizeHV: r.authorizeHV})
 	cancelConfiguration()
 	if err != nil {
@@ -195,6 +215,19 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor string) error {
 	failed = false
 	fmt.Fprintf(r.output, "hardware connected requested_by=%s devices=%d\n", actor, len(topology.Boards))
 	return nil
+}
+
+func configuredChains(connections []janusconfig.Connection) []uint16 {
+	seen := make(map[int]struct{}, dt5215.MaxChains)
+	chains := make([]uint16, 0, dt5215.MaxChains)
+	for _, connection := range connections {
+		if _, exists := seen[connection.Chain]; exists {
+			continue
+		}
+		seen[connection.Chain] = struct{}{}
+		chains = append(chains, uint16(connection.Chain))
+	}
+	return chains
 }
 
 func (r *hardwareRuntime) Disconnect(_ context.Context, actor string) error {

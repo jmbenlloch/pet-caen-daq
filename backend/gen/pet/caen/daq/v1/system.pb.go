@@ -1043,10 +1043,13 @@ func (x *StreamTelemetryResponse) GetSnapshot() *TelemetrySnapshot {
 }
 
 type ConnectHardwareRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestedBy   string                 `protobuf:"bytes,1,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	RequestedBy string                 `protobuf:"bytes,1,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	// Configuration whose Open entries define the topology for this session.
+	// Empty retains the backend startup configuration for compatibility.
+	JanusConfiguration string `protobuf:"bytes,2,opt,name=janus_configuration,json=janusConfiguration,proto3" json:"janus_configuration,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ConnectHardwareRequest) Reset() {
@@ -1082,6 +1085,13 @@ func (*ConnectHardwareRequest) Descriptor() ([]byte, []int) {
 func (x *ConnectHardwareRequest) GetRequestedBy() string {
 	if x != nil {
 		return x.RequestedBy
+	}
+	return ""
+}
+
+func (x *ConnectHardwareRequest) GetJanusConfiguration() string {
+	if x != nil {
+		return x.JanusConfiguration
 	}
 	return ""
 }
@@ -1308,7 +1318,7 @@ func (x *DiscoverHardwareResponse) GetSnapshot() *TelemetrySnapshot {
 
 type SetHighVoltageRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Empty applies to all configured boards; otherwise these are chain/board indices.
+	// Empty applies to all configured boards; otherwise these are logical JANUS board indices.
 	Boards        []uint32 `protobuf:"varint,1,rep,packed,name=boards,proto3" json:"boards,omitempty"`
 	Enabled       bool     `protobuf:"varint,2,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	RequestedBy   string   `protobuf:"bytes,3,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
@@ -4947,8 +4957,10 @@ type Board struct {
 	// Decoded A7585 firmware version when hv_module_firmware_available is true.
 	HvModuleFirmwareVersion   float32 `protobuf:"fixed32,18,opt,name=hv_module_firmware_version,json=hvModuleFirmwareVersion,proto3" json:"hv_module_firmware_version,omitempty"`
 	HvModuleFirmwareAvailable bool    `protobuf:"varint,19,opt,name=hv_module_firmware_available,json=hvModuleFirmwareAvailable,proto3" json:"hv_module_firmware_available,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// Logical JANUS board index mapped to this physical chain/node.
+	LogicalIndex  uint32 `protobuf:"varint,20,opt,name=logical_index,json=logicalIndex,proto3" json:"logical_index,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Board) Reset() {
@@ -5112,6 +5124,13 @@ func (x *Board) GetHvModuleFirmwareAvailable() bool {
 		return x.HvModuleFirmwareAvailable
 	}
 	return false
+}
+
+func (x *Board) GetLogicalIndex() uint32 {
+	if x != nil {
+		return x.LogicalIndex
+	}
+	return 0
 }
 
 type PipelineTelemetry struct {
@@ -5451,9 +5470,10 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\amessage\x18\x04 \x01(\tR\amessage\"\x18\n" +
 	"\x16StreamTelemetryRequest\"Y\n" +
 	"\x17StreamTelemetryResponse\x12>\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\";\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"l\n" +
 	"\x16ConnectHardwareRequest\x12!\n" +
-	"\frequested_by\x18\x01 \x01(\tR\vrequestedBy\"Y\n" +
+	"\frequested_by\x18\x01 \x01(\tR\vrequestedBy\x12/\n" +
+	"\x13janus_configuration\x18\x02 \x01(\tR\x12janusConfiguration\"Y\n" +
 	"\x17ConnectHardwareResponse\x12>\n" +
 	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\">\n" +
 	"\x19DisconnectHardwareRequest\x12!\n" +
@@ -5782,7 +5802,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x05index\x18\x01 \x01(\rR\x05index\x12\x18\n" +
 	"\aenabled\x18\x02 \x01(\bR\aenabled\x125\n" +
 	"\x06health\x18\x03 \x01(\x0e2\x1d.pet.caen.daq.v1.HealthStatusR\x06health\x12.\n" +
-	"\x06boards\x18\x04 \x03(\v2\x16.pet.caen.daq.v1.BoardR\x06boards\"\xc0\x06\n" +
+	"\x06boards\x18\x04 \x03(\v2\x16.pet.caen.daq.v1.BoardR\x06boards\"\xe5\x06\n" +
 	"\x05Board\x12\x12\n" +
 	"\x04node\x18\x01 \x01(\rR\x04node\x12\x1d\n" +
 	"\n" +
@@ -5808,7 +5828,8 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x15telemetry_observed_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\x13telemetryObservedAt\x123\n" +
 	"\x16hv_module_firmware_raw\x18\x11 \x01(\rR\x13hvModuleFirmwareRaw\x12;\n" +
 	"\x1ahv_module_firmware_version\x18\x12 \x01(\x02R\x17hvModuleFirmwareVersion\x12?\n" +
-	"\x1chv_module_firmware_available\x18\x13 \x01(\bR\x19hvModuleFirmwareAvailable\"\xe5\x04\n" +
+	"\x1chv_module_firmware_available\x18\x13 \x01(\bR\x19hvModuleFirmwareAvailable\x12#\n" +
+	"\rlogical_index\x18\x14 \x01(\rR\flogicalIndex\"\xe5\x04\n" +
 	"\x11PipelineTelemetry\x12%\n" +
 	"\x0equeue_capacity\x18\x01 \x01(\x04R\rqueueCapacity\x12\x1f\n" +
 	"\vqueue_depth\x18\x02 \x01(\x04R\n" +
