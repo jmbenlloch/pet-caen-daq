@@ -7,7 +7,7 @@ const props = defineProps<{
   field: ConfigurationField
   constraint: NumericConstraint
   overrides: Record<number, string>
-  boards?: number[]
+  boards: number[]
 }>()
 const emit = defineEmits<{ apply: [values: Record<number, string>]; close: [] }>()
 const values = ref<Record<number, string>>({ ...props.overrides })
@@ -41,7 +41,7 @@ function update(board: number, value: string) {
         >. Leave a board blank to inherit it.
       </p>
       <div class="board-values">
-        <label v-for="board in boards ?? [0, 1, 2, 3]" :key="board">
+        <label v-for="board in boards" :key="board">
           <span>Board {{ board }}</span>
           <input
             type="number"

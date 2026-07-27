@@ -4543,7 +4543,10 @@ type BoardStatistics struct {
 	TimestampCounts      []uint64 `protobuf:"varint,10,rep,packed,name=timestamp_counts,json=timestampCounts,proto3" json:"timestamp_counts,omitempty"`
 	PhaCounts            []uint64 `protobuf:"varint,11,rep,packed,name=pha_counts,json=phaCounts,proto3" json:"pha_counts,omitempty"`
 	// Sum of T-OR interval counters reported by counting and service events.
-	TOrCount      uint64 `protobuf:"varint,12,opt,name=t_or_count,json=tOrCount,proto3" json:"t_or_count,omitempty"`
+	TOrCount uint64 `protobuf:"varint,12,opt,name=t_or_count,json=tOrCount,proto3" json:"t_or_count,omitempty"`
+	// Logical JANUS board index mapped to this physical chain/node. Absent for
+	// legacy persisted runs that predate topology-aware statistics.
+	LogicalIndex  *uint32 `protobuf:"varint,13,opt,name=logical_index,json=logicalIndex,proto3,oneof" json:"logical_index,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4651,6 +4654,13 @@ func (x *BoardStatistics) GetPhaCounts() []uint64 {
 func (x *BoardStatistics) GetTOrCount() uint64 {
 	if x != nil {
 		return x.TOrCount
+	}
+	return 0
+}
+
+func (x *BoardStatistics) GetLogicalIndex() uint32 {
+	if x != nil && x.LogicalIndex != nil {
+		return *x.LogicalIndex
 	}
 	return 0
 }
@@ -5754,7 +5764,7 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"product_id\x18\x03 \x01(\rR\tproductId\"\x82\x01\n" +
 	"\x13StatisticsTelemetry\x121\n" +
 	"\x14elapsed_milliseconds\x18\x01 \x01(\x04R\x13elapsedMilliseconds\x128\n" +
-	"\x06boards\x18\x02 \x03(\v2 .pet.caen.daq.v1.BoardStatisticsR\x06boards\"\xa1\x03\n" +
+	"\x06boards\x18\x02 \x03(\v2 .pet.caen.daq.v1.BoardStatisticsR\x06boards\"\xdd\x03\n" +
 	"\x0fBoardStatistics\x12\x14\n" +
 	"\x05chain\x18\x01 \x01(\rR\x05chain\x12\x12\n" +
 	"\x04node\x18\x02 \x01(\rR\x04node\x12\x1c\n" +
@@ -5771,7 +5781,9 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\n" +
 	"pha_counts\x18\v \x03(\x04R\tphaCounts\x12\x1c\n" +
 	"\n" +
-	"t_or_count\x18\f \x01(\x04R\btOrCountJ\x04\b\a\x10\bR\x11event_build_count\"\xf9\x04\n" +
+	"t_or_count\x18\f \x01(\x04R\btOrCount\x12(\n" +
+	"\rlogical_index\x18\r \x01(\rH\x00R\flogicalIndex\x88\x01\x01B\x10\n" +
+	"\x0e_logical_indexJ\x04\b\a\x10\bR\x11event_build_count\"\xf9\x04\n" +
 	"\n" +
 	"RunSummary\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x129\n" +
@@ -6205,6 +6217,7 @@ func file_pet_caen_daq_v1_system_proto_init() {
 	file_pet_caen_daq_v1_system_proto_msgTypes[31].OneofWrappers = []any{}
 	file_pet_caen_daq_v1_system_proto_msgTypes[40].OneofWrappers = []any{}
 	file_pet_caen_daq_v1_system_proto_msgTypes[47].OneofWrappers = []any{}
+	file_pet_caen_daq_v1_system_proto_msgTypes[61].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

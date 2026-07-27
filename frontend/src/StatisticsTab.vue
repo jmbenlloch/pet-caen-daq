@@ -32,7 +32,7 @@ const props = withDefaults(
 type Metric = 'channelTriggerCounts' | 'timestampCounts' | 'phaCounts'
 const metric = ref<Metric>('channelTriggerCounts')
 const integral = ref(false)
-const selectedBoard = ref<number | 'all'>('all')
+const selectedBoard = ref<string | 'all'>('all')
 const selectedRunId = ref('live')
 const selectedRun = ref<DeepReadonly<RunSummary>>()
 const previous = ref<DeepReadonly<StatisticsTelemetry>>()
@@ -66,15 +66,28 @@ watch(
 )
 
 const boards = computed(() => displayedStatistics.value?.boards ?? [])
+function boardKey(board: DeepReadonly<BoardStatistics>) {
+  return `${board.chain}:${board.node}`
+}
+
+function boardLabel(board: DeepReadonly<BoardStatistics>) {
+  return board.logicalIndex === undefined
+    ? `Chain ${board.chain} · Node ${board.node}`
+    : `Board ${board.logicalIndex}`
+}
+
 const active = computed(() =>
   selectedBoard.value === 'all'
     ? undefined
-    : boards.value.find((board) => board.chain === selectedBoard.value),
+    : boards.value.find((board) => boardKey(board) === selectedBoard.value),
 )
 watch(
   boards,
   (next) => {
-    if (selectedBoard.value !== 'all' && !next.some((board) => board.chain === selectedBoard.value))
+    if (
+      selectedBoard.value !== 'all' &&
+      !next.some((board) => boardKey(board) === selectedBoard.value)
+    )
       selectedBoard.value = 'all'
   },
   { immediate: true },
@@ -190,7 +203,7 @@ const metricDescription = computed(
       {{
         selectedBoard === 'all'
           ? 'Select a board for per-channel metrics.'
-          : `Viewing Board ${selectedBoard} channels`
+          : `Viewing ${active ? boardLabel(active) : 'selected board'} channels`
       }}
     </p>
 
@@ -267,13 +280,13 @@ const metricDescription = computed(
       </button>
       <button
         v-for="board in boards"
-        :key="board.chain"
+        :key="boardKey(board)"
         type="button"
         role="tab"
-        :aria-selected="selectedBoard === board.chain"
-        @click="selectedBoard = board.chain"
+        :aria-selected="selectedBoard === boardKey(board)"
+        @click="selectedBoard = boardKey(board)"
       >
-        Board {{ board.chain }}
+        {{ boardLabel(board) }}
       </button>
     </div>
 
@@ -292,7 +305,7 @@ const metricDescription = computed(
         </thead>
         <tbody>
           <tr v-for="board in boards" :key="`${board.chain}-${board.node}`">
-            <th>B{{ board.chain }}</th>
+            <th>{{ boardLabel(board) }}</th>
             <td>{{ timestampSeconds(board.timestamp) }}</td>
             <td>{{ compact(board.triggerId) }}</td>
             <td>{{ boardRate(board, 'triggerCount') }}</td>
@@ -316,7 +329,7 @@ const metricDescription = computed(
     <div
       v-else-if="active"
       class="channel-statistics"
-      :aria-label="`Board ${active.chain} channel statistics`"
+      :aria-label="`${boardLabel(active)} channel statistics`"
     >
       <div v-for="channel in 64" :key="channel - 1" class="channel-statistic">
         <span>CH {{ channel - 1 }}</span>

@@ -527,6 +527,9 @@ message BoardStatistics {
   repeated uint64 pha_counts = 11;
   // Sum of T-OR interval counters reported by counting and service events.
   uint64 t_or_count = 12;
+  // Logical JANUS board index mapped to this physical chain/node. Absent for
+  // legacy persisted runs that predate topology-aware statistics.
+  optional uint32 logical_index = 13;
 }
 
 enum SystemState {

@@ -9,7 +9,7 @@ const props = defineProps<{
   overrides: Record<number, Record<number, string>>
   nominalBias?: Record<number, number>
   adjustmentRange?: string
-  boards?: number[]
+  boards: number[]
 }>()
 const emit = defineEmits<{ apply: [board: number, values: Record<number, string>]; close: [] }>()
 const board = ref(0)
@@ -55,7 +55,7 @@ function nominalVoltage(channel: number) {
         <label class="board-select"
           >Board
           <select v-model.number="board">
-            <option v-for="index in boards ?? [0, 1, 2, 3]" :key="index" :value="index">
+            <option v-for="index in boards" :key="index" :value="index">
               {{ index }}
             </option>
           </select>

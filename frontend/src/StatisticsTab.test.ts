@@ -20,6 +20,7 @@ function sample(elapsed: bigint, triggerCount: bigint, channelCount: bigint, cha
     elapsedMilliseconds: elapsed,
     boards: [
       {
+        logicalIndex: chain,
         chain,
         timestamp: 125_000_000n,
         triggerId: 9n,
@@ -36,6 +37,24 @@ function sample(elapsed: bigint, triggerCount: bigint, channelCount: bigint, cha
 }
 
 describe('StatisticsTab', () => {
+  it('distinguishes multiple logical boards on the same daisy chain', async () => {
+    const statistics = create(StatisticsTelemetrySchema, {
+      elapsedMilliseconds: 1000n,
+      boards: [
+        { logicalIndex: 4, chain: 1, node: 0, channelTriggerCounts: Array(64).fill(0n) },
+        { logicalIndex: 5, chain: 1, node: 1, channelTriggerCounts: Array(64).fill(0n) },
+      ],
+    })
+    const wrapper = mount(StatisticsTab, {
+      props: { api: apiWithRuns(), statistics },
+    })
+
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs.map((tab) => tab.text())).toEqual(['All boards', 'Board 4', 'Board 5'])
+    await tabs[2].trigger('click')
+    expect(wrapper.get('[aria-label="Board 5 channel statistics"]').isVisible()).toBe(true)
+  })
+
   it('switches between all-board, per-channel, interval, and integral views', async () => {
     const wrapper = mount(StatisticsTab, {
       props: { api: apiWithRuns(), statistics: sample(1000n, 10n, 4n) },
@@ -84,7 +103,7 @@ describe('StatisticsTab', () => {
     await wrapper.setProps({ statistics: sample(2000n, 15n, 7n, 1) })
 
     expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toBe('All boards')
-    expect(wrapper.text()).toContain('B1')
+    expect(wrapper.text()).toContain('Board 1')
     expect(wrapper.find('.channel-statistics').exists()).toBe(false)
   })
 

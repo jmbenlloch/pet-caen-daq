@@ -141,6 +141,7 @@ type RunStatistics struct {
 }
 
 type BoardStatistics struct {
+	LogicalIndex         *uint32                         `json:"logical_index,omitempty"`
 	Chain                uint8                           `json:"chain"`
 	Node                 uint8                           `json:"node"`
 	Timestamp            uint64                          `json:"timestamp,string"`

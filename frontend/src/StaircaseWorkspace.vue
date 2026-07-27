@@ -18,7 +18,7 @@ const props = defineProps<{
   systemState: SystemState
   theme: 'dark' | 'light'
   live?: DeepReadonly<StaircaseScan>
-  boards?: number[]
+  boards: number[]
 }>()
 
 const board = ref(0)
@@ -33,7 +33,7 @@ const historyBoard = ref('any')
 const historyPage = ref(1)
 const historyPageSize = 8
 const historyTotal = ref(0)
-const scanBoards = computed(() => (props.boards?.length ? props.boards : [0, 1, 2, 3]))
+const scanBoards = computed(() => props.boards)
 const finalized = ref<StaircaseScan>()
 const busy = ref(false)
 const error = ref('')

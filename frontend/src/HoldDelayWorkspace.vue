@@ -18,7 +18,7 @@ const props = defineProps<{
   systemState: SystemState
   theme: 'dark' | 'light'
   live?: DeepReadonly<HoldDelayScan>
-  boards?: number[]
+  boards: number[]
 }>()
 const board = ref(0)
 const minimum = ref(0)
@@ -126,7 +126,7 @@ onMounted(refresh)
         <label
           >Board
           <select v-model.number="board">
-            <option v-for="index in boards ?? [0, 1, 2, 3]" :key="index" :value="index">
+            <option v-for="index in boards" :key="index" :value="index">
               {{ index }}
             </option>
           </select>

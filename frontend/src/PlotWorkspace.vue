@@ -15,7 +15,7 @@ import RunDataPicker from './RunDataPicker.vue'
 const props = withDefaults(
   defineProps<{
     api: DaqApi
-    boards: Array<{ chain: number; node: number } & DeepReadonly<Board>>
+    boards: Array<{ chain: number; node: number; logicalIndex: number } & DeepReadonly<Board>>
     activeRunId?: string
     running: boolean
     loading: boolean
@@ -241,7 +241,10 @@ const kindLabel = computed(
         class="histogram-board-selector"
       >
         <header>
-          <strong>Board {{ board.chain }} · node {{ board.node }}</strong>
+          <strong
+            >Board {{ board.logicalIndex }} · Chain {{ board.chain }} · Node
+            {{ board.node }}</strong
+          >
           <span>
             <button
               type="button"
@@ -270,7 +273,7 @@ const kindLabel = computed(
               !selected.has(selectionKey(board.chain, board.node, channel - 1))
             "
             :aria-pressed="selected.has(selectionKey(board.chain, board.node, channel - 1))"
-            :aria-label="`Board ${board.chain} node ${board.node} channel ${channel - 1}`"
+            :aria-label="`Board ${board.logicalIndex}, chain ${board.chain} node ${board.node}, channel ${channel - 1}`"
             @click="toggleSelection(board.chain, board.node, channel - 1)"
           >
             {{ channel - 1 }}

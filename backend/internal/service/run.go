@@ -493,7 +493,7 @@ func statisticsTelemetry(statistics *runstore.RunStatistics) *daqv1.StatisticsTe
 			Chain: uint32(board.Chain), Node: uint32(board.Node), Timestamp: board.Timestamp,
 			TriggerId: board.TriggerID, TriggerCount: board.TriggerCount,
 			LostTriggerCount: board.LostTriggerCount, DataBytes: board.DataBytes,
-			TOrCount: board.TORCount,
+			TOrCount: board.TORCount, LogicalIndex: board.LogicalIndex,
 		}
 		for channel := range dt5202.ChannelCount {
 			converted.ChannelTriggerCounts = append(converted.ChannelTriggerCounts, uint64(board.ChannelTriggerCounts[channel]))

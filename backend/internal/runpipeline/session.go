@@ -94,7 +94,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 		_ = writer.Abort()
 		return nil, err
 	}
-	return &Session{id: runID, pipeline: pipeline, writer: writer, sink: sink}, nil
+	return &Session{id: runID, pipeline: pipeline, writer: writer, sink: sink, topology: identity.Topology}, nil
 }
 
 func configurationIdentity(options acquisition.RunOptions) (runstore.ConfigurationIdentity, error) {
@@ -137,6 +137,7 @@ type Session struct {
 	lastErr    error
 	finalized  bool
 	statistics *runstore.RunStatistics
+	topology   runstore.TopologyIdentity
 }
 
 type StorageStats struct {
@@ -434,12 +435,19 @@ func (s *Session) FinalStatisticsAt(completedAt time.Time) runstore.RunStatistic
 		ElapsedMilliseconds: uint64(elapsed),
 		Boards:              make([]runstore.BoardStatistics, 0, len(boards)),
 	}
+	logicalIndices := make(map[boardKey]uint32, len(s.topology.Boards))
+	for _, identity := range s.topology.Boards {
+		logicalIndices[boardKey{chain: uint8(identity.Chain), node: uint8(identity.Node)}] = uint32(identity.Board)
+	}
 	for _, board := range boards {
 		persisted := runstore.BoardStatistics{
 			Chain: board.Chain, Node: board.Node, Timestamp: board.Timestamp,
 			TriggerID: board.TriggerID, TriggerCount: board.TriggerCount,
 			LostTriggerCount: board.LostTriggerCount, DataBytes: board.DataBytes,
 			TORCount: board.TORCount,
+		}
+		if logicalIndex, ok := logicalIndices[boardKey{chain: board.Chain, node: board.Node}]; ok {
+			persisted.LogicalIndex = &logicalIndex
 		}
 		for channel := range dt5202.ChannelCount {
 			persisted.ChannelTriggerCounts[channel] = runstore.JSONUint64(board.ChannelTriggerCount[channel])
