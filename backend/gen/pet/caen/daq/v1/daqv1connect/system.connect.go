@@ -55,6 +55,9 @@ const (
 	// SystemServiceDisconnectHardwareProcedure is the fully-qualified name of the SystemService's
 	// DisconnectHardware RPC.
 	SystemServiceDisconnectHardwareProcedure = "/pet.caen.daq.v1.SystemService/DisconnectHardware"
+	// SystemServiceDiscoverHardwareProcedure is the fully-qualified name of the SystemService's
+	// DiscoverHardware RPC.
+	SystemServiceDiscoverHardwareProcedure = "/pet.caen.daq.v1.SystemService/DiscoverHardware"
 	// SystemServiceSetHighVoltageProcedure is the fully-qualified name of the SystemService's
 	// SetHighVoltage RPC.
 	SystemServiceSetHighVoltageProcedure = "/pet.caen.daq.v1.SystemService/SetHighVoltage"
@@ -101,6 +104,7 @@ type SystemServiceClient interface {
 	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest]) (*connect.ServerStreamForClient[v1.StreamTelemetryResponse], error)
 	ConnectHardware(context.Context, *connect.Request[v1.ConnectHardwareRequest]) (*connect.Response[v1.ConnectHardwareResponse], error)
 	DisconnectHardware(context.Context, *connect.Request[v1.DisconnectHardwareRequest]) (*connect.Response[v1.DisconnectHardwareResponse], error)
+	DiscoverHardware(context.Context, *connect.Request[v1.DiscoverHardwareRequest]) (*connect.Response[v1.DiscoverHardwareResponse], error)
 	SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error)
 }
 
@@ -151,6 +155,12 @@ func NewSystemServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(systemServiceMethods.ByName("DisconnectHardware")),
 			connect.WithClientOptions(opts...),
 		),
+		discoverHardware: connect.NewClient[v1.DiscoverHardwareRequest, v1.DiscoverHardwareResponse](
+			httpClient,
+			baseURL+SystemServiceDiscoverHardwareProcedure,
+			connect.WithSchema(systemServiceMethods.ByName("DiscoverHardware")),
+			connect.WithClientOptions(opts...),
+		),
 		setHighVoltage: connect.NewClient[v1.SetHighVoltageRequest, v1.SetHighVoltageResponse](
 			httpClient,
 			baseURL+SystemServiceSetHighVoltageProcedure,
@@ -168,6 +178,7 @@ type systemServiceClient struct {
 	streamTelemetry          *connect.Client[v1.StreamTelemetryRequest, v1.StreamTelemetryResponse]
 	connectHardware          *connect.Client[v1.ConnectHardwareRequest, v1.ConnectHardwareResponse]
 	disconnectHardware       *connect.Client[v1.DisconnectHardwareRequest, v1.DisconnectHardwareResponse]
+	discoverHardware         *connect.Client[v1.DiscoverHardwareRequest, v1.DiscoverHardwareResponse]
 	setHighVoltage           *connect.Client[v1.SetHighVoltageRequest, v1.SetHighVoltageResponse]
 }
 
@@ -201,6 +212,11 @@ func (c *systemServiceClient) DisconnectHardware(ctx context.Context, req *conne
 	return c.disconnectHardware.CallUnary(ctx, req)
 }
 
+// DiscoverHardware calls pet.caen.daq.v1.SystemService.DiscoverHardware.
+func (c *systemServiceClient) DiscoverHardware(ctx context.Context, req *connect.Request[v1.DiscoverHardwareRequest]) (*connect.Response[v1.DiscoverHardwareResponse], error) {
+	return c.discoverHardware.CallUnary(ctx, req)
+}
+
 // SetHighVoltage calls pet.caen.daq.v1.SystemService.SetHighVoltage.
 func (c *systemServiceClient) SetHighVoltage(ctx context.Context, req *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error) {
 	return c.setHighVoltage.CallUnary(ctx, req)
@@ -214,6 +230,7 @@ type SystemServiceHandler interface {
 	StreamTelemetry(context.Context, *connect.Request[v1.StreamTelemetryRequest], *connect.ServerStream[v1.StreamTelemetryResponse]) error
 	ConnectHardware(context.Context, *connect.Request[v1.ConnectHardwareRequest]) (*connect.Response[v1.ConnectHardwareResponse], error)
 	DisconnectHardware(context.Context, *connect.Request[v1.DisconnectHardwareRequest]) (*connect.Response[v1.DisconnectHardwareResponse], error)
+	DiscoverHardware(context.Context, *connect.Request[v1.DiscoverHardwareRequest]) (*connect.Response[v1.DiscoverHardwareResponse], error)
 	SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error)
 }
 
@@ -260,6 +277,12 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(systemServiceMethods.ByName("DisconnectHardware")),
 		connect.WithHandlerOptions(opts...),
 	)
+	systemServiceDiscoverHardwareHandler := connect.NewUnaryHandler(
+		SystemServiceDiscoverHardwareProcedure,
+		svc.DiscoverHardware,
+		connect.WithSchema(systemServiceMethods.ByName("DiscoverHardware")),
+		connect.WithHandlerOptions(opts...),
+	)
 	systemServiceSetHighVoltageHandler := connect.NewUnaryHandler(
 		SystemServiceSetHighVoltageProcedure,
 		svc.SetHighVoltage,
@@ -280,6 +303,8 @@ func NewSystemServiceHandler(svc SystemServiceHandler, opts ...connect.HandlerOp
 			systemServiceConnectHardwareHandler.ServeHTTP(w, r)
 		case SystemServiceDisconnectHardwareProcedure:
 			systemServiceDisconnectHardwareHandler.ServeHTTP(w, r)
+		case SystemServiceDiscoverHardwareProcedure:
+			systemServiceDiscoverHardwareHandler.ServeHTTP(w, r)
 		case SystemServiceSetHighVoltageProcedure:
 			systemServiceSetHighVoltageHandler.ServeHTTP(w, r)
 		default:
@@ -313,6 +338,10 @@ func (UnimplementedSystemServiceHandler) ConnectHardware(context.Context, *conne
 
 func (UnimplementedSystemServiceHandler) DisconnectHardware(context.Context, *connect.Request[v1.DisconnectHardwareRequest]) (*connect.Response[v1.DisconnectHardwareResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.DisconnectHardware is not implemented"))
+}
+
+func (UnimplementedSystemServiceHandler) DiscoverHardware(context.Context, *connect.Request[v1.DiscoverHardwareRequest]) (*connect.Response[v1.DiscoverHardwareResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.SystemService.DiscoverHardware is not implemented"))
 }
 
 func (UnimplementedSystemServiceHandler) SetHighVoltage(context.Context, *connect.Request[v1.SetHighVoltageRequest]) (*connect.Response[v1.SetHighVoltageResponse], error) {

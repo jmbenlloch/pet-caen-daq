@@ -172,6 +172,30 @@ Before the first controlled run, after a concentrator/cabling change, or after a
 
 The inspection opens the control and stream connections and performs chain-information and register-read operations only. It does not bind the HTTP server, create run storage, reset or enumerate links, synchronize boards, issue acquisition commands, write registers, or read the HV peripheral through selector writes.
 
+### Discovering connected cards from the dashboard
+
+When the backend is online and the hardware is disconnected, select **Discover
+cards** in the connection controls. Discovery opens a temporary DT5215
+connection, resets and enumerates every TDlink enabled in the DT5215 web
+interface, synchronizes those links, and reads the product ID, FPGA firmware,
+and acquisition status of every enumerated node. The resulting chain/node cards
+remain visible for review after the temporary connection closes.
+
+The **Connect** section of the Configuration panel then lists the proposed
+`Open[board]` address for every discovered card in physical `(chain, node)`
+order. Select **Use discovered addresses** to replace the document's existing
+indexed `Open` entries. This is an explicit editor change: review or save the
+configuration before connecting, and use the raw-configuration view if an
+external detector-position convention requires different logical board
+numbers.
+
+Discovery does not enable persistent TDlinks, apply the JANUS configuration,
+change high voltage, or start acquisition. It is nevertheless a state-changing
+hardware operation because it resets, enumerates, and synchronizes enabled
+links. Stop acquisition and disconnect the normal hardware session before
+using it. The discovered order is physical `(chain, node)` order; it does not
+infer detector position or rewrite the logical `Open[board]` mapping.
+
 A successful inspection:
 
 - lists the DT5215 identity;

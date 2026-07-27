@@ -21,12 +21,17 @@ type HardwareConnectionController interface {
 	Disconnect(context.Context, string) error
 }
 
+type HardwareDiscoveryController interface {
+	Discover(context.Context, string) error
+}
+
 type SystemService struct {
 	daqv1connect.UnimplementedSystemServiceHandler
 	Source                SnapshotSource
 	ConfigurationTemplate string
 	HV                    HVController
 	Hardware              HardwareConnectionController
+	Discovery             HardwareDiscoveryController
 }
 
 func (s *SystemService) ConnectHardware(ctx context.Context, request *connect.Request[daqv1.ConnectHardwareRequest]) (*connect.Response[daqv1.ConnectHardwareResponse], error) {
@@ -55,6 +60,20 @@ func (s *SystemService) DisconnectHardware(ctx context.Context, request *connect
 		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 	}
 	return connect.NewResponse(&daqv1.DisconnectHardwareResponse{Snapshot: s.Source.Snapshot()}), nil
+}
+
+func (s *SystemService) DiscoverHardware(ctx context.Context, request *connect.Request[daqv1.DiscoverHardwareRequest]) (*connect.Response[daqv1.DiscoverHardwareResponse], error) {
+	if s.Discovery == nil {
+		return nil, connect.NewError(connect.CodeUnimplemented, nil)
+	}
+	actor := strings.TrimSpace(request.Msg.GetRequestedBy())
+	if actor == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requested_by is required"))
+	}
+	if err := s.Discovery.Discover(ctx, actor); err != nil {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
+	}
+	return connect.NewResponse(&daqv1.DiscoverHardwareResponse{Snapshot: s.Source.Snapshot()}), nil
 }
 
 func (s *SystemService) SetHighVoltage(ctx context.Context, request *connect.Request[daqv1.SetHighVoltageRequest]) (*connect.Response[daqv1.SetHighVoltageResponse], error) {

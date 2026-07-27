@@ -71,6 +71,7 @@ function dashboardApi(state = SystemState.READY): DaqApi {
     telemetry: pendingTelemetry,
     connectHardware: vi.fn().mockResolvedValue(create(TelemetrySnapshotSchema)),
     disconnectHardware: vi.fn().mockResolvedValue(create(TelemetrySnapshotSchema)),
+    discoverHardware: vi.fn().mockResolvedValue(create(TelemetrySnapshotSchema)),
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
     start: vi.fn().mockResolvedValue({
       snapshot: create(TelemetrySnapshotSchema, {
@@ -291,6 +292,58 @@ describe('operator dashboard', () => {
     expect(disconnectedApi.connectHardware).toHaveBeenCalledWith('operator')
     expect(disconnectedApi.disconnectHardware).not.toHaveBeenCalled()
     disconnected.unmount()
+
+    const discoveryApi = dashboardApi(SystemState.DISCONNECTED)
+    const discovery = mount(App, { props: { api: discoveryApi } })
+    await flushPromises()
+    const discover = discovery
+      .findAll('button')
+      .find((button) => button.text() === 'Discover cards')!
+    await discover.trigger('click')
+    expect(discoveryApi.discoverHardware).toHaveBeenCalledWith('operator')
+    discovery.unmount()
+  })
+
+  it('offers discovered card addresses to the configuration editor', async () => {
+    const api = dashboardApi(SystemState.DISCONNECTED)
+    api.discoverHardware = vi.fn().mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        state: SystemState.DISCONNECTED,
+        chains: [
+          {
+            index: 0,
+            enabled: true,
+            boards: [{ node: 0 }, { node: 1 }],
+          },
+        ],
+      }),
+    )
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Discover cards')!
+      .trigger('click')
+    await flushPromises()
+
+    const proposal = wrapper.get('[aria-label="Discovered card addresses"]')
+    expect(proposal.text()).toContain('Board 0')
+    expect(proposal.text()).toContain('usb:172.16.0.11:tdl:0:0')
+    expect(proposal.text()).toContain('Board 1')
+    expect(proposal.text()).toContain('usb:172.16.0.11:tdl:0:1')
+    await proposal.get('.use-discovered-connections').trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'View raw configuration')!
+      .trigger('click')
+
+    const raw = wrapper.get('textarea[aria-label="JANUS configuration source"]')
+    expect((raw.element as HTMLTextAreaElement).value).toContain('Open[1] usb:172.16.0.11:tdl:0:1')
+    expect((raw.element as HTMLTextAreaElement).value).not.toContain(
+      'Open[2] usb:127.0.0.1:tdl:2:0',
+    )
+    wrapper.unmount()
   })
 
   it('shows only the run action relevant to the current state', async () => {

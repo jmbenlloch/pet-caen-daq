@@ -290,6 +290,18 @@ export function useDaq(api: DaqApi) {
     }
   }
 
+  async function discoverHardware() {
+    busy.value = true
+    error.value = ''
+    try {
+      accept(await api.discoverHardware(operatorIdentity))
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+    } finally {
+      busy.value = false
+    }
+  }
+
   async function loadHistograms(
     runId: string,
     kind: HistogramKind,
@@ -348,6 +360,9 @@ export function useDaq(api: DaqApi) {
     canConnectHardware: computed(
       () => snapshot.value?.state === SystemState.DISCONNECTED && connected.value && !busy.value,
     ),
+    canDiscoverHardware: computed(
+      () => snapshot.value?.state === SystemState.DISCONNECTED && connected.value && !busy.value,
+    ),
     canDisconnectHardware: computed(
       () =>
         (snapshot.value?.state === SystemState.IDLE ||
@@ -363,6 +378,7 @@ export function useDaq(api: DaqApi) {
     setHighVoltage,
     connectHardware,
     disconnectHardware,
+    discoverHardware,
     loadHistograms,
     refreshHistory,
     loadMoreHistory,

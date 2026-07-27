@@ -15,6 +15,7 @@ service SystemService {
   rpc StreamTelemetry(StreamTelemetryRequest) returns (stream StreamTelemetryResponse) {}
   rpc ConnectHardware(ConnectHardwareRequest) returns (ConnectHardwareResponse) {}
   rpc DisconnectHardware(DisconnectHardwareRequest) returns (DisconnectHardwareResponse) {}
+  rpc DiscoverHardware(DiscoverHardwareRequest) returns (DiscoverHardwareResponse) {}
   rpc SetHighVoltage(SetHighVoltageRequest) returns (SetHighVoltageResponse) {}
 }
 
@@ -104,6 +105,14 @@ message DisconnectHardwareRequest {
 }
 
 message DisconnectHardwareResponse {
+  TelemetrySnapshot snapshot = 1;
+}
+
+message DiscoverHardwareRequest {
+  string requested_by = 1;
+}
+
+message DiscoverHardwareResponse {
   TelemetrySnapshot snapshot = 1;
 }
 
