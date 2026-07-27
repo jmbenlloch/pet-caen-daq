@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
@@ -116,12 +117,18 @@ func (s *SystemService) ValidateConfiguration(_ context.Context, request *connec
 
 func (s *SystemService) StreamTelemetry(ctx context.Context, _ *connect.Request[daqv1.StreamTelemetryRequest], stream *connect.ServerStream[daqv1.StreamTelemetryResponse]) error {
 	updates := s.Source.Subscribe(ctx)
+	heartbeat := time.NewTicker(2 * time.Second)
+	defer heartbeat.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case snapshot := <-updates:
 			if err := stream.Send(&daqv1.StreamTelemetryResponse{Snapshot: snapshot}); err != nil {
+				return err
+			}
+		case <-heartbeat.C:
+			if err := stream.Send(&daqv1.StreamTelemetryResponse{Snapshot: s.Source.Snapshot()}); err != nil {
 				return err
 			}
 		}
