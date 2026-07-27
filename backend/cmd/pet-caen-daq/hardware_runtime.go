@@ -50,6 +50,8 @@ type hardwareRuntime struct {
 	configured    acquisition.ConfigurationResult
 }
 
+const topologyOperationTimeout = 3 * time.Minute
+
 func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	r.opMu.Lock()
 	defer r.opMu.Unlock()
@@ -62,7 +64,7 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	r.publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = daqv1.SystemState_SYSTEM_STATE_CONNECTING
 	})
-	discoveryCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	discoveryCtx, cancel := context.WithTimeout(ctx, topologyOperationTimeout)
 	defer cancel()
 	client, err := dt5215.Dial(discoveryCtx, r.controlAddress, r.streamAddress)
 	if err != nil {
@@ -70,7 +72,16 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 		return err
 	}
 	defer client.Close()
-	topology, err := client.DiscoverEnabledTopology(discoveryCtx)
+	startedAt := time.Now()
+	var discoveryProgress *daqv1.DiscoveryProgress
+	observeDiscovery := func(progress dt5215.DiscoveryProgress) {
+		discoveryProgress = protobufDiscoveryProgress(progress, startedAt, time.Now())
+		r.publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+			snapshot.State = daqv1.SystemState_SYSTEM_STATE_CONNECTING
+			snapshot.DiscoveryProgress = discoveryProgress
+		})
+	}
+	topology, err := client.DiscoverEnabledTopologyWithObserver(discoveryCtx, observeDiscovery)
 	if err != nil {
 		r.publishConnectFailure(err)
 		return err
@@ -81,6 +92,7 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	printDiscoveredDevices(r.output, topology)
 	snapshot := topologySnapshot(topology, nil)
 	snapshot.State = daqv1.SystemState_SYSTEM_STATE_DISCONNECTED
+	snapshot.DiscoveryProgress = discoveryProgress
 	snapshot.Diagnostics = append(snapshot.Diagnostics, &daqv1.Diagnostic{
 		Severity: daqv1.DiagnosticSeverity_DIAGNOSTIC_SEVERITY_INFO,
 		Code:     "HARDWARE_DISCOVERY_COMPLETE",
@@ -118,8 +130,9 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration stri
 	}
 	r.publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = daqv1.SystemState_SYSTEM_STATE_CONNECTING
+		snapshot.DiscoveryProgress = nil
 	})
-	connectCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	connectCtx, cancel := context.WithTimeout(ctx, topologyOperationTimeout)
 	defer cancel()
 	client, err := dt5215.Dial(connectCtx, r.controlAddress, r.streamAddress)
 	if err != nil {
@@ -215,6 +228,54 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration stri
 	failed = false
 	fmt.Fprintf(r.output, "hardware connected requested_by=%s devices=%d\n", actor, len(topology.Boards))
 	return nil
+}
+
+func protobufDiscoveryProgress(progress dt5215.DiscoveryProgress, startedAt, updatedAt time.Time) *daqv1.DiscoveryProgress {
+	structured := &daqv1.DiscoveryProgress{
+		Stage:            protobufDiscoveryStage(progress.Stage),
+		Active:           progress.Stage != dt5215.DiscoveryComplete && progress.Stage != dt5215.DiscoveryFailed,
+		ChainsCompleted:  uint32(progress.ChainsCompleted),
+		ChainsTotal:      uint32(progress.ChainsTotal),
+		BoardsDiscovered: uint32(progress.BoardsDiscovered),
+		BoardsTotal:      uint32(progress.BoardsTotal),
+		Message:          progress.Message,
+		StartedAt:        timestamppb.New(startedAt),
+		UpdatedAt:        timestamppb.New(updatedAt),
+	}
+	if progress.Chain >= 0 {
+		chain := uint32(progress.Chain)
+		structured.Chain = &chain
+	}
+	if progress.Node >= 0 {
+		node := uint32(progress.Node)
+		structured.Node = &node
+	}
+	return structured
+}
+
+func protobufDiscoveryStage(stage dt5215.DiscoveryStage) daqv1.DiscoveryStage {
+	switch stage {
+	case dt5215.DiscoveryIdentity:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_IDENTITY
+	case dt5215.DiscoveryScanning:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_SCANNING_LINKS
+	case dt5215.DiscoveryResetting:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_RESETTING_LINKS
+	case dt5215.DiscoveryEnumerating:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_ENUMERATING_LINKS
+	case dt5215.DiscoverySynchronizing:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_SYNCHRONIZING_LINKS
+	case dt5215.DiscoveryRecovering:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_RECOVERING_LINKS
+	case dt5215.DiscoveryReadingBoards:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_READING_BOARDS
+	case dt5215.DiscoveryComplete:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_COMPLETE
+	case dt5215.DiscoveryFailed:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_FAILED
+	default:
+		return daqv1.DiscoveryStage_DISCOVERY_STAGE_UNSPECIFIED
+	}
 }
 
 func configuredChains(connections []janusconfig.Connection) []uint16 {

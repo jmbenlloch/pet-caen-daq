@@ -15,11 +15,14 @@ import (
 
 const (
 	defaultOperationTimeout = 3 * time.Second
+	versionOperationTimeout = 10 * time.Second
 	resetOperationTimeout   = 5 * time.Second
-	enumOperationTimeout    = 10 * time.Second
+	enumOperationTimeout    = 30 * time.Second
 	syncOperationTimeout    = 10 * time.Second
 	tdlCommandDelayUnit     = 10 * time.Nanosecond
 	tdlCommandMaxAttempts   = 10
+	tdlSyncDelaySetting     = 0x16
+	tdlSyncAdjustment       = 0x00010000
 )
 
 // Client owns one DT5215 control connection and one stream connection.
@@ -196,9 +199,14 @@ func (c *Client) WriteConcentratorRegister(ctx context.Context, address, value u
 // returns CNC status 26, so it must run before discovery reads board registers.
 func (c *Client) recoverTDL(ctx context.Context, chains []int) error {
 	for _, chain := range chains {
-		// FERSlib encodes the link number in the high byte of VR_SYNC_DELAY.
-		if err := c.WriteConcentratorRegister(ctx, VirtualRegisterSyncDelay, uint32(chain)<<24); err != nil {
-			return fmt.Errorf("set TDlink %d synchronization delay: %w", chain, err)
+		// Capture-verified from pcap/allcards_janus.pcap. FERSlib selects the
+		// link in the high byte and writes both synchronization parameters
+		// before disabling the readout train.
+		link := uint32(chain) << 24
+		for _, setting := range []uint32{tdlSyncDelaySetting, tdlSyncAdjustment} {
+			if err := c.WriteConcentratorRegister(ctx, VirtualRegisterSyncDelay, link|setting); err != nil {
+				return fmt.Errorf("set TDlink %d synchronization parameter 0x%08x: %w", chain, setting, err)
+			}
 		}
 	}
 	for _, chain := range chains {
@@ -232,7 +240,7 @@ func (c *Client) ReadRegister(ctx context.Context, chain, node uint16, address u
 }
 
 func (c *Client) ConcentratorInfo(ctx context.Context) (ConcentratorInfo, error) {
-	response, err := c.exchange(ctx, []byte("VERS"), 68)
+	response, err := c.exchangeWithTimeout(ctx, []byte("VERS"), 68, versionOperationTimeout)
 	if err != nil {
 		return ConcentratorInfo{}, fmt.Errorf("VERS: %w", err)
 	}
@@ -337,6 +345,33 @@ type Topology struct {
 	Boards       []BoardInfo
 }
 
+type DiscoveryStage string
+
+const (
+	DiscoveryIdentity      DiscoveryStage = "identity"
+	DiscoveryScanning      DiscoveryStage = "scanning_links"
+	DiscoveryResetting     DiscoveryStage = "resetting_links"
+	DiscoveryEnumerating   DiscoveryStage = "enumerating_links"
+	DiscoverySynchronizing DiscoveryStage = "synchronizing_links"
+	DiscoveryRecovering    DiscoveryStage = "recovering_links"
+	DiscoveryReadingBoards DiscoveryStage = "reading_boards"
+	DiscoveryComplete      DiscoveryStage = "complete"
+	DiscoveryFailed        DiscoveryStage = "failed"
+)
+
+type DiscoveryProgress struct {
+	Stage            DiscoveryStage
+	Chain            int
+	Node             int
+	ChainsCompleted  int
+	ChainsTotal      int
+	BoardsDiscovered int
+	BoardsTotal      int
+	Message          string
+}
+
+type DiscoveryObserver func(DiscoveryProgress)
+
 // DiscoverProductionTopology verifies web provisioning, initializes enabled
 // links when CINF reports a pre-enumeration state, and reads board identity and
 // status registers.
@@ -356,13 +391,35 @@ func (c *Client) InspectProductionTopology(ctx context.Context, expected []janus
 // registers of every enumerated node. It does not apply board configuration or
 // change persistent link enablement.
 func (c *Client) DiscoverEnabledTopology(ctx context.Context) (Topology, error) {
+	return c.DiscoverEnabledTopologyWithObserver(ctx, nil)
+}
+
+func (c *Client) DiscoverEnabledTopologyWithObserver(ctx context.Context, observe DiscoveryObserver) (topology Topology, err error) {
+	progress := DiscoveryProgress{Stage: DiscoveryIdentity, Chain: -1, Node: -1, ChainsTotal: MaxChains, Message: "Reading concentrator identity"}
+	publish := func(next DiscoveryProgress) {
+		progress = next
+		if observe != nil {
+			observe(next)
+		}
+	}
+	publish(progress)
+	defer func() {
+		if err != nil {
+			progress.Stage, progress.Message = DiscoveryFailed, err.Error()
+			publish(progress)
+		}
+	}()
 	concentrator, err := c.ConcentratorInfo(ctx)
 	if err != nil {
 		return Topology{}, fmt.Errorf("read DT5215 identity: %w", err)
 	}
-	topology := Topology{Concentrator: concentrator}
+	topology = Topology{Concentrator: concentrator}
 	enabled := make([]int, 0, MaxChains)
 	for chain := 0; chain < MaxChains; chain++ {
+		publish(DiscoveryProgress{
+			Stage: DiscoveryScanning, Chain: chain, Node: -1, ChainsCompleted: chain,
+			ChainsTotal: MaxChains, Message: fmt.Sprintf("Scanning TDlink %d", chain),
+		})
 		info, infoErr := c.ChainInfo(ctx, uint16(chain))
 		if infoErr != nil {
 			return Topology{}, infoErr
@@ -371,26 +428,52 @@ func (c *Client) DiscoverEnabledTopology(ctx context.Context) (Topology, error) 
 		if info.Status != 0 {
 			enabled = append(enabled, chain)
 		}
+		publish(DiscoveryProgress{
+			Stage: DiscoveryScanning, Chain: chain, Node: -1, ChainsCompleted: chain + 1,
+			ChainsTotal: MaxChains, Message: fmt.Sprintf("TDlink %d reports %d cards", chain, info.BoardCount),
+		})
 	}
 	if len(enabled) == 0 {
 		return Topology{}, fmt.Errorf("no TDlinks are enabled; enable the required links in the DT5215 web interface")
 	}
+	publish(DiscoveryProgress{
+		Stage: DiscoveryResetting, Chain: -1, Node: -1, ChainsCompleted: 0,
+		ChainsTotal: len(enabled), Message: "Resetting enabled TDlinks",
+	})
 	if err = c.ResetLinks(ctx); err != nil {
 		return Topology{}, fmt.Errorf("initialize TDlinks: %w", err)
 	}
-	for _, chain := range enabled {
+	for index, chain := range enabled {
+		publish(DiscoveryProgress{
+			Stage: DiscoveryEnumerating, Chain: chain, Node: -1, ChainsCompleted: index,
+			ChainsTotal: len(enabled), Message: fmt.Sprintf("Enumerating TDlink %d", chain),
+		})
 		enumeration, enumerateErr := c.Enumerate(ctx, uint16(chain))
 		if enumerateErr != nil {
 			return Topology{}, enumerateErr
 		}
 		topology.Enumerations[chain] = enumeration
+		publish(DiscoveryProgress{
+			Stage: DiscoveryEnumerating, Chain: chain, Node: -1, ChainsCompleted: index + 1,
+			ChainsTotal: len(enabled), BoardsTotal: int(enumeration.NodeCount),
+			Message: fmt.Sprintf("TDlink %d enumerated %d cards", chain, enumeration.NodeCount),
+		})
 	}
+	publish(DiscoveryProgress{
+		Stage: DiscoverySynchronizing, Chain: -1, Node: -1, ChainsCompleted: len(enabled),
+		ChainsTotal: len(enabled), Message: "Synchronizing enumerated TDlinks",
+	})
 	if err = c.Synchronize(ctx); err != nil {
 		return Topology{}, fmt.Errorf("synchronize enumerated TDlinks: %w", err)
 	}
+	publish(DiscoveryProgress{
+		Stage: DiscoveryRecovering, Chain: -1, Node: -1, ChainsCompleted: len(enabled),
+		ChainsTotal: len(enabled), Message: "Recovering TDlink readout trains",
+	})
 	if err = c.recoverTDL(ctx, enabled); err != nil {
 		return Topology{}, fmt.Errorf("recover DT5215 TDlinks before board discovery: %w", err)
 	}
+	boardTotal := 0
 	for _, chain := range enabled {
 		info, infoErr := c.ChainInfo(ctx, uint16(chain))
 		if infoErr != nil {
@@ -407,7 +490,17 @@ func (c *Client) DiscoverEnabledTopology(ctx context.Context) (Topology, error) 
 		if enumerated := int(topology.Enumerations[chain].NodeCount); enumerated != nodeCount {
 			return Topology{}, fmt.Errorf("TDlink %d reports %d boards after enumerating %d nodes", chain, nodeCount, enumerated)
 		}
+		boardTotal += nodeCount
+	}
+	discovered := 0
+	for _, chain := range enabled {
+		nodeCount := int(topology.Chains[chain].BoardCount)
 		for node := 0; node < nodeCount; node++ {
+			publish(DiscoveryProgress{
+				Stage: DiscoveryReadingBoards, Chain: chain, Node: node, ChainsCompleted: len(enabled),
+				ChainsTotal: len(enabled), BoardsDiscovered: discovered, BoardsTotal: boardTotal,
+				Message: fmt.Sprintf("Reading TDlink %d node %d identity", chain, node),
+			})
 			productID, readErr := c.ReadRegister(ctx, uint16(chain), uint16(node), RegisterProductID)
 			if readErr != nil {
 				return Topology{}, readErr
@@ -424,6 +517,12 @@ func (c *Client) DiscoverEnabledTopology(ctx context.Context) (Topology, error) 
 				Chain: uint16(chain), Node: uint16(node), ProductID: productID,
 				FirmwareRevision: firmware, AcquisitionState: status,
 			})
+			discovered++
+			publish(DiscoveryProgress{
+				Stage: DiscoveryReadingBoards, Chain: chain, Node: node, ChainsCompleted: len(enabled),
+				ChainsTotal: len(enabled), BoardsDiscovered: discovered, BoardsTotal: boardTotal,
+				Message: fmt.Sprintf("Discovered card %d of %d", discovered, boardTotal),
+			})
 		}
 	}
 	sort.Slice(topology.Boards, func(i, j int) bool {
@@ -431,6 +530,11 @@ func (c *Client) DiscoverEnabledTopology(ctx context.Context) (Topology, error) 
 			return topology.Boards[i].Chain < topology.Boards[j].Chain
 		}
 		return topology.Boards[i].Node < topology.Boards[j].Node
+	})
+	publish(DiscoveryProgress{
+		Stage: DiscoveryComplete, Chain: -1, Node: -1, ChainsCompleted: len(enabled),
+		ChainsTotal: len(enabled), BoardsDiscovered: discovered, BoardsTotal: boardTotal,
+		Message: fmt.Sprintf("Discovered %d cards", discovered),
 	})
 	return topology, nil
 }

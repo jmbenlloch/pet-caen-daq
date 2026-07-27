@@ -6,6 +6,7 @@ import type { DaqApi } from './api'
 import {
   ConfigurationLayer,
   ConfigurationStage,
+  DiscoveryStage,
   HealthStatus,
   RunType,
   RunSummarySchema,
@@ -354,6 +355,35 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
+  it('shows live card discovery progress', async () => {
+    const api = dashboardApi(SystemState.CONNECTING)
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        state: SystemState.CONNECTING,
+        discoveryProgress: {
+          stage: DiscoveryStage.READING_BOARDS,
+          active: true,
+          chain: 3,
+          node: 1,
+          chainsCompleted: 6,
+          chainsTotal: 6,
+          boardsDiscovered: 7,
+          boardsTotal: 12,
+          message: 'Reading TDlink 3 node 1 identity',
+        },
+      }),
+    )
+
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    const progress = wrapper.get('[aria-label="Card discovery progress"]')
+    expect(progress.text()).toContain('Read cards')
+    expect(progress.text()).toContain('7 / 12 cards')
+    expect(progress.text()).toContain('TDlink 3, node 1')
+    expect(progress.get('[aria-label="Board discovery progress"]').attributes('value')).toBe('7')
+  })
+
   it('adds and removes configured cards within concentrator limits', async () => {
     const wrapper = mount(App, { props: { api: dashboardApi(SystemState.DISCONNECTED) } })
     await flushPromises()
@@ -602,7 +632,8 @@ describe('operator dashboard', () => {
     expect(wrapper.get('#system-heading').text()).toBe('Ready')
     expect(wrapper.text()).toContain('1 enabled link')
     expect(wrapper.text()).not.toContain('2 enabled links')
-    expect(wrapper.text()).toContain('DT5202 · node 0')
+    expect(wrapper.text()).toContain('Board 0 · Chain 0 · Node 0')
+    expect(wrapper.text()).toContain('DT5202')
     expect(wrapper.text()).toContain('24.5 °C')
     expect(wrapper.get('#history-heading').text()).toBe('Run history')
     expect(wrapper.get('#statistics-heading').text()).toBe('Statistics')

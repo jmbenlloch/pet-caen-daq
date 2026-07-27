@@ -589,6 +589,9 @@ main {
   padding: 0;
   list-style: none;
 }
+.configuration-progress-steps.discovery-progress-steps {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
 .configuration-progress-steps li {
   overflow: hidden;
   padding: 5px 7px;
@@ -1268,6 +1271,11 @@ select:focus {
   display: flex;
   gap: 11px;
   margin-top: 9px;
+}
+.hv-led-strip.two-rows {
+  display: grid;
+  grid-template-columns: repeat(var(--hv-columns), max-content);
+  row-gap: 7px;
 }
 .hv-board-led {
   display: inline-flex;

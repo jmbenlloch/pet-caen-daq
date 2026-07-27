@@ -1,13 +1,115 @@
 package dt5215
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
+
+type deadlineRecordingConn struct {
+	net.Conn
+	mu       sync.Mutex
+	deadline time.Time
+}
+
+func (c *deadlineRecordingConn) SetDeadline(deadline time.Time) error {
+	c.mu.Lock()
+	if deadline.After(c.deadline) {
+		c.deadline = deadline
+	}
+	c.mu.Unlock()
+	return c.Conn.SetDeadline(deadline)
+}
+
+func TestConcentratorInfoAllowsCaptureObservedResponseLatency(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	recording := &deadlineRecordingConn{Conn: clientConn}
+	client := &Client{control: recording}
+	go func() {
+		request := make([]byte, 4)
+		_, _ = io.ReadFull(serverConn, request)
+		response := make([]byte, 68)
+		littleEndian.PutUint32(response[:4], 64)
+		copy(response[4:20], "2026.4.1.1")
+		copy(response[20:52], "25.11.24.01-2-2")
+		copy(response[52:68], "66643")
+		_, _ = serverConn.Write(response)
+	}()
+
+	started := time.Now()
+	if _, err := client.ConcentratorInfo(context.Background()); err != nil {
+		t.Fatalf("ConcentratorInfo() error = %v", err)
+	}
+	recording.mu.Lock()
+	deadline := recording.deadline
+	recording.mu.Unlock()
+	if allowed := deadline.Sub(started); allowed < 9*time.Second {
+		t.Fatalf("VERS deadline allows %s, want approximately %s", allowed, versionOperationTimeout)
+	}
+}
+
+func TestRecoverTDLMatchesJANUSMultiChainSequence(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer clientConn.Close()
+	defer serverConn.Close()
+	client := &Client{control: clientConn}
+	chains := []int{0, 2}
+	var expected [][]byte
+	for _, chain := range chains {
+		link := uint32(chain) << 24
+		expected = append(expected,
+			EncodeConcentratorWriteRegisterRequest(VirtualRegisterSyncDelay, link|tdlSyncDelaySetting),
+			EncodeConcentratorWriteRegisterRequest(VirtualRegisterSyncDelay, link|tdlSyncAdjustment),
+		)
+	}
+	for _, chain := range chains {
+		request, _ := EncodeChainControlRequest(uint16(chain), false, 0)
+		expected = append(expected, request)
+	}
+	for _, command := range []uint32{CommandSync, CommandResetTime, CommandResetPeriodic} {
+		request, _ := EncodeCommandRequest(false, 0xff, 0xff, command, TDLCommandDelay)
+		expected = append(expected, request)
+	}
+	for _, chain := range chains {
+		request, _ := EncodeChainControlRequest(uint16(chain), true, 256)
+		expected = append(expected, request)
+	}
+
+	serverErr := make(chan error, 1)
+	go func() {
+		for index, want := range expected {
+			got := make([]byte, len(want))
+			if _, err := io.ReadFull(serverConn, got); err != nil {
+				serverErr <- err
+				return
+			}
+			if !bytes.Equal(got, want) {
+				serverErr <- fmt.Errorf("request %d = %x, want %x", index, got, want)
+				return
+			}
+			if _, err := serverConn.Write([]byte{0, 0, 0, 0}); err != nil {
+				serverErr <- err
+				return
+			}
+		}
+		serverErr <- nil
+	}()
+
+	if err := client.recoverTDL(context.Background(), chains); err != nil {
+		t.Fatalf("recoverTDL() error = %v", err)
+	}
+	if err := <-serverErr; err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestControlCancellationInterruptsStalledReply(t *testing.T) {
 	clientConn, serverConn := net.Pipe()

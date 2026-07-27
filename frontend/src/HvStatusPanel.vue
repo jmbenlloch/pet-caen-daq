@@ -49,7 +49,13 @@ const globalLabel = computed(() => {
         {{ globalLabel }}
       </strong>
     </div>
-    <div v-if="boards.length" class="hv-led-strip" aria-label="High-voltage status by board">
+    <div
+      v-if="boards.length"
+      class="hv-led-strip"
+      :class="{ 'two-rows': boards.length > 6 }"
+      :style="{ '--hv-columns': Math.ceil(boards.length / 2) }"
+      aria-label="High-voltage status by board"
+    >
       <span
         v-for="board in boards"
         :key="`${board.chain}-${board.node}`"

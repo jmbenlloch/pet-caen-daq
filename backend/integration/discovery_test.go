@@ -442,12 +442,22 @@ func TestEnabledLinkDiscoveryFindsEveryNode(t *testing.T) {
 	}
 	defer client.Close()
 
-	discovered, err := client.DiscoverEnabledTopology(ctx)
+	var progress []dt5215.DiscoveryProgress
+	discovered, err := client.DiscoverEnabledTopologyWithObserver(ctx, func(update dt5215.DiscoveryProgress) {
+		progress = append(progress, update)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(discovered.Boards) != 12 {
 		t.Fatalf("boards = %d, want 12", len(discovered.Boards))
+	}
+	if len(progress) == 0 || progress[0].Stage != dt5215.DiscoveryIdentity {
+		t.Fatalf("initial discovery progress = %+v", progress)
+	}
+	final := progress[len(progress)-1]
+	if final.Stage != dt5215.DiscoveryComplete || final.BoardsDiscovered != 12 || final.BoardsTotal != 12 {
+		t.Fatalf("final discovery progress = %+v", final)
 	}
 	for index, board := range discovered.Boards {
 		wantChain, wantNode := uint16(index/3), uint16(index%3)

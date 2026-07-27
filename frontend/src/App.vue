@@ -33,6 +33,7 @@ import {
   ConfigurationLayer,
   ConfigurationStage,
   DiagnosticSeverity,
+  DiscoveryStage,
   HealthStatus,
   RunType,
   SearchRunsRequestSchema,
@@ -533,6 +534,45 @@ const configurationOverallValue = computed(() => {
   if (!progress?.boardsTotal) return 0
   return Math.min(progress.boardsCompleted, progress.boardsTotal)
 })
+const discoveryProgress = computed(() => daq.snapshot.value?.discoveryProgress)
+const discoveryProgressVisible = computed(
+  () =>
+    discoveryProgress.value !== undefined &&
+    discoveryProgress.value.stage !== DiscoveryStage.UNSPECIFIED,
+)
+const discoveryStageLabels: Partial<Record<DiscoveryStage, string>> = {
+  [DiscoveryStage.IDENTITY]: 'Identity',
+  [DiscoveryStage.SCANNING_LINKS]: 'Scan links',
+  [DiscoveryStage.RESETTING_LINKS]: 'Reset links',
+  [DiscoveryStage.ENUMERATING_LINKS]: 'Enumerate',
+  [DiscoveryStage.SYNCHRONIZING_LINKS]: 'Synchronize',
+  [DiscoveryStage.RECOVERING_LINKS]: 'Recover',
+  [DiscoveryStage.READING_BOARDS]: 'Read cards',
+  [DiscoveryStage.COMPLETE]: 'Complete',
+  [DiscoveryStage.FAILED]: 'Failed',
+}
+const discoveryStageSteps = [
+  DiscoveryStage.IDENTITY,
+  DiscoveryStage.SCANNING_LINKS,
+  DiscoveryStage.RESETTING_LINKS,
+  DiscoveryStage.ENUMERATING_LINKS,
+  DiscoveryStage.SYNCHRONIZING_LINKS,
+  DiscoveryStage.RECOVERING_LINKS,
+  DiscoveryStage.READING_BOARDS,
+]
+const discoveryStagePosition = computed(() =>
+  discoveryStageSteps.indexOf(discoveryProgress.value?.stage ?? 0),
+)
+const discoveryStageLabel = computed(
+  () => discoveryStageLabels[discoveryProgress.value?.stage ?? 0] ?? 'Preparing',
+)
+const discoveryCounterLabel = computed(() => {
+  const progress = discoveryProgress.value
+  if (!progress) return ''
+  if (progress.boardsTotal) return `${progress.boardsDiscovered} / ${progress.boardsTotal} cards`
+  if (progress.chainsTotal) return `${progress.chainsCompleted} / ${progress.chainsTotal} links`
+  return ''
+})
 
 async function loadConfiguration(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
@@ -957,6 +997,65 @@ onMounted(() => daq.connect())
           {{ diagnostic.code }} — {{ diagnostic.message }}
         </span>
       </div>
+
+      <section
+        v-if="discoveryProgressVisible && discoveryProgress"
+        class="configuration-progress-panel"
+        :class="{ failed: discoveryProgress.stage === DiscoveryStage.FAILED }"
+        role="status"
+        aria-live="polite"
+        aria-label="Card discovery progress"
+      >
+        <div class="configuration-progress-heading">
+          <div>
+            <span class="eyebrow">Hardware discovery</span>
+            <strong>{{ discoveryStageLabel }}</strong>
+          </div>
+          <span class="configuration-progress-board">{{ discoveryCounterLabel }}</span>
+        </div>
+        <ol
+          v-if="discoveryProgress.stage !== DiscoveryStage.FAILED"
+          class="configuration-progress-steps discovery-progress-steps"
+          aria-label="Discovery stages"
+        >
+          <li
+            v-for="(stage, index) in discoveryStageSteps"
+            :key="stage"
+            :class="{
+              current: index === discoveryStagePosition,
+              complete:
+                discoveryProgress.stage === DiscoveryStage.COMPLETE ||
+                index < discoveryStagePosition,
+            }"
+          >
+            {{ discoveryStageLabels[stage] }}
+          </li>
+        </ol>
+        <div class="configuration-progress-detail">
+          <span>{{ discoveryProgress.message || 'Discovering cards' }}</span>
+          <span>{{ discoveryCounterLabel }}</span>
+        </div>
+        <progress
+          v-if="discoveryProgress.boardsTotal"
+          :value="discoveryProgress.boardsDiscovered"
+          :max="discoveryProgress.boardsTotal"
+          aria-label="Board discovery progress"
+        />
+        <progress
+          v-else-if="discoveryProgress.chainsTotal"
+          :value="discoveryProgress.chainsCompleted"
+          :max="discoveryProgress.chainsTotal"
+          aria-label="TDlink scan progress"
+        />
+        <div class="configuration-progress-meta">
+          <span v-if="discoveryProgress.chain !== undefined">
+            TDlink {{ discoveryProgress.chain
+            }}<template v-if="discoveryProgress.node !== undefined"
+              >, node {{ discoveryProgress.node }}</template
+            >
+          </span>
+        </div>
+      </section>
 
       <section
         v-if="configurationProgressVisible && configurationProgress"
@@ -1900,8 +1999,10 @@ onMounted(() => daq.connect())
           <article v-for="board in boards" :key="`${board.chain}-${board.node}`" class="board-card">
             <div class="board-title">
               <div>
-                <span>Board {{ board.logicalIndex }} · Chain {{ board.chain }}</span
-                ><strong>DT5202 · node {{ board.node }}</strong>
+                <span
+                  >Board {{ board.logicalIndex }} · Chain {{ board.chain }} · Node
+                  {{ board.node }}</span
+                ><strong>DT5202</strong>
               </div>
               <span class="health-pill" :class="healthLabel[board.health].toLowerCase()">{{
                 healthLabel[board.health]
