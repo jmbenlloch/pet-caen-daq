@@ -10,6 +10,9 @@ The byte-exact real-hardware PCAP inventory, findings, and resulting corrections
 The physical/software architecture and the complete command-surface inventory
 recovered from DT5215 software release 2026.4.1.1 are recorded in
 [DT5215 system architecture and command inventory](dt5215-system-architecture-and-command-inventory.md).
+The static-analysis procedure used to recover and verify that inventory is
+documented in
+[Reproducing the DT5215 binary protocol analysis](dt5215-binary-analysis-method.md).
 
 The project decision is to implement the transport, protocol, configuration, acquisition sequencing, and decoding natively in Go. FERSlib will not be a runtime dependency. Its included source is reference evidence and may be used as a comparison oracle while developing tests.
 

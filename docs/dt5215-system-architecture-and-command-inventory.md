@@ -29,6 +29,8 @@ The findings combine:
 The browser-to-device chain scan and its comparison with native discovery are
 documented separately in
 [DT5215 webapp chain-scan protocol compared with native Go discovery](dt5215-webapp-discovery-protocol.md).
+The extraction, disassembly, call-graph, and cross-check procedure is documented
+in [Reproducing the DT5215 binary protocol analysis](dt5215-binary-analysis-method.md).
 
 Evidence labels follow the repository policy:
 
