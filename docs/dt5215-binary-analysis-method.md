@@ -382,7 +382,236 @@ The resulting comparison should distinguish:
 - capture-derived recovery:
   `CWRG`, `CCNT`, and delayed broadcast `FCMD`.
 
-## 10. Validation checklist
+## 10. Run the real ARM executable under QEMU
+
+The 2026 bridge can be executed with QEMU user-mode. This is not a complete
+DT5215 emulator: QEMU executes the genuine AArch64 Linux process, while sparse
+files and a small `ioctl` interposer stand in for the FPGA MMIO, DMA, UIO, and
+I2C devices. It is useful for exercising process initialization and handlers
+whose result does not depend on realistic FPGA state.
+
+Run this only on an analysis workstation. All writable state is placed in a
+temporary root filesystem; never point the commands at a mounted production
+device filesystem.
+
+### 10.1 Prerequisites
+
+The host needs:
+
+- `qemu-aarch64-static`;
+- `bwrap` (Bubblewrap);
+- `docker`, used below only to build a temporary AArch64 shared object; and
+- the copied rootfs and extracted NIU under the sibling `firmware` directory.
+
+On Debian-derived systems, the first two packages are normally
+`qemu-user-static` and `bubblewrap`.
+
+Run the following commands from the `pet-caen-daq` repository root.
+
+### 10.2 Prepare an isolated ARM root filesystem
+
+```bash
+EMU_ROOT=$(mktemp -d /tmp/dt5215-qemu-rootfs.XXXXXX)
+
+tar -xzf ../firmware/device-172.16.0.11-rootfs.tar.gz \
+  -C "$EMU_ROOT"
+
+cp -a \
+  ../firmware/dt5215-upgrade_2026.4.1.1-extracted/caen/. \
+  "$EMU_ROOT/caen/"
+
+cp /usr/bin/qemu-aarch64-static \
+  "$EMU_ROOT/usr/bin/qemu-aarch64-static"
+```
+
+The copied rootfs supplies the AArch64 dynamic loader and libraries. Copying
+the extracted `caen` directory over it selects the 2026.4.1.1 application,
+configuration, and web assets. The original archives are never modified.
+
+### 10.3 Create synthetic MMIO, DMA, and UIO resources
+
+The bridge maps physical addresses as file offsets in `/dev/mem`. A sparse file
+therefore provides the required address space without consuming 4.3 GB of
+physical storage:
+
+```bash
+truncate -s 4300000000 /tmp/dt5215-devmem.bin
+
+# FPGA firmware magic at physical 0x81000000 + 15 * 4.
+printf '\x22\x22\xba\xab' |
+  dd of=/tmp/dt5215-devmem.bin \
+    bs=1 seek=2164260924 conv=notrunc status=none
+
+truncate -s 1048576 /tmp/dt5215-udmabuf0.bin
+truncate -s 16384   /tmp/dt5215-udmabuf1.bin
+truncate -s 4096    /tmp/dt5215-uio4.bin
+truncate -s 4096    /tmp/dt5215-i2c.bin
+```
+
+Create the sysfs metadata read by the application's DMA wrappers:
+
+```bash
+mkdir -p \
+  /tmp/dt5215-udma-sys/udmabuf0 \
+  /tmp/dt5215-udma-sys/udmabuf1 \
+  /tmp/dt5215-uio-sys/uio4/maps/map0
+
+printf '%s\n' 1048576   > /tmp/dt5215-udma-sys/udmabuf0/size
+printf '%s\n' 0x10000000 > /tmp/dt5215-udma-sys/udmabuf0/phys_addr
+printf '%s\n' 0          > /tmp/dt5215-udma-sys/udmabuf0/sync_for_device
+printf '%s\n' 0          > /tmp/dt5215-udma-sys/udmabuf0/sync_for_cpu
+
+printf '%s\n' 16384      > /tmp/dt5215-udma-sys/udmabuf1/size
+printf '%s\n' 0x10100000 > /tmp/dt5215-udma-sys/udmabuf1/phys_addr
+printf '%s\n' 0          > /tmp/dt5215-udma-sys/udmabuf1/sync_for_device
+printf '%s\n' 0          > /tmp/dt5215-udma-sys/udmabuf1/sync_for_cpu
+
+printf '%s\n' 0x1000     > /tmp/dt5215-uio-sys/uio4/maps/map0/size
+printf '%s\n' 0x80050000 > /tmp/dt5215-uio-sys/uio4/maps/map0/addr
+printf '%s\n' 0x0        > /tmp/dt5215-uio-sys/uio4/maps/map0/offset
+```
+
+The firmware magic is directly established by the `io_driver` constructor:
+it maps `0x81000000`, reads word 15, and compares it with `0xABBA2222`.
+
+### 10.4 Build the temporary I2C `ioctl` interposer
+
+The application expects hardware-specific I2C ioctls. For handler analysis,
+an interposer can make those initialization calls return success:
+
+```bash
+cat >/tmp/dt5215-ioctl-shim.c <<'EOF'
+#include <sys/ioctl.h>
+
+int ioctl(int fd, unsigned long request, ...)
+{
+    (void)fd;
+    (void)request;
+    return 0;
+}
+EOF
+
+docker run --rm \
+  -v /tmp:/work \
+  debian:bookworm-slim \
+  sh -lc '
+    apt-get update >/dev/null &&
+    apt-get install -y --no-install-recommends \
+      gcc-aarch64-linux-gnu libc6-dev-arm64-cross >/dev/null &&
+    aarch64-linux-gnu-gcc -shared -fPIC -O2 \
+      -o /work/dt5215-ioctl-shim.so \
+      /work/dt5215-ioctl-shim.c
+  '
+
+cp /tmp/dt5215-ioctl-shim.so \
+  "$EMU_ROOT/caen/software/libdt5215-ioctl-shim.so"
+```
+
+This shim intentionally does not model I2C transactions. Any value derived
+from an I2C device is synthetic and must not be classified as hardware
+evidence.
+
+### 10.5 Launch the bridge
+
+Run this in a dedicated terminal:
+
+```bash
+timeout 300s bwrap \
+  --bind "$EMU_ROOT" / \
+  --dev /dev \
+  --bind /tmp/dt5215-devmem.bin /dev/mem \
+  --bind /tmp/dt5215-udmabuf0.bin /dev/udmabuf0 \
+  --bind /tmp/dt5215-udmabuf1.bin /dev/udmabuf1 \
+  --bind /tmp/dt5215-uio4.bin /dev/uio4 \
+  --bind /tmp/dt5215-i2c.bin /dev/i2c-0 \
+  --bind /tmp/dt5215-i2c.bin /dev/i2c-2 \
+  --bind /tmp/dt5215-i2c.bin /dev/i2c-3 \
+  --bind /tmp/dt5215-i2c.bin /dev/i2c-4 \
+  --proc /proc \
+  --bind /tmp/dt5215-udma-sys /sys/class/u-dma-buf \
+  --bind /tmp/dt5215-uio-sys /sys/class/uio \
+  --setenv LD_PRELOAD /caen/software/libdt5215-ioctl-shim.so \
+  -- /usr/bin/qemu-aarch64-static \
+     /caen/software/fers_bridge.elf
+```
+
+Successful startup includes:
+
+```text
+Application Started
+FW_VERSION: 2026.4.1.1
+Starting data and control server...
+```
+
+If `Socket creation failed` appears, the execution environment is blocking
+local socket creation or one of ports 9000, 9760, and 8080 is already occupied.
+
+Add `--setenv QEMU_STRACE 1` before `--` to trace ARM Linux system calls.
+
+### 10.6 Send read-only protocol probes
+
+Use a second terminal. This example sends only `VERS`, `CINF`, and `ENUM`;
+it does not send register writes, commands, resets, or acquisition control:
+
+```bash
+python3 - <<'PY'
+import socket
+
+probes = (
+    (b"VERS", 68),
+    (b"CINF\x00\x00", 40),
+    (b"ENUM\x06\x00", 12),  # disabled chain in the supplied configuration
+)
+
+for request, expected in probes:
+    with socket.create_connection(("127.0.0.1", 9760), timeout=2) as sock:
+        sock.sendall(request)
+        reply = bytearray()
+        while len(reply) < expected:
+            chunk = sock.recv(expected - len(reply))
+            if not chunk:
+                break
+            reply.extend(chunk)
+    print(request[:4].decode(), len(reply), bytes(reply).hex())
+PY
+```
+
+Observed read-only results from the 2026 executable included:
+
+```text
+VERS 68 ...
+CINF 40 010000000000000000000000000000000000000000000000000000000000000000803b4500000000
+ENUM 12 190000000000000000000000
+```
+
+The CINF capacity field `00 80 3b 45` is little-endian float32 `3000.0`.
+ENUM status `0x19` is decimal 25, `StatusChainDisabled`.
+
+Do not invoke `RBTF`, `RSTR`, firmware upgrade, raw writes, or other destructive
+handlers in this environment. The shims do not make those operations
+meaningful, and a command may escape into host-visible process or network
+behavior even though MMIO is synthetic.
+
+### 10.7 Evidence limits
+
+This setup proves that code paths in the genuine ARM executable are reachable
+and can confirm framing, parsing, fixed metadata, and software-only behavior.
+It does not reproduce FPGA state transitions, TDlink traffic, interrupt timing,
+DMA semantics, boot-slot selection, physical I2C devices, or real board
+responses.
+
+Classify results accordingly:
+
+- handler framing directly observed from the real executable: `inferred`,
+  strengthened by static data flow;
+- bytes also present in retained physical captures: `capture-verified`;
+- values produced only by sparse MMIO or the ioctl shim: synthetic emulator
+  output, not protocol evidence.
+
+Stop the bridge with Ctrl-C or let `timeout` terminate it. The temporary root
+can be discarded after recording the executable hash and results.
+
+## 11. Validation checklist
 
 Before publishing results:
 
