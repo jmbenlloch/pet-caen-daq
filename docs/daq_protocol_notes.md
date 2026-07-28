@@ -77,7 +77,7 @@ The four ASCII opcode bytes are followed by packed little-endian binary fields. 
 | Arm delayed command | `DCMD`, same 20-byte shape as `FCMD` | u32 status |
 | Concentrator virtual-register write | `CWRG`, u32 address @4, u32 data @8 (12 B) | u32 status |
 | Concentrator virtual-register read | `CRRG`, u32 address @4 (8 B) | u32 status, u32 data |
-| Chain information | `CINF`, u16 chain @4 (6 B) | 40 B requested; fields consumed are status u16, board count u16, RTT float32, event count u64, byte count u64, event rate float32, Mbit/s float32 |
+| Chain information | `CINF`, u16 chain @4 (6 B) | 40 B: status u16, board count u16, RTT float32, event count u64, byte count u64, event rate float32, Mbit/s float32, capacity Mbit/s float32, current timestamp float32 |
 | Chain control | `CCNT`, u16 chain @4, u16 enable @6, u32 token interval @8 (12 B) | u32 status |
 | Enumerate one chain | `ENUM`, u16 chain @4 (6 B) | 12 B: u32 status, u32 node count, u32 word with unknown semantics |
 | Synchronize chains | `SNT0` (4 B) | u32 status |

@@ -125,11 +125,11 @@ are little-endian. Unless noted, status is a `u32`, with zero meaning success.
 | `DCMD` | same as `FCMD` | status | Arm a delayed/synchronous FERS command | device/source/capture | yes |
 | `ACMD` | `u16 chain` | status | Abort the pending command on one TDlink chain | device-confirmed by disassembly and `fers_abort_command` | no |
 | `RLNK` | none | status | Reset TDlink chains before re-enumeration | device/source/capture | yes |
-| `ENUM` | `u16 chain` | status, `u32 node_count`, `u32 unknown` | Enumerate one TDlink ring | device/source/capture | yes |
+| `ENUM` | `u16 chain` | status, `u32 node_count`, `u32 round_trip_ticks` | Enumerate one TDlink ring; one tick is 6.4 ns | inferred by direct binary data flow; capture-verified correlation | yes |
 | `CCNT` | `u16 chain, u16 enable, u32 token_interval` | status | Enable/disable that chain's readout train and set token interval | device/source/capture | yes |
 | `SNT0` | none | status | Synchronize the enabled chains | device/source/capture | yes |
 | `CLRS` | none | status | Clear/flush concentrator hardware stream buffers | device/source/capture | yes |
-| `CINF` | `u16 chain` | fixed 40 bytes | Read link status, board count, RTT, event/byte counters and rates | device/source/capture | yes |
+| `CINF` | `u16 chain` | fixed 40 bytes | Read link status, board count, RTT, event/byte counters and rates, 3000 Mbps capacity, and current timestamp | source/capture; final fields inferred by direct binary data flow | yes |
 | `CWRG` | `u32 virtual_address, u32 data` | status | Write a DT5215 virtual register | device/source/capture | yes |
 | `CRRG` | `u32 virtual_address` | status, `u32 data` | Read a DT5215 virtual register | device/source/capture | no |
 | `VERS` | none | `u32 length` + 64-byte payload | Read ARM software revision, FPGA revision, and product ID | device/source/capture | yes |
@@ -256,10 +256,35 @@ surface for enabled links.
    register.
 3. Document HTTP verbs and JSON schemas by statically following every registered
    handler. Do not learn destructive routes by probing the live device.
-4. Resolve the third `ENUM` response word. FERSlib receives but does not name it.
-5. Resolve the unused final eight bytes of the fixed 40-byte `CINF` reply.
 
-### What the native simulator can and cannot resolve
+### Resolved by executing the ARM binary under QEMU
+
+On 2026-07-28, the unmodified 2026.4.1.1 AArch64 executable was run with
+`qemu-aarch64-static` against the copied device root filesystem. A sparse
+`/dev/mem` image supplied the firmware magic and MMIO ranges; inert
+u-dma-buf/UIO/I2C shims allowed the real program to complete initialization and
+serve its port-9760 dispatcher. Only read-only `VERS`, `CINF`, and a disabled
+chain's `ENUM` were queried.
+
+That execution, static data-flow analysis, and the retained real captures
+resolve the former `ENUM` and `CINF` unknowns:
+
+- `ENUM` response word 2 is the raw value read from per-chain FPGA register 7.
+  The executable returns it unchanged and calculates the CINF round-trip time
+  as `word2 * 6.4 ns`. The real captured pair, 60 ticks and 384.0 ns, satisfies
+  that calculation exactly.
+- CINF bytes 32--35 are `capacity_mbps`, a float32 narrowed from an internal
+  double hard-coded to 3000.0 for an enabled chain.
+- CINF bytes 36--39 are `current_ts`, also a float32 narrowed from an internal
+  double. Retained captures contain zero for this field.
+
+The names `capacity_mbps` and `current_ts` are embedded in the real
+`chains_status` handler next to the other chain-information field names. The
+field meanings are `inferred` by direct static data flow and correlated with
+`capture-verified` values; the QEMU MMIO values alone are not treated as
+physical-hardware evidence.
+
+### What the native Go simulator can and cannot resolve
 
 A targeted simulator run on 2026-07-28 passed the DT5215 codec and simulator
 unit suites and six discovery/enumeration integration scenarios. It confirms
@@ -267,26 +292,23 @@ that the native Go client and simulator agree on request framing, exact reply
 lengths, topology discovery, non-contiguous enabled links, and re-enumeration
 from the pre-enumeration link state.
 
-That run does **not** resolve any of the five semantic unknowns above. The
-simulator is a project-maintained test double whose relevant replies are
-deliberately synthetic:
+That run did not itself resolve the semantic unknowns. The simulator is a
+project-maintained test double whose relevant replies were deliberately
+synthetic:
 
-- `ENUM` word 2 is generated as `60 + chain`; that pattern is a deterministic
-  fixture, not a decoded hardware meaning.
-- bytes 32--39 of the 40-byte `CINF` reply are initialized to zero and have no
-  modeled fields.
+- `ENUM` round-trip ticks are generated as `60 + chain`.
+- the simulator now reports the binary-derived 3000 Mbps CINF capacity and a
+  deterministic zero current timestamp.
 - `ACMD`, `RBTF`, and `RSTR` are not implemented by the simulator.
 - the simulator has no boot-slot, factory-button, web-server, or Linux
   process-supervisor model.
 
 Consequently, simulator observations remain `simulator-observed` test evidence
-and cannot promote an `unknown` to `source-confirmed`, `capture-verified`, or
-`hardware-verified`. `ENUM` word 2 and the final `CINF` bytes require source or
-binary data-flow analysis followed by passive real captures across changing
-link conditions. `RSTR`, `RBTF`, and the HTTP schemas require static analysis
-of the captured firmware (or a purpose-built full-system emulation); the
-destructive reset commands must not be probed on production hardware merely to
-refine documentation.
+and cannot independently promote an `unknown` to `source-confirmed`,
+`capture-verified`, or `hardware-verified`. `RSTR`, `RBTF`, and the remaining
+HTTP schemas require static analysis of the captured firmware or more
+purpose-built emulation. The destructive reset commands must not be probed on
+production hardware merely to refine documentation.
 
 ## Comparison with the captured device root filesystem
 

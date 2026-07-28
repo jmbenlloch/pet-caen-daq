@@ -44,24 +44,30 @@ const (
 
 var littleEndian = binary.LittleEndian
 
-// ChainInfo is the source-confirmed portion of a CINF response.
+// ChainInfo is the complete capture-verified 40-byte CINF response. The final
+// two field names are inferred from direct 2026 ARM-handler data flow.
 type ChainInfo struct {
-	Status      uint16
-	BoardCount  uint16
-	RoundTrip   float32
-	EventCount  uint64
-	ByteCount   uint64
-	EventRateHz float32
-	Megabits    float32
+	Status           uint16
+	BoardCount       uint16
+	RoundTrip        float32
+	EventCount       uint64
+	ByteCount        uint64
+	EventRateHz      float32
+	Megabits         float32
+	CapacityMegabits float32
+	CurrentTimestamp float32
 }
 
-// EnumerationInfo is the capture-verified 12-byte ENUM reply. The DT5215
-// returns a third word after the status and node count. FERSlib consumes the
-// word but does not assign it semantics, so keep it as evidence rather than
-// guessing what it represents.
+// EnumerationInfo is the capture-verified 12-byte ENUM reply. Binary data-flow
+// analysis establishes that RoundTripTicks is the raw per-chain register-7
+// value used to calculate CINF RoundTrip in 6.4 ns units.
 type EnumerationInfo struct {
-	NodeCount uint32
-	Word2     uint32
+	NodeCount      uint32
+	RoundTripTicks uint32
+}
+
+func (info EnumerationInfo) RoundTripNanoseconds() float64 {
+	return float64(info.RoundTripTicks) * 6.4
 }
 
 type BoardInfo struct {
@@ -137,6 +143,10 @@ func DecodeChainInfoResponse(response []byte) (ChainInfo, error) {
 		ByteCount:   littleEndian.Uint64(response[16:24]),
 		EventRateHz: math.Float32frombits(littleEndian.Uint32(response[24:28])),
 		Megabits:    math.Float32frombits(littleEndian.Uint32(response[28:32])),
+		// The 2026 ARM handler names these capacity_mbps and current_ts
+		// and narrows both internal doubles to wire float32 values.
+		CapacityMegabits: math.Float32frombits(littleEndian.Uint32(response[32:36])),
+		CurrentTimestamp: math.Float32frombits(littleEndian.Uint32(response[36:40])),
 	}, nil
 }
 
@@ -180,8 +190,8 @@ func DecodeEnumerateResponse(response []byte) (EnumerationInfo, error) {
 		return EnumerationInfo{}, &StatusError{Operation: "ENUM", Status: status}
 	}
 	info := EnumerationInfo{
-		NodeCount: littleEndian.Uint32(response[4:8]),
-		Word2:     littleEndian.Uint32(response[8:12]),
+		NodeCount:      littleEndian.Uint32(response[4:8]),
+		RoundTripTicks: littleEndian.Uint32(response[8:12]),
 	}
 	if info.NodeCount > MaxNodes {
 		return EnumerationInfo{}, fmt.Errorf("ENUM node count = %d, maximum %d", info.NodeCount, MaxNodes)
