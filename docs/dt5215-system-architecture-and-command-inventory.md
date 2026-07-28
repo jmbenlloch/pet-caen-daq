@@ -259,6 +259,35 @@ surface for enabled links.
 4. Resolve the third `ENUM` response word. FERSlib receives but does not name it.
 5. Resolve the unused final eight bytes of the fixed 40-byte `CINF` reply.
 
+### What the native simulator can and cannot resolve
+
+A targeted simulator run on 2026-07-28 passed the DT5215 codec and simulator
+unit suites and six discovery/enumeration integration scenarios. It confirms
+that the native Go client and simulator agree on request framing, exact reply
+lengths, topology discovery, non-contiguous enabled links, and re-enumeration
+from the pre-enumeration link state.
+
+That run does **not** resolve any of the five semantic unknowns above. The
+simulator is a project-maintained test double whose relevant replies are
+deliberately synthetic:
+
+- `ENUM` word 2 is generated as `60 + chain`; that pattern is a deterministic
+  fixture, not a decoded hardware meaning.
+- bytes 32--39 of the 40-byte `CINF` reply are initialized to zero and have no
+  modeled fields.
+- `ACMD`, `RBTF`, and `RSTR` are not implemented by the simulator.
+- the simulator has no boot-slot, factory-button, web-server, or Linux
+  process-supervisor model.
+
+Consequently, simulator observations remain `simulator-observed` test evidence
+and cannot promote an `unknown` to `source-confirmed`, `capture-verified`, or
+`hardware-verified`. `ENUM` word 2 and the final `CINF` bytes require source or
+binary data-flow analysis followed by passive real captures across changing
+link conditions. `RSTR`, `RBTF`, and the HTTP schemas require static analysis
+of the captured firmware (or a purpose-built full-system emulation); the
+destructive reset commands must not be probed on production hardware merely to
+refine documentation.
+
 ## Comparison with the captured device root filesystem
 
 The copied device root filesystem contains software release `2025.11.24.1`,
