@@ -296,7 +296,9 @@ Implemented on 2026-07-20:
 
 - lossless parsing of JANUS assignment syntax, including indexed settings, comments, repeated settings, and the production Windows/CRLF fixture;
 - extraction and validation of one to 128 `Open` connections within the DT5215's eight-link, sixteen-node-per-link address space;
-- exact little-endian codecs for DT5215 `CINF`, `ENUM`, and `RREG` requests and responses; the capture-verified `ENUM` reply is 12 bytes and its third, semantically unknown word is retained as evidence;
+- exact little-endian codecs for DT5215 `CINF`, `ENUM`, and `RREG` requests and
+  responses; the capture-verified `ENUM` reply is 12 bytes, and binary data-flow
+  analysis identifies its third word as a 6.4 ns round-trip counter;
 - simultaneous connection to TCP 9760 for slow control and TCP 9000 for the data stream;
 - validation that exactly the configured links are enabled and that each link enumerates the configured number of contiguous nodes;
 - enumeration of exactly one DT5202 on each production link;

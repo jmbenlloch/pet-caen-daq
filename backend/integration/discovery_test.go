@@ -844,10 +844,11 @@ func TestDiscoveryEnumeratesEnabledPreEnumerationState(t *testing.T) {
 		t.Fatalf("discover pre-enumeration topology: %v", err)
 	}
 	for chain := 0; chain < 4; chain++ {
-		if discovered.Enumerations[chain].NodeCount != 1 || discovered.Enumerations[chain].Word2 != uint32(60+chain) {
+		if discovered.Enumerations[chain].NodeCount != 1 || discovered.Enumerations[chain].RoundTripTicks != uint32(60+chain) {
 			t.Fatalf("chain %d enumeration = %#v", chain, discovered.Enumerations[chain])
 		}
-		if discovered.Chains[chain].Status != 4 || discovered.Chains[chain].BoardCount != 1 {
+		if discovered.Chains[chain].Status != 4 || discovered.Chains[chain].BoardCount != 1 ||
+			discovered.Chains[chain].CapacityMegabits != 3000 {
 			t.Fatalf("chain %d refreshed info = %#v", chain, discovered.Chains[chain])
 		}
 	}

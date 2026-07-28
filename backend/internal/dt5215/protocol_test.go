@@ -123,7 +123,28 @@ func TestDecodeEnumerateCaptureVerifiedReply(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.NodeCount != 1 || info.Word2 != 60 {
+	if info.NodeCount != 1 || info.RoundTripTicks != 60 || info.RoundTripNanoseconds() != 384 {
 		t.Fatalf("decoded ENUM = %#v", info)
+	}
+}
+
+func TestDecodeChainInfoCapturedReply(t *testing.T) {
+	response, err := hex.DecodeString(
+		"040001000000c043" +
+			"0000000000000000" +
+			"0000000000000000" +
+			"0000000000000000" +
+			"00803b4500000000",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := DecodeChainInfoResponse(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Status != 4 || info.BoardCount != 1 || info.RoundTrip != 384 ||
+		info.CapacityMegabits != 3000 || info.CurrentTimestamp != 0 {
+		t.Fatalf("decoded CINF = %#v", info)
 	}
 }
