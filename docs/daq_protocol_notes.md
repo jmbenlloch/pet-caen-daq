@@ -7,6 +7,9 @@ Status: repository study, 2026-07-20. This note records what is directly support
 The information missing from the public manuals is present in the source distribution bundled with JANUS 5.0.0. In particular, `janus/Janus_5202_5.0.0_20260713_linux/ferslib/src/FERS_LLtdl.c` constructs every DT5215 slow-control request byte by byte, `FERS_readout.c` parses the concentrator stream and DT5202 events, and `FERS_configure_5202.c` translates acquisition settings into register writes and the Citiroc configuration bitstream.
 
 The byte-exact real-hardware PCAP inventory, findings, and resulting corrections are recorded in [Real-hardware capture evidence](real-hardware-capture-evidence.md).
+The physical/software architecture and the complete command-surface inventory
+recovered from DT5215 software release 2026.4.1.1 are recorded in
+[DT5215 system architecture and command inventory](dt5215-system-architecture-and-command-inventory.md).
 
 The project decision is to implement the transport, protocol, configuration, acquisition sequencing, and decoding natively in Go. FERSlib will not be a runtime dependency. Its included source is reference evidence and may be used as a comparison oracle while developing tests.
 
