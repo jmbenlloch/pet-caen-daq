@@ -23,6 +23,7 @@ import {
   parameterScope,
   parseConfiguration,
   maxConfiguredBoards,
+  replaceConnectionSelection,
   replaceIndexedConfigurationValues,
   resizeConnectionConfiguration,
   setConfigurationValue,
@@ -508,9 +509,8 @@ watch(discoveredConnections, (connections) => {
 
 function useDiscoveredConnections() {
   connectionConfigurationTouched.value = true
-  configurationDocument.value = replaceIndexedConfigurationValues(
+  configurationDocument.value = replaceConnectionSelection(
     configurationDocument.value,
-    'Open',
     discoveredConnections.value
       .filter((connection) => selectedDiscoveredDevices.value.has(connection.address))
       .map((connection) => connection.address),
