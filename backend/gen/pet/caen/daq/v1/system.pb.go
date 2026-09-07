@@ -4620,8 +4620,12 @@ type Concentrator struct {
 	SoftwareRevision string                 `protobuf:"bytes,1,opt,name=software_revision,json=softwareRevision,proto3" json:"software_revision,omitempty"`
 	FpgaRevision     string                 `protobuf:"bytes,2,opt,name=fpga_revision,json=fpgaRevision,proto3" json:"fpga_revision,omitempty"`
 	ProductId        uint32                 `protobuf:"varint,3,opt,name=product_id,json=productId,proto3" json:"product_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// JANUS connection prefix for this backend's active DT5215 endpoint,
+	// for example "eth:192.168.50.125". Discovery UIs use this instead of
+	// copying a possibly stale host from the startup configuration.
+	ConnectionUriPrefix string `protobuf:"bytes,4,opt,name=connection_uri_prefix,json=connectionUriPrefix,proto3" json:"connection_uri_prefix,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Concentrator) Reset() {
@@ -4673,6 +4677,13 @@ func (x *Concentrator) GetProductId() uint32 {
 		return x.ProductId
 	}
 	return 0
+}
+
+func (x *Concentrator) GetConnectionUriPrefix() string {
+	if x != nil {
+		return x.ConnectionUriPrefix
+	}
+	return ""
 }
 
 type StatisticsTelemetry struct {
@@ -5977,12 +5988,13 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\x19HoldDelayChannelHistogram\x12\x18\n" +
 	"\achannel\x18\x01 \x01(\rR\achannel\x12$\n" +
 	"\x0ehigh_gain_bins\x18\x02 \x03(\rR\fhighGainBins\x12%\n" +
-	"\x0emissing_events\x18\x03 \x01(\rR\rmissingEvents\"\x7f\n" +
+	"\x0emissing_events\x18\x03 \x01(\rR\rmissingEvents\"\xb3\x01\n" +
 	"\fConcentrator\x12+\n" +
 	"\x11software_revision\x18\x01 \x01(\tR\x10softwareRevision\x12#\n" +
 	"\rfpga_revision\x18\x02 \x01(\tR\ffpgaRevision\x12\x1d\n" +
 	"\n" +
-	"product_id\x18\x03 \x01(\rR\tproductId\"\x82\x01\n" +
+	"product_id\x18\x03 \x01(\rR\tproductId\x122\n" +
+	"\x15connection_uri_prefix\x18\x04 \x01(\tR\x13connectionUriPrefix\"\x82\x01\n" +
 	"\x13StatisticsTelemetry\x121\n" +
 	"\x14elapsed_milliseconds\x18\x01 \x01(\x04R\x13elapsedMilliseconds\x128\n" +
 	"\x06boards\x18\x02 \x03(\v2 .pet.caen.daq.v1.BoardStatisticsR\x06boards\"\xdd\x03\n" +

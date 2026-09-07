@@ -196,7 +196,6 @@ func ValidateProductionTopology(connections []Connection) error {
 	}
 	boards := make(map[int]struct{}, len(connections))
 	addresses := make(map[[2]int]int, len(connections))
-	nodesByChain := make(map[int]map[int]struct{}, MaxChains)
 	host, iface := connections[0].Host, connections[0].Interface
 	for _, connection := range connections {
 		if connection.Board < 0 || connection.Board >= len(connections) {
@@ -211,19 +210,8 @@ func ValidateProductionTopology(connections []Connection) error {
 			return fmt.Errorf("boards %d and %d both use TDlink %d node %d", board, connection.Board, connection.Chain, connection.Node)
 		}
 		addresses[address] = connection.Board
-		if nodesByChain[connection.Chain] == nil {
-			nodesByChain[connection.Chain] = make(map[int]struct{})
-		}
-		nodesByChain[connection.Chain][connection.Node] = struct{}{}
 		if connection.Host != host || connection.Interface != iface {
 			return fmt.Errorf("board %d uses concentrator %s:%s; expected %s:%s", connection.Board, connection.Interface, connection.Host, iface, host)
-		}
-	}
-	for chain, nodes := range nodesByChain {
-		for node := 0; node < len(nodes); node++ {
-			if _, exists := nodes[node]; !exists {
-				return fmt.Errorf("TDlink %d node indices must be contiguous from 0; node %d is missing", chain, node)
-			}
 		}
 	}
 	return nil

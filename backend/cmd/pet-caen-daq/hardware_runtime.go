@@ -94,6 +94,7 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	cancelFirmware()
 	printDiscoveredDevices(r.output, topology)
 	snapshot := topologySnapshot(topology, nil)
+	snapshot.Concentrator.ConnectionUriPrefix = connectionURIPrefix(r.controlAddress)
 	snapshot.State = daqv1.SystemState_SYSTEM_STATE_DISCONNECTED
 	snapshot.DiscoveryProgress = discoveryProgress
 	snapshot.Diagnostics = append(snapshot.Diagnostics, &daqv1.Diagnostic{
@@ -178,7 +179,9 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration stri
 		recoveryBoards = append(recoveryBoards, acquisition.RecoveryBoard{Chain: board.Chain, Node: board.Node, Status: board.AcquisitionState})
 	}
 	recoveryResult, recoveryErr := acquisition.RecoverStartupChains(ctx, states, client, recoveryBoards, activeChains, r.drainTimeout, actor)
-	r.publisher.Publish(topologySnapshot(topology, r.connections))
+	connectedSnapshot := topologySnapshot(topology, r.connections)
+	connectedSnapshot.Concentrator.ConnectionUriPrefix = connectionURIPrefix(r.controlAddress)
+	r.publisher.Publish(connectedSnapshot)
 	service.PublishStartupRecovery(r.publisher, recoveryResult, recoveryErr, time.Now())
 	if recoveryErr != nil {
 		err = fmt.Errorf("recover hardware after connection: %w", recoveryErr)

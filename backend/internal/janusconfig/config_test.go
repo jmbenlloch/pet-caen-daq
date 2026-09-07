@@ -74,6 +74,22 @@ func TestClassifyDeclaresSubsystemOwners(t *testing.T) {
 	}
 }
 
+func TestClassifyAcceptsJANUS501ExternalRunSettings(t *testing.T) {
+	document, err := Parse(strings.NewReader("StartRunMode TDL\nExtRunSource LEMO_RA\nGPSTimeUTC 2030-06-20 16:30:00\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	classified, err := document.Classify()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, setting := range classified {
+		if setting.Owner != OwnerRunControl {
+			t.Errorf("%s owner = %q, want %q", setting.Assignment.Name, setting.Owner, OwnerRunControl)
+		}
+	}
+}
+
 func TestParsePreservesValuesContainingSpaces(t *testing.T) {
 	document, err := Parse(strings.NewReader("DataFilePath C:\\data files\\run # comment\r\n"))
 	if err != nil {
@@ -125,7 +141,7 @@ func TestValidateProductionTopologyAcceptsTwelveBoardsAcrossFourChains(t *testin
 	}
 }
 
-func TestValidateProductionTopologyRejectsAmbiguousAndSparseMappings(t *testing.T) {
+func TestValidateProductionTopologyRejectsDuplicatePhysicalAddress(t *testing.T) {
 	tests := []struct {
 		name        string
 		connections []Connection
@@ -139,14 +155,6 @@ func TestValidateProductionTopologyRejectsAmbiguousAndSparseMappings(t *testing.
 			},
 			message: "both use",
 		},
-		{
-			name: "sparse nodes",
-			connections: []Connection{
-				{Board: 0, Interface: "usb", Host: "172.16.0.11", Chain: 3, Node: 0},
-				{Board: 1, Interface: "usb", Host: "172.16.0.11", Chain: 3, Node: 2},
-			},
-			message: "node 1 is missing",
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -155,5 +163,15 @@ func TestValidateProductionTopologyRejectsAmbiguousAndSparseMappings(t *testing.
 				t.Fatalf("error = %v", err)
 			}
 		})
+	}
+}
+
+func TestValidateProductionTopologyAcceptsSelectedNodesWithGaps(t *testing.T) {
+	connections := []Connection{
+		{Board: 0, Interface: "eth", Host: "192.168.50.125", Chain: 1, Node: 1},
+		{Board: 1, Interface: "eth", Host: "192.168.50.125", Chain: 2, Node: 0},
+	}
+	if err := ValidateProductionTopology(connections); err != nil {
+		t.Fatal(err)
 	}
 }

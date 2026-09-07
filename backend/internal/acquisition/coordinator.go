@@ -352,6 +352,7 @@ func (c *Coordinator) readLoop(run *activeRun) {
 			run.setError(fmt.Errorf("read stream batch: %w", err))
 			return
 		}
+		events = selectedChainEvents(events, c.activeChains)
 		if err = run.pipeline.Submit(run.ctx, PipelineBatch{Raw: raw, Events: events}); err != nil {
 			if run.ctx.Err() != nil {
 				return

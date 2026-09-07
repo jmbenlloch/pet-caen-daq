@@ -601,6 +601,12 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if s.Controller.ActiveRunID() != "" {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ALREADY_ACTIVE", fmt.Errorf("run %q is already active", s.Controller.ActiveRunID()))
 	}
+	// An asynchronous coordinator fault clears its active run without going
+	// through StopRun. Retire monitors from that run before a successor can
+	// publish telemetry, otherwise both sessions alternately replace the same
+	// complete snapshot with old and current statistics.
+	s.stopMonitor()
+	s.stopPresetMonitor()
 	if s.AllocateRunID == nil {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ID_ALLOCATION_UNAVAILABLE", fmt.Errorf("run catalog ID allocation is not configured"))
 	}
@@ -800,6 +806,9 @@ func (s *RunService) completedRun(runID string) *daqv1.RunSummary {
 }
 
 func (s *RunService) startMonitor() {
+	// Be defensive for callers other than StartRun: at most one run-health
+	// publisher may own the complete pipeline/storage/statistics snapshot.
+	s.stopMonitor()
 	source, ok := s.Controller.ActivePipeline().(RunHealthSource)
 	if !ok {
 		return

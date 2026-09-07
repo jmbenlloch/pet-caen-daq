@@ -273,6 +273,10 @@ describe('operator dashboard', () => {
     expect(connected.get('.hardware-status-dot').classes()).toContain('live')
     expect(connected.get('.connection').text()).not.toContain('backend-test')
     expect(connected.findAll('.hardware-connection-action')).toHaveLength(1)
+    expect(connected.get('.rescan-links-action').attributes('disabled')).toBeDefined()
+    expect(connected.get('.rescan-links-action').attributes('title')).toContain(
+      'Disconnect hardware',
+    )
     expect(disconnect.text()).toBe('Disconnect hardware')
     expect(disconnect.classes()).toContain('disconnect')
     await disconnect.trigger('click')
@@ -289,6 +293,8 @@ describe('operator dashboard', () => {
     expect(disconnected.get('.hardware-state').text()).toBe('Hardware disconnected')
     expect(disconnected.get('.hardware-status-dot').classes()).toContain('disconnected')
     expect(disconnected.findAll('.hardware-connection-action')).toHaveLength(1)
+    expect(disconnected.get('.rescan-links-action').text()).toBe('Rescan links')
+    expect(disconnected.get('.rescan-links-action').attributes('disabled')).toBeUndefined()
     expect(connect.text()).toBe('Connect hardware')
     expect(connect.classes()).toContain('connect')
     await connect.trigger('click')
@@ -301,7 +307,7 @@ describe('operator dashboard', () => {
     await flushPromises()
     const discover = discovery
       .findAll('button')
-      .find((button) => button.text() === 'Discover cards')!
+      .find((button) => button.text() === 'Rescan links')!
     await discover.trigger('click')
     expect(discoveryApi.discoverHardware).toHaveBeenCalledWith('operator')
     discovery.unmount()
@@ -312,6 +318,7 @@ describe('operator dashboard', () => {
     api.discoverHardware = vi.fn().mockResolvedValue(
       create(TelemetrySnapshotSchema, {
         state: SystemState.DISCONNECTED,
+        concentrator: { connectionUriPrefix: 'eth:192.168.50.125' },
         chains: [
           {
             index: 0,
@@ -326,7 +333,7 @@ describe('operator dashboard', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === 'Discover cards')!
+      .find((button) => button.text() === 'Rescan links')!
       .trigger('click')
     await flushPromises()
 
@@ -334,18 +341,21 @@ describe('operator dashboard', () => {
     expect(proposal.get('details').attributes('open')).toBeDefined()
     expect(proposal.get('summary').text()).toContain('Discovered devices')
     expect(proposal.get('summary').text()).toContain('2 cards found')
-    expect(proposal.text()).toContain('Board 0')
-    expect(proposal.text()).toContain('usb:172.16.0.11:tdl:0:0')
-    expect(proposal.text()).toContain('Board 1')
-    expect(proposal.text()).toContain('usb:172.16.0.11:tdl:0:1')
-    expect(proposal.get('.use-discovered-connections').attributes('disabled')).toBeDefined()
+    expect(proposal.text()).toContain('Card 0')
+    expect(proposal.text()).toContain('eth:192.168.50.125:tdl:0:0')
+    expect(proposal.text()).toContain('Card 1')
+    expect(proposal.text()).toContain('eth:192.168.50.125:tdl:0:1')
+    await proposal.get('[aria-label="Use TDlink 0 node 1"]').setValue(true)
+    await proposal.get('.use-discovered-connections').trigger('click')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'View raw configuration')!
       .trigger('click')
 
     const raw = wrapper.get('textarea[aria-label="JANUS configuration source"]')
-    expect((raw.element as HTMLTextAreaElement).value).toContain('Open[1] usb:172.16.0.11:tdl:0:1')
+    expect((raw.element as HTMLTextAreaElement).value).toContain(
+      'Open[1] eth:192.168.50.125:tdl:0:1',
+    )
     expect((raw.element as HTMLTextAreaElement).value).not.toContain(
       'Open[2] usb:172.16.0.11:tdl:2:0',
     )
@@ -355,16 +365,16 @@ describe('operator dashboard', () => {
       .trigger('click')
     expect(api.connectHardware).toHaveBeenCalledWith(
       'operator',
-      expect.stringContaining('Open[1] usb:172.16.0.11:tdl:0:1'),
+      expect.stringContaining('Open[1] eth:192.168.50.125:tdl:0:1'),
     )
     wrapper.unmount()
   })
 
-  it('hydrates connection entries from backend topology after a frontend reload', async () => {
+  it('keeps the configured selection after a frontend reload', async () => {
     const wrapper = mount(App, { props: { api: dashboardApi(SystemState.DISCONNECTED) } })
     await flushPromises()
 
-    expect((wrapper.get('#configured-card-count').element as HTMLInputElement).value).toBe('1')
+    expect((wrapper.get('#configured-card-count').element as HTMLInputElement).value).toBe('4')
     expect(
       wrapper.get('[aria-label="Discovered card addresses"]').get('details').attributes('open'),
     ).toBeUndefined()
@@ -378,7 +388,7 @@ describe('operator dashboard', () => {
         .element as HTMLTextAreaElement
     ).value
     expect(source).toContain('Open[0] usb:172.16.0.11:tdl:0:0')
-    expect(source).not.toContain('Open[1]')
+    expect(source).toContain('Open[3]')
     wrapper.unmount()
   })
 

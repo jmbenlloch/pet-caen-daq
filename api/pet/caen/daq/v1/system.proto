@@ -528,6 +528,10 @@ message Concentrator {
   string software_revision = 1;
   string fpga_revision = 2;
   uint32 product_id = 3;
+  // JANUS connection prefix for this backend's active DT5215 endpoint,
+  // for example "eth:192.168.50.125". Discovery UIs use this instead of
+  // copying a possibly stale host from the startup configuration.
+  string connection_uri_prefix = 4;
 }
 
 message StatisticsTelemetry {

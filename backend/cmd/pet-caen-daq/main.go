@@ -326,6 +326,18 @@ func topologySnapshot(topology dt5215.Topology, connections []janusconfig.Connec
 	return snapshot
 }
 
+func connectionURIPrefix(controlAddress string) string {
+	host, _, err := net.SplitHostPort(controlAddress)
+	if err != nil {
+		host = controlAddress
+	}
+	interfaceName := "eth"
+	if host == "172.16.0.11" || host == "172.16.1.11" {
+		interfaceName = "usb"
+	}
+	return interfaceName + ":" + host
+}
+
 func instanceID() string {
 	host, err := os.Hostname()
 	if err != nil || host == "" {

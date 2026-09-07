@@ -55,10 +55,6 @@ func StopAndDrainChains(ctx context.Context, hardware DrainHardware, activeChain
 	if err != nil {
 		return DrainResult{}, err
 	}
-	expected := make(map[uint8]struct{}, len(chains))
-	for _, chain := range chains {
-		expected[uint8(chain)] = struct{}{}
-	}
 	if err := hardware.SendCommand(ctx, 0xff, 0xff, dt5215.CommandAcquisitionStop, dt5215.TDLCommandDelay); err != nil {
 		return DrainResult{}, fmt.Errorf("stop acquisition: %w", err)
 	}
@@ -95,16 +91,16 @@ func StopAndDrainChains(ctx context.Context, hardware DrainHardware, activeChain
 			return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), len(chains), err)
 		}
 		result.Batches++
-		result.Events += len(events)
+		selectedEvents := selectedChainEvents(events, chains)
+		result.Events += len(selectedEvents)
 		if handle != nil {
-			if err := handle(raw, events); err != nil {
+			// Preserve the complete raw batch while exposing only selected-chain
+			// descriptors to decoding and persistence.
+			if err := handle(raw, selectedEvents); err != nil {
 				return result, fmt.Errorf("deliver drained batch: %w", err)
 			}
 		}
-		for _, event := range events {
-			if _, ok := expected[event.Chain]; !ok {
-				return result, fmt.Errorf("drain completion from unexpected chain %d", event.Chain)
-			}
+		for _, event := range selectedEvents {
 			if event.Descriptor.Qualifier != dt5202.QualifierService {
 				continue
 			}
@@ -117,6 +113,20 @@ func StopAndDrainChains(ctx context.Context, hardware DrainHardware, activeChain
 			}
 		}
 	}
+}
+
+func selectedChainEvents(events []dt5215.StreamEvent, chains []uint16) []dt5215.StreamEvent {
+	selected := make(map[uint8]struct{}, len(chains))
+	for _, chain := range chains {
+		selected[uint8(chain)] = struct{}{}
+	}
+	filtered := make([]dt5215.StreamEvent, 0, len(events))
+	for _, event := range events {
+		if _, ok := selected[event.Chain]; ok {
+			filtered = append(filtered, event)
+		}
+	}
+	return filtered
 }
 
 func normalizeChains(activeChains []uint16) ([]uint16, error) {

@@ -139,6 +139,34 @@ func TestStopAndDrainSupportsNonContiguousActiveChains(t *testing.T) {
 	}
 }
 
+func TestStopAndDrainIgnoresEnabledButUnselectedChains(t *testing.T) {
+	hardware := &scriptedDrainHardware{
+		reads: []drainRead{{
+			raw:    []byte("complete-batch"),
+			events: []dt5215.StreamEvent{completion(0, true), completion(1, true), completion(2, true)},
+		}},
+		stallAfterReads: true,
+	}
+	var deliveredRaw []byte
+	var deliveredEvents []dt5215.StreamEvent
+	result, err := StopAndDrainChains(context.Background(), hardware, []uint16{1, 2}, func(raw []byte, events []dt5215.StreamEvent) error {
+		deliveredRaw = append([]byte(nil), raw...)
+		deliveredEvents = append([]dt5215.StreamEvent(nil), events...)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(deliveredRaw) != "complete-batch" || len(deliveredEvents) != 2 || result.Events != 2 || result.CompletedChains != 2 {
+		t.Fatalf("result=%#v raw=%q events=%#v", result, deliveredRaw, deliveredEvents)
+	}
+	for _, event := range deliveredEvents {
+		if event.Chain == 0 {
+			t.Fatal("unselected chain was delivered for decoding")
+		}
+	}
+}
+
 func TestStopAndDrainTimeoutAndCancellation(t *testing.T) {
 	for _, test := range []struct {
 		name string

@@ -791,7 +791,7 @@ func TestStartupRecoveryStopsAndResetsAlreadyRunningHardware(t *testing.T) {
 	}
 }
 
-func TestDiscoveryRejectsUnexpectedEnabledLink(t *testing.T) {
+func TestDiscoveryIgnoresEnabledLinkOutsideSelectedTopology(t *testing.T) {
 	topology := simulator.ProductionTopology()
 	topology.Chains[4] = []simulator.Board{{ProductID: 1, FirmwareRevision: 1, Status: 1}}
 	topology.LinkStatuses[4] = 3
@@ -812,8 +812,17 @@ func TestDiscoveryRejectsUnexpectedEnabledLink(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if _, err := client.DiscoverProductionTopology(ctx, connections); err == nil {
-		t.Fatal("discovery succeeded with unexpected enabled chain")
+	discovered, err := client.DiscoverProductionTopology(ctx, connections)
+	if err != nil {
+		t.Fatalf("discover selected topology with unrelated enabled chain: %v", err)
+	}
+	if len(discovered.Boards) != len(connections) {
+		t.Fatalf("discovered %d selected boards, want %d", len(discovered.Boards), len(connections))
+	}
+	for _, board := range discovered.Boards {
+		if board.Chain == 4 {
+			t.Fatal("unselected chain 4 was included in the production topology")
+		}
 	}
 }
 

@@ -229,6 +229,38 @@ func TestRunServiceOwnsHealthMonitorThroughStop(t *testing.T) {
 	}
 }
 
+func TestRunServiceStartRetiresMonitorsOrphanedByAsynchronousFault(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady}
+	service := newRunService(t, controller)
+
+	healthCtx, healthCancel := context.WithCancel(context.Background())
+	healthDone := make(chan error, 1)
+	go func() {
+		<-healthCtx.Done()
+		healthDone <- healthCtx.Err()
+	}()
+	presetCtx, presetCancel := context.WithCancel(context.Background())
+	presetDone := make(chan struct{})
+	go func() {
+		<-presetCtx.Done()
+		close(presetDone)
+	}()
+	service.monitorCancel, service.monitorDone = healthCancel, healthDone
+	service.presetCancel, service.presetDone = presetCancel, presetDone
+
+	if _, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{
+		RequestedBy: "operator", JanusConfiguration: validTopology,
+	})); err != nil {
+		t.Fatal(err)
+	}
+	service.mu.Lock()
+	monitorsStopped := service.monitorCancel == nil && service.monitorDone == nil && service.presetCancel == nil && service.presetDone == nil
+	service.mu.Unlock()
+	if !monitorsStopped {
+		t.Fatal("orphaned run monitors survived the next start")
+	}
+}
+
 func TestRunServicePresetTimeStopsAndPublishesCompletion(t *testing.T) {
 	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
 	service := newRunService(t, controller)
