@@ -26,6 +26,12 @@ type DrainResult struct {
 	CompletedChains int
 }
 
+// ReadoutTarget identifies one configured board in the concentrator stream.
+type ReadoutTarget struct {
+	Chain uint16
+	Node  uint16
+}
+
 const drainIdleTimeout = 100 * time.Millisecond
 
 // StopAndDrain sends an idempotent broadcast stop and reads until every observed
@@ -51,6 +57,20 @@ func StopAndDrain(ctx context.Context, hardware DrainHardware, expectedChains in
 // StopAndDrainChains drains an explicit set of active TDlinks. Unlike the
 // compatibility count-based wrapper, it supports non-contiguous enabled links.
 func StopAndDrainChains(ctx context.Context, hardware DrainHardware, activeChains []uint16, handle BatchHandler) (DrainResult, error) {
+	return stopAndDrain(ctx, hardware, activeChains, nil, handle)
+}
+
+// StopAndDrainTargets drains the active TDlinks while delivering only events
+// belonging to the explicitly configured chain/node pairs.
+func StopAndDrainTargets(ctx context.Context, hardware DrainHardware, targets []ReadoutTarget, handle BatchHandler) (DrainResult, error) {
+	chains, normalizedTargets, err := normalizeTargets(targets)
+	if err != nil {
+		return DrainResult{}, err
+	}
+	return stopAndDrain(ctx, hardware, chains, normalizedTargets, handle)
+}
+
+func stopAndDrain(ctx context.Context, hardware DrainHardware, activeChains []uint16, targets map[[2]uint16]struct{}, handle BatchHandler) (DrainResult, error) {
 	chains, err := normalizeChains(activeChains)
 	if err != nil {
 		return DrainResult{}, err
@@ -91,7 +111,7 @@ func StopAndDrainChains(ctx context.Context, hardware DrainHardware, activeChain
 			return result, fmt.Errorf("drain incomplete (%d/%d chains): %w", len(completed), len(chains), err)
 		}
 		result.Batches++
-		selectedEvents := selectedChainEvents(events, chains)
+		selectedEvents := selectedReadoutEvents(events, chains, targets)
 		result.Events += len(selectedEvents)
 		if handle != nil {
 			// Preserve the complete raw batch while exposing only selected-chain
@@ -116,17 +136,53 @@ func StopAndDrainChains(ctx context.Context, hardware DrainHardware, activeChain
 }
 
 func selectedChainEvents(events []dt5215.StreamEvent, chains []uint16) []dt5215.StreamEvent {
+	return selectedReadoutEvents(events, chains, nil)
+}
+
+func selectedReadoutEvents(events []dt5215.StreamEvent, chains []uint16, targets map[[2]uint16]struct{}) []dt5215.StreamEvent {
 	selected := make(map[uint8]struct{}, len(chains))
 	for _, chain := range chains {
 		selected[uint8(chain)] = struct{}{}
 	}
 	filtered := make([]dt5215.StreamEvent, 0, len(events))
 	for _, event := range events {
-		if _, ok := selected[event.Chain]; ok {
-			filtered = append(filtered, event)
+		if _, ok := selected[event.Chain]; !ok {
+			continue
 		}
+		if targets != nil {
+			key := [2]uint16{uint16(event.Chain), uint16(event.Descriptor.Node)}
+			if _, ok := targets[key]; !ok {
+				continue
+			}
+		}
+		filtered = append(filtered, event)
 	}
 	return filtered
+}
+
+func normalizeTargets(targets []ReadoutTarget) ([]uint16, map[[2]uint16]struct{}, error) {
+	if len(targets) == 0 {
+		return nil, nil, fmt.Errorf("at least one readout target is required")
+	}
+	selected := make(map[[2]uint16]struct{}, len(targets))
+	chainSet := make(map[uint16]struct{})
+	chains := make([]uint16, 0, len(targets))
+	for _, target := range targets {
+		if target.Chain >= dt5215.MaxChains || target.Node >= dt5215.MaxNodes {
+			return nil, nil, fmt.Errorf("readout target chain %d node %d out of range", target.Chain, target.Node)
+		}
+		key := [2]uint16{target.Chain, target.Node}
+		if _, exists := selected[key]; exists {
+			return nil, nil, fmt.Errorf("duplicate readout target chain %d node %d", target.Chain, target.Node)
+		}
+		selected[key] = struct{}{}
+		if _, exists := chainSet[target.Chain]; !exists {
+			chainSet[target.Chain] = struct{}{}
+			chains = append(chains, target.Chain)
+		}
+	}
+	chains, err := normalizeChains(chains)
+	return chains, selected, err
 }
 
 func normalizeChains(activeChains []uint16) ([]uint16, error) {

@@ -165,7 +165,11 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration stri
 		ExecutionIdentity: executionIdentity(topology, r.connections, r.controlAddress, r.streamAddress),
 	}}
 	activeChains := configuredChains(r.connections)
-	coordinator, err := acquisition.NewCoordinatorForChains(states, client, factory.New, activeChains, r.drainTimeout)
+	readoutTargets := make([]acquisition.ReadoutTarget, 0, len(r.connections))
+	for _, connection := range r.connections {
+		readoutTargets = append(readoutTargets, acquisition.ReadoutTarget{Chain: uint16(connection.Chain), Node: uint16(connection.Node)})
+	}
+	coordinator, err := acquisition.NewCoordinatorForTargets(states, client, factory.New, readoutTargets, r.drainTimeout)
 	if err != nil {
 		r.publishConnectFailure(err)
 		return err
