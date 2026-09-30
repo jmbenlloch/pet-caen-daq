@@ -6,8 +6,8 @@ Histograms belong to one active run and are accumulated in its bounded pipeline
 session after successful event decoding. They are not embedded in the periodic
 telemetry snapshot: a four-board, 64-channel, multi-spectrum payload would make
 every health update unnecessarily large. The frontend instead calls the typed
-`GetHistograms` run API with an exact run ID, histogram family, and 1–64
-board/node/channel selections. The active run is copied from its synchronized
+`GetHistograms` run API with an exact run ID, histogram family, and 1–65
+channel/board-sum selections. The active run is copied from its synchronized
 accumulator; completed runs are read from their finalized histogram artifact.
 
 The implemented families are PHA high gain, PHA low gain, time of arrival
@@ -32,7 +32,8 @@ while holding that lock, so API responses cannot alias or race live acquisition
 memory.
 
 The endpoint validates the run identity, histogram kind, hardware coordinates,
-and a maximum of 64 datasets. Missing quiet-channel datasets in a persisted
+and a maximum of 65 datasets covering at most 256 distinct channel spectra.
+Missing quiet-channel datasets in a persisted
 artifact are returned as zero-filled arrays using the recorded run-time axis
 configuration. When the run-control
 persistence option is enabled in an HDF5 production build, the drained snapshot
@@ -40,6 +41,27 @@ is written once to `run_<run-id>.histograms.h5`, hashed, and cataloged as a run
 artifact. It is independent of the 500 MiB decoded-event segments.
 
 ## Frontend contract
+
+Each board has a separate **Board sum (all 64 channels)** selection alongside
+the 64 individual channels, supported for every histogram family and both live
+and historical runs. This is a bin-by-bin spectrum sum, not an event-by-event
+sum of channel energies. The selection uses `board_sum=true` and channel=0;
+the response identifies it with `board_sum` and carries `board_sum_bins` as
+uint64 instead of the individual spectrum's uint32 `bins`. Entries, underflow,
+and overflow are also summed; inconsistent axes or uint64 counter overflow fail
+explicitly. Existing individual requests and their wire fields are unchanged.
+
+The backend expands sums into all 64 channels, deduplicates overlapping selections,
+loads one coherent snapshot, and returns the extra aggregate dataset. Quiet
+channels contribute zero. Chain AND node identify a board. The sum is independent
+of which channels the operator selected for plotting. Per-channel bin saturation
+still applies; excess hits already recorded as overflow are not reconstructed.
+The maximum summed bin (64 × (2^32−1)) is exactly representable for browser plotting.
+
+HDF5 files retain their existing per-channel layout: board-sum API datasets are
+derived on the server from stored spectra on demand, so older runs work without
+migration or rewriting and there is no redundant persisted copy. The browser
+only plots the returned dataset; it never adds the channel spectra itself.
 
 The plot workspace selects the live run or any completed run with a histogram
 artifact, then a family, board, and channel set. Live data can be requested on

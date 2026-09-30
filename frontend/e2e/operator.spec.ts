@@ -78,6 +78,27 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await plots.getByLabel('Log Y').check()
   await expect(histogramPlot.locator('canvas').first()).toBeVisible()
 
+  await plots.getByLabel('Live refresh').uncheck()
+  await plots
+    .getByRole('button', { name: 'Board 0, chain 0 node 0, sum of all 64 channels', exact: true })
+    .click()
+  await expect(plots.getByLabel('Histogram datasets').locator('.histogram-dataset')).toHaveCount(3)
+  for (const kind of ['1', '2', '3', '4']) {
+    await plots.locator('.plot-controls select').selectOption(kind)
+    const reply = page.waitForResponse(
+      (response) => response.url().endsWith('/GetHistograms') && response.ok(),
+    )
+    await plots.getByRole('button', { name: 'Request data' }).click()
+    const payload = await (await reply).json()
+    const sum = payload.datasets.find((dataset: { boardSum?: boolean }) => dataset.boardSum)
+    expect(sum).toBeDefined()
+    expect(sum.boardSumBins.length).toBeGreaterThan(0)
+    await expect(plots.getByLabel('Histogram datasets')).toContainText(
+      'Board sum (all 64 channels)',
+    )
+    await expect(histogramPlot.locator('canvas').first()).toBeVisible()
+  }
+
   await page.getByRole('tab', { name: /Acquisition/ }).click()
   await page.getByRole('button', { name: 'Stop and drain' }).click()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
@@ -97,7 +118,9 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await page.reload()
   await expect(page.getByRole('heading', { name: 'Ready' })).toBeVisible()
   await page.getByRole('tab', { name: /Runs/ }).click()
-  await expect(page.getByLabel('Stored runs').getByText(runId, { exact: true })).toBeVisible()
+  await expect(
+    page.getByLabel('Stored runs').getByRole('button', { name: runId, exact: true }),
+  ).toBeVisible()
 })
 
 test('start reports structured validation feedback before hardware mutation', async ({ page }) => {

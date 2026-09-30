@@ -5,10 +5,17 @@ run_dir=/tmp/pet-caen-playwright-runs
 mkdir -p "$run_dir"
 
 simulator_log=/tmp/pet-caen-playwright-simulator.log
-../bin/caen-simulator -control 127.0.0.1:19760 -stream 127.0.0.1:19000 >"$simulator_log" 2>&1 &
+control_address=${PET_CAEN_E2E_CONTROL:-127.0.0.1:19760}
+stream_address=${PET_CAEN_E2E_STREAM:-127.0.0.1:19000}
+source_address=${PET_CAEN_E2E_SOURCE:-127.0.0.1:19010}
+../bin/caen-simulator -control "$control_address" -stream "$stream_address" >"$simulator_log" 2>&1 &
 simulator_pid=$!
+../bin/source-stage-simulator -listen "$source_address" >/tmp/pet-caen-playwright-source.log 2>&1 &
+source_pid=$!
 
 cleanup() {
+  kill "$source_pid" 2>/dev/null || true
+  wait "$source_pid" 2>/dev/null || true
   kill "$simulator_pid" 2>/dev/null || true
   wait "$simulator_pid" 2>/dev/null || true
 }
@@ -32,9 +39,10 @@ fi
 
 ../bin/pet-caen-daq \
   -config ../test/fixtures/janus/config_same4_v3_good.txt \
-  -control 127.0.0.1:19760 \
-  -stream 127.0.0.1:19000 \
+  -control "$control_address" \
+  -stream "$stream_address" \
   -listen 127.0.0.1:18080 \
   -frontend-dir dist \
   -runs "$run_dir" \
+  -source-stage "tcp://$source_address" \
   -authorize-hv-config

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type DeepReadonly } from 'vue'
 import { isMaskField, parseConfiguration, type ConfigurationField } from './configuration'
 import { bytes, compact, localDateTime } from './presentation'
-import { RunType } from './gen/pet/caen/daq/v1/system_pb'
+import { RunType, type SourcePositionMetadata } from './gen/pet/caen/daq/v1/system_pb'
 
 interface RunRecord {
+  sourcePosition?: DeepReadonly<SourcePositionMetadata>
   runId: string
   startedAt?: { seconds: bigint; nanos: number }
   completedAt?: { seconds: bigint; nanos: number }
@@ -192,6 +193,17 @@ function maskChannels(field: ConfigurationField) {
                     </button>
                   </div>
                   <dl class="run-facts">
+                    <div v-if="run.sourcePosition">
+                      <dt>Source position (calculated)</dt>
+                      <dd>
+                        Scan {{ run.sourcePosition.scanId }}, point
+                        {{ run.sourcePosition.index + 1 }}; row {{ run.sourcePosition.row }}, column
+                        {{ run.sourcePosition.column }}. X
+                        {{ run.sourcePosition.calculatedXMm }} mm, Y
+                        {{ run.sourcePosition.calculatedYMm }} mm; {{ run.sourcePosition.xSteps }} /
+                        {{ run.sourcePosition.ySteps }} steps.
+                      </dd>
+                    </div>
                     <div>
                       <dt>Type</dt>
                       <dd>{{ typeLabel(run) }}</dd>

@@ -11,6 +11,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/configaudit"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/transportjournal"
 )
 
@@ -28,6 +29,7 @@ type RunPipeline interface {
 }
 
 type RunOptions struct {
+	SourcePosition         *runstore.SourcePosition
 	CaptureRaw             bool
 	JournalTransport       bool
 	RequestedBy            string

@@ -13,6 +13,7 @@ import RunHistoryTable from './RunHistoryTable.vue'
 import StatisticsTab from './StatisticsTab.vue'
 import StaircaseWorkspace from './StaircaseWorkspace.vue'
 import HoldDelayWorkspace from './HoldDelayWorkspace.vue'
+import SourceScanWorkspace from './SourceScanWorkspace.vue'
 import { hvState } from './hvStatus'
 import {
   isBooleanField,
@@ -24,7 +25,6 @@ import {
   parseConfiguration,
   maxConfiguredBoards,
   replaceConnectionSelection,
-  replaceIndexedConfigurationValues,
   resizeConnectionConfiguration,
   setConfigurationValue,
   updateConfiguration,
@@ -64,6 +64,7 @@ const configuration = computed({
   set: (source: string) => (configurationDocument.value = parseConfiguration(source)),
 })
 const captureRaw = ref(false)
+const sourceScanActive = ref(false)
 const journalTransport = ref(false)
 const persistHistograms = ref(true)
 const hdf5SegmentSizeMb = ref(500)
@@ -989,6 +990,7 @@ onMounted(() => daq.connect())
                   !configuration ||
                   configurationErrors.length > 0 ||
                   !!stopPolicyError ||
+                  sourceScanActive ||
                   !Number.isInteger(hdf5SegmentSizeMb) ||
                   hdf5SegmentSizeMb < 1 ||
                   hdf5SegmentSizeMb > 1048576
@@ -2039,6 +2041,16 @@ onMounted(() => daq.connect())
           :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
           :theme="theme"
           :live="daq.snapshot.value?.currentStaircase"
+        />
+        <SourceScanWorkspace
+          :configuration="configuration"
+          :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
+          :capture-raw="captureRaw"
+          :journal-transport="journalTransport"
+          :persist-histograms="persistHistograms"
+          :hdf5-segment-size-mb="hdf5SegmentSizeMb"
+          :hdf5-compression="hdf5Compression"
+          @active="sourceScanActive = $event"
         />
         <HoldDelayWorkspace
           :api="api"

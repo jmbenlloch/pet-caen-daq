@@ -477,6 +477,7 @@ func manifestSummary(parent string, manifest runstore.Manifest) *daqv1.RunSummar
 		run.Artifacts = append(run.Artifacts, &daqv1.Artifact{Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256})
 	}
 	run.FinalStatistics = statisticsTelemetry(manifest.Statistics)
+	run.SourcePosition = sourcePositionProto(manifest.SourcePosition)
 	return run
 }
 
@@ -576,6 +577,10 @@ func summaryStartedAt(summary *daqv1.RunSummary) string {
 }
 
 func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest]) (*connect.Response[daqv1.StartRunResponse], error) {
+	return s.startRun(ctx, request, nil)
+}
+
+func (s *RunService) startRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest], position *runstore.SourcePosition) (*connect.Response[daqv1.StartRunResponse], error) {
 	if !s.opMu.TryLock() {
 		return nil, serviceError(connect.CodeAborted, "CONCURRENT_OPERATION", fmt.Errorf("another run-control operation is in progress"))
 	}
@@ -624,6 +629,10 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if err != nil {
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_STOP_POLICY", err)
 	}
+	// The source scan owns point stopping; preserve the submitted PET document.
+	if position != nil {
+		stopPolicy = presetStopPolicy{mode: "MANUAL"}
+	}
 	histogramOptions, err := parseHistogramOptions(document)
 	if err != nil {
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_CONFIGURATION", err)
@@ -661,7 +670,8 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		return nil, serviceError(connect.CodeInternal, "INVALID_ALLOCATED_RUN_ID", fmt.Errorf("allocated run ID %q is invalid", runID))
 	}
 	options := acquisition.RunOptions{
-		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
+		SourcePosition: position,
+		CaptureRaw:     message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
 		Histograms:           histogramOptions,
 		PersistHistograms:    message.GetPersistHistograms(),
@@ -677,7 +687,8 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	}
 	run := &daqv1.RunSummary{
 		RunId: runID, StartedAt: timestamppb.New(s.now()), Incomplete: true,
-		StopMode: stopPolicy.mode, PresetTimeMilliseconds: uint64(stopPolicy.duration.Milliseconds()), PresetEventCount: stopPolicy.eventCount,
+		SourcePosition: sourcePositionProto(position),
+		StopMode:       stopPolicy.mode, PresetTimeMilliseconds: uint64(stopPolicy.duration.Milliseconds()), PresetEventCount: stopPolicy.eventCount,
 	}
 	s.mu.Lock()
 	s.current = run

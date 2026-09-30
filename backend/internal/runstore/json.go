@@ -25,6 +25,7 @@ const DefaultMaxRecordSize = 1 << 20
 var ErrRunExists = errors.New("run already exists")
 
 type Manifest struct {
+	SourcePosition         *SourcePosition            `json:"source_position,omitempty"`
 	SchemaVersion          int                        `json:"schema_version"`
 	RunID                  string                     `json:"run_id"`
 	RequestedBy            string                     `json:"requested_by,omitempty"`

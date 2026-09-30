@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: './e2e',
   outputDir: '/tmp/pet-caen-playwright-results',
   fullyParallel: false,
+  // All operator specs mutate the same simulator-backed DAQ instance.
+  workers: 1,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI
     ? [['line'], ['html', { outputFolder: '/tmp/pet-caen-playwright-report', open: 'never' }]]

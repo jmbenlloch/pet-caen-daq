@@ -305,9 +305,7 @@ describe('operator dashboard', () => {
     const discoveryApi = dashboardApi(SystemState.DISCONNECTED)
     const discovery = mount(App, { props: { api: discoveryApi } })
     await flushPromises()
-    const discover = discovery
-      .findAll('button')
-      .find((button) => button.text() === 'Rescan links')!
+    const discover = discovery.findAll('button').find((button) => button.text() === 'Rescan links')!
     await discover.trigger('click')
     expect(discoveryApi.discoverHardware).toHaveBeenCalledWith('operator')
     discovery.unmount()

@@ -24,6 +24,26 @@ vi.mock('uplot', () => {
 })
 
 describe('HistogramPlot', () => {
+  it('plots the server board sum alongside channel zero without summing in the browser', () => {
+    const channel = create(HistogramDatasetSchema, { chain: 1, node: 2, bins: [1, 2], binWidth: 1 })
+    const sum = create(HistogramDatasetSchema, {
+      chain: 1,
+      node: 2,
+      boardSum: true,
+      boardSumBins: [4294967296n, 9n],
+      binWidth: 1,
+    })
+    const wrapper = mount(HistogramPlot, {
+      props: { datasets: [channel, sum], theme: 'light', logarithmic: false },
+    })
+    expect(constructed.mock.calls.at(-1)?.[1]).toEqual([
+      [0.5, 1.5],
+      [1, 2],
+      [4294967296, 9],
+    ])
+    expect(constructed.mock.calls.at(-1)?.[0].series[2].label).toContain('Node 2 · Board sum')
+    wrapper.unmount()
+  })
   it('adjusts the count scale when live or stored histogram data changes', async () => {
     const initial = create(HistogramDatasetSchema, {
       chain: 0,

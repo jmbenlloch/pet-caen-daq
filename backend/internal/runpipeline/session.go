@@ -65,7 +65,8 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	}
 	startedAt := options.Now()
 	writer, err := createRunWriter(options.Parent, runstore.Manifest{
-		RunID: runID, StartedAt: startedAt.UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
+		SourcePosition: runOptions.SourcePosition,
+		RunID:          runID, StartedAt: startedAt.UTC().Format(time.RFC3339Nano), RequestedBy: runOptions.RequestedBy,
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
 		PersistHistograms:      runOptions.PersistHistograms,
 		HDF5SegmentSizeBytes:   runOptions.HDF5SegmentSizeBytes,

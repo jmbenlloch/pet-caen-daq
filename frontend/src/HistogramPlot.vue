@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, watch, type DeepReadonly } from 'vue'
 import uPlot, { type AlignedData, type Options, type Series } from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import type { HistogramDataset } from './gen/pet/caen/daq/v1/system_pb'
+import { histogramBins, histogramLabel } from './histogramDataset'
 
 const props = defineProps<{
   datasets: readonly DeepReadonly<HistogramDataset>[]
@@ -29,11 +30,11 @@ const colors = [
 function alignedData(): AlignedData {
   const first = props.datasets[0]
   if (!first) return [[]]
-  const x = first.bins.map((_, index) => first.minimum + (index + 0.5) * first.binWidth)
+  const x = histogramBins(first).map((_, index) => first.minimum + (index + 0.5) * first.binWidth)
   return [
     x,
     ...props.datasets.map((dataset) =>
-      dataset.bins.map((count) => {
+      histogramBins(dataset).map((count) => {
         const value = Number(count)
         return props.logarithmic && value === 0 ? null : value
       }),
@@ -45,23 +46,26 @@ function datasetStructure() {
   return props.datasets
     .map(
       (dataset) =>
-        `${dataset.chain}:${dataset.node}:${dataset.channel}:${dataset.minimum}:${dataset.binWidth}:${dataset.bins.length}`,
+        `${dataset.chain}:${dataset.node}:${dataset.boardSum ? 'sum' : dataset.channel}:${dataset.minimum}:${dataset.binWidth}:${histogramBins(dataset).length}`,
     )
     .join('|')
 }
 
 function yRange() {
-  const counts = props.datasets.flatMap((dataset) => dataset.bins.map(Number))
-  const maximum = Math.max(0, ...counts)
+  let maximum = 0
+  let minimum = Infinity
+  for (const dataset of props.datasets) {
+    for (const count of histogramBins(dataset)) {
+      maximum = Math.max(maximum, count)
+      if (count > 0) minimum = Math.min(minimum, count)
+    }
+  }
   if (!props.logarithmic) return { min: 0, max: Math.max(1, maximum * 1.05) }
 
-  const positive = counts.filter((count) => count > 0)
-  const minimum = Math.min(...positive)
-  const logarithmicMaximum = Math.max(...positive)
-  if (!positive.length) return { min: 1, max: 10 }
+  if (!Number.isFinite(minimum)) return { min: 1, max: 10 }
   return {
     min: minimum,
-    max: logarithmicMaximum > minimum ? logarithmicMaximum : minimum * 10,
+    max: maximum > minimum ? maximum : minimum * 10,
   }
 }
 
@@ -71,7 +75,7 @@ function series(): Series[] {
     ...props.datasets.map((dataset, index) => {
       const color = colors[index % colors.length]
       return {
-        label: `B${dataset.chain} · CH ${dataset.channel}`,
+        label: histogramLabel(dataset),
         stroke: color,
         fill: `${color}38`,
         width: 1,
@@ -91,7 +95,7 @@ function options(): Options {
   return {
     width: Math.max(host.value?.clientWidth ?? 0, 320),
     height: 380,
-    title: 'Accumulated channel histograms',
+    title: 'Accumulated channel and board-sum histograms',
     series: series(),
     cursor: { drag: { x: true, y: false, setScale: true } },
     scales: {

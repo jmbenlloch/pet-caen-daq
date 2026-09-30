@@ -11,6 +11,7 @@ import {
 import { compact } from './presentation'
 import HistogramPlot from './HistogramPlot.vue'
 import RunDataPicker from './RunDataPicker.vue'
+import { histogramBins, histogramLabel } from './histogramDataset'
 
 const props = withDefaults(
   defineProps<{
@@ -35,9 +36,10 @@ const selectorOpen = ref(false)
 const autoRefresh = ref(true)
 const logarithmic = ref(false)
 const selectionError = ref('')
-const selectionLimit = 64
+const selectionLimit = 65
 let timer: number | undefined
 let lastAutomaticRequest = ''
+let selectionInitialized = false
 
 watch(
   () => props.activeRunId,
@@ -60,7 +62,10 @@ watch(
     const retained = new Set(
       [...selected.value].filter((key) => available.has(key.split(':').slice(0, 2).join(':'))),
     )
-    if (!retained.size && boards.length) retained.add(`${boards[0].chain}:${boards[0].node}:0`)
+    if (!selectionInitialized && boards.length) {
+      retained.add(`${boards[0].chain}:${boards[0].node}:0`)
+      selectionInitialized = true
+    }
     selected.value = retained
   },
   { immediate: true },
@@ -78,7 +83,7 @@ function toggleSelection(chain: number, node: number, channel: number) {
     selectionError.value = ''
   } else {
     if (next.size >= selectionLimit) {
-      selectionError.value = `Select no more than ${selectionLimit} channels at a time`
+      selectionError.value = `Select no more than ${selectionLimit} datasets at a time`
       return
     }
     next.add(key)
@@ -88,14 +93,14 @@ function toggleSelection(chain: number, node: number, channel: number) {
 
 function selectBoard(chain: number, node: number, value: boolean) {
   const next = new Set(selected.value)
-  for (let channel = 0; channel < 64; channel++) {
+  for (let channel = 0; channel < (value ? 64 : 65); channel++) {
     const key = selectionKey(chain, node, channel)
     if (!value) next.delete(key)
     else if (next.size < selectionLimit) next.add(key)
   }
   selectionError.value =
     value && next.size === selectionLimit
-      ? `Selection is limited to ${selectionLimit} channels; clear another board to choose different channels`
+      ? `Selection is limited to ${selectionLimit} datasets; clear another board to choose different channels`
       : ''
   selected.value = next
 }
@@ -111,18 +116,19 @@ function histogramSelections() {
       $typeName: 'pet.caen.daq.v1.HistogramSelection' as const,
       chain,
       node,
-      channel,
+      channel: channel === 64 ? 0 : channel,
+      boardSum: channel === 64,
     }))
 }
 
 function requestSelections(selections: HistogramSelection[]) {
   if (!selectedRunId.value) return
   if (!selections.length) {
-    selectionError.value = 'Select at least one channel'
+    selectionError.value = 'Select at least one channel or board sum'
     return
   }
   if (selections.length > selectionLimit) {
-    selectionError.value = `Select no more than ${selectionLimit} channels at a time`
+    selectionError.value = `Select no more than ${selectionLimit} datasets at a time`
     return
   }
   emit('request', selectedRunId.value, kind.value, selections)
@@ -135,10 +141,13 @@ function request() {
 watch(
   [selectedRunId, kind, selected],
   ([runId, histogramKind, selectionKeys]) => {
-    if (!runId || !selectionKeys.size) return
+    if (!runId || !selectionKeys.size) {
+      lastAutomaticRequest = ''
+      return
+    }
     const selections = histogramSelections()
     const requestKey = `${runId}:${histogramKind}:${selections
-      .map(({ chain, node, channel }) => `${chain}:${node}:${channel}`)
+      .map(({ chain, node, channel, boardSum }) => `${chain}:${node}:${boardSum ? 'sum' : channel}`)
       .join(',')}`
     if (requestKey === lastAutomaticRequest) return
     lastAutomaticRequest = requestKey
@@ -148,22 +157,31 @@ watch(
 )
 
 function populatedBins(dataset: DeepReadonly<HistogramDataset>) {
-  return dataset.bins.reduce((count, value) => count + (value > 0 ? 1 : 0), 0)
+  return histogramBins(dataset).reduce((count, value) => count + (value > 0 ? 1 : 0), 0)
 }
 
 function peakCount(dataset: DeepReadonly<HistogramDataset>) {
-  return dataset.bins.reduce((peak, value) => (value > peak ? value : peak), 0)
+  return histogramBins(dataset).reduce((peak, value) => (value > peak ? value : peak), 0)
 }
 
 function updateTimer() {
   window.clearInterval(timer)
   timer = undefined
-  if (autoRefresh.value && props.running && selectedRunId.value === props.activeRunId)
+  if (
+    autoRefresh.value &&
+    props.running &&
+    selected.value.size &&
+    selectedRunId.value === props.activeRunId
+  )
     timer = window.setInterval(request, 1000)
 }
-watch([autoRefresh, () => props.running, selectedRunId, () => props.activeRunId], updateTimer, {
-  immediate: true,
-})
+watch(
+  [autoRefresh, () => props.running, selectedRunId, () => props.activeRunId, selected],
+  updateTimer,
+  {
+    immediate: true,
+  },
+)
 onBeforeUnmount(() => window.clearInterval(timer))
 
 const kindLabel = computed(
@@ -207,7 +225,7 @@ const kindLabel = computed(
         </select></label
       >
       <label class="histogram-channel-control"
-        >Channels
+        >Channels and board sums
         <button
           type="button"
           class="secondary"
@@ -262,6 +280,20 @@ const kindLabel = computed(
             </button>
           </span>
         </header>
+        <button
+          type="button"
+          class="histogram-board-sum"
+          :class="{ active: selected.has(selectionKey(board.chain, board.node, 64)) }"
+          :aria-pressed="selected.has(selectionKey(board.chain, board.node, 64))"
+          :aria-label="`Board ${board.logicalIndex}, chain ${board.chain} node ${board.node}, sum of all 64 channels`"
+          :disabled="
+            selected.size >= selectionLimit &&
+            !selected.has(selectionKey(board.chain, board.node, 64))
+          "
+          @click="toggleSelection(board.chain, board.node, 64)"
+        >
+          Board sum (all 64 channels)
+        </button>
         <div class="channel-grid histogram-channel-grid">
           <button
             v-for="channel in 64"
@@ -297,12 +329,12 @@ const kindLabel = computed(
     <div v-if="datasets.length" class="histogram-datasets" aria-label="Histogram datasets">
       <article
         v-for="dataset in datasets"
-        :key="`${dataset.chain}-${dataset.node}-${dataset.channel}`"
+        :key="`${dataset.chain}-${dataset.node}-${dataset.boardSum ? 'sum' : dataset.channel}`"
         class="histogram-dataset"
       >
         <div class="histogram-metadata">
-          <strong>B{{ dataset.chain }} · CH {{ dataset.channel }}</strong
-          ><span>{{ kindLabel }} · {{ dataset.bins.length }} bins</span
+          <strong>{{ histogramLabel(dataset) }}</strong
+          ><span>{{ kindLabel }} · {{ histogramBins(dataset).length }} bins</span
           ><span
             >{{ compact(dataset.entries) }} entries · bin width
             {{ dataset.binWidth.toPrecision(4) }}</span
