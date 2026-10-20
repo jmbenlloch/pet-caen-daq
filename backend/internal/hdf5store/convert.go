@@ -39,6 +39,7 @@ func ConvertJSONRun(directory, output string) (err error) {
 		return fmt.Errorf("encode effective configuration: %w", err)
 	}
 	metadataJSON, err := json.Marshal(struct {
+		SourcePosition        *runstore.SourcePosition       `json:"source_position,omitempty"`
 		SourceFormat          string                         `json:"source_format"`
 		SourceRunID           string                         `json:"source_run_id"`
 		StartedAt             string                         `json:"started_at"`
@@ -47,7 +48,8 @@ func ConvertJSONRun(directory, output string) (err error) {
 		ExecutionIdentity     runstore.ExecutionIdentity     `json:"execution_identity"`
 	}{
 		SourceFormat: "pet-caen-daq-jsonl", SourceRunID: manifest.RunID,
-		StartedAt: manifest.StartedAt, CompletedAt: manifest.CompletedAt,
+		SourcePosition: manifest.SourcePosition,
+		StartedAt:      manifest.StartedAt, CompletedAt: manifest.CompletedAt,
 		ConfigurationIdentity: manifest.ConfigurationIdentity, ExecutionIdentity: manifest.ExecutionIdentity,
 	})
 	if err != nil {

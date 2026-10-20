@@ -7,6 +7,12 @@ Status: repository study, 2026-07-20. This note records what is directly support
 The information missing from the public manuals is present in the source distribution bundled with JANUS 5.0.0. In particular, `janus/Janus_5202_5.0.0_20260713_linux/ferslib/src/FERS_LLtdl.c` constructs every DT5215 slow-control request byte by byte, `FERS_readout.c` parses the concentrator stream and DT5202 events, and `FERS_configure_5202.c` translates acquisition settings into register writes and the Citiroc configuration bitstream.
 
 The byte-exact real-hardware PCAP inventory, findings, and resulting corrections are recorded in [Real-hardware capture evidence](real-hardware-capture-evidence.md).
+The physical/software architecture and the complete command-surface inventory
+recovered from DT5215 software release 2026.4.1.1 are recorded in
+[DT5215 system architecture and command inventory](dt5215-system-architecture-and-command-inventory.md).
+The static-analysis procedure used to recover and verify that inventory is
+documented in
+[Reproducing the DT5215 binary protocol analysis](dt5215-binary-analysis-method.md).
 
 The project decision is to implement the transport, protocol, configuration, acquisition sequencing, and decoding natively in Go. FERSlib will not be a runtime dependency. Its included source is reference evidence and may be used as a comparison oracle while developing tests.
 
@@ -71,7 +77,7 @@ The four ASCII opcode bytes are followed by packed little-endian binary fields. 
 | Arm delayed command | `DCMD`, same 20-byte shape as `FCMD` | u32 status |
 | Concentrator virtual-register write | `CWRG`, u32 address @4, u32 data @8 (12 B) | u32 status |
 | Concentrator virtual-register read | `CRRG`, u32 address @4 (8 B) | u32 status, u32 data |
-| Chain information | `CINF`, u16 chain @4 (6 B) | 40 B requested; fields consumed are status u16, board count u16, RTT float32, event count u64, byte count u64, event rate float32, Mbit/s float32 |
+| Chain information | `CINF`, u16 chain @4 (6 B) | 40 B: status u16, board count u16, RTT float32, event count u64, byte count u64, event rate float32, Mbit/s float32, capacity Mbit/s float32, current timestamp float32 |
 | Chain control | `CCNT`, u16 chain @4, u16 enable @6, u32 token interval @8 (12 B) | u32 status |
 | Enumerate one chain | `ENUM`, u16 chain @4 (6 B) | 12 B: u32 status, u32 node count, u32 word with unknown semantics |
 | Synchronize chains | `SNT0` (4 B) | u32 status |

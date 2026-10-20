@@ -152,3 +152,9 @@ under the container's `/tmp`.
 ## Current hardware boundary
 
 The DT5215 USB connection presents an Ethernet network interface. JANUS/FERSlib and the native backend communicate with the concentrator over TCP ports 9760 (slow control) and 9000 (data stream). The protocol implementation combines source evidence from FERSlib 5.0.0 with the indexed 2026-07-21 real-hardware captures; individual facts retain their explicit evidence classification.
+
+## XY source scans
+
+The Scans workspace supports configurable XY source scans with one timed or
+event-limited PET run per position. See [source-scan setup, simulator workflow,
+firmware and metadata](docs/source-scans.md).

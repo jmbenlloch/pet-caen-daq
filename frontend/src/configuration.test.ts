@@ -8,6 +8,7 @@ import {
   numericError,
   setConfigurationValue,
   replaceIndexedConfigurationValues,
+  replaceConnectionSelection,
   resizeConnectionConfiguration,
   parseConfiguration,
   updateConfiguration,
@@ -187,6 +188,30 @@ it('replaces indexed connection values while preserving the surrounding document
   )
   expect(changed.source).toContain('# Run\r\nPresetTime 10')
   expect(changed.fields.filter((field) => field.name === 'Open')).toHaveLength(3)
+})
+
+it('remaps board and channel overrides with selected physical connections', () => {
+  const source = [
+    'Open[0] eth:192.168.50.125:tdl:1:0',
+    'Open[1] eth:192.168.50.125:tdl:1:1',
+    'Open[2] eth:192.168.50.125:tdl:2:0',
+    'Open[3] eth:192.168.50.125:tdl:2:1',
+    'HV_Vbias[1] 44.1',
+    'HV_Vbias[3] 45.5',
+    'TD_FineThreshold[2][17] 9',
+    'PresetTime 20 s',
+  ].join('\n')
+  const changed = replaceConnectionSelection(parseConfiguration(source), [
+    'eth:192.168.50.125:tdl:1:0',
+    'eth:192.168.50.125:tdl:2:0',
+    'eth:192.168.50.125:tdl:2:1',
+  ])
+
+  expect(changed.source).not.toContain('tdl:1:1')
+  expect(changed.source).not.toContain('HV_Vbias[1] 44.1')
+  expect(changed.source).toContain('HV_Vbias[2] 45.5')
+  expect(changed.source).toContain('TD_FineThreshold[1][17] 9')
+  expect(changed.source).toContain('PresetTime 20 s')
 })
 
 it('adds and removes cards in deterministic daisy-chain order', () => {

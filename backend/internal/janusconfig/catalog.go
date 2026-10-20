@@ -57,7 +57,8 @@ var settingOwners = map[string]Owner{
 	"TestPulseSource": OwnerHardware, "TestPulseAmplitude": OwnerHardware,
 	"TestPulseDestination": OwnerHardware, "TestPulsePreamp": OwnerHardware,
 
-	"StartRunMode": OwnerRunControl, "StopRunMode": OwnerRunControl,
+	"StartRunMode": OwnerRunControl, "ExtRunSource": OwnerRunControl,
+	"GPSTimeUTC": OwnerRunControl, "StopRunMode": OwnerRunControl,
 	"EventBuildingMode": OwnerRunControl, "TstampCoincWindow": OwnerRunControl,
 	"PresetTime": OwnerRunControl, "PresetCounts": OwnerRunControl,
 	"JobFirstRun": OwnerRunControl, "JobLastRun": OwnerRunControl,

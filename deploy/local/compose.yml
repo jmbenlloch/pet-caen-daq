@@ -20,9 +20,23 @@ services:
       timeout: 1s
       retries: 10
 
+  source-stage:
+    image: ${PET_CAEN_BUILD_IMAGE:-pet-caen-daq-build:latest}
+    command: ["./bin/source-stage-simulator", "-listen", "0.0.0.0:19010"]
+    working_dir: /workspace
+    volumes:
+      - ../..:/workspace:ro
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/19010"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+
   daq:
     image: ${PET_CAEN_RUNTIME_IMAGE:-pet-caen-daq:latest}
     depends_on:
+      source-stage:
+        condition: service_healthy
       simulator:
         condition: service_healthy
     command:
@@ -34,13 +48,17 @@ services:
       - simulator:9000
       - -listen
       - 0.0.0.0:8080
+      - -frontend-dir
+      - /opt/pet-caen/frontend
       - -runs
       - /var/lib/pet-caen/runs
       - -pipeline-capacity
       - "512"
+      - -source-stage
+      - ${PET_CAEN_SOURCE_STAGE:-tcp://source-stage:19010}
       - -authorize-hv-config
     ports:
-      - "8080:8080"
+      - "${PET_CAEN_API_PORT:-8080}:8080"
     volumes:
       - runs:/var/lib/pet-caen/runs
 
@@ -63,7 +81,7 @@ services:
       DAQ_API_URL: http://daq:8080
       HOME: /tmp/pet-caen-home
     ports:
-      - "5173:5173"
+      - "${PET_CAEN_FRONTEND_PORT:-5173}:5173"
     user: "${PET_CAEN_UID:-1000}:${PET_CAEN_GID:-1000}"
     volumes:
       - ../..:/workspace

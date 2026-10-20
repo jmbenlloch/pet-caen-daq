@@ -13,6 +13,7 @@ import RunHistoryTable from './RunHistoryTable.vue'
 import StatisticsTab from './StatisticsTab.vue'
 import StaircaseWorkspace from './StaircaseWorkspace.vue'
 import HoldDelayWorkspace from './HoldDelayWorkspace.vue'
+import SourceScanWorkspace from './SourceScanWorkspace.vue'
 import { hvState } from './hvStatus'
 import {
   configurationEditorFields,
@@ -24,7 +25,7 @@ import {
   parameterScope,
   parseConfiguration,
   maxConfiguredBoards,
-  replaceIndexedConfigurationValues,
+  replaceConnectionSelection,
   resizeConnectionConfiguration,
   setConfigurationValue,
   updateConfiguration,
@@ -65,6 +66,7 @@ const configuration = computed({
   set: (source: string) => (configurationDocument.value = parseConfiguration(source)),
 })
 const captureRaw = ref(false)
+const sourceScanActive = ref(false)
 const journalTransport = ref(false)
 const persistHistograms = ref(true)
 const hdf5SegmentSizeMb = ref(500)
@@ -86,6 +88,7 @@ const showRawConfiguration = ref(false)
 const discoveredDevicesOpen = ref(false)
 const connectionConfigurationTouched = ref(false)
 const connectionsHydratedFromBackend = ref(false)
+const selectedDiscoveredDevices = ref<Set<string>>(new Set())
 const activeMask = ref<{ low: ConfigurationField; high: ConfigurationField }>()
 const activeBoardField = ref<ConfigurationField>()
 const activeChannelField = ref<ConfigurationField>()
@@ -419,6 +422,7 @@ const appliedConfigurationLabel = computed(() => {
 })
 const applyConfigurationDisabled = computed(
   () =>
+    sourceScanActive.value ||
     !daq.canApplyConfiguration.value ||
     !configuration.value ||
     configurationErrors.value.length > 0 ||
@@ -500,7 +504,9 @@ const discoveredConnections = computed(() => {
     (field) => field.name === 'Open' && field.index !== undefined,
   )
   const marker = open?.value.lastIndexOf(':tdl:') ?? -1
-  const prefix = marker >= 0 ? open!.value.slice(0, marker) : 'usb:127.0.0.1'
+  const prefix =
+    daq.snapshot.value?.concentrator?.connectionUriPrefix ||
+    (marker >= 0 ? open!.value.slice(0, marker) : 'usb:127.0.0.1')
   return (daq.snapshot.value?.chains ?? []).flatMap((chain) =>
     chain.boards.map((board) => ({
       chain: chain.index,
@@ -514,30 +520,51 @@ const discoveredConfigurationMatches = computed(() => {
     .filter((field) => field.name === 'Open' && field.index !== undefined)
     .sort((left, right) => Number(left.index) - Number(right.index))
     .map((field) => field.value)
+  const selected = discoveredConnections.value
+    .filter((connection) => selectedDiscoveredDevices.value.has(connection.address))
+    .map((connection) => connection.address)
   return (
-    configured.length === discoveredConnections.value.length &&
-    configured.every((value, index) => value === discoveredConnections.value[index]?.address)
+    configured.length === selected.length &&
+    configured.every((value, index) => value === selected[index])
   )
 })
 
 watch(discoveredConnections, (connections) => {
   if (connectionsHydratedFromBackend.value || !connections.length) return
   connectionsHydratedFromBackend.value = true
-  if (connectionConfigurationTouched.value) return
-  configurationDocument.value = replaceIndexedConfigurationValues(
-    configurationDocument.value,
-    'Open',
-    connections.map((connection) => connection.address),
+  const configuredLocations = new Set(
+    configurationDocument.value.fields
+      .filter((field) => field.name === 'Open' && field.index !== undefined)
+      .map((field) =>
+        field.value
+          .match(/:tdl:(\d+):(\d+)$/)
+          ?.slice(1)
+          .join(':'),
+      )
+      .filter((location): location is string => Boolean(location)),
+  )
+  selectedDiscoveredDevices.value = new Set(
+    connections
+      .filter((connection) => configuredLocations.has(`${connection.chain}:${connection.node}`))
+      .map((connection) => connection.address),
   )
 })
 
 function useDiscoveredConnections() {
   connectionConfigurationTouched.value = true
-  configurationDocument.value = replaceIndexedConfigurationValues(
+  configurationDocument.value = replaceConnectionSelection(
     configurationDocument.value,
-    'Open',
-    discoveredConnections.value.map((connection) => connection.address),
+    discoveredConnections.value
+      .filter((connection) => selectedDiscoveredDevices.value.has(connection.address))
+      .map((connection) => connection.address),
   )
+}
+
+function setDiscoveredDeviceSelected(address: string, selected: boolean) {
+  const next = new Set(selectedDiscoveredDevices.value)
+  if (selected) next.add(address)
+  else next.delete(address)
+  selectedDiscoveredDevices.value = next
 }
 
 function setConfiguredCardCount(count: number) {
@@ -596,6 +623,7 @@ const configurationOverallValue = computed(() => {
   return Math.min(progress.boardsCompleted, progress.boardsTotal)
 })
 const discoveryProgress = computed(() => daq.snapshot.value?.discoveryProgress)
+const discoveryActive = computed(() => discoveryProgress.value?.active === true)
 watch(
   () => discoveryProgress.value?.stage,
   (stage) => {
@@ -978,14 +1006,18 @@ onMounted(() => daq.connect())
                 {{ hardwareActionLabel }}
               </button>
               <button
-                v-if="backendOnline && hardwareDisconnected"
+                v-if="backendOnline"
                 type="button"
-                class="connection-action"
+                class="connection-action rescan-links-action"
                 :disabled="!daq.canDiscoverHardware.value"
-                title="Reset, enumerate, and synchronize enabled TDlinks without applying card configuration"
+                :title="
+                  hardwareDisconnected
+                    ? 'Reset, enumerate, and synchronize enabled TDlinks without applying card configuration'
+                    : 'Disconnect hardware before rescanning TDlinks'
+                "
                 @click="discoverHardware"
               >
-                Discover cards
+                {{ discoveryActive ? 'Rescanning links…' : 'Rescan links' }}
               </button>
             </div>
           </div>
@@ -1000,6 +1032,7 @@ onMounted(() => daq.connect())
                   !configuration ||
                   configurationErrors.length > 0 ||
                   !!stopPolicyError ||
+                  sourceScanActive ||
                   !Number.isInteger(hdf5SegmentSizeMb) ||
                   hdf5SegmentSizeMb < 1 ||
                   hdf5SegmentSizeMb > 1048576
@@ -1367,15 +1400,26 @@ onMounted(() => daq.connect())
                   <div class="discovered-connections-content">
                     <div class="parameter-copy">
                       <p>
-                        Review the physical chain/node order before updating the logical board
-                        addresses.
+                        Select only the chain/node cards that belong to this experiment. Their order
+                        defines the logical board numbers.
                       </p>
                       <ol>
                         <li
                           v-for="(connection, board) in discoveredConnections"
                           :key="connection.address"
                         >
-                          <strong>Board {{ board }}</strong>
+                          <input
+                            type="checkbox"
+                            :aria-label="`Use TDlink ${connection.chain} node ${connection.node}`"
+                            :checked="selectedDiscoveredDevices.has(connection.address)"
+                            @change="
+                              setDiscoveredDeviceSelected(
+                                connection.address,
+                                ($event.target as HTMLInputElement).checked,
+                              )
+                            "
+                          />
+                          <strong>Card {{ board }}</strong>
                           <code>{{ connection.address }}</code>
                         </li>
                       </ol>
@@ -1383,13 +1427,13 @@ onMounted(() => daq.connect())
                     <button
                       type="button"
                       class="secondary use-discovered-connections"
-                      :disabled="discoveredConfigurationMatches"
+                      :disabled="!selectedDiscoveredDevices.size || discoveredConfigurationMatches"
                       @click="useDiscoveredConnections"
                     >
                       {{
                         discoveredConfigurationMatches
-                          ? 'Addresses already in configuration'
-                          : 'Use discovered addresses'
+                          ? 'Selection already in configuration'
+                          : `Use ${selectedDiscoveredDevices.size} selected card${selectedDiscoveredDevices.size === 1 ? '' : 's'}`
                       }}
                     </button>
                   </div>
@@ -2072,6 +2116,16 @@ onMounted(() => daq.connect())
           :theme="theme"
           :live="daq.snapshot.value?.currentStaircase"
           :configuration-notice="configurationNotice"
+        />
+        <SourceScanWorkspace
+          :configuration="configuration"
+          :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
+          :capture-raw="captureRaw"
+          :journal-transport="journalTransport"
+          :persist-histograms="persistHistograms"
+          :hdf5-segment-size-mb="hdf5SegmentSizeMb"
+          :hdf5-compression="hdf5Compression"
+          @active="sourceScanActive = $event"
         />
         <HoldDelayWorkspace
           :api="api"

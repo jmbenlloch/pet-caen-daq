@@ -99,8 +99,8 @@ func (s *RunService) GetHistograms(_ context.Context, request *connect.Request[d
 	if !validRunID.MatchString(message.GetRunId()) {
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_RUN", fmt.Errorf("a valid run_id is required"))
 	}
-	if len(message.GetSelections()) == 0 || len(message.GetSelections()) > 64 {
-		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_SELECTION", fmt.Errorf("select between 1 and 64 channels"))
+	if len(message.GetSelections()) == 0 || len(message.GetSelections()) > 65 {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_SELECTION", fmt.Errorf("select between 1 and 65 datasets (channels or board sums)"))
 	}
 	kinds := map[daqv1.HistogramKind]runpipeline.HistogramKind{
 		daqv1.HistogramKind_HISTOGRAM_KIND_PHA_HIGH_GAIN: runpipeline.HistogramPHAHigh,
@@ -113,11 +113,26 @@ func (s *RunService) GetHistograms(_ context.Context, request *connect.Request[d
 		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_KIND", fmt.Errorf("histogram kind is required"))
 	}
 	selections := make([]runpipeline.HistogramSelection, 0, len(message.GetSelections()))
+	unique := make(map[runpipeline.HistogramSelection]bool)
 	for _, selection := range message.GetSelections() {
-		if selection.GetChain() > 7 || selection.GetNode() > 15 || selection.GetChannel() > 63 {
+		if selection == nil || selection.GetChain() > 7 || selection.GetNode() > 15 || selection.GetChannel() > 63 || (selection.GetBoardSum() && selection.GetChannel() != 0) {
 			return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_SELECTION", fmt.Errorf("selection %d/%d/%d is outside hardware range", selection.GetChain(), selection.GetNode(), selection.GetChannel()))
 		}
-		selections = append(selections, runpipeline.HistogramSelection{Chain: uint8(selection.GetChain()), Node: uint8(selection.GetNode()), Channel: uint8(selection.GetChannel())})
+		first, last := selection.GetChannel(), selection.GetChannel()
+		if selection.GetBoardSum() {
+			first, last = 0, 63
+		}
+		for channel := first; channel <= last; channel++ {
+			key := runpipeline.HistogramSelection{Chain: uint8(selection.GetChain()), Node: uint8(selection.GetNode()), Channel: uint8(channel)}
+			if !unique[key] {
+				unique[key] = true
+				selections = append(selections, key)
+			}
+		}
+	}
+	// Bound work and memory even when many board sums are requested.
+	if len(selections) > 256 {
+		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_SELECTION", fmt.Errorf("request covers more than 256 channel spectra; select fewer boards"))
 	}
 	var datasets []runpipeline.HistogramDataset
 	var err error
@@ -141,12 +156,52 @@ func (s *RunService) GetHistograms(_ context.Context, request *connect.Request[d
 		return nil, serviceError(connect.CodeFailedPrecondition, "HISTOGRAM_UNAVAILABLE", err)
 	}
 	response := &daqv1.GetHistogramsResponse{RunId: message.GetRunId(), Kind: message.GetKind()}
+	index := make(map[runpipeline.HistogramSelection]runpipeline.HistogramDataset, len(datasets))
 	for _, dataset := range datasets {
-		response.Datasets = append(response.Datasets, &daqv1.HistogramDataset{
+		index[dataset.HistogramSelection] = dataset
+	}
+	for _, selection := range message.GetSelections() {
+		key := runpipeline.HistogramSelection{Chain: uint8(selection.Chain), Node: uint8(selection.Node), Channel: uint8(selection.Channel)}
+		dataset, exists := index[key]
+		if !exists {
+			return nil, serviceError(connect.CodeFailedPrecondition, "HISTOGRAM_UNAVAILABLE", fmt.Errorf("missing spectrum %+v", key))
+		}
+		out := &daqv1.HistogramDataset{
 			Chain: uint32(dataset.Chain), Node: uint32(dataset.Node), Channel: uint32(dataset.Channel),
 			Minimum: dataset.Minimum, BinWidth: dataset.BinWidth, Bins: dataset.Bins, Entries: dataset.Entries,
 			Underflow: dataset.Underflow, Overflow: dataset.Overflow,
-		})
+		}
+		if selection.BoardSum {
+			out, err = sumBoardHistograms(key, index)
+			if err != nil {
+				return nil, serviceError(connect.CodeFailedPrecondition, "HISTOGRAM_UNAVAILABLE", err)
+			}
+		}
+		response.Datasets = append(response.Datasets, out)
 	}
 	return connect.NewResponse(response), nil
+}
+
+// Sum a coherent backend snapshot, never the browser's subset of visible channels.
+// Historical loaders supply zero-filled spectra for channels without samples.
+func sumBoardHistograms(board runpipeline.HistogramSelection, index map[runpipeline.HistogramSelection]runpipeline.HistogramDataset) (*daqv1.HistogramDataset, error) {
+	first := index[board]
+	out := &daqv1.HistogramDataset{Chain: uint32(board.Chain), Node: uint32(board.Node), BoardSum: true, Minimum: first.Minimum, BinWidth: first.BinWidth, BoardSumBins: make([]uint64, len(first.Bins))}
+	for channel := uint8(0); channel < 64; channel++ {
+		key := runpipeline.HistogramSelection{Chain: board.Chain, Node: board.Node, Channel: channel}
+		h, ok := index[key]
+		if !ok || len(h.Bins) != len(out.BoardSumBins) || h.Minimum != out.Minimum || h.BinWidth != out.BinWidth {
+			return nil, fmt.Errorf("missing or incompatible histogram axis for %+v", key)
+		}
+		if math.MaxUint64-out.Entries < h.Entries || math.MaxUint64-out.Underflow < h.Underflow || math.MaxUint64-out.Overflow < h.Overflow {
+			return nil, fmt.Errorf("board histogram counters exceed uint64")
+		}
+		out.Entries += h.Entries
+		out.Underflow += h.Underflow
+		out.Overflow += h.Overflow
+		for i, value := range h.Bins {
+			out.BoardSumBins[i] += uint64(value)
+		}
+	}
+	return out, nil
 }

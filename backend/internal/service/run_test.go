@@ -229,6 +229,38 @@ func TestRunServiceOwnsHealthMonitorThroughStop(t *testing.T) {
 	}
 }
 
+func TestRunServiceStartRetiresMonitorsOrphanedByAsynchronousFault(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady}
+	service := newRunService(t, controller)
+
+	healthCtx, healthCancel := context.WithCancel(context.Background())
+	healthDone := make(chan error, 1)
+	go func() {
+		<-healthCtx.Done()
+		healthDone <- healthCtx.Err()
+	}()
+	presetCtx, presetCancel := context.WithCancel(context.Background())
+	presetDone := make(chan struct{})
+	go func() {
+		<-presetCtx.Done()
+		close(presetDone)
+	}()
+	service.monitorCancel, service.monitorDone = healthCancel, healthDone
+	service.presetCancel, service.presetDone = presetCancel, presetDone
+
+	if _, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{
+		RequestedBy: "operator", JanusConfiguration: validTopology,
+	})); err != nil {
+		t.Fatal(err)
+	}
+	service.mu.Lock()
+	monitorsStopped := service.monitorCancel == nil && service.monitorDone == nil && service.presetCancel == nil && service.presetDone == nil
+	service.mu.Unlock()
+	if !monitorsStopped {
+		t.Fatal("orphaned run monitors survived the next start")
+	}
+}
+
 func TestRunServicePresetTimeStopsAndPublishesCompletion(t *testing.T) {
 	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
 	service := newRunService(t, controller)
@@ -329,5 +361,43 @@ func TestRunServiceRejectsConcurrentOperation(t *testing.T) {
 	close(release)
 	if err := <-done; err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSourcePointUsesSharedConfigurationWithoutPresetMonitor(t *testing.T) {
+	for _, sourcePoint := range []bool{false, true} {
+		name := "ordinary run"
+		var position *runstore.SourcePosition
+		if sourcePoint {
+			name = "source point"
+			position = &runstore.SourcePosition{ScanID: "xy-1"}
+		}
+		t.Run(name, func(t *testing.T) {
+			controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
+			s := newRunService(t, controller)
+			text := validTopology + "StopRunMode PRESET_TIME\nPresetTime 60 s\n"
+			response, err := s.startRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: text, ConfigurationRequestId: "point-request"}), position)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				if _, err := s.StopRun(context.Background(), connect.NewRequest(&daqv1.StopRunRequest{RequestedBy: "operator", RunId: response.Msg.Run.RunId})); err != nil {
+					t.Error(err)
+				}
+			}()
+			s.mu.Lock()
+			monitored := s.presetCancel != nil
+			s.mu.Unlock()
+			if monitored == sourcePoint {
+				t.Errorf("preset monitor=%t for sourcePoint=%t", monitored, sourcePoint)
+			}
+			if controller.options.SourcePosition != position || controller.options.RequestedConfiguration != text {
+				t.Error("source position or original configuration was lost")
+			}
+			applied := response.Msg.Snapshot.GetAppliedConfiguration()
+			if applied.GetConfigurationRequestId() != "point-request" || applied.GetRunId() != response.Msg.Run.RunId {
+				t.Errorf("shared configuration tracking lost: %v", applied)
+			}
+		})
 	}
 }

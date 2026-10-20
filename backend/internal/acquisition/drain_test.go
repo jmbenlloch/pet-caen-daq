@@ -57,6 +57,12 @@ func completion(chain uint8, ready bool) dt5215.StreamEvent {
 	return dt5215.StreamEvent{Chain: chain, Descriptor: dt5215.Descriptor{Qualifier: dt5202.QualifierService}, Payload: payload}
 }
 
+func completionNode(chain, node uint8, ready bool) dt5215.StreamEvent {
+	event := completion(chain, ready)
+	event.Descriptor.Node = node
+	return event
+}
+
 func TestStopAndDrainDeliversPendingEventsBeforeCompletion(t *testing.T) {
 	pending := dt5215.StreamEvent{Chain: 0, Descriptor: dt5215.Descriptor{Qualifier: dt5202.QualifierSpectroscopy}}
 	hardware := &scriptedDrainHardware{reads: []drainRead{{raw: []byte("pending"), events: []dt5215.StreamEvent{pending}}, {raw: []byte("complete0"), events: []dt5215.StreamEvent{completion(0, true)}}, {raw: []byte("running"), events: []dt5215.StreamEvent{completion(1, false)}}, {raw: []byte("complete1"), events: []dt5215.StreamEvent{completion(1, true)}}}, stallAfterReads: true}
@@ -136,6 +142,64 @@ func TestStopAndDrainSupportsNonContiguousActiveChains(t *testing.T) {
 	result, err := StopAndDrainChains(context.Background(), hardware, []uint16{2, 5}, nil)
 	if err != nil || result.CompletedChains != 2 {
 		t.Fatalf("result=%#v error=%v", result, err)
+	}
+}
+
+func TestStopAndDrainIgnoresEnabledButUnselectedChains(t *testing.T) {
+	hardware := &scriptedDrainHardware{
+		reads: []drainRead{{
+			raw:    []byte("complete-batch"),
+			events: []dt5215.StreamEvent{completion(0, true), completion(1, true), completion(2, true)},
+		}},
+		stallAfterReads: true,
+	}
+	var deliveredRaw []byte
+	var deliveredEvents []dt5215.StreamEvent
+	result, err := StopAndDrainChains(context.Background(), hardware, []uint16{1, 2}, func(raw []byte, events []dt5215.StreamEvent) error {
+		deliveredRaw = append([]byte(nil), raw...)
+		deliveredEvents = append([]dt5215.StreamEvent(nil), events...)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(deliveredRaw) != "complete-batch" || len(deliveredEvents) != 2 || result.Events != 2 || result.CompletedChains != 2 {
+		t.Fatalf("result=%#v raw=%q events=%#v", result, deliveredRaw, deliveredEvents)
+	}
+	for _, event := range deliveredEvents {
+		if event.Chain == 0 {
+			t.Fatal("unselected chain was delivered for decoding")
+		}
+	}
+}
+
+func TestStopAndDrainTargetsIgnoresUnselectedNodeOnActiveChain(t *testing.T) {
+	hardware := &scriptedDrainHardware{
+		reads: []drainRead{{
+			raw: []byte("complete-batch"),
+			events: []dt5215.StreamEvent{
+				completionNode(1, 0, true),
+				completionNode(1, 1, true),
+				completionNode(2, 0, true),
+			},
+		}},
+		stallAfterReads: true,
+	}
+	var delivered []dt5215.StreamEvent
+	result, err := StopAndDrainTargets(context.Background(), hardware, []ReadoutTarget{{Chain: 1, Node: 0}, {Chain: 2, Node: 0}}, func(_ []byte, events []dt5215.StreamEvent) error {
+		delivered = append(delivered, events...)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(delivered) != 2 || result.Events != 2 || result.CompletedChains != 2 {
+		t.Fatalf("result=%#v events=%#v", result, delivered)
+	}
+	for _, event := range delivered {
+		if event.Chain == 1 && event.Descriptor.Node == 1 {
+			t.Fatal("unselected node on active chain was delivered")
+		}
 	}
 }
 

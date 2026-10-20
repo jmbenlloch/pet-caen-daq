@@ -150,6 +150,14 @@ func auditSoftwareSetting(setting *Setting, doc *janusconfig.Document) {
 	switch setting.Owner {
 	case janusconfig.OwnerRunControl:
 		switch setting.Name {
+		case "ExtRunSource":
+			if value(doc, "StartRunMode") != "TDL_EXTRUN" {
+				inactive("start mode does not use an external DT5215 run source")
+			}
+		case "GPSTimeUTC":
+			if value(doc, "StartRunMode") != "TDL_GPS" {
+				inactive("start mode does not use a GPS start time")
+			}
 		case "TstampCoincWindow":
 			if value(doc, "EventBuildingMode") == "DISABLED" {
 				inactive("event building is disabled")

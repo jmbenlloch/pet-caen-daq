@@ -154,6 +154,40 @@ export function replaceIndexedConfigurationValues(
   return parseConfiguration(retained.join(newline))
 }
 
+// Replaces the physical board selection and carries board/channel overrides
+// with their original connection address as logical board numbers are compacted.
+export function replaceConnectionSelection(document: ConfigurationDocument, values: string[]) {
+  const oldBoardByAddress = new Map(
+    document.fields
+      .filter((field) => field.name === 'Open' && field.index !== undefined)
+      .map((field) => [field.value, Number(field.index)] as const),
+  )
+  const newBoardByOldBoard = new Map<number, number>()
+  values.forEach((address, newBoard) => {
+    const oldBoard = oldBoardByAddress.get(address)
+    if (oldBoard !== undefined) newBoardByOldBoard.set(oldBoard, newBoard)
+  })
+
+  const newline = document.source.includes('\r\n') ? '\r\n' : '\n'
+  const lines = document.source.split(/\r?\n/)
+  for (const field of [...document.fields].sort((left, right) => right.line - left.line)) {
+    if (field.name === 'Open' || field.index === undefined || parameterScope(field) === 'global')
+      continue
+    const oldBoard = Number(field.index)
+    const newBoard = newBoardByOldBoard.get(oldBoard)
+    if (newBoard === undefined) {
+      lines.splice(field.line - 1, 1)
+      continue
+    }
+    if (newBoard === oldBoard) continue
+    const match = lines[field.line - 1]?.match(assignment)
+    if (!match) continue
+    lines[field.line - 1] =
+      `${match[1]}${match[2]}[${newBoard}]${match[4] === undefined ? '' : `[${match[4]}]`}${match[5]}${match[6]}${match[7]}${match[8] ?? ''}`
+  }
+  return replaceIndexedConfigurationValues(parseConfiguration(lines.join(newline)), 'Open', values)
+}
+
 export function resizeConnectionConfiguration(
   document: ConfigurationDocument,
   requestedCount: number,
@@ -169,7 +203,7 @@ export function resizeConnectionConfiguration(
     .sort((left, right) => Number(left.index) - Number(right.index))
     .map((field) => field.value)
   if (requestedCount <= configured.length)
-    return replaceIndexedConfigurationValues(document, 'Open', configured.slice(0, requestedCount))
+    return replaceConnectionSelection(document, configured.slice(0, requestedCount))
 
   const first = configured[0] ?? 'usb:127.0.0.1:tdl:0:0'
   const marker = first.lastIndexOf(':tdl:')

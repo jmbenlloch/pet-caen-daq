@@ -322,6 +322,8 @@ message HistogramSelection {
   uint32 chain = 1;
   uint32 node = 2;
   uint32 channel = 3;
+  // Sum all 64 channels of chain/node. Channel must be zero when true.
+  bool board_sum = 4;
 }
 
 enum HistogramKind {
@@ -348,6 +350,10 @@ message HistogramDataset {
   uint64 entries = 7;
   uint64 underflow = 8;
   uint64 overflow = 9;
+  // A separate board-wide dataset, not channel zero. Individual bins remain uint32.
+  bool board_sum = 10;
+  // Populated instead of bins for board_sum, preventing uint32 sum overflow.
+  repeated uint64 board_sum_bins = 11;
 }
 
 message TelemetrySnapshot {
@@ -580,6 +586,10 @@ message Concentrator {
   string software_revision = 1;
   string fpga_revision = 2;
   uint32 product_id = 3;
+  // JANUS connection prefix for this backend's active DT5215 endpoint,
+  // for example "eth:192.168.50.125". Discovery UIs use this instead of
+  // copying a possibly stale host from the startup configuration.
+  string connection_uri_prefix = 4;
 }
 
 message StatisticsTelemetry {
@@ -645,6 +655,23 @@ message RunSummary {
   // incomplete, and legacy runs that predate statistics persistence.
   StatisticsTelemetry final_statistics = 12;
   RunType run_type = 13;
+  SourcePositionMetadata source_position = 14;
+}
+
+// Calculated logical coordinates; not an encoder or surveyed source position.
+message SourcePositionMetadata {
+  string scan_id = 1;
+  uint32 index = 2;
+  uint32 row = 3;
+  uint32 column = 4;
+  double requested_x_mm = 5;
+  double requested_y_mm = 6;
+  sint32 x_steps = 7;
+  sint32 y_steps = 8;
+  double calculated_x_mm = 9;
+  double calculated_y_mm = 10;
+  string position_basis = 11;
+  string configuration_json = 12;
 }
 
 enum RunType {

@@ -32,6 +32,34 @@ function createRun(runId: string) {
 }
 
 describe('PlotWorkspace', () => {
+  it('keeps the last channel deselected across telemetry board updates', async () => {
+    const board = { chain: 0, ...create(BoardSchema, { node: 0, logicalIndex: 0 }) }
+    const wrapper = mount(PlotWorkspace, {
+      props: {
+        api: apiWithRuns(createRun('80')),
+        boards: [board],
+        running: false,
+        loading: false,
+        datasets: [],
+        theme: 'light',
+      },
+      global: { stubs: { HistogramPlot: { template: '<div />' } } },
+    })
+    await flushPromises()
+    await wrapper.get('[aria-haspopup="true"]').trigger('click')
+    const channel = wrapper.get('[aria-label="Board 0, chain 0 node 0, channel 0"]')
+    await channel.trigger('click')
+    await wrapper.setProps({ boards: [{ ...board }] })
+    expect(channel.attributes('aria-pressed')).toBe('false')
+    expect(wrapper.get('[aria-haspopup="true"]').text()).toContain('0 / 65 selected')
+    const previousRequests = wrapper.emitted('request')?.length ?? 0
+    await channel.trigger('click')
+    expect(wrapper.emitted('request')).toHaveLength(previousRequests + 1)
+    await wrapper.get('.histogram-board-selector header button:last-child').trigger('click')
+    await wrapper.setProps({ boards: [{ ...board }] })
+    expect(channel.attributes('aria-pressed')).toBe('false')
+  })
+
   it('requests the latest persisted run from the paginated picker on page load', async () => {
     const run = createRun('42')
     const wrapper = mount(PlotWorkspace, {
@@ -238,7 +266,7 @@ describe('PlotWorkspace', () => {
     expect(requestButton.attributes('aria-busy')).toBe('true')
   })
 
-  it('enforces the 64-channel request limit in the selector', async () => {
+  it('allows all 64 channels plus a separate board sum and enforces the 65-dataset limit', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
         api: apiWithRuns(),
@@ -265,8 +293,19 @@ describe('PlotWorkspace', () => {
       .filter((button) => button.text() === 'All')
     await allButtons[0].trigger('click')
 
-    expect(wrapper.get('[aria-haspopup="true"]').text()).toContain('64 / 64 selected')
-    expect(wrapper.get('[role="alert"]').text()).toContain('limited to 64 channels')
+    expect(wrapper.get('[aria-haspopup="true"]').text()).toContain('64 / 65 selected')
+    await wrapper
+      .get('[aria-label="Board 3, chain 0 node 0, sum of all 64 channels"]')
+      .trigger('click')
+    expect(wrapper.get('[aria-haspopup="true"]').text()).toContain('65 / 65 selected')
+    const sumButton = wrapper.get('.histogram-board-sum')
+    expect(sumButton.classes()).toContain('active')
+    expect(sumButton.attributes('aria-pressed')).toBe('true')
+    expect(wrapper.emitted('request')?.at(-1)?.[2]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ chain: 0, node: 0, channel: 0, boardSum: true }),
+      ]),
+    )
     expect(
       wrapper.get('[aria-label="Board 8, chain 1 node 0, channel 0"]').attributes('disabled'),
     ).toBeDefined()
@@ -276,6 +315,12 @@ describe('PlotWorkspace', () => {
       .findAll('button')
       .find((button) => button.text() === 'Request data')
     await requestButton!.trigger('click')
-    expect(wrapper.emitted('request')?.at(-1)?.[2]).toHaveLength(64)
+    expect(wrapper.emitted('request')?.at(-1)?.[2]).toHaveLength(65)
+    await wrapper.get('select').setValue(HistogramKind.TOT)
+    expect(wrapper.emitted('request')?.at(-1)?.[1]).toBe(HistogramKind.TOT)
+    expect(wrapper.emitted('request')?.at(-1)?.[2]).toEqual(
+      expect.arrayContaining([expect.objectContaining({ boardSum: true })]),
+    )
+    wrapper.unmount()
   })
 })

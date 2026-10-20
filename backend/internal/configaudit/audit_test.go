@@ -160,3 +160,26 @@ func TestAuditAppliesPeakDetectorMode(t *testing.T) {
 	}
 	t.Fatal("PeakDetectorMode missing from the audit")
 }
+
+func TestAuditMarksInactiveJANUS501RunSettings(t *testing.T) {
+	document, err := janusconfig.Parse(strings.NewReader("Open[0] eth:192.168.50.125:tdl:1:0\nStartRunMode TDL\nExtRunSource LEMO_RA\nGPSTimeUTC 2030-06-20 16:30:00\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := dt5202.ConfigurationPlan{Board: 0}
+	report, err := Build(document, []dt5202.ConfigurationPlan{plan}, []BoardEvidence{{Board: 0}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"ExtRunSource", "GPSTimeUTC"} {
+		found := false
+		for _, setting := range report.Settings {
+			if setting.Name == name {
+				found = setting.Status == Inactive && setting.Reason != ""
+			}
+		}
+		if !found {
+			t.Errorf("%s was not explicitly audited as inactive", name)
+		}
+	}
+}

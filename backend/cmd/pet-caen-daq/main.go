@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"connectrpc.com/connect"
+
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1/daqv1connect"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
@@ -46,6 +48,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	streamAddress := flags.String("stream", "172.16.0.11:9000", "DT5215 stream address")
 	listenAddress := flags.String("listen", "127.0.0.1:8080", "ConnectRPC HTTP listen address")
 	frontendDirectory := flags.String("frontend-dir", "", "optional built frontend directory to serve on the same HTTP origin")
+	sourceStage := flags.String("source-stage", "", "source stage serial path (115200 baud), or tcp://host:port for simulator/Windows bridge; empty disables scans")
 	runParent := flags.String("runs", "./runs", "parent directory for run artifacts")
 	catalogPath := flags.String("catalog", "", "SQLite run catalog path (default: <runs>/catalog.sqlite3)")
 	pipelineCapacity := flags.Int("pipeline-capacity", 32, "bounded stream-batch queue capacity")
@@ -153,10 +156,15 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 		}
 	}
 	defer runtime.Close()
+	sourceService := &service.SourceScanService{Runs: runService, Endpoint: *sourceStage, Parent: *runParent, Lifetime: ctx}
+	defer sourceService.Close()
+	sourceOptions := connect.WithInterceptors(sourceService.Interceptor())
 	mux := http.NewServeMux()
-	systemPath, systemHandler := daqv1connect.NewSystemServiceHandler(systemService)
-	runPath, runHandler := daqv1connect.NewRunServiceHandler(runService)
-	scanPath, scanHandler := daqv1connect.NewScanServiceHandler(scanService)
+	systemPath, systemHandler := daqv1connect.NewSystemServiceHandler(systemService, sourceOptions)
+	runPath, runHandler := daqv1connect.NewRunServiceHandler(runService, sourceOptions)
+	scanPath, scanHandler := daqv1connect.NewScanServiceHandler(scanService, sourceOptions)
+	sourcePath, sourceHandler := daqv1connect.NewSourceScanServiceHandler(sourceService, sourceOptions)
+	mux.Handle(sourcePath, sourceHandler)
 	mux.Handle(systemPath, systemHandler)
 	mux.Handle(runPath, runHandler)
 	mux.Handle(scanPath, scanHandler)
@@ -324,6 +332,18 @@ func topologySnapshot(topology dt5215.Topology, connections []janusconfig.Connec
 		snapshot.Chains = append(snapshot.Chains, &daqv1.Chain{Index: uint32(index), Enabled: enabled, Health: health, Boards: boards[uint16(index)]})
 	}
 	return snapshot
+}
+
+func connectionURIPrefix(controlAddress string) string {
+	host, _, err := net.SplitHostPort(controlAddress)
+	if err != nil {
+		host = controlAddress
+	}
+	interfaceName := "eth"
+	if host == "172.16.0.11" || host == "172.16.1.11" {
+		interfaceName = "usb"
+	}
+	return interfaceName + ":" + host
 }
 
 func instanceID() string {

@@ -983,7 +983,9 @@ Select the **Channels** button to open a grid for each discovered board.
 - **Clear** removes that board's channels;
 - selected channels are highlighted.
 
-At most 64 channels can be requested at once across all boards. Once the limit is reached, unselected channel buttons are disabled. Clear a board or individual channel before selecting a different one.
+At most 65 datasets can be requested at once across all boards, allowing all 64 channels of a board plus its sum. Once the limit is reached, unselected buttons are disabled. Clear a board or individual selection before selecting a different one.
+
+Each board also offers **Board sum (all 64 channels)** for PHA high gain, PHA low gain, ToA, and ToT. The backend sums corresponding bins across all channels, independently of the individually selected channels. This is not an event-by-event energy sum. Sums are available for live and stored runs, with entries, underflow, and overflow totals. Stored runs are summed from their existing histogram artifacts without changing the files. **All** selects individual channels; select the sum separately. **Clear** removes both the board's individual channels and its sum.
 
 At least one channel is required. The initial selection is normally board 0, channel 0.
 
@@ -1705,7 +1707,7 @@ Live refresh only runs while the selected run is the active run and system state
 
 ## Cannot select more histogram channels
 
-The request limit is 64 total channels across all boards. Clear channels or a selected board first.
+The request limit is 65 datasets (individual channels or board sums) across all boards. Clear selections first. A request may cover at most 256 distinct underlying channel spectra; each board sum covers all 64 channels on that board.
 
 ## Staircase start fails
 

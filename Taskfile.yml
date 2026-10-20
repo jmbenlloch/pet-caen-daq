@@ -65,6 +65,7 @@ tasks:
       - mkdir -p bin
       - go build -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq
       - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
+      - go build -o bin/source-stage-simulator ./backend/cmd/source-stage-simulator
       - go build -o bin/catalog-ops ./backend/cmd/catalog-ops
       - npm --prefix frontend run build
 
@@ -74,6 +75,7 @@ tasks:
       - mkdir -p bin
       - go build -tags hdf5 -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq
       - go build -o bin/caen-simulator ./backend/cmd/caen-simulator
+      - go build -o bin/source-stage-simulator ./backend/cmd/source-stage-simulator
       - go build -o bin/catalog-ops ./backend/cmd/catalog-ops
       - go build -tags hdf5 -o bin/jsonl-to-hdf5 ./backend/cmd/jsonl-to-hdf5
       - go build -tags hdf5 -o bin/hdf5-write-benchmark ./backend/cmd/hdf5-write-benchmark
@@ -143,6 +145,34 @@ tasks:
     cmds:
       - npm --prefix frontend run dev
 
+  simulator:source:
+    desc: Run the independent XY stage simulator on localhost:19010
+    cmds:
+      - go run ./backend/cmd/source-stage-simulator {{.CLI_ARGS}}
+
+  simulator:caen:
+    desc: Run the local CAEN simulator for source-scan development
+    cmds:
+      - go run ./backend/cmd/caen-simulator -control 127.0.0.1:19760 -stream 127.0.0.1:19000
+
+  dev:source:
+    desc: Run the DAQ against local CAEN and source-stage simulators
+    cmds:
+      - go run ./backend/cmd/pet-caen-daq -config test/fixtures/janus/config_same4_v3_good.txt -control 127.0.0.1:19760 -stream 127.0.0.1:19000 -source-stage tcp://127.0.0.1:19010 -runs .cache/source-demo-runs -authorize-hv-config
+
+  test:source:
+    desc: Test source scan planning, serial protocol, orchestration, and storage
+    cmds:
+      - go test -race ./backend/internal/sourcestage ./backend/internal/service ./backend/internal/runpipeline ./backend/internal/runstore
+      - task: test:source:firmware
+
+  test:source:firmware:
+    desc: Test the Arduino sketch using deterministic host I/O (requires g++)
+    cmds:
+      - mkdir -p .cache/firmware
+      - g++ -std=c++17 -Wall -Wextra -Werror test/firmware/source_stage_test.cpp -o .cache/firmware/source-stage-test
+      - .cache/firmware/source-stage-test
+
   hardware:inspect:
     desc: Read and validate an already-ready DT5215/DT5202 topology without hardware writes
     vars:
@@ -174,7 +204,32 @@ tasks:
       - mkdir -p bin
       - go build -o bin/pet-caen-daq.exe ./backend/cmd/pet-caen-daq
       - go build -o bin/caen-simulator.exe ./backend/cmd/caen-simulator
+      - go build -o bin/source-stage-simulator.exe ./backend/cmd/source-stage-simulator
+      - go build -o bin/source-stage-bridge.exe ./backend/cmd/source-stage-bridge
       - go build -o bin/catalog-ops.exe ./backend/cmd/catalog-ops
+
+  build:source-bridge:windows:
+    desc: Cross-compile the Windows USB serial to TCP stage bridge
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: "0"
+    cmds:
+      - go build -o bin/source-stage-bridge.exe ./backend/cmd/source-stage-bridge
+
+  test:source-bridge:
+    desc: Test stage bridge forwarding and connection lifecycle without hardware
+    cmds:
+      - go test -race ./backend/internal/stagebridge
+
+  build:source-bridge:windows-tests:
+    desc: Build hardware-free Windows overlapped I/O tests for execution on Windows
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: "0"
+    cmds:
+      - go test -c -o bin/source-stage-bridge-tests.exe ./backend/internal/stagebridge
 
   catalog:check:
     desc: Compare the SQLite run catalog with authoritative manifests without repairing it

@@ -609,16 +609,13 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 		if wanted && !enabled {
 			return Topology{}, fmt.Errorf("TDlink %d is disabled; enable the configured link in the DT5215 web interface", chain)
 		}
-		if !wanted && enabled {
-			return Topology{}, fmt.Errorf("unexpected enabled TDlink %d; disable the unused link in the DT5215 web interface or add its cards to the configuration", chain)
-		}
 		if !wanted {
 			continue
 		}
 		if info.Status == 1 || info.Status == 2 {
 			requiresEnumeration = true
-		} else if int(info.BoardCount) != len(connections) {
-			return Topology{}, fmt.Errorf("TDlink %d reports %d boards; configuration expects %d", chain, info.BoardCount, len(connections))
+		} else if !connectionsFitBoardCount(connections, int(info.BoardCount)) {
+			return Topology{}, fmt.Errorf("TDlink %d reports %d boards; configured node is outside the discovered range", chain, info.BoardCount)
 		}
 	}
 
@@ -639,8 +636,8 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 		topology.Enumerations = enumerations
 		for _, chain := range chains {
 			enumeration := enumerations[chain]
-			if int(enumeration.NodeCount) != len(expectedByChain[chain]) {
-				return Topology{}, fmt.Errorf("TDlink %d enumerated %d nodes; configuration expects %d", chain, enumeration.NodeCount, len(expectedByChain[chain]))
+			if !connectionsFitBoardCount(expectedByChain[chain], int(enumeration.NodeCount)) {
+				return Topology{}, fmt.Errorf("TDlink %d enumerated %d nodes; configured node is outside the discovered range", chain, enumeration.NodeCount)
 			}
 		}
 		if err := c.Synchronize(ctx); err != nil {
@@ -673,8 +670,8 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 			continue
 		}
 		info := topology.Chains[chain]
-		if info.Status == 1 || info.Status == 2 || int(info.BoardCount) != len(connections) {
-			return Topology{}, fmt.Errorf("TDlink %d is not ready after discovery (status %d, boards %d); expected %d boards", chain, info.Status, info.BoardCount, len(connections))
+		if info.Status == 1 || info.Status == 2 || !connectionsFitBoardCount(connections, int(info.BoardCount)) {
+			return Topology{}, fmt.Errorf("TDlink %d is not ready after discovery (status %d, boards %d); a configured node is unavailable", chain, info.Status, info.BoardCount)
 		}
 		for _, connection := range connections {
 			productID, err := c.ReadRegister(ctx, uint16(chain), uint16(connection.Node), RegisterProductID)
@@ -705,4 +702,13 @@ func (c *Client) productionTopology(ctx context.Context, expected []janusconfig.
 		return topology.Boards[i].Node < topology.Boards[j].Node
 	})
 	return topology, nil
+}
+
+func connectionsFitBoardCount(connections []janusconfig.Connection, boardCount int) bool {
+	for _, connection := range connections {
+		if connection.Node < 0 || connection.Node >= boardCount {
+			return false
+		}
+	}
+	return true
 }

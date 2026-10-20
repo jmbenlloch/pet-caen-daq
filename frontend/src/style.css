@@ -893,7 +893,7 @@ select:focus {
 }
 .discovered-connections li {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  grid-template-columns: max-content max-content minmax(0, 1fr);
   align-items: baseline;
   column-gap: 14px;
 }
@@ -1395,7 +1395,8 @@ select:focus {
   gap: 7px;
   margin-top: 15px;
 }
-.channel-grid button {
+.channel-grid button,
+.histogram-board-sum {
   aspect-ratio: 1;
   border: 1px solid #34465e;
   border-radius: 7px;
@@ -1404,13 +1405,15 @@ select:focus {
   font-size: 0.72rem;
   font-weight: 800;
 }
-.channel-grid button.active {
+.channel-grid button.active,
+.histogram-board-sum.active {
   color: #062018;
   border-color: #55d9ae;
   background: #45cda2;
   box-shadow: 0 0 0 2px #45cda222;
 }
-.channel-grid button:focus-visible {
+.channel-grid button:focus-visible,
+.histogram-board-sum:focus-visible {
   outline: 3px solid #f1c66d;
   outline-offset: 2px;
 }
@@ -2614,6 +2617,20 @@ textarea {
   gap: 4px;
   margin-top: 10px;
 }
+.histogram-board-sum {
+  display: block;
+  width: 100%;
+  aspect-ratio: auto;
+  margin-top: 10px;
+  padding: 8px 12px;
+  text-align: left;
+}
+.histogram-board-sum::before {
+  content: 'Σ · ';
+}
+.histogram-board-sum.active::after {
+  content: ' · Selected';
+}
 .histogram-channel-grid button {
   min-width: 0;
   aspect-ratio: auto;
@@ -3030,12 +3047,14 @@ textarea {
   color: #09684f;
   background: #d9e7e2;
 }
-[data-theme='light'] .channel-grid button {
+[data-theme='light'] .channel-grid button,
+[data-theme='light'] .histogram-board-sum {
   color: #526981;
   border-color: #b8c7d8;
   background: #edf3f8;
 }
-[data-theme='light'] .channel-grid button.active {
+[data-theme='light'] .channel-grid button.active,
+[data-theme='light'] .histogram-board-sum.active {
   color: #052c21;
   border-color: #168f70;
   background: #43cba5;

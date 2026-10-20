@@ -466,6 +466,7 @@ func (s *Server) handleChainInfo(connection net.Conn) error {
 		binary.LittleEndian.PutUint16(response[0:2], status)
 		binary.LittleEndian.PutUint16(response[2:4], uint16(len(boards)))
 		binary.LittleEndian.PutUint32(response[4:8], math.Float32bits(10+float32(chain)))
+		binary.LittleEndian.PutUint32(response[32:36], math.Float32bits(3000))
 	}
 	return writeAll(connection, response)
 }

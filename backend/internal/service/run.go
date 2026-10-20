@@ -481,6 +481,7 @@ func manifestSummary(parent string, manifest runstore.Manifest) *daqv1.RunSummar
 		run.Artifacts = append(run.Artifacts, &daqv1.Artifact{Kind: artifact.Kind, Name: artifact.Name, SizeBytes: artifact.SizeBytes, Sha256: artifact.SHA256})
 	}
 	run.FinalStatistics = statisticsTelemetry(manifest.Statistics)
+	run.SourcePosition = sourcePositionProto(manifest.SourcePosition)
 	return run
 }
 
@@ -580,6 +581,10 @@ func summaryStartedAt(summary *daqv1.RunSummary) string {
 }
 
 func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest]) (*connect.Response[daqv1.StartRunResponse], error) {
+	return s.startRun(ctx, request, nil)
+}
+
+func (s *RunService) startRun(ctx context.Context, request *connect.Request[daqv1.StartRunRequest], position *runstore.SourcePosition) (*connect.Response[daqv1.StartRunResponse], error) {
 	if !s.opMu.TryLock() {
 		return nil, serviceError(connect.CodeAborted, "CONCURRENT_OPERATION", fmt.Errorf("another run-control operation is in progress"))
 	}
@@ -605,6 +610,12 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if s.Controller.ActiveRunID() != "" {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ALREADY_ACTIVE", fmt.Errorf("run %q is already active", s.Controller.ActiveRunID()))
 	}
+	// An asynchronous coordinator fault clears its active run without going
+	// through StopRun. Retire monitors from that run before a successor can
+	// publish telemetry, otherwise both sessions alternately replace the same
+	// complete snapshot with old and current statistics.
+	s.stopMonitor()
+	s.stopPresetMonitor()
 	if s.AllocateRunID == nil {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ID_ALLOCATION_UNAVAILABLE", fmt.Errorf("run catalog ID allocation is not configured"))
 	}
@@ -613,6 +624,10 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		return nil, err
 	}
 	stopPolicy := prepared.stopPolicy
+	// Source scans own point stopping without changing the recorded PET configuration.
+	if position != nil {
+		stopPolicy = presetStopPolicy{mode: "MANUAL"}
+	}
 	runID, err := s.AllocateRunID(ctx)
 	if err != nil {
 		return nil, serviceError(connect.CodeInternal, "RUN_ID_ALLOCATION_FAILED", err)
@@ -621,7 +636,8 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 		return nil, serviceError(connect.CodeInternal, "INVALID_ALLOCATED_RUN_ID", fmt.Errorf("allocated run ID %q is invalid", runID))
 	}
 	options := acquisition.RunOptions{
-		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
+		SourcePosition: position,
+		CaptureRaw:     message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
 		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: prepared.configured.Plans, ConfigurationAudit: &prepared.audit,
 		Histograms:           prepared.histograms,
 		PersistHistograms:    message.GetPersistHistograms(),
@@ -637,7 +653,8 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	}
 	run := &daqv1.RunSummary{
 		RunId: runID, StartedAt: timestamppb.New(s.now()), Incomplete: true,
-		StopMode: stopPolicy.mode, PresetTimeMilliseconds: uint64(stopPolicy.duration.Milliseconds()), PresetEventCount: stopPolicy.eventCount,
+		SourcePosition: sourcePositionProto(position),
+		StopMode:       stopPolicy.mode, PresetTimeMilliseconds: uint64(stopPolicy.duration.Milliseconds()), PresetEventCount: stopPolicy.eventCount,
 	}
 	s.mu.Lock()
 	s.current = run
@@ -883,6 +900,9 @@ func (s *RunService) completedRun(runID string) *daqv1.RunSummary {
 }
 
 func (s *RunService) startMonitor() {
+	// Be defensive for callers other than StartRun: at most one run-health
+	// publisher may own the complete pipeline/storage/statistics snapshot.
+	s.stopMonitor()
 	source, ok := s.Controller.ActivePipeline().(RunHealthSource)
 	if !ok {
 		return
