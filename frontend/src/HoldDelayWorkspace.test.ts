@@ -22,6 +22,23 @@ function api(): DaqApi {
 }
 
 describe('HoldDelayWorkspace', () => {
+  it('shows the configuration notice beside Start scan without blocking it', async () => {
+    const wrapper = mount(HoldDelayWorkspace, {
+      props: {
+        api: api(),
+        systemState: SystemState.READY,
+        theme: 'dark',
+        boards: [0],
+        configurationNotice: 'Configuration changed since last apply/run',
+      },
+    })
+    await wrapper.get('.scan-card-toggle').trigger('click')
+
+    const actions = wrapper.get('.staircase-actions')
+    expect(actions.get('.config-notice').text()).toBe('Configuration changed since last apply/run')
+    expect(actions.get('button.primary').attributes('disabled')).toBeUndefined()
+  })
+
   it('is collapsed by default and mounts the live heatmap only when expanded', async () => {
     const live = create(HoldDelayScanSchema, {
       summary: { scanId: '61', state: ScanState.RUNNING, completedPoints: 1, totalPoints: 33 },

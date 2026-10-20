@@ -2,13 +2,17 @@ import { create } from '@bufbuild/protobuf'
 import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App.vue'
+import HoldDelayWorkspace from './HoldDelayWorkspace.vue'
+import StaircaseWorkspace from './StaircaseWorkspace.vue'
 import type { DaqApi } from './api'
 import {
+  AppliedConfigurationSource,
   ConfigurationLayer,
   ConfigurationStage,
   DiscoveryStage,
   HealthStatus,
   RunType,
+  ScanState,
   RunSummarySchema,
   SystemState,
   TelemetrySnapshotSchema,
@@ -76,6 +80,19 @@ function dashboardApi(state = SystemState.READY, advertiseTopology = true): DaqA
     disconnectHardware: vi.fn().mockResolvedValue(create(TelemetrySnapshotSchema)),
     discoverHardware: vi.fn().mockResolvedValue(create(TelemetrySnapshotSchema)),
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
+    applyConfiguration: vi.fn().mockResolvedValue({
+      snapshot: create(TelemetrySnapshotSchema, {
+        instanceId: 'backend-test',
+        sequence: 8n,
+        state: SystemState.READY,
+        appliedConfiguration: {
+          appliedAt: { seconds: 1_800_000_000n, nanos: 0 },
+          requestedBy: 'operator',
+          source: AppliedConfigurationSource.APPLY,
+          boardCount: 1,
+        },
+      }),
+    }),
     start: vi.fn().mockResolvedValue({
       snapshot: create(TelemetrySnapshotSchema, {
         instanceId: 'backend-test',
@@ -465,6 +482,142 @@ describe('operator dashboard', () => {
     expect(wrapper.findAll('button').some((button) => button.text() === 'Stop and drain')).toBe(
       true,
     )
+    wrapper.unmount()
+  })
+
+  it('applies the configuration next to Start run without starting acquisition', async () => {
+    const api = dashboardApi()
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    const apply = wrapper.get('button.apply-configuration')
+    expect(apply.text()).toBe('Apply config')
+    expect(apply.element.previousElementSibling?.textContent?.trim()).toBe('Start run')
+    expect(apply.attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('.applied-configuration').text()).toContain(
+      'No configuration applied to the boards',
+    )
+
+    await apply.trigger('click')
+    await flushPromises()
+
+    expect(api.validate).toHaveBeenCalledOnce()
+    expect(api.applyConfiguration).toHaveBeenCalledWith(
+      'operator',
+      vi.mocked(api.validate).mock.calls[0][0],
+      expect.stringMatching(/^[0-9a-f]{32}$/),
+    )
+    expect(api.start).not.toHaveBeenCalled()
+    expect(wrapper.get('#system-heading').text()).toBe('Ready')
+    expect(wrapper.get('.applied-configuration').text()).toContain('Applied with Apply config')
+    expect(wrapper.find('.applied-configuration .config-notice').exists()).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('shows the board configuration as unknown after a failed scan restore', async () => {
+    const api = dashboardApi(SystemState.FAULT)
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        state: SystemState.FAULT,
+        latestCompletedScan: {
+          scanId: '17',
+          state: ScanState.FAILED,
+          terminationReason: 'restore board 0 configuration: readback mismatch',
+        },
+      }),
+    )
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+    expect(wrapper.get('.applied-configuration').text()).toContain('Board configuration is unknown')
+    expect(wrapper.get('.scan-configuration').text()).toContain('Board configuration is unknown')
+    expect(wrapper.get('.applied-configuration').text()).not.toContain('No configuration applied')
+    expect(wrapper.get('button.apply-configuration').attributes('disabled')).toBeDefined()
+    wrapper.unmount()
+  })
+
+  it('reports apply failures like the other run actions', async () => {
+    const api = dashboardApi()
+    vi.mocked(api.applyConfiguration).mockRejectedValue(
+      new Error('[HARDWARE_DISCONNECTED] connect the hardware before applying a configuration'),
+    )
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    await wrapper.get('button.apply-configuration').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('.alert.error').text()).toContain('[HARDWARE_DISCONNECTED]')
+    wrapper.unmount()
+  })
+
+  it('offers Apply config only where Start run is offered', async () => {
+    const scanning = mount(App, { props: { api: dashboardApi(SystemState.SCANNING) } })
+    await flushPromises()
+    expect(scanning.get('button.apply-configuration').attributes('disabled')).toBeDefined()
+    scanning.unmount()
+
+    const api = dashboardApi()
+    const running = mount(App, { props: { api } })
+    await flushPromises()
+    await running
+      .findAll('button')
+      .find((button) => button.text() === 'Start run')!
+      .trigger('click')
+    await flushPromises()
+    expect(running.find('button.apply-configuration').exists()).toBe(false)
+    running.unmount()
+  })
+
+  it('warns near Start run and the scans when the editor changes after an apply', async () => {
+    const api = dashboardApi()
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+    await wrapper.get('button.apply-configuration').trigger('click')
+    await flushPromises()
+
+    await wrapper
+      .findAll('.section-tabs [role="tab"]')
+      .find((tab) => tab.text() === 'All')!
+      .trigger('click')
+    await wrapper.get('input[id^="PresetTime"]').setValue('30')
+    await wrapper.get('input[id^="PresetTime"]').trigger('change')
+
+    const notice = 'Configuration changed since last apply/run'
+    expect(wrapper.get('.applied-configuration .config-notice').text()).toBe(notice)
+    const scans = wrapper.get('#workspace-panel-scans')
+    expect(scans.get('.scan-configuration').text()).toContain('Applied with Apply config')
+    expect(scans.get('.scan-configuration .config-notice').text()).toContain(notice)
+    expect(wrapper.getComponent(StaircaseWorkspace).props('configurationNotice')).toBe(notice)
+    expect(wrapper.getComponent(HoldDelayWorkspace).props('configurationNotice')).toBe(notice)
+    expect(api.start).not.toHaveBeenCalled()
+    expect(
+      wrapper
+        .findAll('button')
+        .find((button) => button.text() === 'Start run')!
+        .attributes(),
+    ).not.toHaveProperty('disabled')
+    wrapper.unmount()
+  })
+
+  it('shows which configuration the scans will use after a run', async () => {
+    const api = dashboardApi()
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        state: SystemState.READY,
+        appliedConfiguration: {
+          appliedAt: { seconds: 1_800_000_000n, nanos: 0 },
+          requestedBy: 'operator',
+          source: AppliedConfigurationSource.RUN,
+          runId: '42',
+        },
+      }),
+    )
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+
+    const panel = wrapper.get('#workspace-panel-scans .scan-configuration')
+    expect(panel.text()).toContain('Applied by run 42')
+    expect(panel.get('.config-notice').text()).toContain('applied outside this page')
     wrapper.unmount()
   })
 

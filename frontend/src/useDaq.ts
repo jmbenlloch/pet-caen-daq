@@ -2,9 +2,11 @@ import { create } from '@bufbuild/protobuf'
 import { computed, onBeforeUnmount, readonly, ref } from 'vue'
 import type { DaqApi } from './api'
 import {
+  AppliedConfigurationSource,
   StartRunRequestSchema,
   StopRunRequestSchema,
   SystemState,
+  type AppliedConfiguration,
   type TelemetrySnapshot,
   type RunSummary,
   type ValidationIssue,
@@ -17,6 +19,26 @@ import {
 const staleAfterMs = 5_000
 const operatorIdentity = 'operator'
 
+function configurationRequestId() {
+  // getRandomValues also works on the plain HTTP origins used by the DAQ.
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('')
+}
+
+// How the editor text relates to the configuration on the boards: nothing
+// applied (disconnected), identical, edited since, or applied outside this
+// page (another session, or before a reload) so it cannot be compared.
+export type ConfigurationApplyStatus = 'none' | 'current' | 'changed' | 'unknown'
+
+// The run number is added after acquisition starts, so it is not part of the
+// identity of an application.
+function appliedConfigurationKey(applied: AppliedConfiguration | undefined) {
+  if (!applied) return ''
+  const at = applied.appliedAt
+  return `${at?.seconds ?? 0n}.${at?.nanos ?? 0}:${applied.source}:${applied.requestedBy}:${applied.configurationRequestId}`
+}
+
 export function useDaq(api: DaqApi) {
   const snapshot = ref<TelemetrySnapshot>()
   const connected = ref(false)
@@ -24,6 +46,8 @@ export function useDaq(api: DaqApi) {
   const error = ref('')
   const busy = ref(false)
   const startingRun = ref(false)
+  const applyingConfiguration = ref(false)
+  const lastApplied = ref<{ text: string; key: string }>()
   const validationIssues = ref<ValidationIssue[]>([])
   const latestCompletedRun = ref<RunSummary>()
   const runHistory = ref<RunSummary[]>([])
@@ -210,6 +234,7 @@ export function useDaq(api: DaqApi) {
     busy.value = true
     startingRun.value = true
     error.value = ''
+    const requestId = configurationRequestId()
     try {
       const valid = await validate(input.configuration)
       if (!valid) return
@@ -217,6 +242,7 @@ export function useDaq(api: DaqApi) {
       const result = await api.start(
         create(StartRunRequestSchema, {
           requestedBy: operatorIdentity,
+          configurationRequestId: requestId,
           janusConfiguration: input.configuration,
           captureRaw: input.captureRaw,
           journalTransport: input.journalTransport,
@@ -226,10 +252,66 @@ export function useDaq(api: DaqApi) {
         }),
       )
       accept(result.snapshot)
+      rememberApplied(input.configuration, result.snapshot)
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
+      await rememberAfterFailure(input.configuration, requestId, AppliedConfigurationSource.RUN)
     } finally {
       startingRun.value = false
+      busy.value = false
+    }
+  }
+
+  function rememberApplied(configuration: string, next: TelemetrySnapshot | undefined) {
+    const key = appliedConfigurationKey(next?.appliedConfiguration)
+    lastApplied.value = key ? { text: configuration, key } : undefined
+  }
+
+  // A request can fail after the boards were written (an audit rejection).
+  // The backend echoes our request ID even after an audit rejection. The
+  // shared operator identity and a newer timestamp do not prove ownership.
+  async function rememberAfterFailure(
+    configuration: string,
+    requestId: string,
+    source: AppliedConfigurationSource,
+  ) {
+    try {
+      const next = await api.snapshot()
+      const applied = next?.appliedConfiguration
+      accept(next)
+      if (applied?.source !== source || applied.configurationRequestId !== requestId) return
+      rememberApplied(configuration, next)
+    } catch {
+      // The original command error remains the report shown to the operator.
+    }
+  }
+
+  function configurationStatus(configuration: string): ConfigurationApplyStatus {
+    const applied = snapshot.value?.appliedConfiguration
+    if (!applied) return 'none'
+    if (lastApplied.value?.key !== appliedConfigurationKey(applied)) return 'unknown'
+    return lastApplied.value.text === configuration ? 'current' : 'changed'
+  }
+
+  async function applyConfiguration(configuration: string) {
+    busy.value = true
+    applyingConfiguration.value = true
+    error.value = ''
+    const requestId = configurationRequestId()
+    try {
+      const valid = await validate(configuration)
+      if (!valid) return false
+      busy.value = true
+      const result = await api.applyConfiguration(operatorIdentity, configuration, requestId)
+      accept(result.snapshot)
+      rememberApplied(configuration, result.snapshot)
+      return true
+    } catch (reason) {
+      error.value = reason instanceof Error ? reason.message : String(reason)
+      await rememberAfterFailure(configuration, requestId, AppliedConfigurationSource.APPLY)
+      return false
+    } finally {
+      applyingConfiguration.value = false
       busy.value = false
     }
   }
@@ -270,7 +352,9 @@ export function useDaq(api: DaqApi) {
     busy.value = true
     error.value = ''
     try {
-      accept(await api.connectHardware(operatorIdentity, configuration))
+      const next = await api.connectHardware(operatorIdentity, configuration)
+      accept(next)
+      rememberApplied(configuration, next)
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {
@@ -341,6 +425,8 @@ export function useDaq(api: DaqApi) {
     error: readonly(error),
     busy: readonly(busy),
     startingRun: readonly(startingRun),
+    applyingConfiguration: readonly(applyingConfiguration),
+    appliedConfiguration: computed(() => snapshot.value?.appliedConfiguration),
     validationIssues: readonly(validationIssues),
     latestCompletedRun: readonly(latestCompletedRun),
     runHistory: readonly(runHistory),
@@ -355,6 +441,10 @@ export function useDaq(api: DaqApi) {
     histogramDatasets: readonly(histogramDatasets),
     histogramsLoading: readonly(histogramsLoading),
     canStart: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
+    // Apply is offered exactly where Start run is.
+    canApplyConfiguration: computed(
+      () => snapshot.value?.state === SystemState.READY && !busy.value,
+    ),
     canStop: computed(() => snapshot.value?.state === SystemState.RUNNING && !busy.value),
     canSwitchHV: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     canConnectHardware: computed(
@@ -374,6 +464,8 @@ export function useDaq(api: DaqApi) {
     disconnect,
     validate,
     startRun,
+    applyConfiguration,
+    configurationStatus,
     stopRun,
     setHighVoltage,
     connectHardware,

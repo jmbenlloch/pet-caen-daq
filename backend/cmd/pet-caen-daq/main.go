@@ -135,7 +135,7 @@ func run(ctx context.Context, args []string, output io.Writer) error {
 	systemService := &service.SystemService{Source: publisher, ConfigurationTemplate: string(configuration), HV: runtime, Hardware: runtime, Discovery: runtime}
 	runService := &service.RunService{
 		Controller: runtime, Telemetry: publisher, HardwareMetadata: runtime, RunParent: *runParent,
-		Configure: runtime.Configure,
+		Configure: runtime.Configure, ForceConfigure: runtime.ConfigureForced,
 	}
 	scanService := &service.ScanService{
 		Controller:          runtime,

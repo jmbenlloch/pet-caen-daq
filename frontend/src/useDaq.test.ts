@@ -4,6 +4,7 @@ import { defineComponent } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DaqApi } from './api'
 import {
+  AppliedConfigurationSource,
   HistogramKind,
   SystemState,
   RunSummarySchema,
@@ -56,6 +57,7 @@ function fakeApi(overrides: Partial<DaqApi> = {}): DaqApi {
       .fn()
       .mockResolvedValue(create(TelemetrySnapshotSchema, { state: SystemState.DISCONNECTED })),
     validate: vi.fn().mockResolvedValue({ valid: true, issues: [] }),
+    applyConfiguration: vi.fn().mockResolvedValue({}),
     start: vi.fn().mockResolvedValue({}),
     stop: vi.fn().mockResolvedValue({}),
     setHighVoltage: vi
@@ -93,6 +95,163 @@ describe('useDaq', () => {
     await vi.advanceTimersByTimeAsync(5_001)
     expect(store.stale.value).toBe(true)
     wrapper.unmount()
+  })
+
+  it('applies a validated configuration and tracks later editor changes', async () => {
+    const applied = create(TelemetrySnapshotSchema, {
+      state: SystemState.READY,
+      appliedConfiguration: {
+        appliedAt: { seconds: 1_800_000_000n, nanos: 5 },
+        requestedBy: 'operator',
+        source: AppliedConfigurationSource.APPLY,
+        boardCount: 4,
+      },
+    })
+    const applyConfiguration = vi.fn().mockResolvedValue({
+      appliedConfiguration: applied.appliedConfiguration,
+      snapshot: applied,
+    })
+    const api = fakeApi({ applyConfiguration })
+    const { store, wrapper } = mountStore(api)
+
+    expect(store.configurationStatus('HG_ShapingTime 50 ns')).toBe('none')
+    expect(await store.applyConfiguration('HG_ShapingTime 50 ns')).toBe(true)
+
+    expect(api.validate).toHaveBeenCalledWith('HG_ShapingTime 50 ns')
+    expect(applyConfiguration).toHaveBeenCalledWith(
+      'operator',
+      'HG_ShapingTime 50 ns',
+      expect.stringMatching(/^[0-9a-f]{32}$/),
+    )
+    expect(store.appliedConfiguration.value?.source).toBe(AppliedConfigurationSource.APPLY)
+    expect(store.configurationStatus('HG_ShapingTime 50 ns')).toBe('current')
+    expect(store.configurationStatus('HG_ShapingTime 75 ns')).toBe('changed')
+    expect(store.busy.value).toBe(false)
+    expect(store.applyingConfiguration.value).toBe(false)
+    wrapper.unmount()
+  })
+
+  it('cannot compare the editor with a configuration applied outside this page', async () => {
+    const api = fakeApi({
+      snapshot: vi.fn().mockResolvedValue(
+        create(TelemetrySnapshotSchema, {
+          state: SystemState.READY,
+          appliedConfiguration: {
+            appliedAt: { seconds: 1_800_000_000n, nanos: 0 },
+            requestedBy: 'other-session',
+            source: AppliedConfigurationSource.RUN,
+            runId: '17',
+          },
+        }),
+      ),
+    })
+    const { store, wrapper } = mountStore(api)
+    void store.connect()
+    await vi.waitFor(() => expect(store.appliedConfiguration.value?.runId).toBe('17'))
+
+    expect(store.configurationStatus('anything')).toBe('unknown')
+    wrapper.unmount()
+  })
+
+  it('does not apply an invalid configuration and reports apply failures', async () => {
+    const applyConfiguration = vi.fn().mockRejectedValue(new Error('[SCAN_ACTIVE] scan running'))
+    const invalid = fakeApi({
+      validate: vi.fn().mockResolvedValue({ valid: false, issues: [] }),
+      applyConfiguration,
+    })
+    const first = mountStore(invalid)
+    expect(await first.store.applyConfiguration('invalid')).toBe(false)
+    expect(applyConfiguration).not.toHaveBeenCalled()
+    first.wrapper.unmount()
+
+    const second = mountStore(fakeApi({ applyConfiguration }))
+    expect(await second.store.applyConfiguration('Open[0] usb:host:tdl:0:0')).toBe(false)
+    expect(second.store.error.value).toBe('[SCAN_ACTIVE] scan running')
+    expect(second.store.busy.value).toBe(false)
+    second.wrapper.unmount()
+  })
+
+  describe.each(['apply', 'run'] as const)('%s request correlation', (action) => {
+    it.each(['own', 'another page', 'older client'] as const)(
+      'only adopts its own write after a failure: %s record',
+      async (record) => {
+        const afterWrite = create(TelemetrySnapshotSchema, {
+          state: SystemState.READY,
+          appliedConfiguration: {
+            appliedAt: { seconds: 1_800_000_100n, nanos: 0 },
+            requestedBy: 'operator', // All real browser sessions share this identity.
+            source:
+              action === 'apply'
+                ? AppliedConfigurationSource.APPLY
+                : AppliedConfigurationSource.RUN,
+          },
+        })
+        const snapshot = vi
+          .fn()
+          .mockResolvedValueOnce(create(TelemetrySnapshotSchema, { state: SystemState.READY }))
+          .mockResolvedValue(afterWrite)
+        const reject = (requestId: string) => {
+          expect(requestId).toMatch(/^[0-9a-f]{32}$/)
+          afterWrite.appliedConfiguration!.configurationRequestId =
+            record === 'own' ? requestId : record === 'older client' ? '' : 'another-request'
+          return Promise.reject(
+            new Error(
+              record === 'own'
+                ? '[CONFIGURATION_AUDIT_FAILED] audit rejected after write'
+                : '[CONCURRENT_OPERATION] another page is applying different settings',
+            ),
+          )
+        }
+        const api = fakeApi({
+          snapshot,
+          applyConfiguration: vi.fn((_actor, _text, requestId) => reject(requestId)),
+          start: vi.fn((request) => reject(request.configurationRequestId)),
+        })
+        const { store, wrapper } = mountStore(api)
+        try {
+          void store.connect()
+          await vi.waitFor(() => expect(store.snapshot.value?.state).toBe(SystemState.READY))
+          const configuration = 'HG_ShapingTime 50 ns'
+          if (action === 'apply') {
+            expect(await store.applyConfiguration(configuration)).toBe(false)
+          } else {
+            await store.startRun({
+              configuration,
+              captureRaw: false,
+              journalTransport: false,
+              persistHistograms: false,
+              hdf5SegmentSizeMb: 500,
+              hdf5Compression: 'none',
+            })
+          }
+          expect(store.error.value).toContain(
+            record === 'own' ? 'CONFIGURATION_AUDIT_FAILED' : 'CONCURRENT_OPERATION',
+          )
+          expect(store.configurationStatus(configuration)).toBe(
+            record === 'own' ? 'current' : 'unknown',
+          )
+          expect(store.configurationStatus('HG_ShapingTime 75 ns')).toBe(
+            record === 'own' ? 'changed' : 'unknown',
+          )
+        } finally {
+          wrapper.unmount()
+        }
+      },
+    )
+  })
+
+  it('uses a fresh correlation ID for every apply', async () => {
+    const api = fakeApi()
+    const { store, wrapper } = mountStore(api)
+    try {
+      await store.applyConfiguration('HG_ShapingTime 50 ns')
+      await store.applyConfiguration('HG_ShapingTime 50 ns')
+      const calls = vi.mocked(api.applyConfiguration).mock.calls
+      expect(calls[0]![2]).toMatch(/^[0-9a-f]{32}$/)
+      expect(calls[1]![2]).not.toBe(calls[0]![2])
+    } finally {
+      wrapper.unmount()
+    }
   })
 
   it('does not start a run when configuration validation fails', async () => {

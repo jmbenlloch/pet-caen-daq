@@ -29,6 +29,13 @@ service RunService {
   rpc GetRunConfiguration(GetRunConfigurationRequest) returns (GetRunConfigurationResponse) {}
   rpc DownloadArtifact(DownloadArtifactRequest) returns (stream DownloadArtifactResponse) {}
   rpc GetHistograms(GetHistogramsRequest) returns (GetHistogramsResponse) {}
+  // Validates, plans, audits, and writes a configuration to the connected
+  // boards as StartRun does, without starting acquisition, allocating a run
+  // number, or creating run files. Unlike StartRun it always rewrites the
+  // registers, even when the boards already hold an identical configuration.
+  // HV setpoints are written only when the backend runs with
+  // -authorize-hv-config. Scans and the HV switch then use it.
+  rpc ApplyConfiguration(ApplyConfigurationRequest) returns (ApplyConfigurationResponse) {}
 }
 
 // ScanService owns exclusive diagnostic scans. Scans are not physics runs and
@@ -144,11 +151,53 @@ message StartRunRequest {
   // Compression applied to HDF5 event segments and histogram artifacts.
   // Empty selects blosc-lz4-level4-bitshuffle.
   string hdf5_compression = 8;
+  // Optional client-generated correlation ID, echoed in applied_configuration
+  // if configuration succeeds, including when a later audit rejects the run.
+  // This is not an idempotency key: repeated requests still run normally.
+  string configuration_request_id = 9;
 }
 
 message StartRunResponse {
   RunSummary run = 1;
   TelemetrySnapshot snapshot = 2;
+}
+
+message ApplyConfigurationRequest {
+  string janus_configuration = 1;
+  string requested_by = 2;
+  // Optional client-generated correlation ID; not an idempotency key.
+  string configuration_request_id = 3;
+}
+
+message ApplyConfigurationResponse {
+  AppliedConfiguration applied_configuration = 1;
+  TelemetrySnapshot snapshot = 2;
+}
+
+// The configuration most recently written to the connected boards. Staircase
+// and hold-delay scans restore it, and the HV switch uses its HV settings.
+message AppliedConfiguration {
+  google.protobuf.Timestamp applied_at = 1;
+  string requested_by = 2;
+  AppliedConfigurationSource source = 3;
+  // Run number of the run that applied the configuration; empty unless the
+  // source is a run whose acquisition started.
+  string run_id = 4;
+  uint32 board_count = 5;
+  // True when the backend runs with -authorize-hv-config, so this
+  // application also wrote the HV setpoints (HV_Vbias, HV_Imax, temperature
+  // feedback). When false the boards keep their previous HV setpoints.
+  bool hv_authorized = 6;
+  // Identifies the Apply/Start request that wrote this configuration, even
+  // if its RPC failed after the write. Empty for connect and older clients.
+  string configuration_request_id = 7;
+}
+
+enum AppliedConfigurationSource {
+  APPLIED_CONFIGURATION_SOURCE_UNSPECIFIED = 0;
+  APPLIED_CONFIGURATION_SOURCE_CONNECT = 1;
+  APPLIED_CONFIGURATION_SOURCE_APPLY = 2;
+  APPLIED_CONFIGURATION_SOURCE_RUN = 3;
 }
 
 message StopRunRequest {
@@ -319,6 +368,9 @@ message TelemetrySnapshot {
   HoldDelayScan current_hold_delay_scan = 15;
   ConfigurationProgress configuration_progress = 16;
   DiscoveryProgress discovery_progress = 17;
+  // Absent while disconnected and after a configuration write or scan
+  // restoration failure leaves the board configuration unknown.
+  AppliedConfiguration applied_configuration = 18;
 }
 
 // Reconnect-safe snapshot of hardware discovery.

@@ -47,6 +47,25 @@ function api(): DaqApi {
 }
 
 describe('StaircaseWorkspace', () => {
+  it('shows the configuration notice beside Start scan without blocking it', async () => {
+    const wrapper = mount(StaircaseWorkspace, {
+      props: {
+        api: api(),
+        systemState: SystemState.READY,
+        theme: 'dark',
+        boards: [0],
+        configurationNotice: 'Configuration changed since last apply/run',
+      },
+    })
+    await wrapper.get('.scan-card-toggle').trigger('click')
+
+    const actions = wrapper.get('.staircase-actions')
+    expect(actions.get('.config-notice').text()).toBe('Configuration changed since last apply/run')
+    expect(actions.get('button.primary').attributes('disabled')).toBeUndefined()
+    await wrapper.setProps({ configurationNotice: '' })
+    expect(wrapper.find('.config-notice').exists()).toBe(false)
+  })
+
   it('is collapsed by default and exposes the scan controls when expanded', async () => {
     const wrapper = mount(StaircaseWorkspace, {
       props: { api: api(), systemState: SystemState.READY, theme: 'dark', boards: [0, 1, 2, 3] },

@@ -48,7 +48,7 @@ tasks:
   test:integration:
     desc: Run Go integration tests
     cmds:
-      - go test -tags=integration ./backend/integration/...
+      - go test -tags=integration ./backend/integration/... ./backend/cmd/pet-caen-daq/...
 
   test:capture:
     desc: Replay the external JANUS data-taking PCAP through production decoders

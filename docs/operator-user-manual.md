@@ -128,6 +128,7 @@ The backend is the authority for system state. The browser receives independentl
 - pipeline and storage counters;
 - run statistics;
 - active scan and configuration progress;
+- the configuration currently applied to the boards: when, by whom, and by which action (hardware connect, **Apply config**, or a run and its number);
 - diagnostics.
 
 If no fresh snapshot is received for five seconds, the interface marks the backend offline/stale. It retries a broken telemetry connection automatically every two seconds. After reconnecting, the first complete snapshot replaces the browser's prior state; counters are not reconstructed from guesses.
@@ -539,6 +540,8 @@ The toolbar contains:
 
 **Save config** uses the browser file picker when available. In browsers without that API it asks for a filename and downloads the file. A `.txt` suffix is added if omitted.
 
+**Save config** only stores the text on this computer; it does not change the boards. Editing a parameter also changes only the editor. The boards receive a configuration only at **Connect hardware**, **Apply config** ([6.9](#69-applying-a-configuration-without-a-run)), and **Start run**.
+
 ## 5.2 Parameter categories and search
 
 Category tabs correspond to JANUS sections such as **Connect**, **HV_bias**, **RunCtrl**, **AcqMode**, **Discr**, **Spectroscopy**, and **Test-Probe**.
@@ -755,6 +758,8 @@ The setting applies to event segments and histogram artifacts. Compression chang
 
 If the button is disabled, inspect system state, alerts, field errors, stop mode, and HDF5 size.
 
+**Apply config**, next to **Start run**, is enabled under the same conditions except the HDF5 settings, which do not concern the boards. It is hidden while a run is active.
+
 ## 6.2 Stop policies
 
 `StopRunMode` determines the configured policy:
@@ -858,6 +863,20 @@ Common persisted termination reasons include:
 - a specific failure message.
 
 An **Incomplete** status means finalization did not complete authoritatively. Preserve the directory and evidence.
+
+## 6.9 Applying a configuration without a run
+
+> **NOTE — HV SETPOINTS NEED `-authorize-hv-config`**
+>
+> `HV_Vbias`, `HV_Imax`, and the temperature-feedback settings reach the boards only when the backend runs with `-authorize-hv-config`. This holds for **Connect hardware**, **Start run**, and **Apply config** alike. Without the flag these settings in the editor have no effect, and HV cannot be switched on from the DAQ. With the flag, applying a configuration while HV is on changes the bias immediately; wait for Vmon to settle before measuring.
+
+**Apply config** writes the editor configuration to the boards without starting acquisition. Use it after changing settings that scans or the HV switch depend on, for example `HG_ShapingTime`, `Tlogic_Mask`, `TD_CoarseThreshold`, or `HV_Vbias`, before starting a staircase, a hold-delay scan, or switching HV on. It replaces the former practice of starting a short run and stopping it only to load a configuration.
+
+The backend treats the request like the configuration part of **Start run**: it validates the document, plans every board, loads the pedestal calibration, writes and reads back the registers, applies the HV setpoints when the backend runs with `-authorize-hv-config`, and audits the effective configuration. Unlike **Start run**, which skips the write when the boards already hold the same document, **Apply config** always rewrites the registers, so it also returns the boards to a known state after something outside the DAQ has changed them. Progress appears in the hardware configuration panel ([3.4](#34-hardware-configuration-progress)). It does not allocate a run number, does not create run files, and does not start acquisition; the system returns to **Ready**.
+
+The request is refused, with an alert naming the reason, while a run is active (`RUN_ALREADY_ACTIVE`), while a scan is active (`SCAN_ACTIVE`), while the hardware is disconnected (`HARDWARE_DISCONNECTED`), and in any other state where a run could not start (`SYSTEM_NOT_READY`). A validation, audit, or hardware failure is reported in the same way as for **Start run**. An audit rejection is reported after the registers were written, so the boards then hold the rejected configuration and the masthead says so. A hardware failure during the write moves the system to **Fault**, because the board configuration is then unknown.
+
+Below the run controls the masthead shows which configuration the boards hold: **Applied at hardware connect**, **Applied with Apply config**, or **Applied by run** `<n>`, with time and operator. When the editor text differs from what this page last applied, connected with, or started a run with, the notice **Configuration changed since last apply/run** appears there and in the Scans workspace. When the boards were configured from another browser session, or before the page was reloaded, the page cannot compare the editor with them and says so. A rejected request only counts as this page's application when the backend confirms it belongs to that request; an application from another page remains unverified. The notice never blocks an action.
 
 # 7 Statistics workspace
 
@@ -1012,7 +1031,9 @@ Scans:
 - attempt to restore the prior configuration afterward;
 - publish preparing, running, restoring, completed, cancelled, or failed state.
 
-Do not assume restoration succeeded after a failed scan. Inspect final status, system state, and diagnostics.
+A scan takes no configuration from the editor. It runs on, and restores afterwards, the configuration most recently applied to the boards by **Connect hardware**, **Apply config**, or **Start run**. The panel at the top of the Scans workspace states which one that is (**Applied with Apply config**, **Applied by run** `<n>`, or **Applied at hardware connect**, with time and operator). If the editor has been changed since, the notice **Configuration changed since last apply/run** appears in that panel and beside each **Start scan** button; select **Apply config** in the run controls first if the scan should use the edited values. The notice does not block the scan.
+
+Do not assume restoration succeeded after a failed scan. If restoration fails, the scan reports **Failed**, the system reports **Fault**, and the applied configuration is cleared and shown as **unknown**. This also applies when restoration fails after cancellation. Reconnect the hardware to establish a known configuration. A successful restoration preserves the applied record, including after cancellation or a scan error. Inspect final status, system state, and diagnostics.
 
 ## 9.1 Threshold staircase
 
@@ -1169,6 +1190,8 @@ HV-on is rejected unless the backend has `-authorize-hv-config`. HV-off does not
 
 The authorization flag also controls whether configured HV peripheral setpoints may be applied during hardware configuration. Starting without it is the conservative mode for readout commissioning that must not change setpoints.
 
+The HV buttons switch the bias on or off; they do not send `HV_Vbias` or the other HV settings. The boards use the setpoints of the configuration last applied by **Connect hardware**, **Apply config**, or **Start run**. After editing HV settings, select **Apply config** before switching HV on.
+
 ## 10.4 All-board control
 
 **All HV on** requests HV enable for every configured board. If enabling one target fails, the backend attempts to turn back off targets it enabled earlier in the same operation.
@@ -1187,7 +1210,7 @@ During ramping, use Vmon, Imon, and the ramping indication rather than repeatedl
 ## 10.6 Recommended HV-on sequence
 
 1. confirm **Ready** and all board health;
-2. verify `HV_Vbias`, `HV_Imax`, individual adjustment, temperature sensor, and feedback configuration;
+2. verify `HV_Vbias`, `HV_Imax`, individual adjustment, temperature sensor, and feedback configuration, and select **Apply config** if they were edited since the last apply or run;
 3. confirm detector cooling and site interlocks;
 4. prefer enabling one board during commissioning;
 5. watch **Ramping**, Vmon, Imon, and temperatures;
@@ -1611,14 +1634,15 @@ Verify artifact size and SHA-256 against the manifest after copying.
 
 1. Ensure no data run is active and state is **Ready**.
 2. Confirm intended illumination and HV conditions.
-3. Expand the correct scan card.
-4. Verify board and bounds.
-5. Estimate points and duration.
-6. Start the scan and watch progress.
-7. If cancelling, wait through restoration.
-8. Confirm final status and return to **Ready**.
-9. Load the finalized dataset and inspect it.
-10. Reconfirm acquisition/HV configuration before the next physics run.
+3. If the configuration was edited, select **Apply config** and confirm the Scans panel reports it with no change notice.
+4. Expand the correct scan card.
+5. Verify board and bounds.
+6. Estimate points and duration.
+7. Start the scan and watch progress.
+8. If cancelling, wait through restoration.
+9. Confirm final status and return to **Ready**.
+10. Load the finalized dataset and inspect it.
+11. Reconfirm acquisition/HV configuration before the next physics run.
 
 # 16 Troubleshooting
 

@@ -4,6 +4,7 @@ import {
   RunService,
   ScanService,
   SystemService,
+  type AppliedConfiguration,
   type StartRunRequest,
   type StopRunRequest,
   type RunSummary,
@@ -31,6 +32,11 @@ export interface DaqApi {
   disconnectHardware(requestedBy: string): Promise<TelemetrySnapshot>
   discoverHardware(requestedBy: string): Promise<TelemetrySnapshot>
   validate(configuration: string): Promise<{ valid: boolean; issues: ValidationIssue[] }>
+  applyConfiguration(
+    requestedBy: string,
+    configuration: string,
+    configurationRequestId: string,
+  ): Promise<ApplyConfigurationResult>
   start(request: StartRunRequest): Promise<RunCommandResult>
   stop(request: StopRunRequest): Promise<RunCommandResult>
   setHighVoltage(
@@ -62,6 +68,11 @@ export interface DaqApi {
 
 export interface RunCommandResult {
   run?: RunSummary
+  snapshot?: TelemetrySnapshot
+}
+
+export interface ApplyConfigurationResult {
+  appliedConfiguration?: AppliedConfiguration
   snapshot?: TelemetrySnapshot
 }
 
@@ -106,6 +117,14 @@ export function createDaqApi(baseUrl = window.location.origin): DaqApi {
       const response = await system.discoverHardware({ requestedBy })
       if (!response.snapshot) throw new Error('Discovery command returned no telemetry snapshot')
       return response.snapshot
+    },
+    async applyConfiguration(requestedBy, janusConfiguration, configurationRequestId) {
+      const response = await runs.applyConfiguration({
+        requestedBy,
+        janusConfiguration,
+        configurationRequestId,
+      })
+      return { appliedConfiguration: response.appliedConfiguration, snapshot: response.snapshot }
     },
     async start(request) {
       const response = await runs.startRun(request)

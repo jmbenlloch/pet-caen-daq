@@ -31,6 +31,7 @@ import {
   type ConfigurationField,
 } from './configuration'
 import {
+  AppliedConfigurationSource,
   ConfigurationLayer,
   ConfigurationStage,
   DiagnosticSeverity,
@@ -388,6 +389,44 @@ const configuredStopPolicy = computed(() => {
     return `Automatic stop after ${globalValue('PresetCounts') ?? '0'} events`
   return 'Manual stop'
 })
+
+const configurationApplyStatus = computed(() => daq.configurationStatus(configuration.value))
+const configurationNotice = computed(() => {
+  if (configurationApplyStatus.value === 'changed')
+    return 'Configuration changed since last apply/run'
+  if (configurationApplyStatus.value === 'unknown')
+    return 'Editor not compared with the boards: their configuration was applied outside this page; select Apply config to be sure'
+  return ''
+})
+const appliedConfigurationLabel = computed(() => {
+  const applied = daq.appliedConfiguration.value
+  if (!applied)
+    return daq.snapshot.value?.state === SystemState.FAULT
+      ? 'Board configuration is unknown; reconnect hardware before applying a configuration'
+      : 'No configuration applied to the boards'
+  const when = localDateTime(applied.appliedAt)
+  const who = applied.requestedBy ? ` by ${applied.requestedBy}` : ''
+  switch (applied.source) {
+    case AppliedConfigurationSource.CONNECT:
+      return `Applied at hardware connect, ${when}${who}`
+    case AppliedConfigurationSource.RUN:
+      return applied.runId
+        ? `Applied by run ${applied.runId}, ${when}${who}`
+        : `Applied at run start, ${when}${who}`
+    default:
+      return `Applied with Apply config, ${when}${who}`
+  }
+})
+const applyConfigurationDisabled = computed(
+  () =>
+    !daq.canApplyConfiguration.value ||
+    !configuration.value ||
+    configurationErrors.value.length > 0 ||
+    !!stopPolicyError.value,
+)
+function applyConfiguration() {
+  void daq.applyConfiguration(configuration.value)
+}
 
 const state = computed(() =>
   daq.startingRun.value
@@ -979,6 +1018,17 @@ onMounted(() => daq.connect())
                 Start run
               </button>
               <button
+                v-if="!daq.snapshot.value?.currentRun"
+                class="secondary apply-configuration"
+                type="button"
+                title="Write the configuration to the boards without starting a run; scans and the HV switch then use it"
+                :disabled="applyConfigurationDisabled"
+                :aria-busy="daq.applyingConfiguration.value"
+                @click="applyConfiguration"
+              >
+                {{ daq.applyingConfiguration.value ? 'Applying…' : 'Apply config' }}
+              </button>
+              <button
                 v-else
                 class="danger"
                 type="button"
@@ -1003,6 +1053,15 @@ onMounted(() => daq.connect())
               <span><strong>Scan in progress</strong></span>
               <small>Acquisition run controls are unavailable during the scan</small>
             </div>
+            <div
+              v-else-if="daq.applyingConfiguration.value"
+              class="run-now"
+              role="status"
+              aria-live="polite"
+            >
+              <span><strong>Applying configuration…</strong></span>
+              <small>Writing registers to the boards; no run is started</small>
+            </div>
             <div v-else-if="daq.startingRun.value" class="run-now" role="status" aria-live="polite">
               <span><strong>Starting run…</strong></span>
               <small
@@ -1014,6 +1073,10 @@ onMounted(() => daq.connect())
               <span>No active run</span>
               <small>{{ configuredStopPolicy }}</small>
             </div>
+          </div>
+          <div class="applied-configuration" role="status" aria-label="Applied configuration">
+            <small>{{ appliedConfigurationLabel }}</small>
+            <p v-if="configurationNotice" class="config-notice">{{ configurationNotice }}</p>
           </div>
         </div>
       </section>
@@ -1992,12 +2055,23 @@ onMounted(() => daq.connect())
         role="tabpanel"
         aria-labelledby="workspace-tab-scans"
       >
+        <section class="panel scan-configuration" aria-label="Scan configuration">
+          <p class="eyebrow">Configuration used by scans</p>
+          <p>
+            Scans start from and restore the configuration on the boards.
+            {{ appliedConfigurationLabel }}.
+          </p>
+          <p v-if="configurationNotice" class="config-notice" role="status">
+            {{ configurationNotice }}. Use Apply config to scan with the editor values.
+          </p>
+        </section>
         <StaircaseWorkspace
           :api="api"
           :boards="configuredBoardIndices"
           :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
           :theme="theme"
           :live="daq.snapshot.value?.currentStaircase"
+          :configuration-notice="configurationNotice"
         />
         <HoldDelayWorkspace
           :api="api"
@@ -2005,6 +2079,7 @@ onMounted(() => daq.connect())
           :system-state="daq.snapshot.value?.state ?? SystemState.UNSPECIFIED"
           :theme="theme"
           :live="daq.snapshot.value?.currentHoldDelayScan"
+          :configuration-notice="configurationNotice"
         />
       </div>
 

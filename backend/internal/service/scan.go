@@ -109,7 +109,7 @@ func (s *ScanService) StartStaircase(ctx context.Context, request *connect.Reque
 	}
 	s.active = &activeScan{id: scanID, cancel: cancel, scan: scan}
 	s.mu.Unlock()
-	s.publish(scan, daqv1.SystemState_SYSTEM_STATE_SCANNING, nil)
+	s.publish(scan, daqv1.SystemState_SYSTEM_STATE_SCANNING)
 	responseScan := cloneScan(scan)
 	go s.run(scanCtx, actor, domain, writer)
 	return connect.NewResponse(&daqv1.StartStaircaseResponse{Scan: responseScan, Snapshot: s.Telemetry.Snapshot()}), nil
@@ -128,12 +128,7 @@ func (s *ScanService) run(ctx context.Context, actor string, request staircase.R
 		return nil
 	})
 	s.update(func(scan *daqv1.StaircaseScan) { scan.Summary.State = daqv1.ScanState_SCAN_STATE_RESTORING })
-	state, reason := daqv1.ScanState_SCAN_STATE_COMPLETED, "completed"
-	if errors.Is(runErr, context.Canceled) {
-		state, reason = daqv1.ScanState_SCAN_STATE_CANCELLED, "operator_cancel"
-	} else if runErr != nil {
-		state, reason = daqv1.ScanState_SCAN_STATE_FAILED, runErr.Error()
-	}
+	state, reason := scanOutcome(runErr, restored)
 	completedAt := time.Now().UTC()
 	manifestState := strings.ToLower(strings.TrimPrefix(state.String(), "SCAN_STATE_"))
 	if err := writer.Finalize(completedAt.Format(time.RFC3339Nano), manifestState, reason, restored); err != nil {
@@ -153,7 +148,7 @@ func (s *ScanService) run(ctx context.Context, actor string, request staircase.R
 	final := cloneScan(scan)
 	s.active = nil
 	s.mu.Unlock()
-	s.publish(nil, stateAfterScan(runErr), final.Summary)
+	s.publishCompletedScan(stateAfterScan(runErr, restored), final.Summary, restored)
 }
 
 func (s *ScanService) CancelScan(_ context.Context, request *connect.Request[daqv1.CancelScanRequest]) (*connect.Response[daqv1.CancelScanResponse], error) {
@@ -250,21 +245,49 @@ func (s *ScanService) update(change func(*daqv1.StaircaseScan)) {
 	change(s.active.scan)
 	scan := cloneScan(s.active.scan)
 	s.mu.Unlock()
-	s.publish(scan, daqv1.SystemState_SYSTEM_STATE_SCANNING, nil)
+	s.publish(scan, daqv1.SystemState_SYSTEM_STATE_SCANNING)
 }
 
-func (s *ScanService) publish(scan *daqv1.StaircaseScan, state daqv1.SystemState, completed *daqv1.ScanSummary) {
+func (s *ScanService) publish(scan *daqv1.StaircaseScan, state daqv1.SystemState) {
 	s.Telemetry.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = state
 		snapshot.CurrentStaircase = cloneScan(scan)
-		if completed != nil {
-			snapshot.LatestCompletedScan = proto.Clone(completed).(*daqv1.ScanSummary)
+	})
+}
+
+// Publish completion and configuration validity atomically for both scan types.
+func (s *ScanService) publishCompletedScan(state daqv1.SystemState, completed *daqv1.ScanSummary, restored bool) {
+	s.Telemetry.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		snapshot.State = state
+		snapshot.CurrentStaircase = nil
+		snapshot.CurrentHoldDelayScan = nil
+		snapshot.LatestCompletedScan = proto.Clone(completed).(*daqv1.ScanSummary)
+		if !restored {
+			snapshot.AppliedConfiguration = nil
 		}
 	})
 }
 
-func stateAfterScan(err error) daqv1.SystemState {
-	if err != nil && !errors.Is(err, context.Canceled) {
+func scanOutcome(err error, restored bool) (daqv1.ScanState, string) {
+	// Cancellation must not hide a restoration error joined to it.
+	if !restored {
+		reason := "configuration restoration was not confirmed"
+		if err != nil {
+			reason = err.Error()
+		}
+		return daqv1.ScanState_SCAN_STATE_FAILED, reason
+	}
+	if errors.Is(err, context.Canceled) {
+		return daqv1.ScanState_SCAN_STATE_CANCELLED, "operator_cancel"
+	}
+	if err != nil {
+		return daqv1.ScanState_SCAN_STATE_FAILED, err.Error()
+	}
+	return daqv1.ScanState_SCAN_STATE_COMPLETED, "completed"
+}
+
+func stateAfterScan(err error, restored bool) daqv1.SystemState {
+	if !restored || (err != nil && !errors.Is(err, context.Canceled)) {
 		return daqv1.SystemState_SYSTEM_STATE_FAULT
 	}
 	return daqv1.SystemState_SYSTEM_STATE_READY

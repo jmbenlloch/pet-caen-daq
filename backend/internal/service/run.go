@@ -62,10 +62,14 @@ type RunCatalog interface {
 
 type RunService struct {
 	daqv1connect.UnimplementedRunServiceHandler
-	Controller       RunController
-	Telemetry        SnapshotPublisher
-	Now              func() time.Time
-	Configure        ConfigurationApplier
+	Controller RunController
+	Telemetry  SnapshotPublisher
+	Now        func() time.Time
+	Configure  ConfigurationApplier
+	// ForceConfigure writes the configuration even when the boards already
+	// hold an identical one. ApplyConfiguration uses it when set, so an
+	// explicit apply always rewrites and reads back the registers.
+	ForceConfigure   ConfigurationApplier
 	Boards           []configaudit.BoardEvidence
 	Concentrator     *dt5215.ConcentratorInfo
 	HardwareMetadata HardwareMetadataProvider
@@ -604,49 +608,11 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	if s.AllocateRunID == nil {
 		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ID_ALLOCATION_UNAVAILABLE", fmt.Errorf("run catalog ID allocation is not configured"))
 	}
-	if issues := ValidateJANUSConfiguration(message.GetJanusConfiguration()); len(issues) != 0 {
-		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_CONFIGURATION", fmt.Errorf("configuration is invalid: %s", issues[0].GetMessage()))
-	}
-	if s.Configure == nil {
-		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_UNAVAILABLE", fmt.Errorf("run configuration application is unavailable"))
-	}
-	document, err := janusconfig.Parse(bytes.NewBufferString(message.GetJanusConfiguration()))
+	prepared, err := s.applyConfiguration(ctx, s.Configure, message.GetJanusConfiguration(), message.GetRequestedBy(), message.GetConfigurationRequestId(), daqv1.AppliedConfigurationSource_APPLIED_CONFIGURATION_SOURCE_RUN)
 	if err != nil {
-		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_CONFIGURATION", err)
+		return nil, err
 	}
-	stopPolicy, err := parsePresetStop(document)
-	if err != nil {
-		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_STOP_POLICY", err)
-	}
-	histogramOptions, err := parseHistogramOptions(document)
-	if err != nil {
-		return nil, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_CONFIGURATION", err)
-	}
-	configured, err := s.Configure(ctx, document, message.GetRequestedBy())
-	if err != nil {
-		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_APPLICATION_FAILED", fmt.Errorf("apply run configuration: %w", err))
-	}
-	if state := s.Controller.StateSnapshot().State; state != acquisition.StateReady {
-		return nil, serviceError(connect.CodeFailedPrecondition, "SYSTEM_NOT_READY", fmt.Errorf("configuration completed in state %s, want ready", state))
-	}
-	boards, concentrator := s.Boards, s.Concentrator
-	if s.HardwareMetadata != nil {
-		boards, concentrator = s.HardwareMetadata.HardwareMetadata()
-	}
-	audit, err := configaudit.Build(document, configured.Plans, boards)
-	if err != nil || !audit.Valid {
-		if err == nil {
-			rejected := make([]string, 0)
-			for _, setting := range audit.Settings {
-				if setting.Status != configaudit.Rejected {
-					continue
-				}
-				rejected = append(rejected, fmt.Sprintf("line %d %s: %s", setting.Line, setting.Name, setting.Reason))
-			}
-			err = fmt.Errorf("effective configuration audit rejected: %s", strings.Join(rejected, "; "))
-		}
-		return nil, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_AUDIT_FAILED", err)
-	}
+	stopPolicy := prepared.stopPolicy
 	runID, err := s.AllocateRunID(ctx)
 	if err != nil {
 		return nil, serviceError(connect.CodeInternal, "RUN_ID_ALLOCATION_FAILED", err)
@@ -656,12 +622,12 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	}
 	options := acquisition.RunOptions{
 		CaptureRaw: message.GetCaptureRaw(), JournalTransport: message.GetJournalTransport(), RequestedBy: message.GetRequestedBy(),
-		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: configured.Plans, ConfigurationAudit: &audit,
-		Histograms:           histogramOptions,
+		RequestedConfiguration: message.GetJanusConfiguration(), EffectiveConfiguration: prepared.configured.Plans, ConfigurationAudit: &prepared.audit,
+		Histograms:           prepared.histograms,
 		PersistHistograms:    message.GetPersistHistograms(),
 		HDF5SegmentSizeBytes: uint64(segmentSizeMB) * bytesPerMiB,
 		HDF5Compression:      compression,
-		Concentrator:         concentrator,
+		Concentrator:         prepared.concentrator,
 	}
 	if err := s.Controller.Start(ctx, runID, message.GetRequestedBy(), options); err != nil {
 		if errors.Is(err, runstore.ErrRunExists) {
@@ -676,10 +642,127 @@ func (s *RunService) StartRun(ctx context.Context, request *connect.Request[daqv
 	s.mu.Lock()
 	s.current = run
 	s.mu.Unlock()
-	snapshot := s.publish(run)
+	snapshot := s.Telemetry.Update(func(snapshot *daqv1.TelemetrySnapshot) {
+		snapshot.State = protobufState(s.Controller.StateSnapshot().State)
+		snapshot.CurrentRun = run
+		if snapshot.AppliedConfiguration != nil {
+			snapshot.AppliedConfiguration.RunId = runID
+		}
+	})
 	s.startMonitor()
 	s.startPresetMonitor(runID, stopPolicy)
 	return connect.NewResponse(&daqv1.StartRunResponse{Run: run, Snapshot: snapshot}), nil
+}
+
+// ApplyConfiguration writes a configuration to the boards through the same
+// validation, planning, pedestal, HV, and audit path as StartRun, but leaves
+// the system ready without allocating a run number or creating run files.
+func (s *RunService) ApplyConfiguration(ctx context.Context, request *connect.Request[daqv1.ApplyConfigurationRequest]) (*connect.Response[daqv1.ApplyConfigurationResponse], error) {
+	if !s.opMu.TryLock() {
+		return nil, serviceError(connect.CodeAborted, "CONCURRENT_OPERATION", fmt.Errorf("another run-control operation is in progress"))
+	}
+	defer s.opMu.Unlock()
+	message := request.Msg
+	if message.GetRequestedBy() == "" {
+		return nil, serviceError(connect.CodeInvalidArgument, "REQUIRED_IDENTITY", fmt.Errorf("requested_by is required"))
+	}
+	if active := s.Controller.ActiveRunID(); active != "" {
+		return nil, serviceError(connect.CodeFailedPrecondition, "RUN_ALREADY_ACTIVE", fmt.Errorf("run %q is active; stop it before applying a configuration", active))
+	}
+	switch state := s.Controller.StateSnapshot().State; state {
+	case acquisition.StateIdle, acquisition.StateReady:
+	case acquisition.StateDisconnected, acquisition.StateConnecting:
+		return nil, serviceError(connect.CodeFailedPrecondition, "HARDWARE_DISCONNECTED", fmt.Errorf("connect the hardware before applying a configuration"))
+	case acquisition.StateScanning:
+		return nil, serviceError(connect.CodeFailedPrecondition, "SCAN_ACTIVE", fmt.Errorf("a scan is in progress; wait for it to finish or cancel it before applying a configuration"))
+	default:
+		return nil, serviceError(connect.CodeFailedPrecondition, "SYSTEM_NOT_READY", fmt.Errorf("configuration cannot be applied in state %s", state))
+	}
+	configure := s.Configure
+	if s.ForceConfigure != nil {
+		configure = s.ForceConfigure
+	}
+	if _, err := s.applyConfiguration(ctx, configure, message.GetJanusConfiguration(), message.GetRequestedBy(), message.GetConfigurationRequestId(), daqv1.AppliedConfigurationSource_APPLIED_CONFIGURATION_SOURCE_APPLY); err != nil {
+		return nil, err
+	}
+	snapshot := s.publish(nil)
+	applied := snapshot.GetAppliedConfiguration()
+	if applied != nil {
+		applied = proto.Clone(applied).(*daqv1.AppliedConfiguration)
+	}
+	return connect.NewResponse(&daqv1.ApplyConfigurationResponse{AppliedConfiguration: applied, Snapshot: snapshot}), nil
+}
+
+type preparedConfiguration struct {
+	configured   acquisition.ConfigurationResult
+	audit        configaudit.Report
+	concentrator *dt5215.ConcentratorInfo
+	stopPolicy   presetStopPolicy
+	histograms   acquisition.HistogramOptions
+}
+
+// applyConfiguration is the configuration half of StartRun shared with
+// ApplyConfiguration. On success the boards hold the requested configuration,
+// the system is ready, and the published snapshot records the application.
+func (s *RunService) applyConfiguration(ctx context.Context, configure ConfigurationApplier, text, requestedBy, requestID string, source daqv1.AppliedConfigurationSource) (preparedConfiguration, error) {
+	var prepared preparedConfiguration
+	if issues := ValidateJANUSConfiguration(text); len(issues) != 0 {
+		return prepared, serviceError(connect.CodeInvalidArgument, "INVALID_CONFIGURATION", fmt.Errorf("configuration is invalid: %s", issues[0].GetMessage()))
+	}
+	if configure == nil {
+		return prepared, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_UNAVAILABLE", fmt.Errorf("run configuration application is unavailable"))
+	}
+	document, err := janusconfig.Parse(bytes.NewBufferString(text))
+	if err != nil {
+		return prepared, serviceError(connect.CodeInvalidArgument, "INVALID_CONFIGURATION", err)
+	}
+	prepared.stopPolicy, err = parsePresetStop(document)
+	if err != nil {
+		return prepared, serviceError(connect.CodeInvalidArgument, "INVALID_STOP_POLICY", err)
+	}
+	prepared.histograms, err = parseHistogramOptions(document)
+	if err != nil {
+		return prepared, serviceError(connect.CodeInvalidArgument, "INVALID_HISTOGRAM_CONFIGURATION", err)
+	}
+	prepared.configured, err = configure(ctx, document, requestedBy)
+	if err != nil {
+		if s.Controller.StateSnapshot().State == acquisition.StateFault {
+			// A partial write leaves the board configuration unknown.
+			s.Telemetry.Update(func(snapshot *daqv1.TelemetrySnapshot) { snapshot.AppliedConfiguration = nil })
+		}
+		return prepared, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_APPLICATION_FAILED", fmt.Errorf("apply run configuration: %w", err))
+	}
+	if state := s.Controller.StateSnapshot().State; state != acquisition.StateReady {
+		return prepared, serviceError(connect.CodeFailedPrecondition, "SYSTEM_NOT_READY", fmt.Errorf("configuration completed in state %s, want ready", state))
+	}
+	// The boards now hold the requested configuration even if the audit
+	// below rejects it, so record the application before auditing.
+	applied := &daqv1.AppliedConfiguration{
+		AppliedAt: timestamppb.New(s.now()), RequestedBy: requestedBy, Source: source,
+		BoardCount: uint32(len(prepared.configured.Plans)), HvAuthorized: prepared.configured.HVAuthorized,
+		ConfigurationRequestId: requestID,
+	}
+	s.Telemetry.Update(func(snapshot *daqv1.TelemetrySnapshot) { snapshot.AppliedConfiguration = applied })
+	boards, concentrator := s.Boards, s.Concentrator
+	if s.HardwareMetadata != nil {
+		boards, concentrator = s.HardwareMetadata.HardwareMetadata()
+	}
+	prepared.concentrator = concentrator
+	prepared.audit, err = configaudit.Build(document, prepared.configured.Plans, boards)
+	if err != nil || !prepared.audit.Valid {
+		if err == nil {
+			rejected := make([]string, 0)
+			for _, setting := range prepared.audit.Settings {
+				if setting.Status != configaudit.Rejected {
+					continue
+				}
+				rejected = append(rejected, fmt.Sprintf("line %d %s: %s", setting.Line, setting.Name, setting.Reason))
+			}
+			err = fmt.Errorf("effective configuration audit rejected: %s", strings.Join(rejected, "; "))
+		}
+		return prepared, serviceError(connect.CodeFailedPrecondition, "CONFIGURATION_AUDIT_FAILED", err)
+	}
+	return prepared, nil
 }
 
 func (s *RunService) StopRun(ctx context.Context, request *connect.Request[daqv1.StopRunRequest]) (*connect.Response[daqv1.StopRunResponse], error) {

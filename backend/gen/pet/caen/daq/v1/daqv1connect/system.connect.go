@@ -78,6 +78,9 @@ const (
 	// RunServiceGetHistogramsProcedure is the fully-qualified name of the RunService's GetHistograms
 	// RPC.
 	RunServiceGetHistogramsProcedure = "/pet.caen.daq.v1.RunService/GetHistograms"
+	// RunServiceApplyConfigurationProcedure is the fully-qualified name of the RunService's
+	// ApplyConfiguration RPC.
+	RunServiceApplyConfigurationProcedure = "/pet.caen.daq.v1.RunService/ApplyConfiguration"
 	// ScanServiceStartStaircaseProcedure is the fully-qualified name of the ScanService's
 	// StartStaircase RPC.
 	ScanServiceStartStaircaseProcedure = "/pet.caen.daq.v1.ScanService/StartStaircase"
@@ -357,6 +360,13 @@ type RunServiceClient interface {
 	GetRunConfiguration(context.Context, *connect.Request[v1.GetRunConfigurationRequest]) (*connect.Response[v1.GetRunConfigurationResponse], error)
 	DownloadArtifact(context.Context, *connect.Request[v1.DownloadArtifactRequest]) (*connect.ServerStreamForClient[v1.DownloadArtifactResponse], error)
 	GetHistograms(context.Context, *connect.Request[v1.GetHistogramsRequest]) (*connect.Response[v1.GetHistogramsResponse], error)
+	// Validates, plans, audits, and writes a configuration to the connected
+	// boards as StartRun does, without starting acquisition, allocating a run
+	// number, or creating run files. Unlike StartRun it always rewrites the
+	// registers, even when the boards already hold an identical configuration.
+	// HV setpoints are written only when the backend runs with
+	// -authorize-hv-config. Scans and the HV switch then use it.
+	ApplyConfiguration(context.Context, *connect.Request[v1.ApplyConfigurationRequest]) (*connect.Response[v1.ApplyConfigurationResponse], error)
 }
 
 // NewRunServiceClient constructs a client for the pet.caen.daq.v1.RunService service. By default,
@@ -412,6 +422,12 @@ func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...
 			connect.WithSchema(runServiceMethods.ByName("GetHistograms")),
 			connect.WithClientOptions(opts...),
 		),
+		applyConfiguration: connect.NewClient[v1.ApplyConfigurationRequest, v1.ApplyConfigurationResponse](
+			httpClient,
+			baseURL+RunServiceApplyConfigurationProcedure,
+			connect.WithSchema(runServiceMethods.ByName("ApplyConfiguration")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -424,6 +440,7 @@ type runServiceClient struct {
 	getRunConfiguration *connect.Client[v1.GetRunConfigurationRequest, v1.GetRunConfigurationResponse]
 	downloadArtifact    *connect.Client[v1.DownloadArtifactRequest, v1.DownloadArtifactResponse]
 	getHistograms       *connect.Client[v1.GetHistogramsRequest, v1.GetHistogramsResponse]
+	applyConfiguration  *connect.Client[v1.ApplyConfigurationRequest, v1.ApplyConfigurationResponse]
 }
 
 // StartRun calls pet.caen.daq.v1.RunService.StartRun.
@@ -461,6 +478,11 @@ func (c *runServiceClient) GetHistograms(ctx context.Context, req *connect.Reque
 	return c.getHistograms.CallUnary(ctx, req)
 }
 
+// ApplyConfiguration calls pet.caen.daq.v1.RunService.ApplyConfiguration.
+func (c *runServiceClient) ApplyConfiguration(ctx context.Context, req *connect.Request[v1.ApplyConfigurationRequest]) (*connect.Response[v1.ApplyConfigurationResponse], error) {
+	return c.applyConfiguration.CallUnary(ctx, req)
+}
+
 // RunServiceHandler is an implementation of the pet.caen.daq.v1.RunService service.
 type RunServiceHandler interface {
 	StartRun(context.Context, *connect.Request[v1.StartRunRequest]) (*connect.Response[v1.StartRunResponse], error)
@@ -470,6 +492,13 @@ type RunServiceHandler interface {
 	GetRunConfiguration(context.Context, *connect.Request[v1.GetRunConfigurationRequest]) (*connect.Response[v1.GetRunConfigurationResponse], error)
 	DownloadArtifact(context.Context, *connect.Request[v1.DownloadArtifactRequest], *connect.ServerStream[v1.DownloadArtifactResponse]) error
 	GetHistograms(context.Context, *connect.Request[v1.GetHistogramsRequest]) (*connect.Response[v1.GetHistogramsResponse], error)
+	// Validates, plans, audits, and writes a configuration to the connected
+	// boards as StartRun does, without starting acquisition, allocating a run
+	// number, or creating run files. Unlike StartRun it always rewrites the
+	// registers, even when the boards already hold an identical configuration.
+	// HV setpoints are written only when the backend runs with
+	// -authorize-hv-config. Scans and the HV switch then use it.
+	ApplyConfiguration(context.Context, *connect.Request[v1.ApplyConfigurationRequest]) (*connect.Response[v1.ApplyConfigurationResponse], error)
 }
 
 // NewRunServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -521,6 +550,12 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 		connect.WithSchema(runServiceMethods.ByName("GetHistograms")),
 		connect.WithHandlerOptions(opts...),
 	)
+	runServiceApplyConfigurationHandler := connect.NewUnaryHandler(
+		RunServiceApplyConfigurationProcedure,
+		svc.ApplyConfiguration,
+		connect.WithSchema(runServiceMethods.ByName("ApplyConfiguration")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/pet.caen.daq.v1.RunService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case RunServiceStartRunProcedure:
@@ -537,6 +572,8 @@ func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) 
 			runServiceDownloadArtifactHandler.ServeHTTP(w, r)
 		case RunServiceGetHistogramsProcedure:
 			runServiceGetHistogramsHandler.ServeHTTP(w, r)
+		case RunServiceApplyConfigurationProcedure:
+			runServiceApplyConfigurationHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -572,6 +609,10 @@ func (UnimplementedRunServiceHandler) DownloadArtifact(context.Context, *connect
 
 func (UnimplementedRunServiceHandler) GetHistograms(context.Context, *connect.Request[v1.GetHistogramsRequest]) (*connect.Response[v1.GetHistogramsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.GetHistograms is not implemented"))
+}
+
+func (UnimplementedRunServiceHandler) ApplyConfiguration(context.Context, *connect.Request[v1.ApplyConfigurationRequest]) (*connect.Response[v1.ApplyConfigurationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("pet.caen.daq.v1.RunService.ApplyConfiguration is not implemented"))
 }
 
 // ScanServiceClient is a client for the pet.caen.daq.v1.ScanService service.

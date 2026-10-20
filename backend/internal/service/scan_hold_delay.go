@@ -71,7 +71,7 @@ func (s *ScanService) StartHoldDelayScan(ctx context.Context, request *connect.R
 	}
 	s.active = &activeScan{id: scanID, cancel: cancel, holdDelay: scan}
 	s.mu.Unlock()
-	s.publishHoldDelay(scan, daqv1.SystemState_SYSTEM_STATE_SCANNING, nil)
+	s.publishHoldDelay(scan, daqv1.SystemState_SYSTEM_STATE_SCANNING)
 	response := cloneHoldDelayScan(scan)
 	go s.runHoldDelay(scanCtx, actor, domain, writer)
 	return connect.NewResponse(&daqv1.StartHoldDelayScanResponse{Scan: response, Snapshot: s.Telemetry.Snapshot()}), nil
@@ -90,12 +90,7 @@ func (s *ScanService) runHoldDelay(ctx context.Context, actor string, request ho
 		return nil
 	})
 	s.updateHoldDelay(func(scan *daqv1.HoldDelayScan) { scan.Summary.State = daqv1.ScanState_SCAN_STATE_RESTORING })
-	state, reason := daqv1.ScanState_SCAN_STATE_COMPLETED, "completed"
-	if errors.Is(runErr, context.Canceled) {
-		state, reason = daqv1.ScanState_SCAN_STATE_CANCELLED, "operator_cancel"
-	} else if runErr != nil {
-		state, reason = daqv1.ScanState_SCAN_STATE_FAILED, runErr.Error()
-	}
+	state, reason := scanOutcome(runErr, restored)
 	completedAt := time.Now().UTC()
 	manifestState := strings.ToLower(strings.TrimPrefix(state.String(), "SCAN_STATE_"))
 	finalErr := runErr
@@ -118,7 +113,7 @@ func (s *ScanService) runHoldDelay(ctx context.Context, actor string, request ho
 	final := cloneHoldDelayScan(scan)
 	s.active = nil
 	s.mu.Unlock()
-	s.publishHoldDelay(nil, stateAfterScan(finalErr), final.Summary)
+	s.publishCompletedScan(stateAfterScan(finalErr, restored), final.Summary, restored)
 }
 
 func (s *ScanService) GetHoldDelayScan(_ context.Context, request *connect.Request[daqv1.GetHoldDelayScanRequest]) (*connect.Response[daqv1.GetHoldDelayScanResponse], error) {
@@ -153,17 +148,14 @@ func (s *ScanService) updateHoldDelay(change func(*daqv1.HoldDelayScan)) {
 	change(s.active.holdDelay)
 	scan := cloneHoldDelayScan(s.active.holdDelay)
 	s.mu.Unlock()
-	s.publishHoldDelay(scan, daqv1.SystemState_SYSTEM_STATE_SCANNING, nil)
+	s.publishHoldDelay(scan, daqv1.SystemState_SYSTEM_STATE_SCANNING)
 }
 
-func (s *ScanService) publishHoldDelay(scan *daqv1.HoldDelayScan, state daqv1.SystemState, completed *daqv1.ScanSummary) {
+func (s *ScanService) publishHoldDelay(scan *daqv1.HoldDelayScan, state daqv1.SystemState) {
 	s.Telemetry.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = state
 		snapshot.CurrentHoldDelayScan = cloneHoldDelayScan(scan)
 		snapshot.CurrentStaircase = nil
-		if completed != nil {
-			snapshot.LatestCompletedScan = proto.Clone(completed).(*daqv1.ScanSummary)
-		}
 	})
 }
 

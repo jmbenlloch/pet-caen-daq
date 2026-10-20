@@ -19,6 +19,9 @@ const props = defineProps<{
   theme: 'dark' | 'light'
   live?: DeepReadonly<HoldDelayScan>
   boards: number[]
+  // Shown beside Start scan when the editor differs from the configuration
+  // the scan will restore; it never blocks the scan.
+  configurationNotice?: string
 }>()
 const board = ref(0)
 const minimum = ref(0)
@@ -146,6 +149,9 @@ onMounted(refresh)
             Start scan
           </button>
           <button v-if="running" type="button" class="danger" @click="cancel">Cancel</button>
+          <p v-if="configurationNotice" class="config-notice" role="status">
+            {{ configurationNotice }}
+          </p>
         </div>
       </div>
       <p class="muted">
