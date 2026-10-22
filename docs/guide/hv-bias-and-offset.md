@@ -49,8 +49,17 @@ For the example configuration `HV_Vbias = 45.4 V`, `HV_Adjust_Range = 4.5`:
 
 In all these examples the configured board supply setpoint remains **45.4 V**.
 A Janus HV monitor showing about 45.4 V therefore does not demonstrate that the
-channel adjustment is missing. Compare its channel **Vnom** with this DAQ's
-**Vnom** in the `HV_IndivAdj` per-channel editor.
+channel adjustment is missing. Compare its channel **Vnom** with this DAQ's **Estimated channel bias (Vnom)**
+readouts beneath `HV_Vbias`. Each board shows one voltage when all 64 channels
+match, or the minimum–maximum voltage when their DAC codes differ. Select
+**View channel voltages** to inspect each channel's Vnom in the `HV_IndivAdj`
+editor. The readouts update immediately when bias, range, or channel overrides
+change; they describe the edited configuration, not confirmation that it has been
+applied to hardware. Missing or invalid inputs show **Unavailable**.
+
+For the Janus example of a 55 V bias and a 2.5 V range, code 55 yields
+**53.04 V**, while code 255 yields **55.00 V**. Supported bias units (`V`, `mV`,
+and `uV`) are converted to volts before calculating the readouts.
 
 ## Register-level comparison
 

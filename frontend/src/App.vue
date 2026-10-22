@@ -6,6 +6,8 @@ import { createDaqApi, type DaqApi } from './api'
 import BoardOverrides from './BoardOverrides.vue'
 import ChannelOverrides from './ChannelOverrides.vue'
 import HvStatusPanel from './HvStatusPanel.vue'
+import HvBiasSummary from './HvBiasSummary.vue'
+import { biasVoltageInVolts } from './hvBias'
 import MaskEditor from './MaskEditor.vue'
 import NumericField from './NumericField.vue'
 import PlotWorkspace from './PlotWorkspace.vue'
@@ -827,7 +829,9 @@ function effectiveBoardNumericValues(name: string) {
       (field) =>
         field.name === name && field.index === String(board) && field.channel === undefined,
     )
-    result[board] = Number.parseFloat(override?.value ?? String(general))
+    const value = override?.value ?? globalValue(name) ?? String(general)
+    result[board] =
+      name === 'HV_Vbias' ? (biasVoltageInVolts(value) ?? Number.NaN) : Number.parseFloat(value)
   }
   return result
 }
@@ -1565,6 +1569,16 @@ onMounted(() => daq.connect())
                     Per-board overrides
                   </button>
                 </div>
+                <HvBiasSummary
+                  v-if="field.name === 'HV_Vbias' && field.index === undefined"
+                  :fields="configurationDocument.fields"
+                  :boards="configuredBoardIndices"
+                  @inspect="
+                    activeChannelField = editorFields.find(
+                      (item) => item.name === 'HV_IndivAdj' && item.index === undefined,
+                    )
+                  "
+                />
               </article>
               <template v-if="selectedSection === 'RunCtrl'">
                 <article class="parameter-row">
@@ -2273,6 +2287,9 @@ onMounted(() => daq.connect())
       :constraint="numericConstraint(activeChannelField)!"
       :boards="configuredBoardIndices"
       :overrides="channelOverrides(activeChannelField)"
+      :board-defaults="
+        activeChannelField.name === 'HV_IndivAdj' ? boardOverrides(activeChannelField) : undefined
+      "
       :nominal-bias="
         activeChannelField.name === 'HV_IndivAdj'
           ? effectiveBoardNumericValues('HV_Vbias')

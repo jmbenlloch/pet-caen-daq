@@ -623,6 +623,12 @@ Channel-scoped fields include timing/charge fine thresholds, HG/LG gain, zero-su
 
 The main row summarizes the count of non-zero explicit values by board. **Clear board overrides** clears the displayed board's grid.
 
+Beneath `HV_Vbias`, **Estimated channel bias (Vnom)** shows each board's calculated
+channel voltage, or its minimum–maximum when channels differ. **View channel
+voltages** opens the individual DAC editor. These are estimates from the edited
+configuration, not measured Vmon or confirmation of applied hardware settings.
+See [HV bias and channel offset](guide/hv-bias-and-offset.md) for the formula.
+
 For `HV_IndivAdj`, the dialog also uses nominal board bias and the selected adjustment range to help interpret the per-channel value. The configuration stores the DAC value, not an independently commanded voltage.
 
 ## 5.7 Channel masks
