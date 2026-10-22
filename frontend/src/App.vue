@@ -519,7 +519,12 @@ const discoveredConnections = computed(() => {
   )
 })
 function configuredCardPID(address: string) {
-  return discoveredConnections.value.find((connection) => connection.address === address)?.productId
+  const location = address.match(/^(?:usb|eth):\S+:tdl:(\d+):(\d+)$/)
+  if (!location) return undefined
+  return discoveredConnections.value.find(
+    (connection) =>
+      connection.chain === Number(location[1]) && connection.node === Number(location[2]),
+  )?.productId
 }
 
 const discoveredConfigurationMatches = computed(() => {

@@ -27,12 +27,6 @@ test('connection addresses identify discovered cards by PID', async ({ page }) =
     }
   }
   const configured = page.getByRole('textbox', { name: /Open.*Override 0/ })
-  const firstAddress = await devices
-    .locator('li')
-    .filter({ hasText: ':tdl:0:0' })
-    .locator('code')
-    .innerText()
-  await configured.fill(firstAddress)
   await expect(configured.locator('..')).toContainText(`PID ${data.chains[0].boards[0].productId}`)
   await configured.fill('usb:172.16.0.11:tdl:0:15')
   await expect(configured.locator('..')).toContainText('PID unavailable')
