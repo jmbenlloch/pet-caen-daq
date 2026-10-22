@@ -3428,3 +3428,11 @@ textarea {
 [data-theme='light'] .config-notice {
   color: #8a5a00;
 }
+
+.hv-bias-summary {
+  margin-top: 0;
+}
+.hv-bias-summary > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}

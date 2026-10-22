@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   formatNumericValue,
   numericError,
@@ -11,6 +11,17 @@ import {
 const props = defineProps<{ field: ConfigurationField; constraint: NumericConstraint }>()
 const emit = defineEmits<{ change: [value: string] }>()
 const parsed = computed(() => parseNumericValue(props.field.value) ?? { number: 0, unit: '' })
+const unit = ref(parsed.value.unit)
+watch(
+  () => props.field.value,
+  (value) => {
+    const next = parseNumericValue(value)
+    if (next) unit.value = next.unit
+  },
+)
+const inputValue = computed(() =>
+  parseNumericValue(props.field.value) ? props.field.value.trim().split(/\s+/)[0] : '',
+)
 const error = computed(() => numericError(props.field))
 
 function set(value: number) {
@@ -18,7 +29,11 @@ function set(value: number) {
     props.constraint.max ?? Number.POSITIVE_INFINITY,
     Math.max(props.constraint.min ?? Number.NEGATIVE_INFINITY, value),
   )
-  emit('change', formatNumericValue(bounded, parsed.value.unit))
+  emit('change', formatNumericValue(bounded, unit.value))
+}
+function input(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  emit('change', `${value}${unit.value ? ` ${unit.value}` : ''}`)
 }
 </script>
 
@@ -35,15 +50,15 @@ function set(value: number) {
       <input
         :id="field.id"
         type="number"
-        :value="parsed.number"
+        :value="inputValue"
         :min="constraint.min"
         :max="constraint.max"
         :step="constraint.step"
         :aria-invalid="Boolean(error)"
         :aria-describedby="error ? `${field.id}-error` : undefined"
-        @input="set(Number(($event.target as HTMLInputElement).value))"
+        @input="input"
       />
-      <span v-if="parsed.unit" class="unit">{{ parsed.unit }}</span>
+      <span v-if="unit" class="unit">{{ unit }}</span>
       <button
         type="button"
         :aria-label="`Increase ${field.name}`"
@@ -58,7 +73,7 @@ function set(value: number) {
         >{{ constraint.min }}–{{ constraint.max }}</template
       >
       <template v-else-if="constraint.min !== undefined">≥ {{ constraint.min }}</template>
-      · step {{ constraint.step }}{{ parsed.unit ? ` ${parsed.unit}` : '' }}
+      · step {{ constraint.step }}{{ unit ? ` ${unit}` : '' }}
     </span>
   </div>
 </template>

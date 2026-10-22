@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { parseNumericValue, type ConfigurationField, type NumericConstraint } from './configuration'
+import { nominalChannelVoltage } from './hvBias'
 import { useEscapeClose } from './useEscapeClose'
 
 const props = defineProps<{
   field: ConfigurationField
   constraint: NumericConstraint
   overrides: Record<number, Record<number, string>>
+  boardDefaults?: Record<number, string>
   nominalBias?: Record<number, number>
   adjustmentRange?: string
   boards: number[]
@@ -14,7 +16,9 @@ const props = defineProps<{
 const emit = defineEmits<{ apply: [board: number, values: Record<number, string>]; close: [] }>()
 const board = ref(0)
 const values = ref<Record<number, string>>({})
-const general = computed(() => parseNumericValue(props.field.value)?.number ?? 0)
+const general = computed(
+  () => parseNumericValue(props.boardDefaults?.[board.value] ?? props.field.value)?.number ?? 0,
+)
 
 useEscapeClose(() => emit('close'))
 
@@ -32,10 +36,11 @@ function update(channel: number, value: string) {
 
 function nominalVoltage(channel: number) {
   if (!props.nominalBias || !props.adjustmentRange) return undefined
-  const fullScale =
-    props.adjustmentRange === '4.5' ? 4.2 : props.adjustmentRange === '2.5' ? 2.5 : 0
-  const adjustment = Number(values.value[channel] ?? general.value)
-  return props.nominalBias[board.value] - (fullScale * (255 - adjustment)) / 255
+  return nominalChannelVoltage(
+    props.nominalBias[board.value],
+    props.adjustmentRange,
+    values.value[channel] ?? props.boardDefaults?.[board.value] ?? props.field.value,
+  )
 }
 </script>
 

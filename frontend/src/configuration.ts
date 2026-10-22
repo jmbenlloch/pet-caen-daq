@@ -260,7 +260,7 @@ export function isBooleanField(field: ConfigurationField) {
 export function numericConstraint(field: ConfigurationField): NumericConstraint | undefined {
   if (field.options.length || isBooleanField(field) || isMaskField(field)) return undefined
   const parsed = parseNumericValue(field.value)
-  if (!parsed) return undefined
+  const unit = parsed?.unit ?? field.value.trim()
   const explicit = janusParameterCatalog.get(field.name)
   if (!explicit || explicit.step === undefined) return undefined
   const unitScales =
@@ -271,12 +271,12 @@ export function numericConstraint(field: ConfigurationField): NumericConstraint 
         : explicit.units?.some((unit) => unit === 'ns')
           ? timeScales
           : undefined
-  const scale = unitScales?.[parsed.unit as keyof typeof unitScales] ?? 1
+  const scale = unitScales?.[unit as keyof typeof unitScales] ?? 1
   return {
     min: explicit.min === undefined ? undefined : explicit.min / scale,
     max: explicit.max === undefined ? undefined : explicit.max / scale,
     step: explicit.step / scale,
-    integer: explicit.widget === 'integer' && parsed.unit === '',
+    integer: explicit.widget === 'integer' && unit === '',
   }
 }
 
