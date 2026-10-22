@@ -184,7 +184,15 @@ remain visible for review after the temporary connection closes.
 
 The **Connect** section of the Configuration panel then lists the proposed
 `Open[board]` address for every discovered card in physical `(chain, node)`
-order. Select **Use discovered addresses** to replace the document's existing
+order. Each discovered address shows its **PID** (the card's reported product ID),
+so the physical card can be identified in the lab. The same PID appears beside
+an `Open[board]` entry when its TDlink chain and node match a discovered card
+on the backend's current concentrator. The configured transport or host can differ
+from the backend endpoint, as with a localhost simulator override. The PID identifies
+the discovered card at that location; it does not verify the edited host address.
+Unknown chain/node locations or cards without a reported identity show **PID unavailable**. These
+identities come from the latest backend snapshot; rescan after changing cabling.
+Select **Use discovered addresses** to replace the document's existing
 indexed `Open` entries. This is an explicit editor change: review or save the
 configuration before connecting, and use the raw-configuration view if an
 external detector-position convention requires different logical board

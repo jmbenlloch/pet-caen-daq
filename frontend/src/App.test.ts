@@ -339,7 +339,10 @@ describe('operator dashboard', () => {
           {
             index: 0,
             enabled: true,
-            boards: [{ node: 0 }, { node: 1 }],
+            boards: [
+              { node: 0, productId: 64883 },
+              { node: 1, productId: 64138 },
+            ],
           },
         ],
       }),
@@ -361,8 +364,23 @@ describe('operator dashboard', () => {
     expect(proposal.text()).toContain('eth:192.168.50.125:tdl:0:0')
     expect(proposal.text()).toContain('Card 1')
     expect(proposal.text()).toContain('eth:192.168.50.125:tdl:0:1')
+    expect(proposal.findAll('li')[0]!.text()).toContain('PID 64883')
+    expect(proposal.findAll('li')[1]!.text()).toContain('PID 64138')
     await proposal.get('[aria-label="Use TDlink 0 node 1"]').setValue(true)
     await proposal.get('.use-discovered-connections').trigger('click')
+    const configured = wrapper
+      .findAll('.parameter-row')
+      .filter((row) => row.find('label').exists() && row.find('label').text().startsWith('Open'))
+    expect(configured[0]!.text()).toContain('PID 64883')
+    await configured[0]!.get('input').setValue('usb:172.16.0.11:tdl:0:0')
+    expect(configured[0]!.text()).toContain('PID 64883')
+    await configured[0]!.get('input').setValue('eth:192.168.50.125:tdl:0:0')
+    expect(configured[1]!.text()).toContain('PID 64138')
+    await configured[0]!.get('input').setValue('eth:192.168.50.125:tdl:0:1')
+    expect(configured[0]!.text()).toContain('PID 64138')
+    await configured[0]!.get('input').setValue('eth:192.168.50.125:tdl:0:15')
+    expect(configured[0]!.text()).toContain('PID unavailable')
+    await configured[0]!.get('input').setValue('eth:192.168.50.125:tdl:0:0')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === 'View raw configuration')!
@@ -383,6 +401,23 @@ describe('operator dashboard', () => {
       'operator',
       expect.stringContaining('Open[1] eth:192.168.50.125:tdl:0:1'),
     )
+    wrapper.unmount()
+  })
+
+  it('shows unavailable instead of a zero PID when discovery has no identity', async () => {
+    const api = dashboardApi(SystemState.DISCONNECTED, false)
+    api.snapshot = vi.fn().mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        state: SystemState.DISCONNECTED,
+        chains: [{ index: 0, enabled: true, boards: [{ node: 0 }] }],
+      }),
+    )
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+    expect(wrapper.get('[aria-label="Discovered card addresses"]').text()).toContain(
+      'PID unavailable',
+    )
+    expect(wrapper.text()).not.toContain('PID 0')
     wrapper.unmount()
   })
 

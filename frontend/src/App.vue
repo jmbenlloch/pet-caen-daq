@@ -513,10 +513,20 @@ const discoveredConnections = computed(() => {
     chain.boards.map((board) => ({
       chain: chain.index,
       node: board.node,
+      productId: board.productId,
       address: `${prefix}:tdl:${chain.index}:${board.node}`,
     })),
   )
 })
+function configuredCardPID(address: string) {
+  const location = address.match(/^(?:usb|eth):\S+:tdl:(\d+):(\d+)$/)
+  if (!location) return undefined
+  return discoveredConnections.value.find(
+    (connection) =>
+      connection.chain === Number(location[1]) && connection.node === Number(location[2]),
+  )?.productId
+}
+
 const discoveredConfigurationMatches = computed(() => {
   const configured = configurationDocument.value.fields
     .filter((field) => field.name === 'Open' && field.index !== undefined)
@@ -1425,6 +1435,9 @@ onMounted(() => daq.connect())
                           />
                           <strong>Card {{ board }}</strong>
                           <code>{{ connection.address }}</code>
+                          <span class="card-pid">{{
+                            connection.productId ? `PID ${connection.productId}` : 'PID unavailable'
+                          }}</span>
                         </li>
                       </ol>
                     </div>
@@ -1457,6 +1470,13 @@ onMounted(() => daq.connect())
                     >
                   </label>
                   <p>{{ field.help || `JANUS configuration line ${field.line}` }}</p>
+                  <p v-if="field.name === 'Open'" class="card-pid">
+                    {{
+                      configuredCardPID(field.value)
+                        ? `PID ${configuredCardPID(field.value)}`
+                        : 'PID unavailable'
+                    }}
+                  </p>
                 </div>
                 <label v-if="isBooleanField(field)" class="switch">
                   <input
