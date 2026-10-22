@@ -1,0 +1,18 @@
+# Imported by the shared IFIC Caddyfile. The auth snippet stays on the server.
+https://pet.next-experiment.org {
+    import /etc/caddy/pet-auth.caddy
+    header {
+        Cache-Control "private, no-store"
+        X-Robots-Tag "noindex, nofollow"
+        X-Content-Type-Options "nosniff"
+    }
+    redir /docs /docs/ 308
+    handle_path /docs/* {
+        root * /srv/pet-docs/site
+        encode zstd gzip
+        file_server
+    }
+    handle {
+        redir /docs/ 302
+    }
+}

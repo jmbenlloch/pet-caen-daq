@@ -32,3 +32,8 @@ data/
 # Local tooling
 .cache/
 .tmp/
+
+# Documentation build and server credentials
+docs/.vitepress/cache/
+deploy/docs/users.caddy
+deploy/docs/content/

@@ -158,3 +158,15 @@ The DT5215 USB connection presents an Ethernet network interface. JANUS/FERSlib 
 The Scans workspace supports configurable XY source scans with one timed or
 event-limited PET run per position. See [source-scan setup, simulator workflow,
 firmware and metadata](docs/source-scans.md).
+
+## Documentation website
+
+The existing Markdown manuals are published through VitePress with local search.
+
+```sh
+task docs:install
+task docs:dev
+```
+
+See [editing and protected hosting](docs/documentation-site.md) for builds,
+individual collaborator passwords, and automatic deployment setup.
