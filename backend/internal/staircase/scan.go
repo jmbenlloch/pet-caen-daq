@@ -7,6 +7,7 @@ import (
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 )
 
 const (
@@ -66,7 +67,11 @@ func (r Request) PointCount() uint32 {
 
 // Run performs the source-confirmed JANUS staircase sequence without the
 // undocumented max+step warm-up pass. restore is owned by the caller.
-func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Request, timeMask uint64, observe func(Point) error) error {
+func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Request, timeMask uint64, observe func(Point) error, sinks ...scanrecord.Sink) error {
+	var sink scanrecord.Sink
+	if len(sinks) > 0 {
+		sink = sinks[0]
+	}
 	if hardware == nil || observe == nil {
 		return fmt.Errorf("hardware and point observer are required")
 	}
@@ -86,6 +91,9 @@ func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Req
 		{Address: dt5202.T1OutputMask, Value: 0x10},
 		{Address: dt5202.T0OutputMask, Value: 0x04},
 	}
+	if err := scanrecord.Emit(sink, scanrecord.Record{Type: "overrides", Board: request.Board, Chain: chain, Node: node, Phase: "prepare_intent", Writes: setup}); err != nil {
+		return err
+	}
 	for _, write := range setup {
 		if err := hardware.WriteRegister(ctx, chain, node, uint32(write.Address), write.Value); err != nil {
 			return fmt.Errorf("prepare register %#08x: %w", write.Address, err)
@@ -94,10 +102,16 @@ func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Req
 	if err := wait(ctx, prepareSettle); err != nil {
 		return err
 	}
+	var pointIndex uint32
 	for threshold := request.Maximum; ; {
+		index := pointIndex
+		if err := scanrecord.Emit(sink, scanrecord.Record{Type: "overrides", Board: request.Board, Chain: chain, Node: node, PointIndex: &index, Phase: "point_intent", Writes: []dt5202.RegisterWrite{{Address: dt5202.ChargeCoarseThreshold, Value: threshold}, {Address: dt5202.TimeCoarseThreshold, Value: threshold}}}); err != nil {
+			return err
+		}
 		if err := scanPoint(ctx, hardware, chain, node, request, threshold, observe); err != nil {
 			return err
 		}
+		pointIndex++
 		if threshold < request.Minimum+request.Step {
 			break
 		}

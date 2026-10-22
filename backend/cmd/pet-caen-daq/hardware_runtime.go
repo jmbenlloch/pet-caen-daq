@@ -17,6 +17,8 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/service"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircase"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
@@ -515,22 +517,60 @@ func cloneConfigurationResult(result acquisition.ConfigurationResult) acquisitio
 	return result
 }
 
+func (r *hardwareRuntime) scanConfiguration(sink scanrecord.Sink, board uint32) error {
+	if sink == nil {
+		return nil
+	}
+	document := cloneDocument(r.configuredFor)
+	if document == nil {
+		return fmt.Errorf("no applied configuration available for scan")
+	}
+	evidence := make([]configaudit.BoardEvidence, 0, len(r.topology.Boards))
+	for _, b := range r.topology.Boards {
+		// The applied plans retain board numbers; topology is saved separately.
+		for _, connection := range r.connections {
+			if uint16(connection.Chain) == b.Chain && uint16(connection.Node) == b.Node {
+				evidence = append(evidence, configaudit.BoardEvidence{Board: connection.Board, FirmwareRevision: b.FirmwareRevision, HVModuleFirmwareRaw: b.HVModuleFirmwareRaw, HVModuleFirmwareVersion: b.HVModuleFirmwareVersion, HVModuleFirmwareAvailable: b.HVModuleFirmwareAvailable})
+			}
+		}
+	}
+	audit, err := configaudit.Build(document, r.configured.Plans, evidence)
+	if err != nil {
+		return err
+	}
+	return scanrecord.Emit(sink, scanrecord.Record{Type: "configuration", Board: board, Configuration: &scanrecord.Configuration{
+		RequestedAssignments: document.Assignments, EffectiveConfiguration: r.configured.Plans,
+		Audit: &audit, Topology: r.topology, Software: runstore.CurrentSoftwareIdentity(),
+	}})
+}
+
 func (r *hardwareRuntime) Run(ctx context.Context, request staircase.Request, actor string, observe func(staircase.Point) error) (bool, error) {
+	return r.RunRecorded(ctx, request, actor, observe, nil)
+}
+func (r *hardwareRuntime) RunRecorded(ctx context.Context, request staircase.Request, actor string, observe func(staircase.Point) error, sink scanrecord.Sink) (bool, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if r.staircase == nil {
 		return false, fmt.Errorf("hardware is disconnected")
 	}
-	return r.staircase.Run(ctx, request, actor, observe)
+	if err := r.scanConfiguration(sink, request.Board); err != nil {
+		return false, err
+	}
+	return r.staircase.RunRecorded(ctx, request, actor, observe, sink)
 }
-
 func (r *hardwareRuntime) RunHoldDelay(ctx context.Context, request holddelay.Request, actor string, observe func(holddelay.Point) error) (bool, error) {
+	return r.RunHoldDelayRecorded(ctx, request, actor, observe, nil)
+}
+func (r *hardwareRuntime) RunHoldDelayRecorded(ctx context.Context, request holddelay.Request, actor string, observe func(holddelay.Point) error, sink scanrecord.Sink) (bool, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	if r.holdDelay == nil {
 		return false, fmt.Errorf("hardware is disconnected")
 	}
-	return r.holdDelay.Run(ctx, request, actor, observe)
+	if err := r.scanConfiguration(sink, request.Board); err != nil {
+		return false, err
+	}
+	return r.holdDelay.RunRecorded(ctx, request, actor, observe, sink)
 }
 
 func staircaseTargets(targets []acquisition.ConfigurationTarget, plans []dt5202.ConfigurationPlan) []acquisition.StaircaseTarget {

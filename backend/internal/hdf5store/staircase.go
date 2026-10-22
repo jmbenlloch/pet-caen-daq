@@ -31,7 +31,7 @@ type staircaseChannelRow struct {
 // WriteStaircase writes a finalized, self-contained scan artifact. Point rows
 // and channel rows are separate datasets so channel arrays remain portable
 // across HDF5 readers.
-func WriteStaircase(path string, metadata []byte, points []staircase.Point) (err error) {
+func WriteStaircase(path string, metadata []byte, points []staircase.Point, evidence ...[]byte) (err error) {
 	compression, err := compressionName()
 	if err != nil {
 		return err
@@ -46,7 +46,11 @@ func WriteStaircase(path string, metadata []byte, points []staircase.Point) (err
 		return err
 	}
 	defer root.Close()
-	if err := writeUintAttribute(root, "schema_version", 1); err != nil {
+	schemaVersion := 1
+	if len(evidence) > 0 {
+		schemaVersion = 2
+	}
+	if err := writeUintAttribute(root, "schema_version", schemaVersion); err != nil {
 		return err
 	}
 	scan, err := file.CreateGroup("staircase")
@@ -88,6 +92,9 @@ func WriteStaircase(path string, metadata []byte, points []staircase.Point) (err
 		return err
 	}
 	if err := appendRows(&channelTable, channelRows); err != nil {
+		return err
+	}
+	if err := writeScanEvidence(file, evidence); err != nil {
 		return err
 	}
 	return file.Flush(hdf5.F_SCOPE_GLOBAL)

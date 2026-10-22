@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/hdf5store"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircase"
 )
 
@@ -16,7 +17,11 @@ func buildArtifact(dir string, manifest Manifest, points []staircase.Point) (str
 	if err != nil {
 		return "", "", err
 	}
-	if err := hdf5store.WriteStaircase(path, metadata, points); err != nil {
+	evidence, err := scanrecord.Read(dir)
+	if err != nil {
+		return "", "", err
+	}
+	if err := hdf5store.WriteStaircase(path, metadata, points, evidence); err != nil {
 		return "", "", err
 	}
 	return path, "staircase-hdf5", nil

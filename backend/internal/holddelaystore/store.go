@@ -15,11 +15,13 @@ import (
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 )
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 type Manifest struct {
+	EvidenceArtifact  *runstore.Artifact `json:"evidence_artifact,omitempty"`
 	SchemaVersion     int                `json:"schema_version"`
 	ScanType          string             `json:"scan_type"`
 	ScanID            string             `json:"scan_id"`
@@ -69,6 +71,14 @@ func Create(parent string, manifest Manifest) (*Writer, error) {
 	return writer, nil
 }
 
+// RecordEvidence preserves configuration, overrides and telemetry during a scan.
+func (w *Writer) RecordEvidence(record scanrecord.Record) error {
+	if w.closed {
+		return errors.New("scan writer is closed")
+	}
+	return scanrecord.Append(w.dir, record)
+}
+
 func (w *Writer) Append(point holddelay.Point) error {
 	if w.closed {
 		return errors.New("scan writer is closed")
@@ -94,6 +104,16 @@ func (w *Writer) Finalize(completedAt, state, reason string, restored bool) erro
 	}
 	w.manifest.CompletedAt, w.manifest.State = completedAt, state
 	w.manifest.TerminationReason, w.manifest.Restored = reason, restored
+	evidencePath := filepath.Join(w.dir, scanrecord.JournalName)
+	if info, statErr := os.Stat(evidencePath); statErr == nil {
+		sum, hashErr := fileSHA256(evidencePath)
+		if hashErr != nil {
+			return hashErr
+		}
+		w.manifest.EvidenceArtifact = &runstore.Artifact{Kind: "scan-evidence-jsonl", Name: scanrecord.JournalName, SizeBytes: uint64(info.Size()), SHA256: sum}
+	} else if !os.IsNotExist(statErr) {
+		return statErr
+	}
 	path, kind, err := buildArtifact(w.dir, w.manifest, w.points)
 	if err != nil {
 		return err

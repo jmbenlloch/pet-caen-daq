@@ -8,6 +8,7 @@ import (
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 )
 
 type HoldDelayHardware interface {
@@ -42,7 +43,11 @@ func (c *HoldDelayCoordinator) SetTargets(targets []StaircaseTarget) {
 	}
 }
 
-func (c *HoldDelayCoordinator) Run(ctx context.Context, request holddelay.Request, actor string, observe func(holddelay.Point) error) (restored bool, err error) {
+func (c *HoldDelayCoordinator) Run(ctx context.Context, request holddelay.Request, actor string, observe func(holddelay.Point) error) (bool, error) {
+	return c.RunRecorded(ctx, request, actor, observe, nil)
+}
+
+func (c *HoldDelayCoordinator) RunRecorded(ctx context.Context, request holddelay.Request, actor string, observe func(holddelay.Point) error, sink scanrecord.Sink) (restored bool, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	target, ok := c.targets[request.Board]
@@ -59,10 +64,13 @@ func (c *HoldDelayCoordinator) Run(ctx context.Context, request holddelay.Reques
 		restoreCtx := context.WithoutCancel(ctx)
 		restoreErr := dt5202.ApplyConfiguration(restoreCtx, c.hardware, target.Chain, target.Node, target.Plan, true)
 		restored = restoreErr == nil
+		recordErr := scanrecord.Emit(sink, scanrecord.Record{Type: "restoration", Board: request.Board, Chain: target.Chain, Node: target.Node, Restored: &restored, Error: errorText(restoreErr)})
+		err = errors.Join(err, recordErr)
+		err = errors.Join(err, scanrecord.SampleMonitor(restoreCtx, c.hardware, sink, request.Board, target.Chain, target.Node, "after_restore", nil))
 		if restoreErr != nil {
 			err = errors.Join(err, fmt.Errorf("restore board %d configuration: %w", request.Board, restoreErr))
 		}
-		if restoreErr != nil || (err != nil && !errors.Is(err, context.Canceled)) {
+		if restoreErr != nil || errors.Is(err, scanrecord.ErrPersistence) || (err != nil && !errors.Is(err, context.Canceled)) {
 			_, transitionErr := c.states.Move(StateFault, actor)
 			err = errors.Join(err, transitionErr)
 			return
@@ -71,19 +79,39 @@ func (c *HoldDelayCoordinator) Run(ctx context.Context, request holddelay.Reques
 		err = errors.Join(err, transitionErr)
 	}()
 
+	if err = scanrecord.Emit(sink, scanrecord.Record{Type: "baseline", Board: request.Board, Chain: target.Chain, Node: target.Node, BaselinePlan: &target.Plan}); err != nil {
+		return false, err
+	}
+	if err = scanrecord.SampleMonitor(ctx, c.hardware, sink, request.Board, target.Chain, target.Node, "before_scan", nil); err != nil {
+		return false, err
+	}
+	var pointIndex uint32
+	recordPoint := func(point holddelay.Point) error {
+		if err := observe(point); err != nil {
+			return err
+		}
+		index := pointIndex
+		pointIndex++
+		return scanrecord.SampleMonitor(ctx, c.hardware, sink, request.Board, target.Chain, target.Node, "after_point", &index)
+	}
+
 	acquisitionControl := uint32(registerValue(target.Plan, dt5202.AcquisitionControl))
 	acquisitionControl = acquisitionControl&^0x7&^(0x3<<12) | 1 | 0x3<<12
-	for _, write := range []dt5202.RegisterWrite{
+	setup := []dt5202.RegisterWrite{
 		{Address: dt5202.AcquisitionControl, Value: acquisitionControl},
 		{Address: dt5202.TriggerMask, Value: uint32(registerValue(target.Plan, dt5202.TriggerMask))},
 		{Address: dt5202.RunMask, Value: 1},
-	} {
+	}
+	if err = scanrecord.Emit(sink, scanrecord.Record{Type: "overrides", Phase: "prepare_intent", Board: request.Board, Chain: target.Chain, Node: target.Node, Writes: setup}); err != nil {
+		return false, err
+	}
+	for _, write := range setup {
 		if err = c.hardware.WriteRegister(ctx, target.Chain, target.Node, uint32(write.Address), write.Value); err != nil {
 			return false, fmt.Errorf("prepare hold-delay register %#08x: %w", write.Address, err)
 		}
 	}
 	range14 := acquisitionControl&(1<<21) != 0
-	err = holddelay.Run(ctx, c.hardware, target.Chain, target.Node, request, range14, observe)
+	err = holddelay.Run(ctx, c.hardware, target.Chain, target.Node, request, range14, recordPoint, sink)
 	return restored, err
 }
 

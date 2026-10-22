@@ -15,6 +15,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelaystore"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircase"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircasestore"
 	"google.golang.org/protobuf/proto"
@@ -117,7 +118,15 @@ func (s *ScanService) StartStaircase(ctx context.Context, request *connect.Reque
 
 func (s *ScanService) run(ctx context.Context, actor string, request staircase.Request, writer *staircasestore.Writer) {
 	s.update(func(scan *daqv1.StaircaseScan) { scan.Summary.State = daqv1.ScanState_SCAN_STATE_RUNNING })
-	restored, runErr := s.Controller.Run(ctx, request, actor, func(point staircase.Point) error {
+	run := s.Controller.Run
+	if recorded, ok := s.Controller.(interface {
+		RunRecorded(context.Context, staircase.Request, string, func(staircase.Point) error, scanrecord.Sink) (bool, error)
+	}); ok {
+		run = func(ctx context.Context, request staircase.Request, actor string, observe func(staircase.Point) error) (bool, error) {
+			return recorded.RunRecorded(ctx, request, actor, observe, writer.RecordEvidence)
+		}
+	}
+	restored, runErr := run(ctx, request, actor, func(point staircase.Point) error {
 		if err := writer.Append(point); err != nil {
 			return err
 		}
@@ -277,6 +286,9 @@ func scanOutcome(err error, restored bool) (daqv1.ScanState, string) {
 		}
 		return daqv1.ScanState_SCAN_STATE_FAILED, reason
 	}
+	if errors.Is(err, scanrecord.ErrPersistence) {
+		return daqv1.ScanState_SCAN_STATE_FAILED, err.Error()
+	}
 	if errors.Is(err, context.Canceled) {
 		return daqv1.ScanState_SCAN_STATE_CANCELLED, "operator_cancel"
 	}
@@ -287,7 +299,7 @@ func scanOutcome(err error, restored bool) (daqv1.ScanState, string) {
 }
 
 func stateAfterScan(err error, restored bool) daqv1.SystemState {
-	if !restored || (err != nil && !errors.Is(err, context.Canceled)) {
+	if !restored || errors.Is(err, scanrecord.ErrPersistence) || (err != nil && !errors.Is(err, context.Canceled)) {
 		return daqv1.SystemState_SYSTEM_STATE_FAULT
 	}
 	return daqv1.SystemState_SYSTEM_STATE_READY
