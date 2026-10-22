@@ -1,6 +1,6 @@
-# Imported by the shared IFIC Caddyfile. The auth snippet stays on the server.
+# Imported by the shared IFIC Caddyfile. PET manual access is temporarily public.
 https://pet.next-experiment.org {
-    import /etc/caddy/pet-auth.caddy
+    # Authentication temporarily disabled at the operator's request.
     header {
         Cache-Control "private, no-store"
         X-Robots-Tag "noindex, nofollow"
