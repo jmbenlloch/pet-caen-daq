@@ -273,3 +273,16 @@ func TestCompletedRunIndexesOnlyThatRunWithoutFailingOnCatalogError(t *testing.T
 		t.Fatal("catalog error was not reported")
 	}
 }
+
+func TestManifestSummaryRestoresPerBoardTarget(t *testing.T) {
+	manifest := runstore.Manifest{RunID: "42", RequestedConfiguration: "StopRunMode PRESET_COUNTS_PER_BOARD\nPresetCounts 25\n"}
+	summary := manifestSummary(t.TempDir(), manifest)
+	if summary.StopMode != "PRESET_COUNTS_PER_BOARD" || summary.PresetEventCount != 25 {
+		t.Fatalf("summary = %+v", summary)
+	}
+	manifest.SourcePosition = &runstore.SourcePosition{ScanID: "scan"}
+	summary = manifestSummary(t.TempDir(), manifest)
+	if summary.PresetEventCount != 0 {
+		t.Fatal("source scan inherited per-card target")
+	}
+}

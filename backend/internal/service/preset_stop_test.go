@@ -15,6 +15,7 @@ func TestParsePresetStopModesAndUnits(t *testing.T) {
 		duration      time.Duration
 		count         uint64
 	}{
+		{"StopRunMode PRESET_COUNTS_PER_BOARD\nPresetCounts 42\n", "PRESET_COUNTS_PER_BOARD", 0, 42},
 		{"StopRunMode MANUAL\n", "MANUAL", 0, 0},
 		{"StopRunMode PRESET_TIME\nPresetTime 1.5 s\n", "PRESET_TIME", 1500 * time.Millisecond, 0},
 		{"StopRunMode PRESET_TIME\nPresetTime 250 ms\n", "PRESET_TIME", 250 * time.Millisecond, 0},
@@ -36,6 +37,10 @@ func TestParsePresetStopRejectsZeroAndUnknownPolicies(t *testing.T) {
 	for _, configuration := range []string{
 		"StopRunMode PRESET_TIME\nPresetTime 0\n",
 		"StopRunMode PRESET_COUNTS\nPresetCounts 0\n",
+		"StopRunMode PRESET_COUNTS_PER_BOARD\nPresetCounts 0\n",
+		"StopRunMode PRESET_COUNTS_PER_BOARD\nPresetCounts -1\n",
+		"StopRunMode PRESET_COUNTS_PER_BOARD\nPresetCounts 1.5\n",
+		"StopRunMode PRESET_COUNTS_PER_BOARD\nPresetCounts 18446744073709551616\n",
 		"StopRunMode LATER\n",
 	} {
 		document, _ := janusconfig.Parse(strings.NewReader(configuration))

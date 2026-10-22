@@ -106,6 +106,7 @@ type StorageIdentity struct {
 }
 
 type RuntimeIdentity struct {
+	EventLimitPerBoard      uint64  `json:"event_limit_per_board,omitempty"`
 	PipelineCapacity        int     `json:"pipeline_capacity"`
 	BackpressurePolicy      string  `json:"backpressure_policy"`
 	CaptureRaw              bool    `json:"capture_raw"`

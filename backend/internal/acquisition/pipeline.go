@@ -42,6 +42,12 @@ type BatchPipelineSink interface {
 	AppendEvents([]DecodedEvent) error
 }
 
+// DecodedEventSelector selects records for persistence after decoding. The event
+// worker calls it serially; raw capture remains byte-exact and unfiltered.
+type DecodedEventSelector interface {
+	SelectEvents([]DecodedEvent) []DecodedEvent
+}
+
 // Pipeline preserves ordering within separate raw and decoded-event workers.
 // An event batch waits for its raw batch to persist, while the raw worker may
 // capture the next batch concurrently with decoding and event persistence.
@@ -258,7 +264,6 @@ func (p *Pipeline) runEvents() {
 			<-p.slots
 			continue
 		}
-		p.eventBatches.Add(1)
 		<-p.slots
 	}
 }
@@ -274,12 +279,19 @@ func (p *Pipeline) processEvents(batch PipelineBatch) error {
 		p.decoded.Add(1)
 		decodedBatch = append(decodedBatch, DecodedEvent{Wire: wire, Event: decoded})
 	}
+	if selector, ok := p.sink.(DecodedEventSelector); ok {
+		decodedBatch = selector.SelectEvents(decodedBatch)
+	}
+	if len(decodedBatch) == 0 {
+		return nil
+	}
 	if sink, ok := p.sink.(BatchPipelineSink); ok {
 		if err := sink.AppendEvents(decodedBatch); err != nil {
 			p.sinkFail.Add(1)
 			return fmt.Errorf("store decoded event batch: %w", err)
 		}
 		p.persisted.Add(uint64(len(decodedBatch)))
+		p.eventBatches.Add(1)
 		return nil
 	}
 	for _, item := range decodedBatch {
@@ -289,6 +301,7 @@ func (p *Pipeline) processEvents(batch PipelineBatch) error {
 		}
 		p.persisted.Add(1)
 	}
+	p.eventBatches.Add(1)
 	return nil
 }
 

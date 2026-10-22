@@ -245,7 +245,11 @@ function maskChannels(field: ConfigurationField) {
                       <dd>{{ compact(run.presetTimeMilliseconds) }} ms</dd>
                     </div>
                     <div v-if="run.presetEventCount">
-                      <dt>Preset events</dt>
+                      <dt>
+                        Preset events{{
+                          run.stopMode === 'PRESET_COUNTS_PER_BOARD' ? ' per card' : ''
+                        }}
+                      </dt>
                       <dd>{{ compact(run.presetEventCount) }}</dd>
                     </div>
                   </dl>
