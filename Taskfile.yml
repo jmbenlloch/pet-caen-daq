@@ -14,6 +14,37 @@ tasks:
     cmds:
       - task --list
 
+  docs:install:
+    desc: Install pinned documentation dependencies
+    cmds:
+      - npm --prefix docs ci
+
+  docs:dev:
+    desc: Preview documentation with live updates on localhost:5173
+    cmds:
+      - npm --prefix docs run dev
+
+  docs:build:
+    desc: Build documentation and check internal links
+    cmds:
+      - npm --prefix docs run build
+
+  docs:preview:
+    desc: Serve the built documentation on localhost:4173
+    cmds:
+      - npm --prefix docs run preview
+
+  docs:test:auth:
+    desc: Verify protected pages and search assets using temporary Docker hosting
+    deps: [docs:build]
+    cmds:
+      - bash scripts/test-docs-auth
+
+  docs:serve:
+    desc: Start the HTTPS documentation server (requires domain and credentials)
+    cmds:
+      - docker compose -f deploy/docs/compose.yml up -d
+
   generate:
     desc: Generate protobuf and ConnectRPC Go and TypeScript bindings
     cmds:

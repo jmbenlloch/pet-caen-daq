@@ -12,7 +12,7 @@ The original `XY_raster_scan_with_JANUS_trigger_handshake_over_Serial.ino`
 was the motion/handshake reference. It drives step/direction motors (not hobby
 servos), starts moving at boot, and has a compiled-in raster and calibration.
 It cannot accept a frontend-selected grid. Install the replacement
-[`pet_xy_stage.ino`](../firmware/pet_xy_stage/pet_xy_stage.ino) for this integration.
+[`pet_xy_stage.ino`](https://github.com/jmbenlloch/pet-caen-daq/blob/main/firmware/pet_xy_stage/pet_xy_stage.ino) for this integration.
 The original sketch is preserved and is **not compatible with PETXY/1**.
 
 ## Configuration and operation

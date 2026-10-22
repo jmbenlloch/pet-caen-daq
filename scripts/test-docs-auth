@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+scratch=$(mktemp -d /tmp/pet-caen-docs-auth.XXXXXX)
+container=pet-caen-docs-auth-${scratch##*.}
+trap 'docker rm -f "$container" >/dev/null 2>&1 || true; rm -rf "$scratch"' EXIT
+hash=$(docker run --rm caddy:2.11.2-alpine caddy hash-password --plaintext temporary-test-password)
+printf 'collaborator %s\n' "$hash" > "$scratch/users.caddy"
+chmod 644 "$scratch/users.caddy"
+docker run --rm -d --name "$container" -p 127.0.0.1::80 \
+  -e DOCS_DOMAIN=http://:80 \
+  -v "$root/deploy/docs/Caddyfile:/etc/caddy/Caddyfile:ro" \
+  -v "$scratch/users.caddy:/etc/caddy/users.caddy:ro" \
+  -v "$root/docs/.vitepress/dist:/srv/docs/site:ro" \
+  caddy:2.11.2-alpine >/dev/null
+port=$(docker port "$container" 80/tcp | sed 's/.*://')
+base="http://127.0.0.1:$port"
+for attempt in $(seq 1 30); do
+  if curl -s -o /dev/null "$base/docs/"; then break; fi
+  sleep 0.2
+done
+test -f "$root/docs/.vitepress/dist/index.html"
+asset=$(find "$root/docs/.vitepress/dist/assets" -name '*localSearchIndex*.js' -printf '/docs/assets/%P\n' -quit)
+test -n "$asset"
+for path in /docs/ /docs/guide/telemetry.html "$asset"; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' "$base$path")
+  test "$code" = 401
+  code=$(curl -s -u collaborator:incorrect -o /dev/null -w '%{http_code}' "$base$path")
+  test "$code" = 401
+  code=$(curl -s -u collaborator:temporary-test-password -o /dev/null -w '%{http_code}' "$base$path")
+  test "$code" = 200
+  printf 'Authentication verified: %s\n' "$path"
+done
+curl -s -u collaborator:temporary-test-password -D "$scratch/headers" -o /dev/null "$base/docs/"
+grep -qi 'cache-control: private, no-store' "$scratch/headers"
+printf 'Private cache headers verified\n'

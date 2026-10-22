@@ -1,0 +1,17 @@
+{
+  "name": "pet-caen-daq-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev --host 127.0.0.1",
+    "build": "vitepress build",
+    "preview": "vite preview --outDir .vitepress/dist --host 127.0.0.1 --strictPort --base /docs/"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4",
+    "vite": "6.4.5"
+  },
+  "overrides": {
+    "vite": "$vite"
+  }
+}

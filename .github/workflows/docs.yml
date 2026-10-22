@@ -1,0 +1,72 @@
+name: Documentation
+
+on:
+  pull_request:
+    paths: ['docs/**', 'deploy/docs/**', '.github/workflows/docs.yml', 'Taskfile.yml', 'scripts/test-docs-auth']
+  push:
+    branches: [main]
+    paths: ['docs/**', 'deploy/docs/**', '.github/workflows/docs.yml', 'Taskfile.yml', 'scripts/test-docs-auth']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+      - uses: go-task/setup-task@v2
+        with:
+          version: 3.48.0
+      - run: task docs:install docs:test:auth
+      - uses: actions/upload-artifact@v4
+        with:
+          name: documentation-site
+          path: docs/.vitepress/dist
+          retention-days: 7
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DOCS_DEPLOY_ENABLED == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: documentation
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: documentation-site
+          path: site
+      - name: Install deployment credentials
+        env:
+          SSH_KEY: ${{ secrets.DOCS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DOCS_SSH_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Publish release
+        env:
+          DOCS_HOST: ${{ secrets.DOCS_SSH_HOST }}
+          DOCS_USER: ${{ secrets.DOCS_SSH_USER }}
+          DOCS_PORT: ${{ secrets.DOCS_SSH_PORT }}
+        run: |
+          release="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          target="${DOCS_USER}@${DOCS_HOST}"
+          ssh -p "$DOCS_PORT" "$target" "mkdir -p /home/petdocs/content/releases/$release"
+          rsync -az -e "ssh -p $DOCS_PORT" site/ "$target:/home/petdocs/content/releases/$release/"
+          ssh -p "$DOCS_PORT" "$target" "cd /home/petdocs/content && ln -s releases/$release site-next && mv -Tf site-next site"
+      - name: Remove deployment credentials
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519

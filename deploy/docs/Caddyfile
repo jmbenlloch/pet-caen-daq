@@ -1,0 +1,19 @@
+{$DOCS_DOMAIN} {
+	basic_auth {
+		import /etc/caddy/users.caddy
+	}
+	header {
+		Cache-Control "private, no-store"
+		X-Robots-Tag "noindex, nofollow"
+		X-Content-Type-Options "nosniff"
+	}
+	redir /docs /docs/ 308
+	handle_path /docs/* {
+		root * /srv/docs/site
+		encode zstd gzip
+		file_server
+	}
+	handle {
+		redir /docs/ 302
+	}
+}
