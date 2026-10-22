@@ -28,3 +28,5 @@ different stages of acquisition. Do not assume their values should be identical.
 See the [complete operator manual](../operator-user-manual.md) for workspace fields,
 run statistics, storage progress, and historical data selection. Temperature and
 voltage measurements are explained in [temperatures and HV](temperatures-and-hv.md).
+
+For historical measurements, see [read configuration and telemetry from saved data](reading-saved-data.md).

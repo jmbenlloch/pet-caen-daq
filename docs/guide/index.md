@@ -10,5 +10,7 @@ check the installed DAQ revision before applying instructions from a newer build
 4. Review [trigger configuration](triggers.md) and [hardware caveats](caveats.md).
 5. Use the [hardware recovery procedures](../hardware-operations.md) if acquisition fails.
 
-For saved data, see the [HDF5 examples](../hdf5-schema-examples.md).
+For saved data, start with [reading configuration and telemetry](reading-saved-data.md),
+including the logbook field mapping and a downloadable Python reader.
+The [HDF5 examples](../hdf5-schema-examples.md) cover the wider schema.
 For scanning, see [source scans](../source-scans.md).
