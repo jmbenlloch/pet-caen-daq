@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createClient } from '@connectrpc/connect'
+import { daqBaseUrl } from './baseUrl'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import {
   SourceScanService,
@@ -20,10 +21,7 @@ const props = defineProps<{
   hdf5Compression: string
 }>()
 const emit = defineEmits<{ active: [boolean] }>()
-const client = createClient(
-  SourceScanService,
-  createConnectTransport({ baseUrl: window.location.origin }),
-)
+const client = createClient(SourceScanService, createConnectTransport({ baseUrl: daqBaseUrl() }))
 const scan = ref<SourceScan>()
 const liveScan = ref<SourceScan>()
 const history = ref<SourceScanHistoryEntry[]>([])
