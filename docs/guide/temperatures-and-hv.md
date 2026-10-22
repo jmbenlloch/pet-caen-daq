@@ -30,4 +30,5 @@ an accepted command does not prove that the requested voltage has been reached.
 
 Read the [full HV procedure](../operator-user-manual.md) and
 [hardware operations](../hardware-operations.md) before changing settings.
-The [voltage-range caveat](caveats.md) concerns a separate configuration concept.
+See [HV bias, channel offset, and Janus](hv-bias-and-offset.md) to distinguish
+board Vmon from the estimated voltage after the individual channel adjustment.

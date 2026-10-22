@@ -22,6 +22,7 @@ export default defineConfig({
         { text: 'Start here', link: '/guide/' },
         { text: 'Reading telemetry', link: '/guide/telemetry' },
         { text: 'Temperatures and HV', link: '/guide/temperatures-and-hv' },
+        { text: 'HV bias and channel offset', link: '/guide/hv-bias-and-offset' },
         { text: 'Trigger configuration', link: '/guide/triggers' },
         { text: 'Hardware caveats', link: '/guide/caveats' },
         { text: 'Complete operator manual', link: '/operator-user-manual' },

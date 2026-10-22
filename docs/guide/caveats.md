@@ -2,20 +2,17 @@
 
 ## The 4.5 V setting and the reported 4.2 V value
 
-**Source-confirmed:** `HV_Adjust_Range` accepts `4.5`, `2.5`, or `DISABLED`.
-It selects the individual channel adjustment DAC range; it is separate from the
-board HV bias setpoint `HV_Vbias` and measured output Vmon. The
-[Citiroc configuration audit](../janus-gui-configuration-audit.md)
-documents the input-DAC reference selection.
+**Source-confirmed:** Janus and this DAQ both use **4.2 V** when estimating
+channel voltage for the range labelled `4.5`. Neither subtracts that offset from
+the board HV supply setpoint. The channel DAC is programmed separately, and Vmon
+reports the supply output rather than the individual channel voltage.
 
-**Unknown:** the relationship between the reported **4.2 V** value and the
-**4.5 V** setting has not been established in the checked-in documentation.
-Do not apply a 0.3 V correction or assume these values are interchangeable.
+See [HV bias, channel offset, and Janus](hv-bias-and-offset.md) for the formula,
+a worked example, register comparison, and source references.
 
-To resolve this entry, retain the board/chip identity, firmware, configuration,
-measurement point and method, and the source or measurement supporting the 4.2 V
-value. State whether it is a measured span, a nominal reference, or another quantity
-before prescribing an operating adjustment.
+**Unknown:** the physical DAC span on our hardware and CAEN's reason for using
+4.2 V in the estimate have not been established. The display formula alone does
+not justify a 0.3 V operating correction.
 
 ## Evidence labels
 
