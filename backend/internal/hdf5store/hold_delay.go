@@ -28,7 +28,7 @@ type holdDelayMissingRow struct {
 	Count      uint32
 }
 
-func WriteHoldDelay(path string, metadata []byte, points []holddelay.Point) (err error) {
+func WriteHoldDelay(path string, metadata []byte, points []holddelay.Point, evidence ...[]byte) (err error) {
 	compression, err := histogramCompressionName()
 	if err != nil {
 		return err
@@ -43,7 +43,11 @@ func WriteHoldDelay(path string, metadata []byte, points []holddelay.Point) (err
 		return err
 	}
 	defer root.Close()
-	if err := writeUintAttribute(root, "schema_version", 1); err != nil {
+	schemaVersion := 1
+	if len(evidence) > 0 {
+		schemaVersion = 2
+	}
+	if err := writeUintAttribute(root, "schema_version", schemaVersion); err != nil {
 		return err
 	}
 	group, err := file.CreateGroup("hold_delay")
@@ -98,6 +102,9 @@ func WriteHoldDelay(path string, metadata []byte, points []holddelay.Point) (err
 		if err != nil {
 			return err
 		}
+	}
+	if err := writeScanEvidence(file, evidence); err != nil {
+		return err
 	}
 	return file.Flush(hdf5.F_SCOPE_GLOBAL)
 }

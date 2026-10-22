@@ -721,6 +721,29 @@ func TestConfigurationOrchestratorReachesReadyWithExplicitHVAuthorization(t *tes
 		updates[len(updates)-1].BoardsCompleted != 4 || updates[len(updates)-1].BoardsTotal != 4 {
 		t.Fatalf("updates=%#v", updates)
 	}
+	for board, plan := range result.Plans {
+		offsets := []dt5202.RegisterWrite{}
+		for _, write := range plan.Writes {
+			if write.Address == dt5202.DCOffset {
+				offsets = append(offsets, write)
+			}
+		}
+		if len(offsets) != 4 {
+			t.Fatalf("board %d DC offset writes = %v", board, offsets)
+		}
+		for index, write := range offsets {
+			if want := uint32(index)<<14 | 2750; write.Value != want {
+				t.Fatalf("board %d DAC %d value %#x, want %#x", board, index, write.Value, want)
+			}
+		}
+		snapshot, err := server.BoardSnapshot(board, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := snapshot.Registers[uint32(dt5202.DCOffset)]; got != uint32(3)<<14|2750 {
+			t.Fatalf("board %d final DAC command %#x", board, got)
+		}
+	}
 	for board := range 4 {
 		var wroteRegisters, readRegisters, configuredCitiroc, configuredHV bool
 		for _, update := range updates {

@@ -16,6 +16,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/janusconfig"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/simulator"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/staircase"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/telemetry"
@@ -104,20 +105,60 @@ func TestRuntimeForcedConfigureRewritesAndRetargetsScans(t *testing.T) {
 		t.Fatalf("second forced apply did not rewrite: threshold = %d, want 321", got)
 	}
 
-	restored, err := runtime.Run(ctx, staircase.Request{Board: uint32(connection.Board), Minimum: 100, Maximum: 110, Step: 10, Dwell: time.Millisecond}, "integration", func(staircase.Point) error { return nil })
+	var records []scanrecord.Record
+	sink := func(r scanrecord.Record) error { records = append(records, r); return nil }
+	restored, err := runtime.RunRecorded(ctx, staircase.Request{Board: uint32(connection.Board), Minimum: 100, Maximum: 110, Step: 10, Dwell: time.Millisecond}, "integration", func(staircase.Point) error { return nil }, sink)
 	if err != nil || !restored {
 		t.Fatalf("staircase restored=%t error=%v", restored, err)
 	}
 	if got := threshold(); got != 321 {
 		t.Fatalf("staircase restored threshold %d, want the applied 321", got)
 	}
-	restored, err = runtime.RunHoldDelay(ctx, holddelay.Request{
+	assertScanEvidence(t, records)
+	records = nil
+	restored, err = runtime.RunHoldDelayRecorded(ctx, holddelay.Request{
 		Board: uint32(connection.Board), MinimumDelayNS: 0, MaximumDelayNS: 8, StepNS: 8, EventsPerDelay: 10, PointTimeout: 5 * time.Second,
-	}, "integration", func(holddelay.Point) error { return nil })
+	}, "integration", func(holddelay.Point) error { return nil }, sink)
 	if err != nil || !restored {
 		t.Fatalf("hold-delay restored=%t error=%v", restored, err)
 	}
 	if got := threshold(); got != 321 {
 		t.Fatalf("hold-delay restored threshold %d, want the applied 321", got)
+	}
+	assertScanEvidence(t, records)
+}
+
+func assertScanEvidence(t *testing.T, records []scanrecord.Record) {
+	t.Helper()
+	configuration, baseline, overrides, restoration, monitor := false, false, false, false, 0
+	for _, r := range records {
+		switch r.Type {
+		case "configuration":
+			configuration = r.Configuration != nil && len(r.Configuration.RequestedAssignments) > 0 && len(r.Configuration.EffectiveConfiguration) > 0 && r.Configuration.Audit != nil && len(r.Configuration.Topology.Boards) > 0 && r.Configuration.Software.Revision != ""
+			found := false
+			for _, a := range r.Configuration.RequestedAssignments {
+				if a.Name == "TD_CoarseThreshold" && a.Index != nil && *a.Index == 0 && a.Value == "321" {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatal("recorded stale configuration instead of newly applied threshold")
+			}
+		case "baseline":
+			baseline = r.BaselinePlan != nil
+		case "overrides":
+			overrides = len(r.Writes) > 0
+		case "monitor":
+			if r.Monitor != nil {
+				monitor++
+			} else {
+				t.Fatalf("simulator monitor failed: %s", r.Error)
+			}
+		case "restoration":
+			restoration = r.Restored != nil && *r.Restored
+		}
+	}
+	if !configuration || !baseline || !overrides || !restoration || monitor != 4 {
+		t.Fatalf("missing evidence: configuration=%t baseline=%t overrides=%t restoration=%t monitors=%d", configuration, baseline, overrides, restoration, monitor)
 	}
 }

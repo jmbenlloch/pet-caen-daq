@@ -12,6 +12,7 @@ import (
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelaystore"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -79,7 +80,15 @@ func (s *ScanService) StartHoldDelayScan(ctx context.Context, request *connect.R
 
 func (s *ScanService) runHoldDelay(ctx context.Context, actor string, request holddelay.Request, writer *holddelaystore.Writer) {
 	s.updateHoldDelay(func(scan *daqv1.HoldDelayScan) { scan.Summary.State = daqv1.ScanState_SCAN_STATE_RUNNING })
-	restored, runErr := s.HoldDelayController.RunHoldDelay(ctx, request, actor, func(point holddelay.Point) error {
+	run := s.HoldDelayController.RunHoldDelay
+	if recorded, ok := s.HoldDelayController.(interface {
+		RunHoldDelayRecorded(context.Context, holddelay.Request, string, func(holddelay.Point) error, scanrecord.Sink) (bool, error)
+	}); ok {
+		run = func(ctx context.Context, request holddelay.Request, actor string, observe func(holddelay.Point) error) (bool, error) {
+			return recorded.RunHoldDelayRecorded(ctx, request, actor, observe, writer.RecordEvidence)
+		}
+	}
+	restored, runErr := run(ctx, request, actor, func(point holddelay.Point) error {
 		if err := writer.Append(point); err != nil {
 			return err
 		}

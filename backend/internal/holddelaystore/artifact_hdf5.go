@@ -8,6 +8,7 @@ import (
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/hdf5store"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/holddelay"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 )
 
 func buildArtifact(dir string, manifest Manifest, points []holddelay.Point) (string, string, error) {
@@ -16,7 +17,11 @@ func buildArtifact(dir string, manifest Manifest, points []holddelay.Point) (str
 	if err != nil {
 		return "", "", err
 	}
-	if err := hdf5store.WriteHoldDelay(path, metadata, points); err != nil {
+	evidence, err := scanrecord.Read(dir)
+	if err != nil {
+		return "", "", err
+	}
+	if err := hdf5store.WriteHoldDelay(path, metadata, points, evidence); err != nil {
 		return "", "", err
 	}
 	return path, "hold-delay-hdf5", nil

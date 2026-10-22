@@ -81,6 +81,11 @@ tasks:
     cmds:
       - go test -tags=integration ./backend/integration/... ./backend/cmd/pet-caen-daq/...
 
+  test:scan-evidence:
+    desc: Verify scan provenance, telemetry, restoration and HDF5 output with the simulator
+    cmds:
+      - go test -race -tags=integration,hdf5 ./backend/internal/scanrecord ./backend/internal/staircase ./backend/internal/holddelay ./backend/internal/acquisition ./backend/internal/staircasestore ./backend/internal/holddelaystore ./backend/internal/hdf5store ./backend/internal/service ./backend/cmd/pet-caen-daq
+
   test:capture:
     desc: Replay the external JANUS data-taking PCAP through production decoders
     cmds:

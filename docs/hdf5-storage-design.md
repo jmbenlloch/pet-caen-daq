@@ -756,3 +756,10 @@ flush latency, and representative analysis query latency.
   raw capture option, and lightweight JSONL development writer.
 - Whether SWMR live reading is required. It should not be enabled until a real
   live-analysis requirement and binding support are demonstrated.
+
+## Diagnostic scan evidence
+
+Staircase and hold-delay scans persist their applied baseline, temporary
+configuration overrides, restoration outcome and temperature/HV telemetry.
+See [Scan configuration and telemetry evidence](scan-evidence.md) for the
+version-2 scan output layout, validity masks and compatibility with older scans.

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5202"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/dt5215"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/scanrecord"
 )
 
 const (
@@ -83,7 +84,11 @@ func EnergyBin(value uint16, range14 bool) uint16 {
 	return bin
 }
 
-func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Request, range14 bool, observe func(Point) error) (err error) {
+func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Request, range14 bool, observe func(Point) error, sinks ...scanrecord.Sink) (err error) {
+	var sink scanrecord.Sink
+	if len(sinks) > 0 {
+		sink = sinks[0]
+	}
 	if hardware == nil || observe == nil {
 		return fmt.Errorf("hardware and point observer are required")
 	}
@@ -93,14 +98,20 @@ func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Req
 	if err := hardware.Synchronize(ctx); err != nil {
 		return fmt.Errorf("synchronize before hold-delay scan: %w", err)
 	}
+	var pointIndex uint32
 	for delay := request.MinimumDelayNS; delay <= request.MaximumDelayNS; delay += request.StepNS {
-		point, pointErr := scanPoint(ctx, hardware, chain, node, request, delay, range14)
+		index := pointIndex
+		if err := scanrecord.Emit(sink, scanrecord.Record{Type: "overrides", Board: request.Board, Chain: chain, Node: node, PointIndex: &index, Phase: "point_intent", Writes: []dt5202.RegisterWrite{{Address: dt5202.HoldDelay, Value: delay / 8}}}); err != nil {
+			return err
+		}
+		point, pointErr := scanPoint(ctx, hardware, chain, node, request, delay, range14, sink)
 		if pointErr != nil {
 			return pointErr
 		}
 		if err := observe(point); err != nil {
 			return err
 		}
+		pointIndex++
 		if request.MaximumDelayNS-delay < request.StepNS {
 			break
 		}
@@ -108,7 +119,11 @@ func Run(ctx context.Context, hardware Hardware, chain, node uint16, request Req
 	return nil
 }
 
-func scanPoint(ctx context.Context, hardware Hardware, chain, node uint16, request Request, delay uint32, range14 bool) (point Point, err error) {
+func scanPoint(ctx context.Context, hardware Hardware, chain, node uint16, request Request, delay uint32, range14 bool, sinks ...scanrecord.Sink) (point Point, err error) {
+	var sink scanrecord.Sink
+	if len(sinks) > 0 {
+		sink = sinks[0]
+	}
 	if err := hardware.ClearStream(ctx); err != nil {
 		return point, fmt.Errorf("delay %d ns clear stream: %w", delay, err)
 	}
@@ -159,7 +174,31 @@ func scanPoint(ctx context.Context, hardware Hardware, chain, node uint16, reque
 			return point, fmt.Errorf("delay %d ns collected %d/%d events: %w", delay, point.EventsCollected, request.EventsPerDelay, readErr)
 		}
 		for _, wire := range events {
-			if wire.Chain != uint8(chain) || wire.Descriptor.Node != uint8(node) || wire.Descriptor.Qualifier == dt5202.QualifierService {
+			if wire.Chain != uint8(chain) || wire.Descriptor.Node != uint8(node) {
+				continue
+			}
+			if wire.Descriptor.Qualifier == dt5202.QualifierService {
+				if sink != nil {
+					index := (delay - request.MinimumDelayNS) / request.StepNS
+					timestamp := wire.Descriptor.Timestamp
+					service, decodeErr := dt5202.DecodeService(timestamp, wire.Payload)
+					record := scanrecord.Record{Type: "service", Board: request.Board, Chain: chain, Node: node, PointIndex: &index, Phase: "during_point", HardwareTimestamp: &timestamp, CRCError: wire.Descriptor.CRCError}
+					if decodeErr != nil {
+						record.RawPayload = append([]byte(nil), wire.Payload...)
+						record.Error = decodeErr.Error()
+					} else {
+						record.Service = &service
+					}
+					if record.CRCError {
+						record.RawPayload = append([]byte(nil), wire.Payload...)
+					}
+					if err := scanrecord.Emit(sink, record); err != nil {
+						return point, err
+					}
+				}
+				continue
+			}
+			if point.EventsCollected >= request.EventsPerDelay {
 				continue
 			}
 			if wire.Descriptor.CRCError {
@@ -183,9 +222,7 @@ func scanPoint(ctx context.Context, hardware Hardware, chain, node uint16, reque
 				}
 			}
 			point.EventsCollected++
-			if point.EventsCollected == request.EventsPerDelay {
-				break
-			}
+
 		}
 	}
 	point.Elapsed = time.Since(started)
