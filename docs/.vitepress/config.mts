@@ -30,6 +30,7 @@ export default defineConfig({
         { text: 'Recovery procedures', link: '/hardware-operations' },
       ] },
       { text: 'Data and engineering', collapsed: true, items: [
+        { text: 'Read saved configuration and telemetry', link: '/guide/reading-saved-data' },
         { text: 'HDF5 schema', link: '/hdf5-schema-examples' },
         { text: 'Run catalog', link: '/run-catalog-operations' },
         { text: 'Architecture', link: '/architecture' },

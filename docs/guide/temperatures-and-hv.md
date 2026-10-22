@@ -32,3 +32,5 @@ Read the [full HV procedure](../operator-user-manual.md) and
 [hardware operations](../hardware-operations.md) before changing settings.
 See [HV bias, channel offset, and Janus](hv-bias-and-offset.md) to distinguish
 board Vmon from the estimated voltage after the individual channel adjustment.
+
+To read the same quantities from run and scan files, see [reading saved configuration and telemetry](reading-saved-data.md).
