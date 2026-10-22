@@ -567,7 +567,7 @@ Parameters are rendered according to their definition:
 - board-scoped numeric values provide per-board overrides;
 - channel-scoped numeric values provide per-channel overrides.
 
-Native number fields also support typing and Arrow Up/Down. A value must meet its minimum, maximum, integer, and step requirements. Active invalid values are summarized above the raw editor and disable **Start run**.
+Native number fields also support typing and Arrow Up/Down. You can clear a field and type a replacement, including decimal voltages such as `45.4` for `HV_Vbias`. Typed values are validated without clamping each keystroke; empty and out-of-range values remain invalid until corrected. A value must meet its minimum, maximum, integer, and step requirements. Active invalid values are summarized above the raw editor and disable **Start run**.
 
 The minus/plus buttons move by one defined increment and clamp at a defined minimum or maximum. Numeric override and mask dialogs can also be closed with **Cancel**, the Escape key, or a click on the backdrop; only their **Apply** button commits the dialog's current values.
 
