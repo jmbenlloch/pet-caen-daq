@@ -383,13 +383,18 @@ const presetCounts = computed(() => globalValue('PresetCounts') ?? '0')
 const stopPolicyError = computed(() => {
   if (stopMode.value === 'PRESET_TIME' && !(Number.parseFloat(presetTime.value) > 0))
     return 'Preset time must be greater than zero.'
-  if (stopMode.value === 'PRESET_COUNTS' && !(Number(presetCounts.value) > 0))
+  if (
+    ['PRESET_COUNTS', 'PRESET_COUNTS_PER_BOARD'].includes(stopMode.value) &&
+    !(Number(presetCounts.value) > 0)
+  )
     return 'Preset event count must be a positive integer.'
   return ''
 })
 const configuredStopPolicy = computed(() => {
   const mode = globalValue('StopRunMode') ?? 'MANUAL'
   if (mode === 'PRESET_TIME') return `Automatic stop after ${globalValue('PresetTime') ?? '0'} s`
+  if (mode === 'PRESET_COUNTS_PER_BOARD')
+    return `Automatic stop after ${globalValue('PresetCounts') ?? '0'} non-service events per card`
   if (mode === 'PRESET_COUNTS')
     return `Automatic stop after ${globalValue('PresetCounts') ?? '0'} events`
   return 'Manual stop'
@@ -849,6 +854,8 @@ function effectiveBoardNumericValues(name: string) {
 function activeStopPolicy() {
   const run = daq.snapshot.value?.currentRun
   if (!run || run.stopMode === 'MANUAL' || !run.stopMode) return 'Manual stop enabled'
+  if (run.stopMode === 'PRESET_COUNTS_PER_BOARD')
+    return `Stops at ${compact(run.presetEventCount)} non-service events per card · manual stop enabled`
   if (run.stopMode === 'PRESET_COUNTS') {
     const remaining =
       run.presetEventCount > run.eventCount ? run.presetEventCount - run.eventCount : 0n
@@ -1091,6 +1098,24 @@ onMounted(() => daq.connect())
                 {{ compact(daq.snapshot.value.currentRun.eventCount) }} events
               </span>
               <small>{{ activeStopPolicy() }}</small>
+              <small
+                v-if="daq.snapshot.value.currentRun.stopMode === 'PRESET_COUNTS_PER_BOARD'"
+                aria-label="Per-card event progress"
+              >
+                <span
+                  v-for="board in daq.snapshot.value.statistics?.boards ?? []"
+                  :key="`${board.chain}:${board.node}`"
+                >
+                  B{{ board.logicalIndex }}: {{ compact(board.triggerCount) }}/{{
+                    compact(daq.snapshot.value.currentRun.presetEventCount)
+                  }}{{
+                    board.triggerCount >= daq.snapshot.value.currentRun.presetEventCount
+                      ? ' complete'
+                      : ' waiting'
+                  }}
+                  ·
+                </span>
+              </small>
             </div>
             <div
               v-else-if="daq.snapshot.value?.state === SystemState.SCANNING"

@@ -47,7 +47,8 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	identity := options.ExecutionIdentity
 	identity.Storage = storageIdentity(runOptions)
 	identity.Runtime = runstore.RuntimeIdentity{
-		PipelineCapacity: options.Capacity, BackpressurePolicy: backpressureName(options.Backpressure),
+		EventLimitPerBoard: runOptions.EventLimitPerBoard,
+		PipelineCapacity:   options.Capacity, BackpressurePolicy: backpressureName(options.Backpressure),
 		CaptureRaw: runOptions.CaptureRaw, JournalTransport: runOptions.JournalTransport,
 		PersistHistograms:   runOptions.PersistHistograms,
 		EnergyHistogramBins: runOptions.Histograms.EnergyBins, ToAHistogramBins: runOptions.Histograms.ToABins,
@@ -62,6 +63,18 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 	}
 	if runOptions.PersistHistograms && !histogramPersistenceSupported() {
 		return nil, fmt.Errorf("histogram persistence requires an HDF5-enabled build")
+	}
+	quotaTargets := make(map[boardKey]struct{})
+	if runOptions.EventLimitPerBoard > 0 {
+		for _, board := range identity.Topology.Boards {
+			if board.Chain >= dt5215.MaxChains || board.Node >= dt5215.MaxNodes {
+				return nil, fmt.Errorf("event quota target outside supported topology: chain %d node %d", board.Chain, board.Node)
+			}
+			quotaTargets[boardKey{chain: uint8(board.Chain), node: uint8(board.Node)}] = struct{}{}
+		}
+		if len(quotaTargets) == 0 {
+			return nil, fmt.Errorf("per-board event limit requires a configured board topology")
+		}
 	}
 	startedAt := options.Now()
 	writer, err := createRunWriter(options.Parent, runstore.Manifest{
@@ -89,7 +102,7 @@ func (f Factory) New(runID string, runOptions acquisition.RunOptions) (acquisiti
 			return nil, err
 		}
 	}
-	sink := &sink{writer: writer, captureRaw: runOptions.CaptureRaw, persistHistograms: runOptions.PersistHistograms, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: startedAt, histogramOptions: runOptions.Histograms, histograms: make(map[histogramKey]*histogramAccumulator)}
+	sink := &sink{eventLimitPerBoard: runOptions.EventLimitPerBoard, quotaTargets: quotaTargets, writer: writer, captureRaw: runOptions.CaptureRaw, persistHistograms: runOptions.PersistHistograms, boards: make(map[boardKey]BoardStats), now: options.Now, startedAt: startedAt, histogramOptions: runOptions.Histograms, histograms: make(map[histogramKey]*histogramAccumulator)}
 	pipeline, err := acquisition.NewPipeline(options.Capacity, options.Backpressure, sink)
 	if err != nil {
 		_ = writer.Abort()
@@ -254,17 +267,19 @@ func (s *Session) recordError(err error) {
 }
 
 type sink struct {
-	writer            runWriter
-	captureRaw        bool
-	persistHistograms bool
-	events            atomic.Uint64
-	rawBatches        atomic.Uint64
-	mu                sync.Mutex
-	boards            map[boardKey]BoardStats
-	now               func() time.Time
-	startedAt         time.Time
-	histogramOptions  acquisition.HistogramOptions
-	histograms        map[histogramKey]*histogramAccumulator
+	eventLimitPerBoard uint64
+	quotaTargets       map[boardKey]struct{}
+	writer             runWriter
+	captureRaw         bool
+	persistHistograms  bool
+	events             atomic.Uint64
+	rawBatches         atomic.Uint64
+	mu                 sync.Mutex
+	boards             map[boardKey]BoardStats
+	now                func() time.Time
+	startedAt          time.Time
+	histogramOptions   acquisition.HistogramOptions
+	histograms         map[histogramKey]*histogramAccumulator
 }
 
 type boardKey struct{ chain, node uint8 }

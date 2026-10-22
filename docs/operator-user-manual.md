@@ -584,7 +584,7 @@ Some fields are conditional:
 - `ExtRunSource` is active for `StartRunMode TDL_EXTRUN`;
 - `GPSTimeUTC` is active for `StartRunMode TDL_GPS`;
 - `PresetTime` is active for `StopRunMode PRESET_TIME`;
-- `PresetCounts` is active for `StopRunMode PRESET_COUNTS`;
+- `PresetCounts` is active for `StopRunMode PRESET_COUNTS` or `PRESET_COUNTS_PER_BOARD`;
 - `ChTrg_Width` is active for `CountingMode PAIRED_AND`;
 - `MajorityLevel` is active for majority trigger modes;
 - test-pulse amplitude, destination, and preamplifier fields are active when the test-pulse source is not `OFF`.
@@ -780,7 +780,12 @@ If the button is disabled, inspect system state, alerts, field errors, stop mode
 
 - `MANUAL` — only operator stop or a failure ends the run;
 - `PRESET_TIME` — automatic stop after `PresetTime`;
-- `PRESET_COUNTS` — automatic stop after `PresetCounts` decoded events.
+- `PRESET_COUNTS` — automatic stop after `PresetCounts` decoded events across all cards (including service records, with possible overshoot during stop/drain);
+- `PRESET_COUNTS_PER_BOARD` — save exactly `PresetCounts` non-service events from each configured card, then stop automatically.
+
+For the per-card mode, select **RunCtrl → StopRunMode → PRESET_COUNTS_PER_BOARD** and enter **PresetCounts**. This is a PET extension to the JANUS configuration vocabulary. Each decoded non-service record counts once; channel hits and counting-mode channel totals do not count separately. Service events are saved until that card reaches its target, but do not advance it. After the target, all further decoded records from that card are omitted, including during shutdown draining. Slower cards keep collecting. The masthead displays saved counts per card.
+
+A silent configured card keeps the run waiting; use **Stop and drain** to finish a partial run. Optional raw capture and transport journals retain the complete incoming stream, including records omitted from decoded output. Histograms and final statistics use the retained events. The manifest records `execution_identity.runtime.event_limit_per_board`, and successful automatic completion uses reason `preset_counts_per_board`. Source scans retain their own point-stop policy and do not apply this limit.
 
 Preset time must be greater than zero. Preset count must be a positive integer.
 
@@ -1464,9 +1469,9 @@ This section documents every JANUS parameter intentionally exposed by the fronte
 | `StartRunMode`       | Global | `ASYNC`, `TDL`, `TDL_EXTRUN`, `TDL_GPS`, `CHAIN_T0`, `CHAIN_T1` | Hardware start coordination mode. Confirm synchronization wiring before using an external mode.                             |
 | `ExtRunSource`       | Global | `SYNC-IN`, `LEMO_RA`, `LEMO_RB`, `LEMO_FA`, `LEMO_FB`           | DT5215 external run-start source; active with `TDL_EXTRUN`.                                                                 |
 | `GPSTimeUTC`         | Global | `YYYY-MM-DD HH:MM:SS`                                           | UTC target used with `TDL_GPS`.                                                                                             |
-| `StopRunMode`        | Global | `MANUAL`, `PRESET_TIME`, `PRESET_COUNTS`                        | Manual or automatic stop policy enforced by the backend.                                                                    |
+| `StopRunMode`        | Global | `MANUAL`, `PRESET_TIME`, `PRESET_COUNTS`, `PRESET_COUNTS_PER_BOARD`                        | Manual or automatic stop policy enforced by the backend.                                                                    |
 | `PresetTime`         | Global | positive when active; `s`, `ms`, `us`, or `ns`                  | Automatic duration for `PRESET_TIME`.                                                                                       |
-| `PresetCounts`       | Global | positive integer when active                                    | Automatic decoded-event target for `PRESET_COUNTS`.                                                                         |
+| `PresetCounts`       | Global | positive integer when active                                    | Total decoded-event target for `PRESET_COUNTS`, or non-service events per card for `PRESET_COUNTS_PER_BOARD`.                                                                         |
 | `RunNumber_AutoIncr` | Global | 0/1                                                             | JANUS compatibility setting retained in the editor. Server run IDs always come from the shared monotonic catalog allocator. |
 
 The frontend also adds the five application output settings described in Section 5.11.

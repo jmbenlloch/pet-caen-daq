@@ -29,7 +29,12 @@ type fakeRunController struct {
 	pipeline acquisition.RunPipeline
 }
 
-type serviceHealthPipeline struct{ events atomic.Uint64 }
+type serviceHealthPipeline struct {
+	events       atomic.Uint64
+	quotaReached atomic.Bool
+}
+
+func (p *serviceHealthPipeline) PerBoardQuotaReached() bool { return p.quotaReached.Load() }
 
 func (*serviceHealthPipeline) Submit(context.Context, acquisition.PipelineBatch) error { return nil }
 func (*serviceHealthPipeline) Close() error                                            { return nil }
@@ -399,5 +404,46 @@ func TestSourcePointUsesSharedConfigurationWithoutPresetMonitor(t *testing.T) {
 				t.Errorf("shared configuration tracking lost: %v", applied)
 			}
 		})
+	}
+}
+
+func TestRunServicePerBoardQuotaWaitsForAllBoards(t *testing.T) {
+	pipeline := &serviceHealthPipeline{}
+	controller := &fakeRunController{state: acquisition.StateReady, pipeline: pipeline}
+	service := newRunService(t, controller)
+	service.HealthInterval = time.Millisecond
+	configuration := validTopology + "StopRunMode PRESET_COUNTS_PER_BOARD\nPresetCounts 3\n"
+	if _, err := service.StartRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: configuration})); err != nil {
+		t.Fatal(err)
+	}
+	if controller.options.EventLimitPerBoard != 3 {
+		t.Fatalf("options = %+v", controller.options)
+	}
+	pipeline.events.Store(100)
+	time.Sleep(20 * time.Millisecond)
+	if service.Telemetry.Snapshot().GetLatestCompletedRun() != nil {
+		t.Fatal("stopped on global count before all cards completed")
+	}
+	pipeline.quotaReached.Store(true)
+	deadline := time.Now().Add(time.Second)
+	for service.Telemetry.Snapshot().GetLatestCompletedRun() == nil && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	completed := service.Telemetry.Snapshot().GetLatestCompletedRun()
+	if completed.GetTerminationReason() != "preset_counts_per_board" || completed.GetPresetEventCount() != 3 {
+		t.Fatalf("completed = %+v", completed)
+	}
+}
+
+func TestSourcePointDoesNotApplyPerBoardQuota(t *testing.T) {
+	controller := &fakeRunController{state: acquisition.StateReady, pipeline: &serviceHealthPipeline{}}
+	s := newRunService(t, controller)
+	response, err := s.startRun(context.Background(), connect.NewRequest(&daqv1.StartRunRequest{RequestedBy: "operator", JanusConfiguration: validTopology + "StopRunMode PRESET_COUNTS_PER_BOARD\nPresetCounts 3\n"}), &runstore.SourcePosition{ScanID: "xy-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.StopRun(context.Background(), connect.NewRequest(&daqv1.StopRunRequest{RequestedBy: "operator", RunId: response.Msg.Run.RunId}))
+	if controller.options.EventLimitPerBoard != 0 || response.Msg.Run.StopMode != "MANUAL" {
+		t.Fatal("source point applied per-board quota")
 	}
 }

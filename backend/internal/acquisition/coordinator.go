@@ -29,6 +29,9 @@ type RunPipeline interface {
 }
 
 type RunOptions struct {
+	// EventLimitPerBoard caps persisted non-service records for each configured board.
+	// Zero disables per-board quotas.
+	EventLimitPerBoard     uint64
 	SourcePosition         *runstore.SourcePosition
 	CaptureRaw             bool
 	JournalTransport       bool

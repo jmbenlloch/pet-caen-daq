@@ -37,7 +37,7 @@ func parsePresetStop(document *janusconfig.Document) (presetStopPolicy, error) {
 		}
 		policy.duration = duration
 		return policy, nil
-	case "PRESET_COUNTS":
+	case "PRESET_COUNTS", "PRESET_COUNTS_PER_BOARD":
 		count, err := strconv.ParseUint(strings.TrimSpace(values["PresetCounts"]), 10, 64)
 		if err != nil || count == 0 {
 			return presetStopPolicy{}, fmt.Errorf("PresetCounts must be a positive integer")
@@ -77,4 +77,11 @@ func pipelineEventCount(pipeline any) uint64 {
 		return source.Stats().EventCount
 	}
 	return 0
+}
+
+func pipelinePerBoardQuotaReached(pipeline any) bool {
+	if source, ok := pipeline.(interface{ PerBoardQuotaReached() bool }); ok {
+		return source.PerBoardQuotaReached()
+	}
+	return false
 }

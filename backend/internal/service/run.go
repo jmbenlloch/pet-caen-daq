@@ -469,6 +469,13 @@ func manifestSummary(parent string, manifest runstore.Manifest) *daqv1.RunSummar
 		EventCount: manifest.EventCount, RawBatchCount: manifest.RawBatchCount,
 		RunType: daqv1.RunType_RUN_TYPE_DATA,
 	}
+	if document, err := janusconfig.Parse(strings.NewReader(manifest.RequestedConfiguration)); err == nil && manifest.SourcePosition == nil {
+		if policy, err := parsePresetStop(document); err == nil {
+			run.StopMode = policy.mode
+			run.PresetEventCount = policy.eventCount
+			run.PresetTimeMilliseconds = uint64(policy.duration.Milliseconds())
+		}
+	}
 	if value, err := time.Parse(time.RFC3339Nano, manifest.StartedAt); err == nil {
 		run.StartedAt = timestamppb.New(value)
 	}
@@ -645,6 +652,9 @@ func (s *RunService) startRun(ctx context.Context, request *connect.Request[daqv
 		HDF5Compression:      compression,
 		Concentrator:         prepared.concentrator,
 	}
+	if stopPolicy.mode == "PRESET_COUNTS_PER_BOARD" {
+		options.EventLimitPerBoard = stopPolicy.eventCount
+	}
 	if err := s.Controller.Start(ctx, runID, message.GetRequestedBy(), options); err != nil {
 		if errors.Is(err, runstore.ErrRunExists) {
 			return nil, serviceError(connect.CodeAlreadyExists, "RUN_DIRECTORY_EXISTS", err)
@@ -662,6 +672,7 @@ func (s *RunService) startRun(ctx context.Context, request *connect.Request[daqv
 	snapshot := s.Telemetry.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = protobufState(s.Controller.StateSnapshot().State)
 		snapshot.CurrentRun = run
+		snapshot.Statistics = nil // Do not display the preceding run as per-card progress.
 		if snapshot.AppliedConfiguration != nil {
 			snapshot.AppliedConfiguration.RunId = runID
 		}
@@ -964,7 +975,11 @@ func (s *RunService) startPresetMonitor(runID string, policy presetStopPolicy) {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					trigger = pipelineEventCount(s.Controller.ActivePipeline()) >= policy.eventCount
+					if policy.mode == "PRESET_COUNTS_PER_BOARD" {
+						trigger = pipelinePerBoardQuotaReached(s.Controller.ActivePipeline())
+					} else {
+						trigger = pipelineEventCount(s.Controller.ActivePipeline()) >= policy.eventCount
+					}
 				}
 			}
 		}
@@ -983,6 +998,8 @@ func (s *RunService) automaticStop(runID, mode string) {
 	reason := "preset_time"
 	if mode == "PRESET_COUNTS" {
 		reason = "preset_counts"
+	} else if mode == "PRESET_COUNTS_PER_BOARD" {
+		reason = "preset_counts_per_board"
 	}
 	_, _ = s.stopActive(context.Background(), runID, "preset-stop", reason)
 }

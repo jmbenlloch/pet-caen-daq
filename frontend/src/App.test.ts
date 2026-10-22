@@ -930,28 +930,56 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
-  it('commits a preset count before the numeric control loses focus', async () => {
-    const api = dashboardApi()
+  it('shows independent per-card progress including a silent card', async () => {
+    const api = dashboardApi(SystemState.RUNNING)
+    vi.mocked(api.snapshot).mockResolvedValue(
+      create(TelemetrySnapshotSchema, {
+        instanceId: 'quota-test',
+        state: SystemState.RUNNING,
+        currentRun: { runId: '42', stopMode: 'PRESET_COUNTS_PER_BOARD', presetEventCount: 3n },
+        statistics: {
+          boards: [
+            { logicalIndex: 0, chain: 0, triggerCount: 3n },
+            { logicalIndex: 1, chain: 1, triggerCount: 1n },
+            { logicalIndex: 2, chain: 2, triggerCount: 0n },
+          ],
+        },
+      }),
+    )
     const wrapper = mount(App, { props: { api } })
     await flushPromises()
-
-    await wrapper
-      .findAll('.section-tabs [role="tab"]')
-      .find((tab) => tab.text() === 'RunCtrl')!
-      .trigger('click')
-    await wrapper.get('select[id^="StopRunMode"]').setValue('PRESET_COUNTS')
-    const presetCounts = wrapper.get('input[id^="PresetCounts"]')
-    const presetCountsInput = presetCounts.element as HTMLInputElement
-    presetCountsInput.value = '3'
-    await presetCounts.trigger('input')
-    await wrapper.get('button.primary').trigger('click')
-    await flushPromises()
-
-    expect(api.validate).toHaveBeenCalledOnce()
-    expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/StopRunMode\s+PRESET_COUNTS/)
-    expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/PresetCounts\s+3/)
+    const progress = wrapper.get('[aria-label="Per-card event progress"]')
+    expect(progress.text()).toContain('B0: 3/3 complete')
+    expect(progress.text()).toContain('B1: 1/3 waiting')
+    expect(progress.text()).toContain('B2: 0/3 waiting')
     wrapper.unmount()
   })
+
+  it.each(['PRESET_COUNTS', 'PRESET_COUNTS_PER_BOARD'])(
+    'commits %s before the numeric control loses focus',
+    async (mode) => {
+      const api = dashboardApi()
+      const wrapper = mount(App, { props: { api } })
+      await flushPromises()
+
+      await wrapper
+        .findAll('.section-tabs [role="tab"]')
+        .find((tab) => tab.text() === 'RunCtrl')!
+        .trigger('click')
+      await wrapper.get('select[id^="StopRunMode"]').setValue(mode)
+      const presetCounts = wrapper.get('input[id^="PresetCounts"]')
+      const presetCountsInput = presetCounts.element as HTMLInputElement
+      presetCountsInput.value = '3'
+      await presetCounts.trigger('input')
+      await wrapper.get('button.primary').trigger('click')
+      await flushPromises()
+
+      expect(api.validate).toHaveBeenCalledOnce()
+      expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(new RegExp(`StopRunMode\\s+${mode}`))
+      expect(vi.mocked(api.validate).mock.calls[0][0]).toMatch(/PresetCounts\s+3/)
+      wrapper.unmount()
+    },
+  )
 
   it('searches run configuration with typed scoped predicates and clears results', async () => {
     const api = dashboardApi(SystemState.READY, false)

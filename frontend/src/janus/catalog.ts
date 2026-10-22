@@ -59,7 +59,7 @@ const dependencies: Record<string, JanusDependency> = {
   ExtRunSource: { parameter: 'StartRunMode', values: ['TDL_EXTRUN'] },
   GPSTimeUTC: { parameter: 'StartRunMode', values: ['TDL_GPS'] },
   PresetTime: { parameter: 'StopRunMode', values: ['PRESET_TIME'] },
-  PresetCounts: { parameter: 'StopRunMode', values: ['PRESET_COUNTS'] },
+  PresetCounts: { parameter: 'StopRunMode', values: ['PRESET_COUNTS', 'PRESET_COUNTS_PER_BOARD'] },
   ChTrg_Width: { parameter: 'CountingMode', values: ['PAIRED_AND'] },
   MajorityLevel: { parameter: 'TriggerLogic', values: ['MAJ64', 'MAJ32_AND2'] },
   TestPulseAmplitude: {
@@ -77,6 +77,10 @@ const dependencies: Record<string, JanusDependency> = {
 }
 
 const descriptions: Record<string, string> = {
+  StopRunMode:
+    'Stop manually, after a duration, after a total event count, or after each card saves its target count',
+  PresetCounts:
+    'Event target. PRESET_COUNTS_PER_BOARD saves exactly this many non-service events per configured card',
   ChTrg_Width:
     'Coincidence window for PAIRED_AND counting mode. 0 disables it; otherwise use 8–2032 ns in 8 ns steps',
 }
@@ -162,6 +166,10 @@ export const excludedJanusParameters = new Set([
 export const janusParameters = parseDefinitions(definitions).filter(
   (parameter) => !excludedJanusParameters.has(parameter.name),
 )
+// PET extension; preserve the bundled JANUS reference definitions.
+janusParameters
+  .find((parameter) => parameter.name === 'StopRunMode')
+  ?.options.push('PRESET_COUNTS_PER_BOARD')
 export const janusParameterCatalog = new Map(
   janusParameters.map((parameter) => [parameter.name, parameter]),
 )

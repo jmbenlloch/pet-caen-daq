@@ -163,7 +163,7 @@ func auditSoftwareSetting(setting *Setting, doc *janusconfig.Document) {
 				inactive("event building is disabled")
 			}
 		case "PresetCounts":
-			if value(doc, "StopRunMode") != "PRESET_COUNTS" {
+			if mode := value(doc, "StopRunMode"); mode != "PRESET_COUNTS" && mode != "PRESET_COUNTS_PER_BOARD" {
 				inactive("stop mode does not use preset counts")
 			}
 		case "PresetTime":
