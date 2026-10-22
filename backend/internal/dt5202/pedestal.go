@@ -86,3 +86,25 @@ func correctedEnergy(raw, common, calibrated uint16) uint16 {
 	}
 	return uint16(value)
 }
+
+// WithAnalogDCOffsets adds the source-confirmed FERSlib analog MuxOut offset
+// initialization to the persisted plan. The four DACs are LG0, HG0, LG1, HG1.
+// These are hardware offsets, independent of host-side pedestal subtraction.
+func (p ConfigurationPlan) WithAnalogDCOffsets(offsets [4]uint16) (ConfigurationPlan, error) {
+	for index, value := range offsets {
+		if value == 0 || value >= 4095 {
+			return ConfigurationPlan{}, fmt.Errorf("DC offset %d value %d outside 1..4094", index, value)
+		}
+	}
+	writes := make([]RegisterWrite, 0, len(p.Writes)+len(offsets))
+	for _, write := range p.Writes {
+		if write.Address != DCOffset {
+			writes = append(writes, write)
+		}
+	}
+	for index, value := range offsets {
+		writes = append(writes, RegisterWrite{DCOffset, uint32(index)<<14 | uint32(value)})
+	}
+	p.Writes = writes
+	return p, nil
+}

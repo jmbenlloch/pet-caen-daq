@@ -52,6 +52,10 @@ func encodeTimeReferenceDelay(ns float64) (uint32, error) {
 func (p ConfigurationPlan) ValidateReadback(actual map[Register]uint32) error {
 	expected := make(map[Register]uint32, len(p.Writes))
 	for _, write := range p.Writes {
+		// DCOffset is a DAC command port; no analog DAC readback is defined.
+		if write.Address == DCOffset {
+			continue
+		}
 		expected[write.Address] = write.Value
 	}
 	for address, want := range expected {

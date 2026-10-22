@@ -346,3 +346,21 @@ These are the next study steps, before architecture selection:
 No disassembly-based binary reverse engineering is necessary to begin because the relevant FERSlib source is available. The first milestone will implement a native Go transport/parser against the deterministic simulator and source-derived golden vectors. Real packet captures and hardware tests will then validate and correct the implementation before production use.
 
 The included FERSlib carries LGPL notices while JANUS carries GPL/LGPL files; exact obligations depend on how the eventual product links, modifies, and distributes these components. Treat licensing as a design input and obtain appropriate legal review rather than assuming the source can simply be copied into a proprietary product.
+
+## Analog DC-offset initialization
+
+Source-confirmed: bundled FERSlib `FERSlib.c`, board-open calibration loading,
+programs four analog MuxOut offset DACs through `a_dc_offset` (`0x01000220`).
+The order is LG0, HG0, LG1, HG1; commands are `(index << 14) | value`, with
+1 ms settling after each write. These hardware offsets are distinct from
+software pedestal subtraction. Production configuration now adds the four
+validated flash values to the ordered, persisted FPGA-write plan. They are
+reapplied after hard reset, on ordinary configuration, and during scan restore,
+even when the flash evidence is cached for the connection.
+
+The register is a DAC command port: ordinary register readback cannot verify
+the four analog outputs. It is excluded from register-value comparison; write
+failures and cancellation still fail configuration. Flash loading remains
+read-only. Invalid flash offsets are rejected rather than silently substituted.
+Hardware acceptance requires nonsaturated pedestal/test-pulse measurements;
+source agreement and simulator tests alone do not establish analog behavior.

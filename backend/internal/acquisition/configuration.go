@@ -144,6 +144,10 @@ func (c *Configurator) Configure(ctx context.Context, document *janusconfig.Docu
 		if err != nil {
 			return ConfigurationResult{}, c.fail(target, fmt.Errorf("complete pedestal plan board %d: %w", target.Board, err), options.Actor)
 		}
+		plan, err = plan.WithAnalogDCOffsets(calibration.DCOffsets)
+		if err != nil {
+			return ConfigurationResult{}, c.fail(target, fmt.Errorf("complete analog DC-offset plan board %d: %w", target.Board, err), options.Actor)
+		}
 		if err = dt5202.ApplyConfigurationWithProgress(ctx, c.hardware, target.Chain, target.Node, plan, options.Hard, func(progress dt5202.ConfigurationApplyProgress) {
 			if progress.Completed != 0 && progress.Completed != progress.Total && progress.Completed%50 != 0 {
 				return
