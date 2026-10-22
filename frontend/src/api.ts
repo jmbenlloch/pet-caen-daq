@@ -1,3 +1,4 @@
+import { daqBaseUrl } from './baseUrl'
 import { createClient } from '@connectrpc/connect'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import {
@@ -81,7 +82,7 @@ export interface ScanHistoryPage {
   totalCount: number
 }
 
-export function createDaqApi(baseUrl = window.location.origin): DaqApi {
+export function createDaqApi(baseUrl = daqBaseUrl()): DaqApi {
   const transport = createConnectTransport({ baseUrl })
   const system = createClient(SystemService, transport)
   const runs = createClient(RunService, transport)

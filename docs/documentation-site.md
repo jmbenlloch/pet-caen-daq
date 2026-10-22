@@ -146,3 +146,29 @@ This site initially publishes one current documentation build. Match it to the
 installed software using the source revision shown in the build workflow. Git
 retains documentation history. A public version selector and concurrent release
 manuals are not implemented yet.
+
+## Hosting the DAQ beside the public manual
+
+The DAQ frontend can be served under `/daq/`.
+Its build uses relative asset URLs and resolves all ConnectRPC clients, including
+source scans and telemetry streams, against the directory containing the UI.
+The same build still works at `/` for direct local access. The ingress must
+redirect `/daq` to `/daq/` so the browser resolves those relative URLs correctly.
+
+Authentication belongs to the existing Caddy ingress proxy; the
+Go service and frontend do not implement a login. Configure Basic Authentication
+for the entire `/daq/*` handler before forwarding requests, strip `/daq` from
+the upstream path, and proxy to the private backend service. This must
+cover HTML, assets, every RPC, streamed telemetry and artifact downloads. Keep
+`/docs/*` public and do not forward domain-root RPC paths to the backend.
+
+Keep the backend listener restricted to authorized private clients and the proxy;
+proxy authentication does not protect direct access to the backend. Store web
+credentials only on the proxy and use HTTPS for browser access. Before rollout,
+verify unauthenticated and incorrect-credential requests to both the UI and RPC
+paths receive 401, authenticated assets and read-only telemetry work, `/docs/`
+remains public, and direct public backend access is blocked. Do not exercise
+acquisition or HV controls just to validate the proxy.
+
+This repository change does not update the live proxy, firewall or backend
+service, and does not establish proxy-to-backend connectivity.

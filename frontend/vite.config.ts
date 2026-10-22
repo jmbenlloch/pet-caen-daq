@@ -3,6 +3,8 @@ import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  // One build can be served at / or behind a prefix-stripping proxy at /daq/.
+  base: './',
   plugins: [vue(), tailwindcss()],
   server: {
     fs: {
