@@ -25,7 +25,7 @@ loopback host option.
 
 The build checks internal page links and writes `docs/.vitepress/dist`. Preview
 listens on `http://localhost:4173/docs/`. Development and preview bind to loopback and
-have no authentication; use the protected server for collaborator access.
+have no authentication. The production manual is currently public as described below.
 
 ## Authentication regression check
 
@@ -40,10 +40,19 @@ The documentation CI job runs this check.
 The production URL is **https://pet.next-experiment.org/docs/**.
 Cloudflare DNS has a DNS-only A record to the IFIC server `147.156.49.194`.
 The existing Caddy service on `next.ific.uv.es` owns HTTPS and imports
-`/etc/caddy/pet.caddy` (the template is `deploy/docs/pet.caddy`). It imports the dedicated
-`/etc/caddy/pet-auth.caddy` authentication snippet. The PET web login is stored in
-Infisical at `prod:/services/pet-caen/docs` (`USERNAME`, `PASSWORD`, `URL`),
-separate from the deployment key. The initial username is `petdocs`.
+`/etc/caddy/pet.caddy` (the template is `deploy/docs/pet.caddy`).
+
+**Current access policy:** authentication was temporarily disabled at the operator's
+request on 2026-10-22. The manual, pages, and search assets are publicly readable.
+NEXT100 docs retain their separate authentication. The indexing and cache headers
+remain configured; they do not restrict access.
+
+The dedicated `/etc/caddy/pet-auth.caddy` snippet is retained but is not imported.
+Its web login remains stored in Infisical at `prod:/services/pet-caen/docs`
+(`USERNAME`, `PASSWORD`, `URL`), separate from the SSH deployment key. The username
+is `petdocs`. To restore the password requirement, add
+`import /etc/caddy/pet-auth.caddy` inside the PET site block, validate the shared
+configuration, reload Caddy, and verify unauthenticated pages and assets return 401.
 
 The dedicated `petdocs` Linux account deploys over SSH port `2222`, has no sudo
 or Docker access, and owns `/home/petdocs/content`. Caddy mounts this directory
