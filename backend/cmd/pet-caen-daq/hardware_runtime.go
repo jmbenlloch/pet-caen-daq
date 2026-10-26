@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,6 +60,10 @@ type hardwareRuntime struct {
 const topologyOperationTimeout = 10 * time.Minute
 
 func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
+	return r.DiscoverAt(ctx, actor, "")
+}
+
+func (r *hardwareRuntime) DiscoverAt(ctx context.Context, actor, ip string) error {
 	r.opMu.Lock()
 	defer r.opMu.Unlock()
 	r.mu.RLock()
@@ -66,12 +72,16 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	if connected {
 		return fmt.Errorf("disconnect hardware before discovering cards")
 	}
+	control, stream, err := concentratorAddresses(ip, r.controlAddress, r.streamAddress)
+	if err != nil {
+		return err
+	}
 	r.publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = daqv1.SystemState_SYSTEM_STATE_CONNECTING
 	})
 	discoveryCtx, cancel := context.WithTimeout(ctx, topologyOperationTimeout)
 	defer cancel()
-	client, err := dt5215.Dial(discoveryCtx, r.controlAddress, r.streamAddress)
+	client, err := dt5215.Dial(discoveryCtx, control, stream)
 	if err != nil {
 		r.publishConnectFailure(err)
 		return err
@@ -96,7 +106,7 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 	cancelFirmware()
 	printDiscoveredDevices(r.output, topology)
 	snapshot := topologySnapshot(topology, nil)
-	snapshot.Concentrator.ConnectionUriPrefix = connectionURIPrefix(r.controlAddress)
+	snapshot.Concentrator.ConnectionUriPrefix = connectionURIPrefix(control)
 	snapshot.State = daqv1.SystemState_SYSTEM_STATE_DISCONNECTED
 	snapshot.DiscoveryProgress = discoveryProgress
 	snapshot.Diagnostics = append(snapshot.Diagnostics, &daqv1.Diagnostic{
@@ -109,6 +119,10 @@ func (r *hardwareRuntime) Discover(ctx context.Context, actor string) error {
 }
 
 func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration string) error {
+	return r.ConnectAt(ctx, actor, configuration, "")
+}
+
+func (r *hardwareRuntime) ConnectAt(ctx context.Context, actor, configuration, ip string) error {
 	r.opMu.Lock()
 	defer r.opMu.Unlock()
 	r.mu.RLock()
@@ -134,13 +148,17 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration stri
 		}
 		r.document, r.connections = document, connections
 	}
+	control, stream, err := concentratorAddresses(ip, r.controlAddress, r.streamAddress)
+	if err != nil {
+		return err
+	}
 	r.publisher.Update(func(snapshot *daqv1.TelemetrySnapshot) {
 		snapshot.State = daqv1.SystemState_SYSTEM_STATE_CONNECTING
 		snapshot.DiscoveryProgress = nil
 	})
 	connectCtx, cancel := context.WithTimeout(ctx, topologyOperationTimeout)
 	defer cancel()
-	client, err := dt5215.Dial(connectCtx, r.controlAddress, r.streamAddress)
+	client, err := dt5215.Dial(connectCtx, control, stream)
 	if err != nil {
 		r.publishConnectFailure(err)
 		return err
@@ -164,7 +182,7 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration stri
 	states, _ := acquisition.NewStateMachine(acquisition.StateIdle, nil)
 	factory := runpipeline.Factory{Options: runpipeline.Options{
 		Parent: r.runParent, Capacity: r.capacity, Backpressure: acquisition.BackpressureBlock,
-		ExecutionIdentity: executionIdentity(topology, r.connections, r.controlAddress, r.streamAddress),
+		ExecutionIdentity: executionIdentity(topology, r.connections, control, stream),
 	}}
 	activeChains := configuredChains(r.connections)
 	readoutTargets := make([]acquisition.ReadoutTarget, 0, len(r.connections))
@@ -186,7 +204,7 @@ func (r *hardwareRuntime) Connect(ctx context.Context, actor, configuration stri
 	}
 	recoveryResult, recoveryErr := acquisition.RecoverStartupChains(ctx, states, client, recoveryBoards, activeChains, r.drainTimeout, actor)
 	connectedSnapshot := topologySnapshot(topology, r.connections)
-	connectedSnapshot.Concentrator.ConnectionUriPrefix = connectionURIPrefix(r.controlAddress)
+	connectedSnapshot.Concentrator.ConnectionUriPrefix = connectionURIPrefix(control)
 	r.publisher.Publish(connectedSnapshot)
 	service.PublishStartupRecovery(r.publisher, recoveryResult, recoveryErr, time.Now())
 	if recoveryErr != nil {
@@ -617,4 +635,17 @@ func (r *hardwareRuntime) HardwareMetadata() ([]configaudit.BoardEvidence, *dt52
 	}
 	concentrator := r.topology.Concentrator
 	return boards, &concentrator
+}
+
+// Empty selection preserves the deployment's original addresses and ports.
+func concentratorAddresses(ip, control, stream string) (string, string, error) {
+	ip = strings.TrimSpace(ip)
+	if ip == "" {
+		return control, stream, nil
+	}
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return "", "", fmt.Errorf("enter a valid concentrator IPv4 or IPv6 address")
+	}
+	return net.JoinHostPort(parsed.String(), "9760"), net.JoinHostPort(parsed.String(), "9000"), nil
 }

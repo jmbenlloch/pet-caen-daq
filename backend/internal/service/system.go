@@ -43,7 +43,17 @@ func (s *SystemService) ConnectHardware(ctx context.Context, request *connect.Re
 	if actor == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requested_by is required"))
 	}
-	if err := s.Hardware.Connect(ctx, actor, request.Msg.GetJanusConfiguration()); err != nil {
+	var err error
+	if target, ok := s.Hardware.(interface {
+		ConnectAt(context.Context, string, string, string) error
+	}); ok {
+		err = target.ConnectAt(ctx, actor, request.Msg.GetJanusConfiguration(), request.Msg.GetConcentratorIp())
+	} else if request.Msg.GetConcentratorIp() != "" {
+		err = fmt.Errorf("concentrator address selection is unavailable")
+	} else {
+		err = s.Hardware.Connect(ctx, actor, request.Msg.GetJanusConfiguration())
+	}
+	if err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 	}
 	return connect.NewResponse(&daqv1.ConnectHardwareResponse{Snapshot: s.Source.Snapshot()}), nil
@@ -71,7 +81,17 @@ func (s *SystemService) DiscoverHardware(ctx context.Context, request *connect.R
 	if actor == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("requested_by is required"))
 	}
-	if err := s.Discovery.Discover(ctx, actor); err != nil {
+	var err error
+	if target, ok := s.Discovery.(interface {
+		DiscoverAt(context.Context, string, string) error
+	}); ok {
+		err = target.DiscoverAt(ctx, actor, request.Msg.GetConcentratorIp())
+	} else if request.Msg.GetConcentratorIp() != "" {
+		err = fmt.Errorf("concentrator address selection is unavailable")
+	} else {
+		err = s.Discovery.Discover(ctx, actor)
+	}
+	if err != nil {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
 	}
 	return connect.NewResponse(&daqv1.DiscoverHardwareResponse{Snapshot: s.Source.Snapshot()}), nil

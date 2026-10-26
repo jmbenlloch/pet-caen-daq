@@ -473,22 +473,35 @@ const hardwareActionLabel = computed(() => {
   return hardwareDisconnected.value ? 'Connect hardware' : 'Disconnect hardware'
 })
 const hardwareActionDisabled = computed(() => {
-  if (hardwareConnecting.value) return true
+  if (hardwareConnecting.value || (concentratorPreset.value === 'custom' && !concentratorIp.value))
+    return true
   return hardwareDisconnected.value
     ? !daq.canConnectHardware.value
     : !daq.canDisconnectHardware.value
 })
 
+const concentratorPreset = ref(localStorage.getItem('concentratorPreset') || '')
+const customConcentratorIp = ref(localStorage.getItem('customConcentratorIp') || '')
+const concentratorIp = computed(() =>
+  concentratorPreset.value === 'custom'
+    ? customConcentratorIp.value.trim()
+    : concentratorPreset.value,
+)
+watch([concentratorPreset, customConcentratorIp], () => {
+  localStorage.setItem('concentratorPreset', concentratorPreset.value)
+  localStorage.setItem('customConcentratorIp', customConcentratorIp.value)
+})
+
 function toggleHardwareConnection() {
   if (hardwareDisconnected.value) {
-    void daq.connectHardware(configuration.value)
+    void daq.connectHardware(configuration.value, concentratorIp.value)
   } else {
     void daq.disconnectHardware()
   }
 }
 
 async function discoverHardware() {
-  await daq.discoverHardware()
+  await daq.discoverHardware(concentratorIp.value)
   if (discoveredConnections.value.length) discoveredDevicesOpen.value = true
 }
 const enabledLinkCount = computed(
@@ -1030,7 +1043,10 @@ onMounted(() => daq.connect())
                 v-if="backendOnline"
                 type="button"
                 class="connection-action rescan-links-action"
-                :disabled="!daq.canDiscoverHardware.value"
+                :disabled="
+                  !daq.canDiscoverHardware.value ||
+                  (concentratorPreset === 'custom' && !concentratorIp)
+                "
                 :title="
                   hardwareDisconnected
                     ? 'Reset, enumerate, and synchronize enabled TDlinks without applying card configuration'
@@ -1040,8 +1056,59 @@ onMounted(() => daq.connect())
               >
                 {{ discoveryActive ? 'Rescanning links…' : 'Rescan links' }}
               </button>
+              <details
+                class="connection-settings-menu"
+                @keydown.esc="($event.currentTarget as HTMLDetailsElement).removeAttribute('open')"
+              >
+                <summary
+                  class="connection-action"
+                  aria-label="Connection settings"
+                  title="Connection settings"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="m9 3-.6 2.3-2 .9-2.1-.7-2 3.5 1.6 1.7v2.6L2.3 15l2 3.5 2.2-.7 1.9 1L9 21h4l.6-2.3 2-.9 2.1.7 2-3.5-1.6-1.7v-2.6L19.7 9l-2-3.5-2.2.7-1.9-1L13 3Z"
+                    />
+                    <circle cx="11" cy="12" r="3" />
+                  </svg>
+                </summary>
+                <fieldset
+                  class="connection-settings"
+                  :disabled="!hardwareDisconnected || hardwareConnecting || daq.busy.value"
+                >
+                  <h3>Concentrator connection</h3>
+                  <label for="concentrator-address">Address</label>
+                  <select id="concentrator-address" v-model="concentratorPreset">
+                    <option value="">Server default (configured at startup)</option>
+                    <option value="172.16.0.11">USB — 172.16.0.11</option>
+                    <option value="custom">Custom IP address</option>
+                  </select>
+                  <label v-if="concentratorPreset === 'custom'" for="custom-concentrator-ip"
+                    >IP address</label
+                  >
+                  <input
+                    v-if="concentratorPreset === 'custom'"
+                    id="custom-concentrator-ip"
+                    v-model="customConcentratorIp"
+                    placeholder="192.168.50.125"
+                  />
+                  <p>
+                    Disconnect before changing the address. Connect and Rescan use this selection.
+                    TCP ports: 9760 / 9000.
+                  </p>
+                </fieldset>
+              </details>
             </div>
           </div>
+
           <div class="run-control">
             <div class="actions hero-actions">
               <button

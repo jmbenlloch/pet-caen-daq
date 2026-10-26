@@ -1170,8 +1170,10 @@ type ConnectHardwareRequest struct {
 	// Configuration whose Open entries define the topology for this session.
 	// Empty retains the backend startup configuration for compatibility.
 	JanusConfiguration string `protobuf:"bytes,2,opt,name=janus_configuration,json=janusConfiguration,proto3" json:"janus_configuration,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Empty uses the server startup addresses. Otherwise a literal IPv4 or IPv6 address.
+	ConcentratorIp string `protobuf:"bytes,3,opt,name=concentrator_ip,json=concentratorIp,proto3" json:"concentrator_ip,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ConnectHardwareRequest) Reset() {
@@ -1214,6 +1216,13 @@ func (x *ConnectHardwareRequest) GetRequestedBy() string {
 func (x *ConnectHardwareRequest) GetJanusConfiguration() string {
 	if x != nil {
 		return x.JanusConfiguration
+	}
+	return ""
+}
+
+func (x *ConnectHardwareRequest) GetConcentratorIp() string {
+	if x != nil {
+		return x.ConcentratorIp
 	}
 	return ""
 }
@@ -1351,10 +1360,11 @@ func (x *DisconnectHardwareResponse) GetSnapshot() *TelemetrySnapshot {
 }
 
 type DiscoverHardwareRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestedBy   string                 `protobuf:"bytes,1,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RequestedBy    string                 `protobuf:"bytes,1,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	ConcentratorIp string                 `protobuf:"bytes,2,opt,name=concentrator_ip,json=concentratorIp,proto3" json:"concentrator_ip,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *DiscoverHardwareRequest) Reset() {
@@ -1390,6 +1400,13 @@ func (*DiscoverHardwareRequest) Descriptor() ([]byte, []int) {
 func (x *DiscoverHardwareRequest) GetRequestedBy() string {
 	if x != nil {
 		return x.RequestedBy
+	}
+	return ""
+}
+
+func (x *DiscoverHardwareRequest) GetConcentratorIp() string {
+	if x != nil {
+		return x.ConcentratorIp
 	}
 	return ""
 }
@@ -6149,18 +6166,20 @@ const file_pet_caen_daq_v1_system_proto_rawDesc = "" +
 	"\amessage\x18\x04 \x01(\tR\amessage\"\x18\n" +
 	"\x16StreamTelemetryRequest\"Y\n" +
 	"\x17StreamTelemetryResponse\x12>\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"l\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"\x95\x01\n" +
 	"\x16ConnectHardwareRequest\x12!\n" +
 	"\frequested_by\x18\x01 \x01(\tR\vrequestedBy\x12/\n" +
-	"\x13janus_configuration\x18\x02 \x01(\tR\x12janusConfiguration\"Y\n" +
+	"\x13janus_configuration\x18\x02 \x01(\tR\x12janusConfiguration\x12'\n" +
+	"\x0fconcentrator_ip\x18\x03 \x01(\tR\x0econcentratorIp\"Y\n" +
 	"\x17ConnectHardwareResponse\x12>\n" +
 	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\">\n" +
 	"\x19DisconnectHardwareRequest\x12!\n" +
 	"\frequested_by\x18\x01 \x01(\tR\vrequestedBy\"\\\n" +
 	"\x1aDisconnectHardwareResponse\x12>\n" +
-	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"<\n" +
+	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"e\n" +
 	"\x17DiscoverHardwareRequest\x12!\n" +
-	"\frequested_by\x18\x01 \x01(\tR\vrequestedBy\"Z\n" +
+	"\frequested_by\x18\x01 \x01(\tR\vrequestedBy\x12'\n" +
+	"\x0fconcentrator_ip\x18\x02 \x01(\tR\x0econcentratorIp\"Z\n" +
 	"\x18DiscoverHardwareResponse\x12>\n" +
 	"\bsnapshot\x18\x01 \x01(\v2\".pet.caen.daq.v1.TelemetrySnapshotR\bsnapshot\"l\n" +
 	"\x15SetHighVoltageRequest\x12\x16\n" +
