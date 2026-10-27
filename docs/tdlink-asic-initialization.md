@@ -33,3 +33,35 @@ Run `task test:initialization` for sequence, every-step failure, invalid readbac
 cancellation and simulator integration checks. Run `task build:backend:hdf5` in
 the pinned build container for a backend-only artifact. Preserve the previous
 deployment and retain failed and successful hardware evidence separately.
+
+## Hardware evidence, 2026-10-27
+
+The implementation was based on deployed source `8990817` (backend `6514fc9`)
+and deployed as commit `e2072b2`, with the running frontend preserved. Tests
+included the failing-before regression, every-I/O failure injection, full backend
+race tests, simulator/API integration and the HDF5 production build.
+
+Before the update, five complete Go-only runs after a physical power cycle
+(75, 76, 77, 79, 80) had channels 0–31 on PID 64884 identically zero in both
+gains. PID 64887 was healthy. Normal old-version reconnect/configuration had
+not recovered the dead block. The updated Go connection initialized the same
+cards on concentrator 172.16.0.11 without JANUS or another physical power cycle.
+Run 81 immediately recovered all 64 channels on both cards, with 10,000 events
+per card, no zero ADC samples, no constant channels and no descriptor CRC errors.
+An independent raw decoder matched all 20,000 stored events exactly and verified
+12,877 raw batch checksums. The recovery is present in raw data, not introduced
+by event decoding or storage.
+
+Five consecutive runs **81–85** passed with 50,000 events per card (100,000
+total), all 64 channels varying in both gains, zero zero-valued ADC samples and
+zero descriptor CRC errors. Final state was READY with both HV outputs off.
+
+The evidence establishes recovery using the combined initialization change;
+it does not distinguish the individual effects of reset delay, load delay,
+second load and readback. A physical power cycle after deployment remains
+untested. Invalid concentrator responses and the earlier malformed-event
+incident remain separate robustness issues.
+
+Detailed source/capture comparisons, test logs, deployment provenance, channel
+statistics and retained data are under the sibling evidence directory
+`../asic-init-validation-20261027/` (relative to the repository root).
