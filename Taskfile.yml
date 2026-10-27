@@ -356,3 +356,15 @@ tasks:
       - h5dump .cache/hdf5-smoke/blosc-round-trip.h5 >/dev/null
       - rm .cache/hdf5-smoke/blosc-round-trip.h5
       - go test -tags hdf5 ./backend/internal/hdf5store ./backend/internal/runpipeline ./test/hdf5 -v
+
+  test:initialization:
+    desc: Test the captured TDlink ASIC initialization sequence and failure paths
+    cmds:
+      - go test -race ./backend/internal/dt5202 ./backend/internal/dt5215
+      - go test -tags=integration ./backend/integration/... ./backend/cmd/pet-caen-daq/...
+
+  build:backend:hdf5:
+    desc: Build only the HDF5 server for a backend-only production update
+    cmds:
+      - mkdir -p bin
+      - go build -tags hdf5 -o bin/pet-caen-daq ./backend/cmd/pet-caen-daq

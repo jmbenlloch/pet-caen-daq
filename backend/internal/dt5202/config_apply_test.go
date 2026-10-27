@@ -46,7 +46,7 @@ func TestApplyConfigurationWritesLoadsAndValidates(t *testing.T) {
 	if err := ApplyConfiguration(context.Background(), hardware, 3, 0, plan, true); err != nil {
 		t.Fatal(err)
 	}
-	want := []uint32{uint32(CommandGlobalReset), uint32(CommandConfigureASIC), uint32(CommandConfigureASIC)}
+	want := []uint32{uint32(CommandGlobalReset), uint32(CommandConfigureASIC), uint32(CommandConfigureASIC), uint32(CommandConfigureASIC), uint32(CommandConfigureASIC)}
 	if len(hardware.commands) != len(want) {
 		t.Fatalf("commands = %#v", hardware.commands)
 	}

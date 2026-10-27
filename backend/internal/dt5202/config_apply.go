@@ -39,7 +39,7 @@ func ApplyConfigurationWithProgress(ctx context.Context, hardware ConfigurationH
 		}
 	}
 	if hard {
-		if err := hardware.SendCommand(ctx, chain, node, uint32(CommandGlobalReset), 0); err != nil {
+		if err := hardware.SendCommand(ctx, chain, node, uint32(CommandGlobalReset), TDLConfigurationCommandDelay); err != nil {
 			return fmt.Errorf("board %d chain %d node %d reset: %w", plan.Board, chain, node, err)
 		}
 	}
@@ -61,7 +61,7 @@ func ApplyConfigurationWithProgress(ctx context.Context, hardware ConfigurationH
 		publish(ConfigurationApplyWriting, index+1, len(plan.Writes))
 	}
 	publish(ConfigurationApplyCitiroc, 0, 2)
-	if err := ConfigureCitirocAutomatic(ctx, hardware, chain, node); err != nil {
+	if err := ConfigureCitirocAutomaticReadback(ctx, hardware, chain, node); err != nil {
 		return fmt.Errorf("board %d chain %d node %d: %w", plan.Board, chain, node, err)
 	}
 	seen := make(map[Register]bool, len(plan.Writes))
