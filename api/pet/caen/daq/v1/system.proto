@@ -104,6 +104,8 @@ message ConnectHardwareRequest {
   // Configuration whose Open entries define the topology for this session.
   // Empty retains the backend startup configuration for compatibility.
   string janus_configuration = 2;
+  // Empty uses the server startup addresses. Otherwise a literal IPv4 or IPv6 address.
+  string concentrator_ip = 3;
 }
 
 message ConnectHardwareResponse {
@@ -120,6 +122,7 @@ message DisconnectHardwareResponse {
 
 message DiscoverHardwareRequest {
   string requested_by = 1;
+  string concentrator_ip = 2;
 }
 
 message DiscoverHardwareResponse {

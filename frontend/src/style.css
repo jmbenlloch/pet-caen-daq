@@ -3436,3 +3436,77 @@ textarea {
   grid-column: 1 / -1;
   margin: 0;
 }
+
+.connection-settings-menu {
+  position: relative;
+  margin-left: 0.25rem;
+}
+.connection-settings-menu summary {
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+.connection-settings-menu summary::-webkit-details-marker {
+  display: none;
+}
+.connection-settings {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  width: min(22rem, 85vw);
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid #3d536d;
+  border-radius: 0.75rem;
+  background: #14243a;
+  color: #e7edf7;
+  box-shadow: 0 12px 32px #0005;
+  font-weight: 400;
+}
+.connection-settings h3 {
+  margin: 0 0 0.75rem;
+  font-weight: 700;
+}
+.connection-settings label {
+  display: block;
+}
+.connection-settings select,
+.connection-settings input {
+  width: 100%;
+  margin: 0.4rem 0 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid #536881;
+  border-radius: 0.4rem;
+  color: inherit;
+  background: #09111f;
+}
+.connection-settings p {
+  margin: 0;
+  color: #9cafc5;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+[data-theme='light'] .connection-settings {
+  color: #233b55;
+  background: #f8faff;
+  border-color: #b8c7d8;
+}
+[data-theme='light'] .connection-settings select,
+[data-theme='light'] .connection-settings input {
+  background: #fff;
+  border-color: #b8c7d8;
+}
+[data-theme='light'] .connection-settings p {
+  color: #60748d;
+}
+
+.connection-settings-menu summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: 0;
+}

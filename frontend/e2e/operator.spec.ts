@@ -391,3 +391,37 @@ test('operator monitors and safely switches high voltage while ready', async ({ 
   await expect(board0.getByText('HV off')).toBeVisible()
   await expect(hvPanel.getByLabel('HV summary: Off')).toBeVisible()
 })
+
+test('connection settings stay hidden until opened without expanding the header', async ({
+  page,
+}) => {
+  await page.goto('/')
+  const panel = page.locator('.connection-settings')
+  const toggle = page.locator('.connection-settings-menu summary')
+  await expect(panel).toBeHidden()
+  const height = await page
+    .locator('.hero')
+    .evaluate((element) => element.getBoundingClientRect().height)
+  await toggle.click()
+  await expect(panel).toBeVisible()
+  await expect(page.getByLabel('Address', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Switch to light theme' }).click()
+  await expect(panel).toHaveCSS('background-color', 'rgb(248, 250, 255)')
+  await expect(page.getByLabel('Address', { exact: true })).toHaveCSS(
+    'background-color',
+    'rgb(255, 255, 255)',
+  )
+  await page.getByRole('button', { name: 'Switch to dark theme' }).click()
+  await expect(panel).toHaveCSS('background-color', 'rgb(20, 36, 58)')
+  const expandedHeight = await page
+    .locator('.hero')
+    .evaluate((element) => element.getBoundingClientRect().height)
+  expect(expandedHeight).toBe(height)
+  await toggle.focus()
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  await toggle.click()
+  await expect(panel).toBeVisible()
+  await toggle.click()
+  await expect(panel).toBeHidden()
+})

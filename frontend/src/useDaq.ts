@@ -348,11 +348,13 @@ export function useDaq(api: DaqApi) {
     }
   }
 
-  async function connectHardware(configuration: string) {
+  async function connectHardware(configuration: string, concentratorIp = '') {
     busy.value = true
     error.value = ''
     try {
-      const next = await api.connectHardware(operatorIdentity, configuration)
+      const next = await (concentratorIp
+        ? api.connectHardware(operatorIdentity, configuration, concentratorIp)
+        : api.connectHardware(operatorIdentity, configuration))
       accept(next)
       rememberApplied(configuration, next)
     } catch (reason) {
@@ -374,11 +376,15 @@ export function useDaq(api: DaqApi) {
     }
   }
 
-  async function discoverHardware() {
+  async function discoverHardware(concentratorIp = '') {
     busy.value = true
     error.value = ''
     try {
-      accept(await api.discoverHardware(operatorIdentity))
+      accept(
+        await (concentratorIp
+          ? api.discoverHardware(operatorIdentity, concentratorIp)
+          : api.discoverHardware(operatorIdentity)),
+      )
     } catch (reason) {
       error.value = reason instanceof Error ? reason.message : String(reason)
     } finally {

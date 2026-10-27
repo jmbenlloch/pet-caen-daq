@@ -280,6 +280,29 @@ describe('operator dashboard', () => {
     wrapper.unmount()
   })
 
+  it('uses USB and custom concentrator addresses for connection and discovery', async () => {
+    localStorage.clear()
+    const api = dashboardApi(SystemState.DISCONNECTED)
+    const wrapper = mount(App, { props: { api } })
+    await flushPromises()
+    expect(wrapper.get('.connection-settings-menu').attributes('open')).toBeUndefined()
+    expect(wrapper.get('.connection-settings-menu summary').attributes('aria-label')).toBe(
+      'Connection settings',
+    )
+    await wrapper.get('#concentrator-address').setValue('172.16.0.11')
+    await wrapper.get('.hardware-connection-action').trigger('click')
+    expect(api.connectHardware).toHaveBeenCalledWith('operator', expect.any(String), '172.16.0.11')
+    wrapper.unmount()
+    const discovery = mount(App, { props: { api } })
+    await flushPromises()
+    await discovery.get('#concentrator-address').setValue('custom')
+    await discovery.get('#custom-concentrator-ip').setValue('10.20.30.40')
+    await discovery.get('.rescan-links-action').trigger('click')
+    expect(api.discoverHardware).toHaveBeenCalledWith('operator', '10.20.30.40')
+    discovery.unmount()
+    localStorage.clear()
+  })
+
   it('shows one hardware action matching the current connection state', async () => {
     const connectedApi = dashboardApi(SystemState.READY)
     const connected = mount(App, { props: { api: connectedApi } })

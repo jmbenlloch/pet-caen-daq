@@ -29,9 +29,13 @@ export interface DaqApi {
   snapshot(): Promise<TelemetrySnapshot | undefined>
   configurationTemplate(): Promise<string>
   telemetry(signal: AbortSignal): AsyncIterable<TelemetrySnapshot>
-  connectHardware(requestedBy: string, configuration: string): Promise<TelemetrySnapshot>
+  connectHardware(
+    requestedBy: string,
+    configuration: string,
+    concentratorIp?: string,
+  ): Promise<TelemetrySnapshot>
   disconnectHardware(requestedBy: string): Promise<TelemetrySnapshot>
-  discoverHardware(requestedBy: string): Promise<TelemetrySnapshot>
+  discoverHardware(requestedBy: string, concentratorIp?: string): Promise<TelemetrySnapshot>
   validate(configuration: string): Promise<{ valid: boolean; issues: ValidationIssue[] }>
   applyConfiguration(
     requestedBy: string,
@@ -104,8 +108,12 @@ export function createDaqApi(baseUrl = daqBaseUrl()): DaqApi {
       const response = await system.validateConfiguration({ janusConfiguration })
       return { valid: response.valid, issues: response.issues }
     },
-    async connectHardware(requestedBy, janusConfiguration) {
-      const response = await system.connectHardware({ requestedBy, janusConfiguration })
+    async connectHardware(requestedBy, janusConfiguration, concentratorIp) {
+      const response = await system.connectHardware({
+        requestedBy,
+        janusConfiguration,
+        concentratorIp,
+      })
       if (!response.snapshot) throw new Error('Connect command returned no telemetry snapshot')
       return response.snapshot
     },
@@ -114,8 +122,8 @@ export function createDaqApi(baseUrl = daqBaseUrl()): DaqApi {
       if (!response.snapshot) throw new Error('Disconnect command returned no telemetry snapshot')
       return response.snapshot
     },
-    async discoverHardware(requestedBy) {
-      const response = await system.discoverHardware({ requestedBy })
+    async discoverHardware(requestedBy, concentratorIp) {
+      const response = await system.discoverHardware({ requestedBy, concentratorIp })
       if (!response.snapshot) throw new Error('Discovery command returned no telemetry snapshot')
       return response.snapshot
     },

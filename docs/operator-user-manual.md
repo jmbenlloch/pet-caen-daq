@@ -1777,3 +1777,20 @@ Stop and drain if it remains safely available. Record counters and the error. Ch
 - `docs/hardware-operations.md` — project hardware provisioning, acceptance, and recovery procedures
 - `docs/architecture.md` — implemented software architecture
 - `docs/daq_protocol_notes.md` — protocol evidence classification and wire behavior
+
+### Concentrator network address
+
+Click **Connection settings** beside the hardware connection actions to open
+the **Concentrator connection** panel. It stays hidden by default and floats
+over the page without expanding the header. Click again or press Escape to
+close it. Change the address while hardware is disconnected.
+**Server default** retains the backend's `-control` and `-stream` addresses
+(the Windows installation uses `192.168.50.125`). Choose **USB — 172.16.0.11**
+or **Custom IP address** to connect on another reachable IPv4/IPv6 subnet.
+Both **Connect hardware** and **Rescan links** use the selected IP with TCP
+ports 9760 and 9000. The browser remembers the selection; the server startup
+default remains unchanged. Network interfaces and routes must already allow
+the server/container to reach the chosen address.
+
+API clients may supply optional `concentrator_ip` on `ConnectHardwareRequest`
+and `DiscoverHardwareRequest`; omission preserves startup addresses and ports.
