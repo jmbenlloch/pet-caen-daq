@@ -663,7 +663,7 @@ func TestProductionConfigurationAppliesAndValidatesFourBoards(t *testing.T) {
 		if got := snapshot.Registers[uint32(dt5202.IndividualRegister(dt5202.HighGain, 63))]; got != 55 {
 			t.Errorf("board %d channel 63 HG = %d", board, got)
 		}
-		if snapshot.CitirocLoads != [2]uint32{1, 1} {
+		if snapshot.CitirocLoads != [2]uint32{2, 2} {
 			t.Errorf("board %d Citiroc loads = %v", board, snapshot.CitirocLoads)
 		}
 		// FERSlib defaults with the fixture's FastShaperInput LG-PA and HV_Adjust_Range 4.5.
@@ -768,7 +768,7 @@ func TestConfigurationOrchestratorReachesReadyWithExplicitHVAuthorization(t *tes
 		if err != nil {
 			t.Fatal(err)
 		}
-		if snapshot.CitirocLoads != [2]uint32{1, 1} || snapshot.HVRegisters[0x102] != 454000 {
+		if snapshot.CitirocLoads != [2]uint32{2, 2} || snapshot.HVRegisters[0x102] != 454000 {
 			t.Fatalf("board %d loads=%v HV=%#x", board, snapshot.CitirocLoads, snapshot.HVRegisters[0x102])
 		}
 	}

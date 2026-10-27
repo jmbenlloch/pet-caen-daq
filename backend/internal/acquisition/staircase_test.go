@@ -129,9 +129,10 @@ func TestStaircaseRestoresProductionCitirocModes(t *testing.T) {
 				if err := dt5202.ApplyConfiguration(context.Background(), hardware, 1, 2, plan, true); err != nil {
 					t.Fatal(err)
 				}
-				productionLoads := []staircaseChipLoad{{0, mode.register}, {1, mode.register}}
-				if !slices.Equal(hardware.loads, productionLoads) {
-					t.Fatalf("initial ASIC loads = %#v, want %#v", hardware.loads, productionLoads)
+				productionLoads := []staircaseChipLoad{{0, mode.register}, {0, mode.register}, {1, mode.register}, {1, mode.register}}
+				initialLoads := []staircaseChipLoad{{0, mode.register}, {0, mode.register}, {1, mode.register}, {1, mode.register}}
+				if !slices.Equal(hardware.loads, initialLoads) {
+					t.Fatalf("initial ASIC loads = %#v, want %#v", hardware.loads, initialLoads)
 				}
 				hardware.loads = nil
 				hardware.configWrites = nil
@@ -215,7 +216,7 @@ func TestStaircaseRestoresProductionCitirocModes(t *testing.T) {
 					}
 				case "reload":
 					wantWrites = append(wantWrites, mode.register)
-					wantLoads = append(wantLoads, productionLoads[0])
+					wantLoads = append(wantLoads, productionLoads[:2]...)
 					if !errors.Is(runErr, restoreError) {
 						t.Errorf("restoration ASIC error lost: %v", runErr)
 					}
