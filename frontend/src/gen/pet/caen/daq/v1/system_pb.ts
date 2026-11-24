@@ -1117,7 +1117,8 @@ export type HistogramSelection = Message<'pet.caen.daq.v1.HistogramSelection'> &
   channel: number
 
   /**
-   * Sum all 64 channels of chain/node. Channel must be zero when true.
+   * Select per-event board charge for PHA or summed channel bins for timing.
+   * Channel must be zero when true.
    *
    * @generated from field: bool board_sum = 4;
    */
@@ -1217,7 +1218,7 @@ export type HistogramDataset = Message<'pet.caen.daq.v1.HistogramDataset'> & {
   boardSum: boolean
 
   /**
-   * Populated instead of bins for board_sum, preventing uint32 sum overflow.
+   * Board histogram counts, populated instead of bins when board_sum is true.
    *
    * @generated from field: repeated uint64 board_sum_bins = 11;
    */

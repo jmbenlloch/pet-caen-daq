@@ -18,6 +18,15 @@ const (
 	HistogramToT     HistogramKind = "tot"
 )
 
+// BoardChargeChannel identifies a board-level PHA spectrum in histogram storage.
+const BoardChargeChannel = dt5202.ChannelCount
+
+const boardChargeUpperADC = 1 << 18
+
+func (kind HistogramKind) IsPHA() bool {
+	return kind == HistogramPHAHigh || kind == HistogramPHALow
+}
+
 type HistogramSelection struct {
 	Chain, Node, Channel uint8
 }
@@ -65,15 +74,32 @@ func histogramSpec(options acquisition.HistogramOptions, kind HistogramKind) (in
 	}
 }
 
-func (s *sink) incrementHistogram(key histogramKey, value float64) {
-	bins, minimum, width, err := histogramSpec(s.histogramOptions, key.kind)
-	if err != nil || bins <= 0 {
-		return
+func selectionHistogramSpec(options acquisition.HistogramOptions, kind HistogramKind, channel uint8) (int, float64, float64, error) {
+	bins, minimum, width, err := histogramSpec(options, kind)
+	if err == nil && bins > 0 && channel == BoardChargeChannel {
+		// Keep the per-channel ADC bin width over the board charge range.
+		bins = int(float64(boardChargeUpperADC) / width)
 	}
-	histogram := s.histograms[key]
+	return bins, minimum, width, err
+}
+
+func (s *sink) histogram(key histogramKey) *histogramAccumulator {
+	if histogram := s.histograms[key]; histogram != nil {
+		return histogram
+	}
+	bins, minimum, width, err := selectionHistogramSpec(s.histogramOptions, key.kind, key.channel)
+	if err != nil || bins <= 0 {
+		return nil
+	}
+	histogram := &histogramAccumulator{minimum: minimum, width: width, bins: make([]uint32, bins)}
+	s.histograms[key] = histogram
+	return histogram
+}
+
+func (s *sink) incrementHistogram(key histogramKey, value float64) {
+	histogram := s.histogram(key)
 	if histogram == nil {
-		histogram = &histogramAccumulator{minimum: minimum, width: width, bins: make([]uint32, bins)}
-		s.histograms[key] = histogram
+		return
 	}
 	histogram.entries++
 	index := int((value - histogram.minimum) / histogram.width)
@@ -92,13 +118,30 @@ func (s *sink) incrementHistogram(key histogramKey, value float64) {
 
 func (s *sink) accumulateHistograms(chain, node uint8, event dt5202.Event) {
 	if event.Spectroscopy != nil {
+		var high, low uint32
+		var hasHigh, hasLow bool
 		for _, energy := range event.Spectroscopy.Energies {
 			if energy.HasHighGain {
+				high += uint32(energy.HighGain)
+				hasHigh = true
 				s.incrementHistogram(histogramKey{chain, node, energy.Channel, HistogramPHAHigh}, float64(energy.HighGain))
 			}
 			if energy.HasLowGain {
+				low += uint32(energy.LowGain)
+				hasLow = true
 				s.incrementHistogram(histogramKey{chain, node, energy.Channel, HistogramPHALow}, float64(energy.LowGain))
 			}
+		}
+		highKey := histogramKey{chain, node, BoardChargeChannel, HistogramPHAHigh}
+		lowKey := histogramKey{chain, node, BoardChargeChannel, HistogramPHALow}
+		// Persist both spectra even if only one gain is present in this run.
+		s.histogram(highKey)
+		s.histogram(lowKey)
+		if hasHigh {
+			s.incrementHistogram(highKey, float64(high))
+		}
+		if hasLow {
+			s.incrementHistogram(lowKey, float64(low))
 		}
 		for _, timing := range event.Spectroscopy.Timings {
 			s.accumulateTiming(chain, node, timing)
@@ -121,14 +164,14 @@ func (s *sink) accumulateTiming(chain, node uint8, timing dt5202.Timing) {
 func (s *sink) Histograms(kind HistogramKind, selections []HistogramSelection) ([]HistogramDataset, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	binCount, minimum, width, err := histogramSpec(s.histogramOptions, kind)
-	if err != nil || binCount <= 0 {
-		return nil, fmt.Errorf("histogram %s is disabled", kind)
-	}
 	result := make([]HistogramDataset, 0, len(selections))
 	for _, selection := range selections {
-		if selection.Channel >= dt5202.ChannelCount {
+		if selection.Channel >= dt5202.ChannelCount && (selection.Channel != BoardChargeChannel || !kind.IsPHA()) {
 			return nil, fmt.Errorf("channel %d outside range [0,63]", selection.Channel)
+		}
+		binCount, minimum, width, err := selectionHistogramSpec(s.histogramOptions, kind, selection.Channel)
+		if err != nil || binCount <= 0 {
+			return nil, fmt.Errorf("histogram %s is disabled", kind)
 		}
 		dataset := HistogramDataset{HistogramSelection: selection, Minimum: minimum, BinWidth: width, Bins: make([]uint32, binCount)}
 		if histogram := s.histograms[histogramKey{selection.Chain, selection.Node, selection.Channel, kind}]; histogram != nil {

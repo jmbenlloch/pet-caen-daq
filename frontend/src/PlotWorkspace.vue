@@ -184,6 +184,23 @@ watch(
 )
 onBeforeUnmount(() => window.clearInterval(timer))
 
+const isPHA = computed(
+  () => kind.value === HistogramKind.PHA_HIGH_GAIN || kind.value === HistogramKind.PHA_LOW_GAIN,
+)
+const boardHistogramLabel = computed(() =>
+  isPHA.value ? 'Board charge (sum per event)' : 'Board sum (all 64 channels)',
+)
+const plotGroups = computed(() => {
+  const groups = new Map<string, DeepReadonly<HistogramDataset>[]>()
+  for (const dataset of props.datasets) {
+    const length = dataset.boardSum ? dataset.boardSumBins.length : dataset.bins.length
+    const axis = `${dataset.minimum}:${dataset.binWidth}:${length}`
+    const group = groups.get(axis) ?? []
+    group.push(dataset)
+    groups.set(axis, group)
+  }
+  return groups
+})
 const kindLabel = computed(
   () =>
     ({
@@ -285,14 +302,14 @@ const kindLabel = computed(
           class="histogram-board-sum"
           :class="{ active: selected.has(selectionKey(board.chain, board.node, 64)) }"
           :aria-pressed="selected.has(selectionKey(board.chain, board.node, 64))"
-          :aria-label="`Board ${board.logicalIndex}, chain ${board.chain} node ${board.node}, sum of all 64 channels`"
+          :aria-label="`Board ${board.logicalIndex}, chain ${board.chain} node ${board.node}, ${boardHistogramLabel}`"
           :disabled="
             selected.size >= selectionLimit &&
             !selected.has(selectionKey(board.chain, board.node, 64))
           "
           @click="toggleSelection(board.chain, board.node, 64)"
         >
-          Board sum (all 64 channels)
+          {{ boardHistogramLabel }}
         </button>
         <div class="channel-grid histogram-channel-grid">
           <button
@@ -321,8 +338,10 @@ const kindLabel = computed(
       Viewing persisted histograms from run {{ selectedRunId }}.
     </p>
     <HistogramPlot
-      v-if="datasets.length"
-      :datasets="datasets"
+      v-for="[axis, spectra] in plotGroups"
+      :key="axis"
+      :datasets="spectra"
+      :board-histogram-label="boardHistogramLabel"
       :theme="theme"
       :logarithmic="logarithmic"
     />
@@ -333,7 +352,7 @@ const kindLabel = computed(
         class="histogram-dataset"
       >
         <div class="histogram-metadata">
-          <strong>{{ histogramLabel(dataset) }}</strong
+          <strong>{{ histogramLabel(dataset, boardHistogramLabel) }}</strong
           ><span>{{ kindLabel }} · {{ histogramBins(dataset).length }} bins</span
           ><span
             >{{ compact(dataset.entries) }} entries · bin width

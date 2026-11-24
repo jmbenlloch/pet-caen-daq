@@ -325,7 +325,8 @@ message HistogramSelection {
   uint32 chain = 1;
   uint32 node = 2;
   uint32 channel = 3;
-  // Sum all 64 channels of chain/node. Channel must be zero when true.
+  // Select per-event board charge for PHA or summed channel bins for timing.
+  // Channel must be zero when true.
   bool board_sum = 4;
 }
 
@@ -355,7 +356,7 @@ message HistogramDataset {
   uint64 overflow = 9;
   // A separate board-wide dataset, not channel zero. Individual bins remain uint32.
   bool board_sum = 10;
-  // Populated instead of bins for board_sum, preventing uint32 sum overflow.
+  // Board histogram counts, populated instead of bins when board_sum is true.
   repeated uint64 board_sum_bins = 11;
 }
 

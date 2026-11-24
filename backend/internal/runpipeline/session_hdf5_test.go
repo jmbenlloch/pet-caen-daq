@@ -31,6 +31,13 @@ func TestSessionPersistsFinalHistogramSnapshotWhenSelected(t *testing.T) {
 		Kind:   dt5202.EventTiming,
 		Timing: &dt5202.TimingEvent{Hits: []dt5202.Timing{{Channel: 3, ToA: 8, ToT: 4}}},
 	})
+	session.sink.accumulateHistograms(1, 2, dt5202.Event{
+		Kind: dt5202.EventSpectroscopy,
+		Spectroscopy: &dt5202.SpectroscopyEvent{Energies: []dt5202.Energy{
+			{Channel: 0, HighGain: 100, HasHighGain: true},
+			{Channel: 63, HighGain: 200, HasHighGain: true},
+		}},
+	})
 	if err := session.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -60,5 +67,20 @@ func TestSessionPersistsFinalHistogramSnapshotWhenSelected(t *testing.T) {
 	}
 	if datasets[0].Entries != 1 || datasets[0].Bins[4] != 1 || datasets[1].Entries != 0 || len(datasets[1].Bins) != 256 {
 		t.Fatalf("persisted datasets = %+v", datasets)
+	}
+	board := []HistogramSelection{{Chain: 1, Node: 2, Channel: BoardChargeChannel}}
+	high, err := LoadPersistedHistograms(parent, "histogram-session", HistogramPHAHigh, board)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if high[0].Entries != 1 || high[0].Bins[300/32] != 1 {
+		t.Fatal("saved high-gain board histogram is missing the 300 ADC total")
+	}
+	low, err := LoadPersistedHistograms(parent, "histogram-session", HistogramPHALow, board)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if low[0].Entries != 0 {
+		t.Fatal("saved low-gain board histogram should have no entries")
 	}
 }

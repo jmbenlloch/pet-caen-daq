@@ -9,6 +9,7 @@ const props = defineProps<{
   datasets: readonly DeepReadonly<HistogramDataset>[]
   theme: 'dark' | 'light'
   logarithmic: boolean
+  boardHistogramLabel?: string
 }>()
 
 const host = ref<HTMLElement>()
@@ -75,7 +76,7 @@ function series(): Series[] {
     ...props.datasets.map((dataset, index) => {
       const color = colors[index % colors.length]
       return {
-        label: histogramLabel(dataset),
+        label: histogramLabel(dataset, props.boardHistogramLabel),
         stroke: color,
         fill: `${color}38`,
         width: 1,
@@ -95,7 +96,7 @@ function options(): Options {
   return {
     width: Math.max(host.value?.clientWidth ?? 0, 320),
     height: 380,
-    title: 'Accumulated channel and board-sum histograms',
+    title: 'Accumulated histograms',
     series: series(),
     cursor: { drag: { x: true, y: false, setScale: true } },
     scales: {

@@ -44,8 +44,8 @@ func TestHistogramAccumulatorRejectsDisabledAndInvalidSelections(t *testing.T) {
 		t.Fatal("accepted disabled histogram")
 	}
 	sink.histogramOptions.EnergyBins = 256
-	if _, err := sink.Histograms(HistogramPHAHigh, []HistogramSelection{{Channel: 64}}); err == nil {
-		t.Fatal("accepted channel 64")
+	if _, err := sink.Histograms(HistogramPHAHigh, []HistogramSelection{{Channel: 65}}); err == nil {
+		t.Fatal("accepted channel 65")
 	}
 }
 
@@ -94,5 +94,69 @@ func TestHistogramUint32CounterSaturatesInsteadOfWrapping(t *testing.T) {
 	sink.incrementHistogram(key, 0)
 	if sink.histograms[key].bins[0] != ^uint32(0) || sink.histograms[key].overflow != 1 {
 		t.Fatalf("saturated histogram = %+v", sink.histograms[key])
+	}
+}
+
+func TestBoardChargeAccumulatesOneTotalPerPresentGainAndEvent(t *testing.T) {
+	s := &sink{
+		histogramOptions: acquisition.HistogramOptions{EnergyBins: 8192, EnergyChannels: 8192},
+		histograms:       make(map[histogramKey]*histogramAccumulator),
+	}
+	add := func(node uint8, energies ...dt5202.Energy) {
+		s.accumulateHistograms(1, node, dt5202.Event{Spectroscopy: &dt5202.SpectroscopyEvent{Energies: energies}})
+	}
+	add(2,
+		dt5202.Energy{Channel: 0, HighGain: 100, HasHighGain: true, LowGain: 12, HasLowGain: true},
+		dt5202.Energy{Channel: 63, HighGain: 200, HasHighGain: true, LowGain: 30, HasLowGain: true},
+	)
+	add(2, dt5202.Energy{Channel: 0, HighGain: 9000, HasHighGain: true})
+	add(2, dt5202.Energy{Channel: 0, HasLowGain: true})
+	add(2)
+	add(3, dt5202.Energy{Channel: 0, HighGain: 300, HasHighGain: true})
+	selections := []HistogramSelection{{Chain: 1, Node: 2, Channel: BoardChargeChannel}, {Chain: 1, Node: 3, Channel: BoardChargeChannel}}
+	high, err := s.Histograms(HistogramPHAHigh, selections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if high[0].Entries != 2 || high[0].Bins[300] != 1 || high[0].Bins[9000] != 1 || high[0].Bins[100] != 0 || high[0].Bins[200] != 0 || high[1].Entries != 1 || high[1].Bins[300] != 1 {
+		t.Fatal("high-gain totals were not accumulated separately per board and event")
+	}
+	low, err := s.Histograms(HistogramPHALow, selections)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if low[0].Entries != 2 || low[0].Bins[42] != 1 || low[0].Bins[0] != 1 || low[1].Entries != 0 {
+		t.Fatal("low-gain totals must include reported zero and skip absent gains")
+	}
+}
+
+func TestBoardChargeUpperEdgeOverflowsForBothGains(t *testing.T) {
+	s := &sink{
+		histogramOptions: acquisition.HistogramOptions{EnergyBins: 256, EnergyChannels: 8192},
+		histograms:       make(map[histogramKey]*histogramAccumulator),
+	}
+	energies := make([]dt5202.Energy, 17)
+	for i := range energies {
+		energies[i] = dt5202.Energy{
+			Channel: uint8(i), HighGain: 16383, HasHighGain: true, LowGain: 16383, HasLowGain: true,
+		}
+	}
+	event := dt5202.Event{Spectroscopy: &dt5202.SpectroscopyEvent{Energies: energies}}
+	energies[16].HighGain, energies[16].LowGain = 15, 15 // 262143 ADC total
+	s.accumulateHistograms(0, 0, event)
+	energies[16].HighGain, energies[16].LowGain = 16, 16 // 262144 ADC total
+	s.accumulateHistograms(0, 0, event)
+
+	for _, kind := range []HistogramKind{HistogramPHAHigh, HistogramPHALow} {
+		datasets, err := s.Histograms(kind, []HistogramSelection{{Channel: BoardChargeChannel}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := datasets[0]
+		if got.Minimum != 0 || got.BinWidth != 32 || len(got.Bins) != 8192 ||
+			got.Bins[8191] != 1 || got.Entries != 2 || got.Overflow != 1 {
+			t.Fatalf("%s range or counts differ: min=%g width=%g bins=%d entries=%d overflow=%d",
+				kind, got.Minimum, got.BinWidth, len(got.Bins), got.Entries, got.Overflow)
+		}
 	}
 }
