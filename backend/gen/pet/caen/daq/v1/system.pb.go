@@ -3006,7 +3006,8 @@ type HistogramSelection struct {
 	Chain   uint32                 `protobuf:"varint,1,opt,name=chain,proto3" json:"chain,omitempty"`
 	Node    uint32                 `protobuf:"varint,2,opt,name=node,proto3" json:"node,omitempty"`
 	Channel uint32                 `protobuf:"varint,3,opt,name=channel,proto3" json:"channel,omitempty"`
-	// Sum all 64 channels of chain/node. Channel must be zero when true.
+	// Select per-event board charge for PHA or summed channel bins for timing.
+	// Channel must be zero when true.
 	BoardSum      bool `protobuf:"varint,4,opt,name=board_sum,json=boardSum,proto3" json:"board_sum,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -3143,7 +3144,7 @@ type HistogramDataset struct {
 	Overflow  uint64                 `protobuf:"varint,9,opt,name=overflow,proto3" json:"overflow,omitempty"`
 	// A separate board-wide dataset, not channel zero. Individual bins remain uint32.
 	BoardSum bool `protobuf:"varint,10,opt,name=board_sum,json=boardSum,proto3" json:"board_sum,omitempty"`
-	// Populated instead of bins for board_sum, preventing uint32 sum overflow.
+	// Board histogram counts, populated instead of bins when board_sum is true.
 	BoardSumBins  []uint64 `protobuf:"varint,11,rep,packed,name=board_sum_bins,json=boardSumBins,proto3" json:"board_sum_bins,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

@@ -266,6 +266,39 @@ describe('PlotWorkspace', () => {
     expect(requestButton.attributes('aria-busy')).toBe('true')
   })
 
+  it('plots board charge and individual PHA on their own axes', () => {
+    const wrapper = mount(PlotWorkspace, {
+      props: {
+        api: apiWithRuns(),
+        boards: [],
+        activeRunId: '42',
+        running: false,
+        loading: false,
+        datasets: [
+          create(HistogramDatasetSchema, { binWidth: 1, bins: [1, 0] }),
+          create(HistogramDatasetSchema, {
+            binWidth: 1,
+            boardSum: true,
+            boardSumBins: [0n, 0n, 1n],
+          }),
+        ],
+        theme: 'light',
+      },
+      global: {
+        stubs: {
+          HistogramPlot: {
+            props: ['datasets'],
+            template: '<div class="plot-stub">{{ datasets.length }}</div>',
+          },
+        },
+      },
+    })
+
+    expect(wrapper.findAll('.plot-stub').map((plot) => plot.text())).toEqual(['1', '1'])
+    expect(wrapper.text()).toContain('Board charge (sum per event)')
+    wrapper.unmount()
+  })
+
   it('allows all 64 channels plus a separate board sum and enforces the 65-dataset limit', async () => {
     const wrapper = mount(PlotWorkspace, {
       props: {
@@ -295,7 +328,7 @@ describe('PlotWorkspace', () => {
 
     expect(wrapper.get('[aria-haspopup="true"]').text()).toContain('64 / 65 selected')
     await wrapper
-      .get('[aria-label="Board 3, chain 0 node 0, sum of all 64 channels"]')
+      .get('[aria-label="Board 3, chain 0 node 0, Board charge (sum per event)"]')
       .trigger('click')
     expect(wrapper.get('[aria-haspopup="true"]').text()).toContain('65 / 65 selected')
     const sumButton = wrapper.get('.histogram-board-sum')

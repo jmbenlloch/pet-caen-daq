@@ -42,26 +42,23 @@ artifact. It is independent of the 500 MiB decoded-event segments.
 
 ## Frontend contract
 
-Each board has a separate **Board sum (all 64 channels)** selection alongside
-the 64 individual channels, supported for every histogram family and both live
-and historical runs. This is a bin-by-bin spectrum sum, not an event-by-event
-sum of channel energies. The selection uses `board_sum=true` and channel=0;
-the response identifies it with `board_sum` and carries `board_sum_bins` as
-uint64 instead of the individual spectrum's uint32 `bins`. Entries, underflow,
-and overflow are also summed; inconsistent axes or uint64 counter overflow fail
-explicitly. Existing individual requests and their wire fields are unchanged.
+Each board has a separate board histogram selection alongside its 64 channels.
+For PHA high gain and low gain, the backend adds all ADC samples present for the
+selected gain in each spectroscopy event on that board and bins the total once.
+A gain with no samples in an event contributes no entry. Reported zeros are
+included. The board-charge axis uses the channel PHA bin width and covers
+0 through 262,143 ADC counts. Totals at or above 262,144 count as overflow. The UI plots it on a separate axis from
+individual PHA spectra so both ranges remain readable.
 
-The backend expands sums into all 64 channels, deduplicates overlapping selections,
-loads one coherent snapshot, and returns the extra aggregate dataset. Quiet
-channels contribute zero. Chain AND node identify a board. The sum is independent
-of which channels the operator selected for plotting. Per-channel bin saturation
-still applies; excess hits already recorded as overflow are not reconstructed.
-The maximum summed bin (64 × (2^32−1)) is exactly representable for browser plotting.
+For ToA and ToT, the board histogram still adds corresponding bins from all
+64 timing spectra. Both board selections are independent of the selected
+individual channels. The API uses `board_sum=true` with channel 0 and returns
+counts in `board_sum_bins` with separate entry and out-of-range counters.
 
-HDF5 files retain their existing per-channel layout: board-sum API datasets are
-derived on the server from stored spectra on demand, so older runs work without
-migration or rewriting and there is no redundant persisted copy. The browser
-only plots the returned dataset; it never adds the channel spectra itself.
+Board-charge spectra are saved with the run histograms using histogram
+channel index 64, reserved for this aggregate. Older histogram artifacts
+provide individual spectra and board timing sums. Board charge is unavailable
+from those artifacts because individual spectra have lost event membership.
 
 The plot workspace selects the live run or any completed run with a histogram
 artifact, then a family, board, and channel set. Live data can be requested on

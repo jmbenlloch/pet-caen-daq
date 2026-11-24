@@ -20,9 +20,9 @@ func (*sumPipeline) Histograms(_ runpipeline.HistogramKind, selections []runpipe
 	}
 	return out, nil
 }
-func TestBoardSumsAllKindsLiveAndHistorical(t *testing.T) {
+func TestTimingBoardSumsLiveAndHistorical(t *testing.T) {
 	for _, live := range []bool{true, false} {
-		for _, kind := range []daqv1.HistogramKind{1, 2, 3, 4} {
+		for _, kind := range []daqv1.HistogramKind{daqv1.HistogramKind_HISTOGRAM_KIND_TOA, daqv1.HistogramKind_HISTOGRAM_KIND_TOT} {
 			p := &sumPipeline{}
 			controller := &fakeRunController{state: acquisition.StateReady}
 			if live {
@@ -85,7 +85,7 @@ func TestBoardSumSelectionValidation(t *testing.T) {
 	}
 	cases = append(cases, many, []*daqv1.HistogramSelection{{BoardSum: true, Node: 0}, {BoardSum: true, Node: 1}, {BoardSum: true, Node: 2}, {BoardSum: true, Node: 3}, {BoardSum: true, Node: 4}})
 	for _, sels := range cases {
-		_, err := s.GetHistograms(context.Background(), connect.NewRequest(&daqv1.GetHistogramsRequest{RunId: "42", Kind: 1, Selections: sels}))
+		_, err := s.GetHistograms(context.Background(), connect.NewRequest(&daqv1.GetHistogramsRequest{RunId: "42", Kind: daqv1.HistogramKind_HISTOGRAM_KIND_TOA, Selections: sels}))
 		if connect.CodeOf(err) != connect.CodeInvalidArgument {
 			t.Fatalf("expected validation error, got %v", err)
 		}
@@ -100,11 +100,24 @@ func TestAllChannelsAndBoardSumTogether(t *testing.T) {
 		selections = append(selections, &daqv1.HistogramSelection{Channel: i})
 	}
 	selections = append(selections, &daqv1.HistogramSelection{BoardSum: true})
-	r, err := s.GetHistograms(context.Background(), connect.NewRequest(&daqv1.GetHistogramsRequest{RunId: "42", Kind: 1, Selections: selections}))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(r.Msg.Datasets) != 65 || !r.Msg.Datasets[64].BoardSum || r.Msg.Datasets[64].BoardSumBins[1] != 2080 {
-		t.Fatalf("all channels + sum: %v", r.Msg)
+	for _, test := range []struct {
+		kind daqv1.HistogramKind
+		want uint64
+	}{
+		{daqv1.HistogramKind_HISTOGRAM_KIND_PHA_HIGH_GAIN, 65},
+		{daqv1.HistogramKind_HISTOGRAM_KIND_PHA_LOW_GAIN, 65},
+		{daqv1.HistogramKind_HISTOGRAM_KIND_TOA, 2080},
+	} {
+		r, err := s.GetHistograms(context.Background(), connect.NewRequest(&daqv1.GetHistogramsRequest{RunId: "42", Kind: test.kind, Selections: selections}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(r.Msg.Datasets) != 65 {
+			t.Fatalf("got %d datasets, want 65", len(r.Msg.Datasets))
+		}
+		board := r.Msg.Datasets[64]
+		if !board.BoardSum || board.Channel != 0 || len(board.Bins) != 0 || board.BoardSumBins[1] != test.want {
+			t.Fatalf("%s board histogram: %v", test.kind, board)
+		}
 	}
 }

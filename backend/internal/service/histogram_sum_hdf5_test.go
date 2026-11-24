@@ -8,6 +8,7 @@ import (
 	daqv1 "github.com/jmbenlloch/pet-caen-daq/backend/gen/pet/caen/daq/v1"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/acquisition"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/hdf5store"
+	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runpipeline"
 	"github.com/jmbenlloch/pet-caen-daq/backend/internal/runstore"
 	"testing"
 	"time"
@@ -30,6 +31,9 @@ func TestBoardSumFromSparsePersistedHDF5(t *testing.T) {
 		count, width := 256, 1.0
 		if kind == "pha_high" || kind == "pha_low" {
 			width = 32
+			bins := make([]uint32, (1<<18)/32)
+			bins[9] = 1 // An event with total charge 300 ADC.
+			spectra = append(spectra, runstore.HistogramDataset{Kind: kind, Chain: 1, Node: 2, Channel: runpipeline.BoardChargeChannel, Bins: bins, BinWidth: width, Entries: 1})
 		}
 		if kind == "tot" {
 			count = 512
@@ -53,8 +57,20 @@ func TestBoardSumFromSparsePersistedHDF5(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Msg.Datasets[0].BoardSumBins[7] != 65 || r.Msg.Datasets[0].Entries != 65 || r.Msg.Datasets[1].Bins[7] != 64 {
-			t.Fatalf("wrong historical sum: %v", r.Msg)
+		bin, count := 7, uint64(65)
+		if kind == daqv1.HistogramKind_HISTOGRAM_KIND_PHA_HIGH_GAIN || kind == daqv1.HistogramKind_HISTOGRAM_KIND_PHA_LOW_GAIN {
+			bin, count = 9, 1
 		}
+		if r.Msg.Datasets[0].BoardSumBins[bin] != count || r.Msg.Datasets[0].Entries != count || r.Msg.Datasets[1].Bins[7] != 64 {
+			t.Fatalf("wrong historical sum for %s", kind)
+		}
+
+	}
+	_, err = s.GetHistograms(context.Background(), connect.NewRequest(&daqv1.GetHistogramsRequest{
+		RunId: "sum-history", Kind: daqv1.HistogramKind_HISTOGRAM_KIND_PHA_HIGH_GAIN,
+		Selections: []*daqv1.HistogramSelection{{Chain: 1, Node: 3, BoardSum: true}},
+	}))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("board charge without a saved total should be unavailable, got %v", err)
 	}
 }

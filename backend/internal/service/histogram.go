@@ -120,7 +120,11 @@ func (s *RunService) GetHistograms(_ context.Context, request *connect.Request[d
 		}
 		first, last := selection.GetChannel(), selection.GetChannel()
 		if selection.GetBoardSum() {
-			first, last = 0, 63
+			if kind.IsPHA() {
+				first, last = runpipeline.BoardChargeChannel, runpipeline.BoardChargeChannel
+			} else {
+				first, last = 0, 63
+			}
 		}
 		for channel := first; channel <= last; channel++ {
 			key := runpipeline.HistogramSelection{Chain: uint8(selection.GetChain()), Node: uint8(selection.GetNode()), Channel: uint8(channel)}
@@ -162,6 +166,9 @@ func (s *RunService) GetHistograms(_ context.Context, request *connect.Request[d
 	}
 	for _, selection := range message.GetSelections() {
 		key := runpipeline.HistogramSelection{Chain: uint8(selection.Chain), Node: uint8(selection.Node), Channel: uint8(selection.Channel)}
+		if selection.BoardSum && kind.IsPHA() {
+			key.Channel = runpipeline.BoardChargeChannel
+		}
 		dataset, exists := index[key]
 		if !exists {
 			return nil, serviceError(connect.CodeFailedPrecondition, "HISTOGRAM_UNAVAILABLE", fmt.Errorf("missing spectrum %+v", key))
@@ -172,9 +179,19 @@ func (s *RunService) GetHistograms(_ context.Context, request *connect.Request[d
 			Underflow: dataset.Underflow, Overflow: dataset.Overflow,
 		}
 		if selection.BoardSum {
-			out, err = sumBoardHistograms(key, index)
-			if err != nil {
-				return nil, serviceError(connect.CodeFailedPrecondition, "HISTOGRAM_UNAVAILABLE", err)
+			if kind.IsPHA() {
+				out.Channel = 0
+				out.BoardSum = true
+				out.BoardSumBins = make([]uint64, len(dataset.Bins))
+				for i, count := range dataset.Bins {
+					out.BoardSumBins[i] = uint64(count)
+				}
+				out.Bins = nil
+			} else {
+				out, err = sumBoardHistograms(key, index)
+				if err != nil {
+					return nil, serviceError(connect.CodeFailedPrecondition, "HISTOGRAM_UNAVAILABLE", err)
+				}
 			}
 		}
 		response.Datasets = append(response.Datasets, out)

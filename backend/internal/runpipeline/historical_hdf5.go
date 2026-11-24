@@ -75,10 +75,13 @@ func LoadPersistedHistograms(parent, runID string, kind HistogramKind, selection
 		return nil, errors.New("histogram artifact is incomplete")
 	}
 	if file.LinkExists(fmt.Sprintf("histograms/%s/spectra", kind)) {
-		return readPersistedHistogramV2(file, kind, selections, binCount, minimum, width)
+		return readPersistedHistogramV2(file, kind, selections, options)
 	}
 	result := make([]HistogramDataset, 0, len(selections))
 	for _, selection := range selections {
+		if selection.Channel == BoardChargeChannel {
+			return nil, fmt.Errorf("board charge histogram was not saved for chain %d node %d", selection.Chain, selection.Node)
+		}
 		dataset := HistogramDataset{
 			HistogramSelection: selection, Minimum: minimum, BinWidth: width, Bins: make([]uint32, binCount),
 		}
@@ -93,7 +96,7 @@ func LoadPersistedHistograms(parent, runID string, kind HistogramKind, selection
 	return result, nil
 }
 
-func readPersistedHistogramV2(file *hdf5.File, kind HistogramKind, selections []HistogramSelection, binCount int, minimum, width float64) ([]HistogramDataset, error) {
+func readPersistedHistogramV2(file *hdf5.File, kind HistogramKind, selections []HistogramSelection, options acquisition.HistogramOptions) ([]HistogramDataset, error) {
 	base := fmt.Sprintf("histograms/%s", kind)
 	spectra, err := file.OpenDataset(base + "/spectra")
 	if err != nil {
@@ -135,8 +138,12 @@ func readPersistedHistogramV2(file *hdf5.File, kind HistogramKind, selections []
 	defer bins.Close()
 	result := make([]HistogramDataset, 0, len(selections))
 	for _, selection := range selections {
-		target := HistogramDataset{HistogramSelection: selection, Minimum: minimum, BinWidth: width, Bins: make([]uint32, binCount)}
 		row, exists := index[selection]
+		if !exists && selection.Channel == BoardChargeChannel {
+			return nil, fmt.Errorf("board charge histogram was not saved for chain %d node %d", selection.Chain, selection.Node)
+		}
+		binCount, minimum, width, _ := selectionHistogramSpec(options, kind, selection.Channel)
+		target := HistogramDataset{HistogramSelection: selection, Minimum: minimum, BinWidth: width, Bins: make([]uint32, binCount)}
 		if exists {
 			if int(row.BinCount) != binCount {
 				return nil, fmt.Errorf("histogram %s %+v has %d bins, want %d", kind, selection, row.BinCount, binCount)
