@@ -117,7 +117,10 @@ test('operator completes a simulated run and downloads its persisted artifact', 
 
   await plots.getByLabel('Live refresh').uncheck()
   await plots
-    .getByRole('button', { name: 'Board 0, chain 0 node 0, sum of all 64 channels', exact: true })
+    .getByRole('button', {
+      name: 'Board 0, chain 0 node 0, Board charge (sum per event)',
+      exact: true,
+    })
     .click()
   await expect(plots.getByLabel('Histogram datasets').locator('.histogram-dataset')).toHaveCount(3)
   for (const kind of ['1', '2', '3', '4']) {
@@ -130,9 +133,11 @@ test('operator completes a simulated run and downloads its persisted artifact', 
     const sum = payload.datasets.find((dataset: { boardSum?: boolean }) => dataset.boardSum)
     expect(sum).toBeDefined()
     expect(sum.boardSumBins.length).toBeGreaterThan(0)
+    const isPHA = kind === '1' || kind === '2'
     await expect(plots.getByLabel('Histogram datasets')).toContainText(
-      'Board sum (all 64 channels)',
+      isPHA ? 'Board charge (sum per event)' : 'Board sum (all 64 channels)',
     )
+    await expect(histogramPlot).toHaveCount(isPHA ? 2 : 1)
     await expect(histogramPlot.locator('canvas').first()).toBeVisible()
   }
 
