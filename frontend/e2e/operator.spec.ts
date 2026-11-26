@@ -125,15 +125,16 @@ test('operator completes a simulated run and downloads its persisted artifact', 
   await expect(plots.getByLabel('Histogram datasets').locator('.histogram-dataset')).toHaveCount(3)
   for (const kind of ['1', '2', '3', '4']) {
     await plots.locator('.plot-controls select').selectOption(kind)
-    const reply = page.waitForResponse(
-      (response) => response.url().endsWith('/GetHistograms') && response.ok(),
-    )
+    const reply = page.waitForResponse((response) => response.url().endsWith('/GetHistograms'))
     await plots.getByRole('button', { name: 'Request data' }).click()
-    const payload = await (await reply).json()
+    const response = await reply
+    const payload = await response.json()
+    expect(response.ok(), response.ok() ? undefined : JSON.stringify(payload)).toBe(true)
     const sum = payload.datasets.find((dataset: { boardSum?: boolean }) => dataset.boardSum)
     expect(sum).toBeDefined()
     expect(sum.boardSumBins.length).toBeGreaterThan(0)
     const isPHA = kind === '1' || kind === '2'
+    if (isPHA) expect(sum.boardSumBins.length * sum.binWidth + (sum.minimum ?? 0)).toBe(524288)
     await expect(plots.getByLabel('Histogram datasets')).toContainText(
       isPHA ? 'Board charge (sum per event)' : 'Board sum (all 64 channels)',
     )

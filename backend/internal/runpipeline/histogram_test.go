@@ -135,16 +135,16 @@ func TestBoardChargeUpperEdgeOverflowsForBothGains(t *testing.T) {
 		histogramOptions: acquisition.HistogramOptions{EnergyBins: 256, EnergyChannels: 8192},
 		histograms:       make(map[histogramKey]*histogramAccumulator),
 	}
-	energies := make([]dt5202.Energy, 17)
+	energies := make([]dt5202.Energy, 33)
 	for i := range energies {
 		energies[i] = dt5202.Energy{
 			Channel: uint8(i), HighGain: 16383, HasHighGain: true, LowGain: 16383, HasLowGain: true,
 		}
 	}
 	event := dt5202.Event{Spectroscopy: &dt5202.SpectroscopyEvent{Energies: energies}}
-	energies[16].HighGain, energies[16].LowGain = 15, 15 // 262143 ADC total
+	energies[32].HighGain, energies[32].LowGain = 31, 31 // 524287 ADC total
 	s.accumulateHistograms(0, 0, event)
-	energies[16].HighGain, energies[16].LowGain = 16, 16 // 262144 ADC total
+	energies[32].HighGain, energies[32].LowGain = 32, 32 // 524288 ADC total
 	s.accumulateHistograms(0, 0, event)
 
 	for _, kind := range []HistogramKind{HistogramPHAHigh, HistogramPHALow} {
@@ -153,8 +153,8 @@ func TestBoardChargeUpperEdgeOverflowsForBothGains(t *testing.T) {
 			t.Fatal(err)
 		}
 		got := datasets[0]
-		if got.Minimum != 0 || got.BinWidth != 32 || len(got.Bins) != 8192 ||
-			got.Bins[8191] != 1 || got.Entries != 2 || got.Overflow != 1 {
+		if got.Minimum != 0 || got.BinWidth != 32 || len(got.Bins) != 16384 ||
+			got.Bins[16383] != 1 || got.Entries != 2 || got.Overflow != 1 {
 			t.Fatalf("%s range or counts differ: min=%g width=%g bins=%d entries=%d overflow=%d",
 				kind, got.Minimum, got.BinWidth, len(got.Bins), got.Entries, got.Overflow)
 		}

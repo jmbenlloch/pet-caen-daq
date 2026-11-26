@@ -47,8 +47,9 @@ For PHA high gain and low gain, the backend adds all ADC samples present for the
 selected gain in each spectroscopy event on that board and bins the total once.
 A gain with no samples in an event contributes no entry. Reported zeros are
 included. The board-charge axis uses the channel PHA bin width and covers
-0 through 262,143 ADC counts. Totals at or above 262,144 count as overflow. The UI plots it on a separate axis from
-individual PHA spectra so both ranges remain readable.
+0 through 524,287 ADC counts. Totals at or above 524,288 count as overflow. The UI plots it on a separate axis from
+individual PHA spectra so both ranges remain readable. Saved board-charge spectra
+from earlier runs retain their original axis and overflow counts.
 
 For ToA and ToT, the board histogram still adds corresponding bins from all
 64 timing spectra. Both board selections are independent of the selected

@@ -73,7 +73,7 @@ func TestSessionPersistsFinalHistogramSnapshotWhenSelected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if high[0].Entries != 1 || high[0].Bins[300/32] != 1 {
+	if len(high[0].Bins) != 16384 || high[0].Entries != 1 || high[0].Bins[300/32] != 1 {
 		t.Fatal("saved high-gain board histogram is missing the 300 ADC total")
 	}
 	low, err := LoadPersistedHistograms(parent, "histogram-session", HistogramPHALow, board)

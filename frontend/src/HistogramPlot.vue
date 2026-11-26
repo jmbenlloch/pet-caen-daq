@@ -135,7 +135,7 @@ function resetZoom() {
   plot?.setData(alignedData(), true)
 }
 
-watch(() => props.datasets, render, { deep: true })
+watch(() => props.datasets, render)
 watch([() => props.theme, () => props.logarithmic], rebuild)
 
 onMounted(() => {

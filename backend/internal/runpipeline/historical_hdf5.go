@@ -143,6 +143,11 @@ func readPersistedHistogramV2(file *hdf5.File, kind HistogramKind, selections []
 			return nil, fmt.Errorf("board charge histogram was not saved for chain %d node %d", selection.Chain, selection.Node)
 		}
 		binCount, minimum, width, _ := selectionHistogramSpec(options, kind, selection.Channel)
+		// Older board-charge spectra used half the current ADC range. Keep their
+		// original axis so their saved overflow still refers to the correct edge.
+		if kind.IsPHA() && selection.Channel == BoardChargeChannel && int(row.BinCount) == binCount/2 {
+			binCount /= 2
+		}
 		target := HistogramDataset{HistogramSelection: selection, Minimum: minimum, BinWidth: width, Bins: make([]uint32, binCount)}
 		if exists {
 			if int(row.BinCount) != binCount {

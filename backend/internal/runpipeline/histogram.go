@@ -21,7 +21,7 @@ const (
 // BoardChargeChannel identifies a board-level PHA spectrum in histogram storage.
 const BoardChargeChannel = dt5202.ChannelCount
 
-const boardChargeUpperADC = 1 << 18
+const boardChargeUpperADC = 1 << 19
 
 func (kind HistogramKind) IsPHA() bool {
 	return kind == HistogramPHAHigh || kind == HistogramPHALow
