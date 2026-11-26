@@ -1,5 +1,5 @@
 import { create } from '@bufbuild/protobuf'
-import { computed, onBeforeUnmount, readonly, ref } from 'vue'
+import { computed, onBeforeUnmount, readonly, ref, shallowReadonly, shallowRef } from 'vue'
 import type { DaqApi } from './api'
 import {
   AppliedConfigurationSource,
@@ -59,7 +59,8 @@ export function useDaq(api: DaqApi) {
   const searchError = ref('')
   const searchPerformed = ref(false)
   const configurationTemplate = ref('')
-  const histogramDatasets = ref<HistogramDataset[]>([])
+  // Histogram responses replace the entire array and can contain hundreds of thousands of bins.
+  const histogramDatasets = shallowRef<readonly HistogramDataset[]>([])
   const histogramsLoading = ref(false)
   let streamController: AbortController | undefined
   let staleTimer: number | undefined
@@ -444,7 +445,7 @@ export function useDaq(api: DaqApi) {
     searchError: readonly(searchError),
     searchPerformed: readonly(searchPerformed),
     configurationTemplate: readonly(configurationTemplate),
-    histogramDatasets: readonly(histogramDatasets),
+    histogramDatasets: shallowReadonly(histogramDatasets),
     histogramsLoading: readonly(histogramsLoading),
     canStart: computed(() => snapshot.value?.state === SystemState.READY && !busy.value),
     // Apply is offered exactly where Start run is.
