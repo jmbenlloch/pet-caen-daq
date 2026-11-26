@@ -31,8 +31,8 @@ func TestBoardSumFromSparsePersistedHDF5(t *testing.T) {
 		count, width := 256, 1.0
 		if kind == "pha_high" || kind == "pha_low" {
 			width = 32
-			bins := make([]uint32, (1<<18)/32)
-			bins[9] = 1 // An event with total charge 300 ADC.
+			bins := make([]uint32, (1<<18)/32) // Range used by the first board-charge release.
+			bins[9] = 1                        // An event with total charge 300 ADC.
 			spectra = append(spectra, runstore.HistogramDataset{Kind: kind, Chain: 1, Node: 2, Channel: runpipeline.BoardChargeChannel, Bins: bins, BinWidth: width, Entries: 1})
 		}
 		if kind == "tot" {
@@ -60,6 +60,9 @@ func TestBoardSumFromSparsePersistedHDF5(t *testing.T) {
 		bin, count := 7, uint64(65)
 		if kind == daqv1.HistogramKind_HISTOGRAM_KIND_PHA_HIGH_GAIN || kind == daqv1.HistogramKind_HISTOGRAM_KIND_PHA_LOW_GAIN {
 			bin, count = 9, 1
+			if got := r.Msg.Datasets[0]; len(got.BoardSumBins) != 8192 || got.BinWidth != 32 {
+				t.Fatalf("wrong historical board-charge axis for %s", kind)
+			}
 		}
 		if r.Msg.Datasets[0].BoardSumBins[bin] != count || r.Msg.Datasets[0].Entries != count || r.Msg.Datasets[1].Bins[7] != 64 {
 			t.Fatalf("wrong historical sum for %s", kind)
